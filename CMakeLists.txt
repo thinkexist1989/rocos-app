@@ -40,6 +40,7 @@ set(CMAKE_RUNTIME_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/bin)
 find_package(Boost REQUIRED COMPONENTS date_time filesystem system chrono)
 find_package(yaml-cpp REQUIRED)
 find_package(Threads REQUIRED)
+find_package(Qt5 REQUIRED COMPONENTS Core)
 
 
 ###########
@@ -69,6 +70,7 @@ set(DEP_LIBS
         Boost::system
         Boost::chrono
         yaml-cpp
+        Qt5::Core
 )
 
 ## Specify libraries to link a library or executable target against
@@ -87,10 +89,10 @@ target_link_libraries(${PROJECT_NAME}
 ## Testing ##
 #############
 
-#enable_testing()
-#add_executable(unit_test test/unit_test.cpp)
-#target_link_libraries(unit_test
-#       PRIVATE
-#       ${DEP_LIBS}
-#       )
-#add_test(NAME unit_test COMMAND unit_test)
+enable_testing()
+add_executable(unit_test test/unit_test.cpp)
+target_link_libraries(unit_test
+       PRIVATE
+       ${DEP_LIBS}
+       )
+add_test(NAME unit_test COMMAND unit_test)
