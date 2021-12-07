@@ -26,7 +26,7 @@
 
 namespace rocos {
 
-enum class ModeOfOperationEnum : int8_t {
+enum class ModeOfOperation : int8_t {
   NA = 0,
   ProfiledPositionMode = 1,
   ProfiledVelocityMode = 3,

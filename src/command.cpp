@@ -22,7 +22,7 @@
 
 #include <iomanip>
 
-#include <ethercat/Command.h>
+#include <ethercat/command.h>
 
 namespace rocos {
 
@@ -193,7 +193,7 @@ void Command::setDigitalOutputs(uint32_t digitalOutputs) {
 void Command::setUseRawCommands(bool useRawCommands) {
   useRawCommands_ = useRawCommands;
 }
-void Command::setModeOfOperation(const ModeOfOperationEnum modeOfOperation) {
+void Command::setModeOfOperation(const ModeOfOperation modeOfOperation) {
   modeOfOperation_ = modeOfOperation;
 }
 
@@ -267,7 +267,7 @@ void Command::doUnitConversion() {
 }
 
 /// other get methods
-ModeOfOperationEnum Command::getModeOfOperation() const {
+ModeOfOperation Command::getModeOfOperation() const {
   return modeOfOperation_;
 }
 

@@ -27,32 +27,35 @@
 #include <iostream>
 #include <string>
 
-#include "ethercat/DriveState.h"
+#include "ethercat/drive_state.h"
 
 namespace rocos {
 
-class Statusword {
- private:
-  bool readyToSwitchOn_{false};      // bit 0
-  bool switchedOn_{false};           // bit 1
-  bool operationEnabled_{false};     // bit 2
-  bool fault_{false};                // bit 3
-  bool voltageEnabled_{false};       // bit 4
-  bool quickStop_{false};            // bit 5
-  bool switchOnDisabled_{false};     // bit 6
-  bool warning_{false};              // bit 7
-  bool targetReached_{false};        // bit 10
-  bool internalLimitActive_{false};  // bit 11
-  bool followingError_{false};       // bit 13, CSV mode
+    class Statusword {
+    private:
+        bool readyToSwitchOn_{false};      // bit 0
+        bool switchedOn_{false};           // bit 1
+        bool operationEnabled_{false};     // bit 2
+        bool fault_{false};                // bit 3
+        bool voltageEnabled_{false};       // bit 4
+        bool quickStop_{false};            // bit 5
+        bool switchOnDisabled_{false};     // bit 6
+        bool warning_{false};              // bit 7
+        bool targetReached_{false};        // bit 10
+        bool internalLimitActive_{false};  // bit 11
+        bool followingError_{false};       // bit 13, CSV mode
 
-  // the raw statusword
-  uint16_t rawStatusword_{0};
+        // the raw statusword
+        uint16_t rawStatusword_{0};
 
- public:
-  friend std::ostream& operator<<(std::ostream& os, const Statusword& statusword);
-  void setFromRawStatusword(uint16_t status);
-  DriveState getDriveState() const;
-  std::string getDriveStateString() const;
-};
+    public:
+        friend std::ostream &operator<<(std::ostream &os, const Statusword &statusword);
+
+        void setFromRawStatusword(uint16_t status);
+
+        DriveState getDriveState() const;
+
+        std::string getDriveStateString() const;
+    };
 
 }  // namespace elmo

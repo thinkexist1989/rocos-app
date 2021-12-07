@@ -22,7 +22,7 @@
 
 #include <iomanip>
 
-#include <ethercat/Controlword.h>
+#include <ethercat/control_word.h>
 
 namespace rocos {
 

@@ -27,7 +27,7 @@
 #include <mutex>
 #include <string>
 
-#include <ethercat/ModeOfOperationEnum.h>
+#include <ethercat/mode_of_operation.h>
 
 namespace rocos {
 
@@ -66,7 +66,7 @@ class Command {
   /// other
   void setDigitalOutputs(uint32_t digitalOutputs);
   void setUseRawCommands(bool useRawCommands);
-  void setModeOfOperation(const ModeOfOperationEnum modeOfOperation);
+  void setModeOfOperation(const ModeOfOperation modeOfOperation);
 
   /// get (raw)
   int32_t getTargetPositionRaw() const;
@@ -96,7 +96,7 @@ class Command {
 
   /// get (other)
   std::string getDigitalOutputString() const;
-  ModeOfOperationEnum getModeOfOperation() const;
+  ModeOfOperation getModeOfOperation() const;
 
   /// Convert the units
   void doUnitConversion();
@@ -134,7 +134,7 @@ class Command {
   double torqueFactorNmToInteger_{1};
   double currentFactorAToInteger_{1};
 
-  ModeOfOperationEnum modeOfOperation_{ModeOfOperationEnum::NA};
+  ModeOfOperation modeOfOperation_{ModeOfOperation::NA};
 
   /*!
    * set this to true if raw commands have been used and therefore no unit

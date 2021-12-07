@@ -22,10 +22,10 @@
 
 #pragma once
 
-#include "ecat/Command.h"
-#include "ecat/DriveState.h"
+#include "ethercat/command.h"
+#include "ethercat/drive_state.h"
 //#include "ethercat/Reading.h"
-#include "ecat/Controlword.h"
+#include "ethercat/control_word.h"
 
 #include <yaml-cpp/yaml.h>
 
@@ -115,7 +115,7 @@ namespace rocos {
     // Configurable parameters
     protected:
       bool allowModeChange_{false};
-      ModeOfOperationEnum modeOfOperation_{ModeOfOperationEnum::NA};
+      ModeOfOperation modeOfOperation_{ModeOfOperation::NA};
 
     protected:
       mutable std::recursive_mutex stagedCommandMutex_; //TODO required?

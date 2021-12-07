@@ -20,7 +20,7 @@
  * Modified: Yang Luo, luoyang@sia.cn
  */
 
-#include <ethercat/DriveState.h>
+#include <ethercat/drive_state.h>
 
 std::ostream &operator<<(std::ostream &os, const rocos::DriveState &driveState) {
     switch (driveState) {

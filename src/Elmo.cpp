@@ -20,7 +20,7 @@
  * Modified: Yang Luo, luoyang@sia.cn
  */
 
-#include <ecat/Elmo.h>
+#include <ethercat/Elmo.h>
 //#include <ethercat/ConfigurationParser.h>
 //#include <ethercat/ObjectDictionary.h>
 //#include <ethercat/RxPdo.h>
@@ -30,7 +30,7 @@
 #include <thread>
 #include <chrono>
 #include <stdexcept>
-#include <ecat/Error.hpp>
+#include <ethercat/error.hpp>
 
 namespace rocos{
   std::string binstring(uint16_t var){
@@ -128,7 +128,7 @@ namespace rocos{
     /*
     ** Check if the Mode of Operation has been set properly
     */
-    if (modeOfOperation_ == ModeOfOperationEnum::NA) {
+    if (modeOfOperation_ == ModeOfOperation::NA) {
       reading_.addError(ErrorType::ModeOfOperationError);
       MELO_ERROR_STREAM("[elmo_ethercat_sdk:Elmo::updateWrite] Mode of operation for '"
                         << name_ << "' has not been set.");
@@ -253,10 +253,10 @@ namespace rocos{
 
     stagedCommand_.doUnitConversion();
 
-    if(allowModeChange_ && command.getModeOfOperation() != ModeOfOperationEnum::NA){
+    if(allowModeChange_ && command.getModeOfOperation() != ModeOfOperation::NA){
       modeOfOperation_ = command.getModeOfOperation();
     }else{
-      if(modeOfOperation_ != command.getModeOfOperation() && command.getModeOfOperation() != ModeOfOperationEnum::NA){
+      if(modeOfOperation_ != command.getModeOfOperation() && command.getModeOfOperation() != ModeOfOperation::NA){
         MELO_ERROR_STREAM("[elmo_ethercat_sdk:Elmo::stageCommand] Changing the mode of operation of '"
                           << name_ << "' is not allowed for the active configuration.");
       }

@@ -117,13 +117,13 @@ typedef boost::interprocess::basic_string<char, std::char_traits<char>, CharAllo
 typedef boost::interprocess::allocator<EcString, boost::interprocess::managed_shared_memory::segment_manager> StringAlloc;
 typedef boost::interprocess::vector<EcString, StringAlloc> EcStringVec;
 
-struct  EcatSlaveInfo;
-typedef boost::interprocess::allocator<EcatSlaveInfo,boost::interprocess::managed_shared_memory::segment_manager> EcSlaveAlloc;
-typedef boost::interprocess::vector<EcatSlaveInfo,EcSlaveAlloc>  EcSlaveVec;
+struct EcatSlaveInfo;
+typedef boost::interprocess::allocator<EcatSlaveInfo, boost::interprocess::managed_shared_memory::segment_manager> EcSlaveAlloc;
+typedef boost::interprocess::vector<EcatSlaveInfo, EcSlaveAlloc> EcSlaveVec;
 
 struct EcatSlaveInfo {
 
-    uint32_t slave_id {0};
+    uint32_t slave_id{0};
 
     /** Struct store the EtherCAT process data input  **/
     struct PDInput {
@@ -163,21 +163,20 @@ struct EcatInfo {
         BOOTSTRAP = 3
     };
 
-    double minCyclcTime {0.0}; // minimum cycling time   /* usec */
-    double maxCycleTime {0.0}; // maximum cycling time  /* usec */
-    double avgCycleTime {0.0}; // average cycling time  /* usec */
-    double currCycleTime {0.0}; // current cycling time /* usec */
+    double minCyclcTime{0.0}; // minimum cycling time   /* usec */
+    double maxCycleTime{0.0}; // maximum cycling time  /* usec */
+    double avgCycleTime{0.0}; // average cycling time  /* usec */
+    double currCycleTime{0.0}; // current cycling time /* usec */
 
-    EcatState ecatState {UNKNOWN};    // State of Ec-Master
+    EcatState ecatState{UNKNOWN};    // State of Ec-Master
 
-    int32_t slave_number {0};
+    int32_t slave_number{0};
 
 //    EcVec slaves; // all the slaves data
 //    std::vector<EcatSlaveInfo> slaves; // all the slaves data
 //     EcatSlaveInfo slaves[MAX_SLAVE_NUM];
 
 };
-
 
 
 /** Class SlaveConfig contains all configurations of one joint
@@ -239,37 +238,37 @@ public:
  */
 class EcatConfig {
 public:
-    explicit EcatConfig(std::string configFile = ROBOT_CONFIG_FILE) : configFileName(configFile) {
+#ifdef ROCOS_ECM_ENABLED
+    explicit EcatConfig(std::string configFile = ROBOT_CONFIG_FILE) : configFileName(configFile) { }
+#endif
+
+    virtual ~EcatConfig() {
 
     }
 
-    ~EcatConfig() {
-
-    }
-
-    std::string configFileName{};
+#ifdef ROCOS_ECM_ENABLED
+std::string configFileName{};
 
     std::string name{"default_robot"};
 
     uint32_t loop_hz{1000};
 
-    int slave_number {0};
+    int slave_number{0};
 
     std::vector<SlaveConfig> slaveCfg;
+#endif
 
-
-    int ec_in_fd;
-    int ec_out_fd;
 
     sem_t *sem_mutex;
-    sem_t *sem_sync;
 
-    EcatInfo* ecatInfo = nullptr;
-    EcSlaveVec* ecatSlaveVec = nullptr;
-    EcStringVec* ecatSlaveNameVec = nullptr;
-    boost::interprocess::managed_shared_memory* managedSharedMemory;
+    EcatInfo *ecatInfo = nullptr;
+    EcSlaveVec *ecatSlaveVec = nullptr;
+    EcStringVec *ecatSlaveNameVec = nullptr;
+    boost::interprocess::managed_shared_memory *managedSharedMemory = nullptr;
 
 public:
+
+#ifdef ROCOS_ECM_ENABLED
     bool parserYamlFile(const std::string &configFile) {
         if (!boost::filesystem::exists(configFile)) {
             print_message("[YAML] Can not find the config file.", MessageLevel::ERROR);
@@ -364,7 +363,7 @@ public:
 
     inline bool parserYamlFile() { return parserYamlFile(configFileName); }
 
-#ifdef ROCOS_ECM_ENABLED
+
     std::string getEcInpVarName(int jntId, INPUTS enumEcInp) {
         return slaveCfg[jntId].name + ".Inputs." + slaveCfg[jntId].ecInpMap[enumEcInp];
     }
@@ -419,10 +418,10 @@ public:
 
         return true;
     }
-
 #endif
 
 #ifdef ROCOS_APP_ENABLED
+
     /// \brief
     /// \return
     bool getSharedMemory() {
@@ -435,34 +434,31 @@ public:
         }
 
         using namespace boost::interprocess;
-        managedSharedMemory = new managed_shared_memory {open_or_create, EC_SHM, EC_SHM_MAX_SIZE};
+        managedSharedMemory = new managed_shared_memory{open_or_create, EC_SHM, EC_SHM_MAX_SIZE};
         EcSlaveAlloc alloc_inst(managedSharedMemory->get_segment_manager());
-        CharAlloc   char_alloc_inst(managedSharedMemory->get_segment_manager());
+        CharAlloc char_alloc_inst(managedSharedMemory->get_segment_manager());
         StringAlloc string_alloc_inst(managedSharedMemory->get_segment_manager());
 
-        std::pair<EcatInfo *, std::size_t> p1 =  managedSharedMemory->find<EcatInfo>("ecat");
-        if(p1.first) {
+        std::pair<EcatInfo *, std::size_t> p1 = managedSharedMemory->find<EcatInfo>("ecat");
+        if (p1.first) {
             ecatInfo = p1.first;
-        }
-        else {
+        } else {
             print_message("[SHM] Ec-Master is not running.", MessageLevel::WARNING);
             ecatInfo = managedSharedMemory->construct<EcatInfo>("ecat")();
         }
 
-        auto p2 =  managedSharedMemory->find<EcSlaveVec>("slaves");
-        if(p2.first) {
+        auto p2 = managedSharedMemory->find<EcSlaveVec>("slaves");
+        if (p2.first) {
             ecatSlaveVec = p2.first;
-        }
-        else {
+        } else {
             print_message("[SHM] Ec-Master is not running.", MessageLevel::WARNING);
             ecatSlaveVec = managedSharedMemory->construct<EcSlaveVec>("slaves")(alloc_inst);
         }
 
-        auto p3 =  managedSharedMemory->find<EcStringVec>("slave_names");
-        if(p3.first) {
+        auto p3 = managedSharedMemory->find<EcStringVec>("slave_names");
+        if (p3.first) {
             ecatSlaveNameVec = p3.first;
-        }
-        else {
+        } else {
             print_message("[SHM] Ec-Master is not running.", MessageLevel::WARNING);
             ecatSlaveNameVec = managedSharedMemory->construct<EcStringVec>("slave_names")(string_alloc_inst);
         }
@@ -506,15 +502,17 @@ public:
     ///////////// Format robot info /////////////////
     std::string to_string() {
         std::stringstream ss;
-        for (int i = 0; i < slave_number; i++) {
+        for (int i = 0; i < ecatSlaveVec->size(); i++) {
             ss << "[Joint " << i << "] "
-               << " stat: " << ecatSlaveVec->at(i).inputs.status_word << "; pos: " << ecatSlaveVec->at(i).inputs.position_actual_value
-               << "; vel: " << ecatSlaveVec->at(i).inputs.velocity_actual_value << "; tor: " << ecatSlaveVec->at(i).inputs.torque_actual_value << ";";
+               << " stat: " << ecatSlaveVec->at(i).inputs.status_word << "; pos: "
+               << ecatSlaveVec->at(i).inputs.position_actual_value
+               << "; vel: " << ecatSlaveVec->at(i).inputs.velocity_actual_value << "; tor: "
+               << ecatSlaveVec->at(i).inputs.torque_actual_value << ";";
         }
         return ss.str();
     }
 
-private:
+protected:
     //////////// OUTPUT FORMAT SETTINGS ////////////////////
     boost::format _f{"\033[1;3%1%m "};       //设置前景色
     boost::format _b{"\033[1;4%1%m "};       //设置背景色
