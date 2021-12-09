@@ -27,27 +27,76 @@
 #ifndef ROCOS_APP_HARDWARE_INTERFACE_H
 #define ROCOS_APP_HARDWARE_INTERFACE_H
 
+#include <ethercat/command.h>
+#include <ethercat/control_word.h>
+#include <ethercat/drive_state.h>
+#include <ethercat/status_word.h>
+#include <ethercat/mode_of_operation.h>
+#include <ethercat/ecat_config.hpp>
+
+#include <string>
+#include <mutex>
+#include <atomic>
+
+#include <boost/chrono.hpp>
+
 namespace rocos {
+
+    typedef boost::chrono::time_point<boost::chrono::system_clock> Timestamp;
+
     class HardwareInterface {
+
+        ///////Hardware Type Definition///////
+        enum HWType {
+            HW_UNKNOWN,
+            HW_SIM,
+            HW_ETHERCAT,
+            HW_CAN,      // reserved
+            HW_PROFINET  // reserved
+        };
+
+    public:
         virtual ~HardwareInterface();
 
-        virtual bool setTargetPositionRaw(int id, int pos);
+        ///////////////////////Data Info/////////////////////////
+        virtual Timestamp getTimestamp() = 0; // Timestamp
 
-        virtual bool setTargetVelocityRaw(int id, int vel);
+        virtual double getMinCycleTime() = 0; // min cycle time
+        virtual double getMaxCycleTime() = 0; // max cycle time
+        virtual double getAvgCycleTime() = 0; // avg cycle time
+        virtual double getCurrCycleTime() = 0; // current cycle time
 
-        virtual bool setTargetTorqueRaw(int id, int tor);
 
-        virtual int getTargetPositionRaw(int id);
 
-        virtual int getTargetVelocityRaw(int id);
+        ///////////////////////Raw Data/////////////////////////
+        virtual void setTargetPositionRaw(int id, int32_t pos);
 
-        virtual int getTargetTorqueRaw(int id);
+        virtual void setTargetVelocityRaw(int id, int32_t vel);
 
-        virtual int getActualPositionRaw(int id);
+        virtual void setTargetTorqueRaw(int id, int32_t tor);
 
-        virtual int getActualVelocityRaw(int id);
+        virtual int32_t getActualPositionRaw(int id);
 
-        virtual int getActualTorqueRaw(int id);
+        virtual int32_t getActualVelocityRaw(int id);
+
+        virtual int16_t getActualTorqueRaw(int id);
+
+        virtual int16_t getLoadTorqueRaw(int id);
+
+        virtual uint16_t getStatuswordRaw(int id);
+
+        virtual Statusword getStatusword(int id);
+
+        virtual DriveState getDriverState(int id);
+
+        /////////////////////Hardware Type//////////////////////
+        virtual HWType getHardwareType();
+
+        virtual std::string getHardwareTypeString(HWType type);
+
+    protected:
+        HWType _type = HW_UNKNOWN;
+
     };
 }
 

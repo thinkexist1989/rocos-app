@@ -18,3 +18,7 @@
 // email: luoyang@sia.cn
 
 #include <ethercat/hardware.h>
+
+rocos::Hardware::~Hardware() {
+
+}

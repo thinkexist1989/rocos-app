@@ -92,26 +92,6 @@ enum OUTPUTS {
     TARGET_TORQUE
 };
 
-//Terminal Color Show
-enum Color {
-    BLACK = 0,
-    RED = 1,
-    GREEN = 2,
-    YELLOW = 3,
-    BLUE = 4,
-    MAGENTA = 5,
-    CYAN = 6,
-    WHITE = 7,
-    DEFAULT = 9
-};
-
-enum MessageLevel {
-    NORMAL = 0,
-    WARNING = 1,
-    ERROR = 2
-};
-
-
 typedef boost::interprocess::allocator<char, boost::interprocess::managed_shared_memory::segment_manager> CharAlloc;
 typedef boost::interprocess::basic_string<char, std::char_traits<char>, CharAlloc> EcString;
 typedef boost::interprocess::allocator<EcString, boost::interprocess::managed_shared_memory::segment_manager> StringAlloc;
@@ -476,7 +456,7 @@ public:
 
     inline int16_t getActualTorqueEC(int id) const { return ecatSlaveVec->at(id).inputs.torque_actual_value; }
 
-    inline int32_t getLoadTorqueEC(int id) const { return ecatSlaveVec->at(id).inputs.load_torque_value; }
+    inline int16_t getLoadTorqueEC(int id) const { return ecatSlaveVec->at(id).inputs.load_torque_value; }
 
     inline uint16_t getStatusWord(int id) const { return ecatSlaveVec->at(id).inputs.status_word; }
 
@@ -488,10 +468,10 @@ public:
 
     inline void setTargetTorqueEC(int id, int32_t tor) { ecatSlaveVec->at(id).outputs.target_torque = tor; }
 
-    inline void setJointMode(int id, int32_t mode) { ecatSlaveVec->at(id).outputs.mode_of_operation = mode; }
+    inline void setModeOfOperation(int id, int8_t mode) { ecatSlaveVec->at(id).outputs.mode_of_operation = mode; }
 
     inline void
-    setControlWord(int id, int32_t ctrlword) { ecatSlaveVec->at(id).outputs.control_word = ctrlword; }
+    setControlword(int id, uint16_t ctrlword) { ecatSlaveVec->at(id).outputs.control_word = ctrlword; }
 
     inline void waitForSignal() { sem_wait(sem_mutex); }
 
@@ -514,6 +494,26 @@ public:
 
 protected:
     //////////// OUTPUT FORMAT SETTINGS ////////////////////
+    //Terminal Color Show
+    enum Color {
+        BLACK = 0,
+        RED = 1,
+        GREEN = 2,
+        YELLOW = 3,
+        BLUE = 4,
+        MAGENTA = 5,
+        CYAN = 6,
+        WHITE = 7,
+        DEFAULT = 9
+    };
+
+    enum MessageLevel {
+        NORMAL = 0,
+        WARNING = 1,
+        ERROR = 2
+    };
+
+
     boost::format _f{"\033[1;3%1%m "};       //设置前景色
     boost::format _b{"\033[1;4%1%m "};       //设置背景色
     boost::format _fb{"\033[1;3%1%;4%2%m "}; //前景背景都设置

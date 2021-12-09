@@ -39,6 +39,6 @@ enum class DriveState : uint8_t {
 
 enum class StateTransition : uint8_t { _2, _3, _4, _5, _6, _7, _8, _9, _10, _11, _12, _15 };
 
-}  // namespace elmo
+}  // namespace rocos
 
 std::ostream& operator<<(std::ostream& os, const rocos::DriveState& driveState);

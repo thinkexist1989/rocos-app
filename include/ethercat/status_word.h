@@ -53,9 +53,11 @@ namespace rocos {
 
         void setFromRawStatusword(uint16_t status);
 
+        uint16_t getRawStatusword();
+
         DriveState getDriveState() const;
 
         std::string getDriveStateString() const;
     };
 
-}  // namespace elmo
+}  // namespace rocos

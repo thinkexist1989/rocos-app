@@ -28,10 +28,13 @@
 
 #include <ethercat/ecat_config.hpp>
 
+#include <ethercat/hardware_interface.h>
+
 namespace rocos {
 
-    class Hardware : EcatConfig {
-
+    class Hardware : HardwareInterface {
+    public:
+        ~Hardware() override;
     };
 
 }

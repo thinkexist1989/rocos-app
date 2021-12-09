@@ -37,7 +37,7 @@ set(CMAKE_RUNTIME_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/bin)
 ## Dependencies ##
 ################
 # find_package(Boost REQUIRED COMPONENTS system)
-find_package(Boost REQUIRED COMPONENTS date_time filesystem system chrono)
+find_package(Boost REQUIRED COMPONENTS date_time filesystem system chrono thread)
 find_package(yaml-cpp REQUIRED)
 find_package(Threads REQUIRED)
 find_package(Qt5 REQUIRED COMPONENTS Core)
@@ -69,6 +69,7 @@ set(DEP_LIBS
         Boost::filesystem
         Boost::system
         Boost::chrono
+        Boost::thread
         yaml-cpp
         Qt5::Core
 )
