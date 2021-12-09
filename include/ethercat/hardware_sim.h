@@ -17,12 +17,18 @@
 // Shenyang Institute of Automation, Chinese Academy of Sciences.
 // email: luoyang@sia.cn
 
-#include <ethercat/hardware.h>
+#ifndef ROCOS_APP_HARDWARE_SIM_H
+#define ROCOS_APP_HARDWARE_SIM_H
+
+#include <ethercat/hardware_interface.h>
 
 namespace rocos {
 
-    Hardware::~Hardware() {
-
-    }
+    class HardwareSim : HardwareInterface {
+    public:
+        ~HardwareSim() override;
+    };
 
 }
+
+#endif //ROCOS_APP_HARDWARE_SIM_H

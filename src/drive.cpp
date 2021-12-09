@@ -19,9 +19,14 @@
 
 #include <ethercat/drive.h>
 
-#include <boost/thread.hpp>
 
 namespace rocos {
+
+    Drive::Drive(HardwareInterface *hw, int id) : _hw_interface(hw),
+                                                  _id(id)
+    {
+
+    }
 
     bool Drive::setDriverState(const DriveState &driveState, bool waitForState) {
         bool success = false;
@@ -250,4 +255,41 @@ namespace rocos {
 
         return controlword;
     }
+
+    void Drive::engageStateMachine() {
+// locking the mutex
+        boost::lock_guard<boost::recursive_mutex> lock(_mutex);
+
+        // elapsed time since the last new controlword
+        auto microsecondsSinceChange =
+                (boost::chrono::duration_cast<boost::chrono::microseconds>(boost::chrono::system_clock::now() - _driveStateChangeTimePoint)).count();
+
+        // get the current state
+        // since we wait until "hasRead" is true, this is guaranteed to be a newly
+        // read value
+//        const DriveState currentDriveState = reading_.getDriveState();
+
+        // check if the state change already was successful:
+        if (_currentDriveState == _targetDriveState) {
+            _numberOfSuccessfulTargetStateReadings++;
+//            if (numberOfSuccessfulTargetStateReadings_ >= configuration_.minNumberOfSuccessfulTargetStateReadings) {
+            if (_numberOfSuccessfulTargetStateReadings >= 3) {
+                // disable the state machine
+                _conductStateChange = false;
+                _numberOfSuccessfulTargetStateReadings = 0;
+                _stateChangeSuccessful = true;
+                return;
+            }
+//        } else if (microsecondsSinceChange > configuration_.driveStateChangeMinTimeout) {
+        } else if (microsecondsSinceChange > 20000) {
+            // get the next controlword from the state machine
+            _controlword = getNextStateTransitionControlword(_targetDriveState, _currentDriveState);
+            _driveStateChangeTimePoint = boost::chrono::system_clock::now();
+        }
+
+        // set the "hasRead" variable to false such that there will definitely be a
+        // new reading when this method is called again
+//        hasRead_ = false;
+    }
+
 }

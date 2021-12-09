@@ -60,7 +60,7 @@ link_directories(
 file(GLOB_RECURSE SRCS src/*.cpp)
 file(GLOB_RECURSE HDRS include/*.h include/*.hpp)
 
-add_executable(${PROJECT_NAME} ${SRCS})
+add_executable(${PROJECT_NAME} ${SRCS} src/hardware_sim.cpp include/ethercat/hardware_sim.h)
 
 set(DEP_LIBS
         Threads::Threads

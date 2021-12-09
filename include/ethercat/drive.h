@@ -23,35 +23,54 @@
 #include <ethercat/hardware_interface.h>
 
 #include <boost/shared_ptr.hpp>
+#include <boost/thread.hpp>
+#include <boost/thread/lock_guard.hpp>
+#include <boost/thread/recursive_mutex.hpp>
 
 namespace rocos {
 
     class Drive {
 
     public:
+        Drive(HardwareInterface* hw, int id);
 
         virtual bool setDriverState(const DriveState &driveState, bool waitForState);
 
     protected:
-        std::string _name;
-        Statusword _statusword;
-        Controlword _controlword;
-        DriveState _currentDriveState;
-        DriveState _targetDriveState;
+        std::string _name {};
+        Statusword _statusword {};
+        Controlword _controlword {};
+        DriveState _currentDriveState {};
+        DriveState _targetDriveState {};
 
-        bool _conductStateChange;
-        std::atomic<bool> _stateChangeSuccessful;
+        bool _conductStateChange {false};
+        std::atomic<bool> _stateChangeSuccessful {false};
 
         Timestamp _driveStateChangeTimePoint;
 
+        uint16_t _numberOfSuccessfulTargetStateReadings {0};
 
-        mutable std::recursive_mutex _mutex; // TODO: change name!!!!
+        mutable boost::recursive_mutex _mutex; // TODO: change name!!!!
 
     protected:
-        boost::shared_ptr<HardwareInterface> _hw_interface; // The pointer of HardwareInterface instance
 
+        void engageStateMachine();
+
+        /// Get next control word according to the requested drive state and current drive state
+        /// \param requestedDriveState
+        /// \param currentDriveState
+        /// \return the controlword to be sent
         virtual Controlword getNextStateTransitionControlword(const DriveState &requestedDriveState,
                                                               const DriveState &currentDriveState);
+
+    protected:
+
+        boost::shared_ptr<HardwareInterface> _hw_interface {nullptr}; // The pointer of HardwareInterface instance
+        int _id {0}; // drive id in bus
+        double _reduction_ratio {1.0}; // reduction ratio
+        double _minPosLimit {-2.0};
+        double _maxPosLimit {2.0};
+
     };
 }
 
