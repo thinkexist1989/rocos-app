@@ -32,7 +32,7 @@
 #include <ethercat/drive_state.h>
 #include <ethercat/status_word.h>
 #include <ethercat/mode_of_operation.h>
-#include <ethercat/ecat_config.hpp>
+//#include <ethercat/ecat_config.hpp>
 
 #include <string>
 #include <mutex>
@@ -45,7 +45,7 @@ namespace rocos {
     typedef boost::chrono::time_point<boost::chrono::system_clock> Timestamp;
 
     class HardwareInterface {
-
+    public:
         ///////Hardware Type Definition///////
         enum HWType {
             HW_UNKNOWN,
@@ -55,18 +55,19 @@ namespace rocos {
             HW_PROFINET  // reserved
         };
 
-    public:
         virtual ~HardwareInterface();
 
         ///////////////////////Data Info/////////////////////////
-        virtual Timestamp getTimestamp() = 0; // Timestamp
+        virtual Timestamp getTimestamp(); // Timestamp
 
-        virtual double getMinCycleTime() = 0; // min cycle time
-        virtual double getMaxCycleTime() = 0; // max cycle time
-        virtual double getAvgCycleTime() = 0; // avg cycle time
-        virtual double getCurrCycleTime() = 0; // current cycle time
+        virtual double getMinCycleTime(); // min cycle time
+        virtual double getMaxCycleTime(); // max cycle time
+        virtual double getAvgCycleTime(); // avg cycle time
+        virtual double getCurrCycleTime(); // current cycle time
 
+        virtual int32_t getSlaveNumber();   // slave number
 
+        virtual void waitForSignal();    // Signal of Bus
 
         ///////////////////////Raw Data/////////////////////////
         virtual void setTargetPositionRaw(int id, int32_t pos);
@@ -74,6 +75,13 @@ namespace rocos {
         virtual void setTargetVelocityRaw(int id, int32_t vel);
 
         virtual void setTargetTorqueRaw(int id, int32_t tor);
+
+        virtual void setControlwordRaw(int id, uint16_t ctrlwd);
+
+        virtual void setModeOfOperationRaw(int id, int8_t mode);
+
+        virtual void setModeOfOperation(int id, ModeOfOperation modeOfOperation);
+
 
         virtual int32_t getActualPositionRaw(int id);
 
@@ -84,6 +92,7 @@ namespace rocos {
         virtual int16_t getLoadTorqueRaw(int id);
 
         virtual uint16_t getStatuswordRaw(int id);
+
 
         virtual Statusword getStatusword(int id);
 

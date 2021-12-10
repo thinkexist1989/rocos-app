@@ -27,7 +27,7 @@ namespace rocos {
     HardwareInterface::~HardwareInterface() = default;
 
     HardwareInterface::HWType rocos::HardwareInterface::getHardwareType() {
-        return HardwareInterface::HW_UNKNOWN;
+        return _type;
     }
 
     std::string HardwareInterface::getHardwareTypeString(HardwareInterface::HWType type) {
@@ -68,6 +68,18 @@ namespace rocos {
         boost::ignore_unused(id, tor);
     }
 
+    void HardwareInterface::setControlwordRaw(int id, uint16_t ctrlwd) {
+        boost::ignore_unused(id, ctrlwd);
+    }
+
+    void HardwareInterface::setModeOfOperationRaw(int id, int8_t mode) {
+        boost::ignore_unused(id, mode);
+    }
+
+    void HardwareInterface::setModeOfOperation(int id, ModeOfOperation modeOfOperation) {
+        boost::ignore_unused(id, modeOfOperation);
+    }
+
     int32_t HardwareInterface::getActualPositionRaw(int id) {
         return 0;
     }
@@ -89,6 +101,34 @@ namespace rocos {
     DriveState HardwareInterface::getDriverState(int id) {
         boost::ignore_unused(id);
         return DriveState();
+    }
+
+    Timestamp HardwareInterface::getTimestamp() {
+        return rocos::Timestamp();
+    }
+
+    double HardwareInterface::getMinCycleTime() {
+        return 0;
+    }
+
+    double HardwareInterface::getMaxCycleTime() {
+        return 0;
+    }
+
+    double HardwareInterface::getAvgCycleTime() {
+        return 0;
+    }
+
+    double HardwareInterface::getCurrCycleTime() {
+        return 0;
+    }
+
+    int32_t HardwareInterface::getSlaveNumber() {
+        return 0;
+    }
+
+    void HardwareInterface::waitForSignal() {
+        usleep(1000);
     }
 
 }

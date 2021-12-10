@@ -24,9 +24,48 @@
 
 namespace rocos {
 
-    class HardwareSim : HardwareInterface {
+    class HardwareSim : public HardwareInterface {
     public:
+        HardwareSim();
         ~HardwareSim() override;
+
+        Timestamp getTimestamp() override;
+
+        double getMinCycleTime() override;
+
+        double getMaxCycleTime() override;
+
+        double getAvgCycleTime() override;
+
+        double getCurrCycleTime() override;
+
+        int32_t getSlaveNumber() override;
+
+        void setTargetPositionRaw(int id, int32_t pos) override;
+
+        void setTargetVelocityRaw(int id, int32_t vel) override;
+
+        void setTargetTorqueRaw(int id, int32_t tor) override;
+
+        void setControlwordRaw(int id, uint16_t ctrlwd) override;
+
+        void setModeOfOperationRaw(int id, int8_t mode) override;
+
+        void setModeOfOperation(int id, ModeOfOperation modeOfOperation) override;
+
+        int32_t getActualPositionRaw(int id) override;
+
+        int32_t getActualVelocityRaw(int id) override;
+
+        int16_t getActualTorqueRaw(int id) override;
+
+        int16_t getLoadTorqueRaw(int id) override;
+
+        uint16_t getStatuswordRaw(int id) override;
+
+        Statusword getStatusword(int id) override;
+
+        DriveState getDriverState(int id) override;
     };
 
 }

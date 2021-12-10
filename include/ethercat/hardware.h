@@ -30,11 +30,58 @@
 
 #include <ethercat/hardware_interface.h>
 
+
+#include <boost/smart_ptr.hpp>
+
 namespace rocos {
 
-    class Hardware : HardwareInterface {
+    class Hardware : public HardwareInterface {
     public:
+        Hardware();
         ~Hardware() override;
+
+        Timestamp getTimestamp() override;
+
+        double getMinCycleTime() override;
+
+        double getMaxCycleTime() override;
+
+        double getAvgCycleTime() override;
+
+        double getCurrCycleTime() override;
+
+        void setTargetPositionRaw(int id, int32_t pos) override;
+
+        void setTargetVelocityRaw(int id, int32_t vel) override;
+
+        void setTargetTorqueRaw(int id, int32_t tor) override;
+
+        int32_t getActualPositionRaw(int id) override;
+
+        int32_t getActualVelocityRaw(int id) override;
+
+        int16_t getActualTorqueRaw(int id) override;
+
+        int16_t getLoadTorqueRaw(int id) override;
+
+        uint16_t getStatuswordRaw(int id) override;
+
+        int32_t getSlaveNumber() override;
+
+        void setControlwordRaw(int id, uint16_t ctrlwd) override;
+
+        void setModeOfOperationRaw(int id, int8_t mode) override;
+
+        void setModeOfOperation(int id, ModeOfOperation modeOfOperation) override;
+
+        Statusword getStatusword(int id) override;
+
+        DriveState getDriverState(int id) override;
+
+        void waitForSignal() override;
+
+    protected:
+        boost::shared_ptr<EcatConfig> ecPtr;
     };
 
 }

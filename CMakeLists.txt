@@ -60,9 +60,9 @@ link_directories(
 file(GLOB_RECURSE SRCS src/*.cpp)
 file(GLOB_RECURSE HDRS include/*.h include/*.hpp)
 
-add_executable(${PROJECT_NAME} ${SRCS} src/hardware_sim.cpp include/ethercat/hardware_sim.h)
-
 set(DEP_LIBS
+        dl
+        rt
         Threads::Threads
         Boost::boost
         Boost::date_time
@@ -71,13 +71,28 @@ set(DEP_LIBS
         Boost::chrono
         Boost::thread
         yaml-cpp
-        Qt5::Core
 )
+
+add_library(hardware src/command.cpp
+        src/status_word.cpp
+        src/control_word.cpp
+        src/drive_state.cpp
+        src/hardware.cpp
+        src/hardware_interface.cpp
+        src/hardware_sim.cpp
+)
+target_link_libraries(hardware
+        PRIVATE
+        ${DEP_LIBS})
+add_library(rocos::hardware ALIAS hardware)
+
+add_executable(${PROJECT_NAME} src/rocosAppMain.cpp)
 
 ## Specify libraries to link a library or executable target against
 target_link_libraries(${PROJECT_NAME}
         PRIVATE
-        ${DEP_LIBS}
+        Qt5::Core
+        rocos::hardware
 )
 
 #############
@@ -94,6 +109,6 @@ enable_testing()
 add_executable(unit_test test/unit_test.cpp)
 target_link_libraries(unit_test
        PRIVATE
-       ${DEP_LIBS}
+       rocos::hardware
        )
 add_test(NAME unit_test COMMAND unit_test)

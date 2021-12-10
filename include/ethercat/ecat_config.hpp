@@ -458,7 +458,7 @@ public:
 
     inline int16_t getLoadTorqueEC(int id) const { return ecatSlaveVec->at(id).inputs.load_torque_value; }
 
-    inline uint16_t getStatusWord(int id) const { return ecatSlaveVec->at(id).inputs.status_word; }
+    inline uint16_t getStatusWordEC(int id) const { return ecatSlaveVec->at(id).inputs.status_word; }
 
     ////////////// Get joints info for Ec Input /////////////////////
 
@@ -468,10 +468,10 @@ public:
 
     inline void setTargetTorqueEC(int id, int32_t tor) { ecatSlaveVec->at(id).outputs.target_torque = tor; }
 
-    inline void setModeOfOperation(int id, int8_t mode) { ecatSlaveVec->at(id).outputs.mode_of_operation = mode; }
+    inline void setModeOfOperationEC(int id, int8_t mode) { ecatSlaveVec->at(id).outputs.mode_of_operation = mode; }
 
     inline void
-    setControlword(int id, uint16_t ctrlword) { ecatSlaveVec->at(id).outputs.control_word = ctrlword; }
+    setControlwordEC(int id, uint16_t ctrlword) { ecatSlaveVec->at(id).outputs.control_word = ctrlword; }
 
     inline void waitForSignal() { sem_wait(sem_mutex); }
 
