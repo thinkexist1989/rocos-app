@@ -61,10 +61,10 @@ TEST_CASE("Hardware") {
         double i = 0.0;
         while (i <= 2 * M_PI) {
             hw->waitForSignal();
-            int32_t p = pos + 50000.0 * sin(i);
+            int32_t p = pos + 80000.0 * sin(i);
             hw->setTargetPositionRaw(id, p);
             i += 0.0005;
-            std::cout << "Curr pos: " << p << std::endl;
+//            std::cout << "Curr pos: " << p << std::endl;
         }
 
 //    hw->setTargetVelocityRaw(1, 0);

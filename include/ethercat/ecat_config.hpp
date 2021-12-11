@@ -466,7 +466,7 @@ public:
 
     inline void setTargetVelocityEC(int id, int32_t vel) { ecatSlaveVec->at(id).outputs.target_velocity = vel; }
 
-    inline void setTargetTorqueEC(int id, int32_t tor) { ecatSlaveVec->at(id).outputs.target_torque = tor; }
+    inline void setTargetTorqueEC(int id, int16_t tor) { ecatSlaveVec->at(id).outputs.target_torque = tor; }
 
     inline void setModeOfOperationEC(int id, int8_t mode) { ecatSlaveVec->at(id).outputs.mode_of_operation = mode; }
 

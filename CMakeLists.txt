@@ -48,13 +48,13 @@ find_package(Qt5 REQUIRED COMPONENTS Core)
 ###########
 
 include_directories(
-  include
-  include/${PROJECT_NAME}
-  include/sdk
+        include
+        include/${PROJECT_NAME}
+        include/sdk
 )
 
 link_directories(
-  lib
+        lib
 )
 
 file(GLOB_RECURSE SRCS src/*.cpp)
@@ -71,34 +71,49 @@ set(DEP_LIBS
         Boost::chrono
         Boost::thread
         yaml-cpp
-)
+        )
 
-add_library(hardware src/command.cpp
+######### Library Hardware ###############
+add_library(hardware
+        SHARED
+        src/command.cpp
         src/status_word.cpp
         src/control_word.cpp
         src/drive_state.cpp
         src/hardware.cpp
         src/hardware_interface.cpp
         src/hardware_sim.cpp
-)
+        )
 target_link_libraries(hardware
         PRIVATE
         ${DEP_LIBS})
 add_library(rocos::hardware ALIAS hardware)
 
+
+########## Library Drive #################
+add_library(drive
+        SHARED
+        src/drive.cpp
+        )
+target_link_libraries(drive
+        PRIVATE
+        rocos::hardware)
+add_library(rocos::drive ALIAS drive)
+
+
+########## Executable RocosAppMain ################
 add_executable(${PROJECT_NAME} src/rocosAppMain.cpp)
 
 ## Specify libraries to link a library or executable target against
 target_link_libraries(${PROJECT_NAME}
         PRIVATE
         Qt5::Core
-        rocos::hardware
-)
+        rocos::drive
+        )
 
 #############
 ## Install ##
 #############
-
 
 
 #############
@@ -108,7 +123,8 @@ target_link_libraries(${PROJECT_NAME}
 enable_testing()
 add_executable(unit_test test/unit_test.cpp)
 target_link_libraries(unit_test
-       PRIVATE
-       rocos::hardware
-       )
+        PRIVATE
+        rocos::hardware
+        rocos::drive
+)
 add_test(NAME unit_test COMMAND unit_test)

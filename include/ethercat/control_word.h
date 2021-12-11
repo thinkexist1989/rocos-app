@@ -39,6 +39,8 @@ struct Controlword {
   bool faultReset_{false};            // bit 7
   bool halt_{false};                  // bit 8
 
+
+  void setFromRawControlword(uint16_t ctrlwd);
   /*!
    * get the control word as a 16 bit unsigned integer
    * THIS DOES NOT RESPECT THE MODE SPECIFIC OPTIONS!

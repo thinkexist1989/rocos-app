@@ -21,23 +21,17 @@
 #define ROCOS_APP_HARDWARE_SIM_H
 
 #include <ethercat/hardware_interface.h>
+#include <vector>
 
 namespace rocos {
 
     class HardwareSim : public HardwareInterface {
     public:
-        HardwareSim();
+        HardwareSim(int slave_num = 20);
         ~HardwareSim() override;
 
+        //////////// Override Hardware Interface //////////////////
         Timestamp getTimestamp() override;
-
-        double getMinCycleTime() override;
-
-        double getMaxCycleTime() override;
-
-        double getAvgCycleTime() override;
-
-        double getCurrCycleTime() override;
 
         int32_t getSlaveNumber() override;
 
@@ -45,7 +39,7 @@ namespace rocos {
 
         void setTargetVelocityRaw(int id, int32_t vel) override;
 
-        void setTargetTorqueRaw(int id, int32_t tor) override;
+        void setTargetTorqueRaw(int id, int16_t tor) override;
 
         void setControlwordRaw(int id, uint16_t ctrlwd) override;
 
@@ -66,6 +60,22 @@ namespace rocos {
         Statusword getStatusword(int id) override;
 
         DriveState getDriverState(int id) override;
+
+
+        ////////////////// SPECIAL ///////////////////////////////
+        void setSlaveNumber(int slave_num);
+
+    private:
+        int _slaveNumber;
+        std::vector<int32_t> _positionVec;
+        std::vector<int32_t> _velocityVec;
+        std::vector<int16_t> _torqueVec;
+        std::vector<int16_t> _loadTorqueVec;
+
+        std::vector<Controlword> _controlwordVec;
+        std::vector<Statusword> _statuswordVec;
+        std::vector<int8_t> _modeVec;
+        std::vector<DriveState> _driveStateVec;
     };
 
 }

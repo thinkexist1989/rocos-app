@@ -54,7 +54,7 @@ namespace rocos {
 
         void setTargetVelocityRaw(int id, int32_t vel) override;
 
-        void setTargetTorqueRaw(int id, int32_t tor) override;
+        void setTargetTorqueRaw(int id, int16_t tor) override;
 
         int32_t getActualPositionRaw(int id) override;
 

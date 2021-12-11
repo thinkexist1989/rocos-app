@@ -6,86 +6,96 @@
 
 namespace rocos {
 
-    HardwareSim::HardwareSim() {
-
+    HardwareSim::HardwareSim(int slave_num) : _slaveNumber(slave_num),
+                                              _positionVec(slave_num),
+                                              _velocityVec(slave_num),
+                                              _torqueVec(slave_num),
+                                              _loadTorqueVec(slave_num),
+                                              _controlwordVec(slave_num),
+                                              _statuswordVec(slave_num),
+                                              _modeVec(slave_num),
+                                              _driveStateVec(slave_num, DriveState::OperationEnabled) {
+        for(auto s : _statuswordVec) {
+            s.setFromRawStatusword(4663); // in simulation all is enabled forever.
+        }
     }
 
     HardwareSim::~HardwareSim() = default;
 
     Timestamp HardwareSim::getTimestamp() {
-        return HardwareInterface::getTimestamp();
-    }
-
-    double HardwareSim::getMinCycleTime() {
-        return HardwareInterface::getMinCycleTime();
-    }
-
-    double HardwareSim::getMaxCycleTime() {
-        return HardwareInterface::getMaxCycleTime();
-    }
-
-    double HardwareSim::getAvgCycleTime() {
-        return HardwareInterface::getAvgCycleTime();
-    }
-
-    double HardwareSim::getCurrCycleTime() {
-        return HardwareInterface::getCurrCycleTime();
+        return boost::chrono::system_clock::now();
     }
 
     int32_t HardwareSim::getSlaveNumber() {
-        return HardwareInterface::getSlaveNumber();
+        return _slaveNumber;
     }
 
     void HardwareSim::setTargetPositionRaw(int id, int32_t pos) {
-        HardwareInterface::setTargetPositionRaw(id, pos);
+        _positionVec[id] = pos;
     }
 
     void HardwareSim::setTargetVelocityRaw(int id, int32_t vel) {
-        HardwareInterface::setTargetVelocityRaw(id, vel);
+        _velocityVec[id] = vel;
     }
 
-    void HardwareSim::setTargetTorqueRaw(int id, int32_t tor) {
-        HardwareInterface::setTargetTorqueRaw(id, tor);
+    void HardwareSim::setTargetTorqueRaw(int id, int16_t tor) {
+        _torqueVec[id] = tor;
     }
 
     void HardwareSim::setControlwordRaw(int id, uint16_t ctrlwd) {
-        HardwareInterface::setControlwordRaw(id, ctrlwd);
+        _controlwordVec[id].setFromRawControlword(ctrlwd);
     }
 
     void HardwareSim::setModeOfOperationRaw(int id, int8_t mode) {
-        HardwareInterface::setModeOfOperationRaw(id, mode);
+        _modeVec[id] = mode;
     }
 
     void HardwareSim::setModeOfOperation(int id, ModeOfOperation modeOfOperation) {
-        HardwareInterface::setModeOfOperation(id, modeOfOperation);
+        _modeVec[id] = static_cast<int8_t>(modeOfOperation);
     }
 
     int32_t HardwareSim::getActualPositionRaw(int id) {
-        return HardwareInterface::getActualPositionRaw(id);
+        return _positionVec[id];
     }
 
     int32_t HardwareSim::getActualVelocityRaw(int id) {
-        return HardwareInterface::getActualVelocityRaw(id);
+        return _velocityVec[id];
     }
 
     int16_t HardwareSim::getActualTorqueRaw(int id) {
-        return HardwareInterface::getActualTorqueRaw(id);
+        return _torqueVec[id];
     }
 
     int16_t HardwareSim::getLoadTorqueRaw(int id) {
-        return HardwareInterface::getLoadTorqueRaw(id);
+        return _loadTorqueVec[id];
     }
 
     uint16_t HardwareSim::getStatuswordRaw(int id) {
-        return HardwareInterface::getStatuswordRaw(id);
+        return _statuswordVec[id].getRawStatusword();
     }
 
     Statusword HardwareSim::getStatusword(int id) {
-        return HardwareInterface::getStatusword(id);
+        return _statuswordVec[id];
     }
 
     DriveState HardwareSim::getDriverState(int id) {
-        return HardwareInterface::getDriverState(id);
+        return _driveStateVec[id];
+    }
+
+    void HardwareSim::setSlaveNumber(int slave_num) {
+        _slaveNumber = slave_num;
+        _positionVec.resize(slave_num, 0);
+        _velocityVec.resize(slave_num, 0);
+        _torqueVec.resize(slave_num, 0);
+        _loadTorqueVec.resize(slave_num, 0);
+        _modeVec.resize(slave_num, 0);
+        _statuswordVec.resize(slave_num);
+        _controlwordVec.resize(slave_num);
+        _driveStateVec.resize(slave_num, DriveState::OperationEnabled);
+
+        for(auto s : _statuswordVec) {
+            s.setFromRawStatusword(4663);
+        }
     }
 
 } // namespace rocos

@@ -74,7 +74,7 @@ namespace rocos {
 
         virtual void setTargetVelocityRaw(int id, int32_t vel);
 
-        virtual void setTargetTorqueRaw(int id, int32_t tor);
+        virtual void setTargetTorqueRaw(int id, int16_t tor);
 
         virtual void setControlwordRaw(int id, uint16_t ctrlwd);
 

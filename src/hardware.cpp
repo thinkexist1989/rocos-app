@@ -62,7 +62,7 @@ namespace rocos {
         ecPtr->setTargetVelocityEC(id, vel);
     }
 
-    void Hardware::setTargetTorqueRaw(int id, int32_t tor) {
+    void Hardware::setTargetTorqueRaw(int id, int16_t tor) {
         ecPtr->setTargetTorqueEC(id, tor);
     }
 

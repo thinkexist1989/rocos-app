@@ -64,7 +64,7 @@ namespace rocos {
         boost::ignore_unused(id, vel);
     }
 
-    void HardwareInterface::setTargetTorqueRaw(int id, int32_t tor) {
+    void HardwareInterface::setTargetTorqueRaw(int id, int16_t tor) {
         boost::ignore_unused(id, tor);
     }
 
