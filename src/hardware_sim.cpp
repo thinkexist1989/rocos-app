@@ -15,8 +15,11 @@ namespace rocos {
                                               _statuswordVec(slave_num),
                                               _modeVec(slave_num),
                                               _driveStateVec(slave_num, DriveState::OperationEnabled) {
-        for(auto s : _statuswordVec) {
+
+        _type = HW_SIM;
+        for (auto& s: _statuswordVec) {
             s.setFromRawStatusword(4663); // in simulation all is enabled forever.
+            std::cout << "Init raw status word" <<  s << std::endl;
         }
     }
 
@@ -93,7 +96,7 @@ namespace rocos {
         _controlwordVec.resize(slave_num);
         _driveStateVec.resize(slave_num, DriveState::OperationEnabled);
 
-        for(auto s : _statuswordVec) {
+        for (auto s: _statuswordVec) {
             s.setFromRawStatusword(4663);
         }
     }

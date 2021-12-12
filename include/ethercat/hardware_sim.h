@@ -27,7 +27,7 @@ namespace rocos {
 
     class HardwareSim : public HardwareInterface {
     public:
-        HardwareSim(int slave_num = 20);
+        explicit HardwareSim(int slave_num = 20);
         ~HardwareSim() override;
 
         //////////// Override Hardware Interface //////////////////
