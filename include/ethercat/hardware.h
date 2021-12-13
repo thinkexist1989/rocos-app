@@ -78,7 +78,7 @@ namespace rocos {
 
         DriveState getDriverState(int id) override;
 
-        void waitForSignal() override;
+        void waitForSignal(int id = 0) override;
 
     protected:
         boost::shared_ptr<EcatConfig> ecPtr;

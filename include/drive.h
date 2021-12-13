@@ -32,16 +32,20 @@ namespace rocos {
     class Drive {
 
     public:
-        Drive(HardwareInterface* hw, int id);
+        Drive(boost::shared_ptr<HardwareInterface> hw, int id);
 
-        virtual bool setDriverState(const DriveState &driveState, bool waitForState);
+        bool setDriverState(const DriveState &driveState, bool waitForState);
+        bool setEnabled(bool waitForState = true);
+        bool setDisabled(bool waitForState = true);
 
-    protected:
+        void waitForSignal();
+
+    public:
         std::string _name {};
         Statusword _statusword {};
         Controlword _controlword {};
-        DriveState _currentDriveState {};
-        DriveState _targetDriveState {};
+        DriveState _currentDriveState {DriveState::NA};
+        DriveState _targetDriveState {DriveState::NA};
 
         bool _conductStateChange {false};
         std::atomic<bool> _stateChangeSuccessful {false};
@@ -60,8 +64,10 @@ namespace rocos {
         /// \param requestedDriveState
         /// \param currentDriveState
         /// \return the controlword to be sent
-        virtual Controlword getNextStateTransitionControlword(const DriveState &requestedDriveState,
+        Controlword getNextStateTransitionControlword(const DriveState &requestedDriveState,
                                                               const DriveState &currentDriveState);
+
+        void workingThread();
 
     protected:
 
@@ -70,6 +76,12 @@ namespace rocos {
         double _reduction_ratio {1.0}; // reduction ratio
         double _minPosLimit {-2.0};
         double _maxPosLimit {2.0};
+
+        bool _isEnabled {false};
+
+        boost::shared_ptr<boost::thread> _thread {nullptr};
+
+        bool _isThreadRunning {false};
 
     };
 }

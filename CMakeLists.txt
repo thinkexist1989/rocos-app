@@ -85,7 +85,7 @@ add_library(hardware
         src/hardware_sim.cpp
         )
 target_link_libraries(hardware
-        PRIVATE
+        PUBLIC
         ${DEP_LIBS})
 add_library(rocos::hardware ALIAS hardware)
 
@@ -96,7 +96,7 @@ add_library(drive
         src/drive.cpp
         )
 target_link_libraries(drive
-        PRIVATE
+        PUBLIC
         rocos::hardware)
 add_library(rocos::drive ALIAS drive)
 

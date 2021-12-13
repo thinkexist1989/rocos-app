@@ -86,8 +86,8 @@ namespace rocos {
         return ecPtr->getStatusWordEC(id);
     }
 
-    void Hardware::waitForSignal() {
-        ecPtr->waitForSignal();
+    void Hardware::waitForSignal(int id) {
+        ecPtr->waitForSignal(id);
     }
 
     int32_t Hardware::getSlaveNumber() {

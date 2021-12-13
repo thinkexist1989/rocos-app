@@ -10,6 +10,8 @@
 #include <ethercat/hardware.h>
 #include <ethercat/hardware_sim.h>
 
+#include <drive.h>
+
 #include <iostream>
 
 TEST_CASE("Hello World") {
@@ -136,4 +138,28 @@ TEST_CASE("HardwareSim") {
         std::cout << hw->getStatuswordRaw(id) << std::endl;
 //    usleep(10000);
     }
+}
+
+TEST_CASE("Drive") {
+    using namespace rocos;
+    boost::shared_ptr<HardwareInterface> hw = boost::make_shared<Hardware>();
+
+    Drive drive(hw, 1);
+    usleep(1000000);
+
+    drive.setEnabled();
+    std::cout << "After Enabled: \n" << drive._currentDriveState << std::endl;
+
+    usleep(1000000);
+    drive.setDisabled();
+    std::cout << "After Disabled: \n" << drive._currentDriveState << std::endl;
+
+    usleep(1000000);
+    drive.setEnabled();
+    std::cout << "After Enabled: \n" << drive._currentDriveState << std::endl;
+
+    usleep(1000000);
+    drive.setDisabled();
+    std::cout << "After Disabled: \n" << drive._currentDriveState << std::endl;
+
 }

@@ -67,7 +67,7 @@ namespace rocos {
 
         virtual int32_t getSlaveNumber();   // slave number
 
-        virtual void waitForSignal();    // Signal of Bus
+        virtual void waitForSignal(int id = 0);    // Signal of Bus
 
         ///////////////////////Raw Data/////////////////////////
         virtual void setTargetPositionRaw(int id, int32_t pos);

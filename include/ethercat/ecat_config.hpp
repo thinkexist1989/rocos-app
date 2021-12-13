@@ -69,6 +69,7 @@ Shenyang Institute of Automation, Chinese Academy of Sciences.
 
 //#define EC_SEM_SYNC "sync"
 #define EC_SEM_MUTEX "sync"
+#define EC_SEM_NUM 10
 
 #define MAX_NAME_LEN 20
 #define MAX_JOINT_NUM 10
@@ -239,7 +240,8 @@ std::string configFileName{};
 #endif
 
 
-    sem_t *sem_mutex;
+//    sem_t *sem_mutex;
+    std::vector<sem_t*> sem_mutex {EC_SEM_NUM};
 
     EcatInfo *ecatInfo = nullptr;
     EcSlaveVec *ecatSlaveVec = nullptr;
@@ -355,27 +357,33 @@ public:
     bool createSharedMemory() {
         mode_t mask = umask(0); // 取消屏蔽的权限位
 
-        sem_mutex = sem_open(EC_SEM_MUTEX, O_CREAT | O_RDWR, 0777, 1);
-        if (sem_mutex == SEM_FAILED) {
-            print_message("[SHM] Can not open or create semaphore mutex.", MessageLevel::ERROR);
-            return false;
+        //////////////////// Semaphore //////////////////////////
+        sem_mutex.resize(EC_SEM_NUM);
+        for(int i = 0; i < EC_SEM_NUM; i++) {
+            sem_mutex[i] = sem_open((EC_SEM_MUTEX + std::to_string(i)).c_str(),O_CREAT | O_RDWR, 0777, 1);
+            if (sem_mutex[i] == SEM_FAILED) {
+                print_message("[SHM] Can not open or create semaphore mutex " + std::to_string(i) + ".", MessageLevel::ERROR);
+                return false;
+            }
+
+            int val = 0;
+            sem_getvalue(sem_mutex[i], &val);
+            std::cout << "value of sem_mutex is: " << val << std::endl;
+            if (val != 1) {
+                sem_destroy(sem_mutex[i]);
+                sem_unlink(EC_SEM_MUTEX);
+                sem_mutex[i] = sem_open((EC_SEM_MUTEX + std::to_string(i)).c_str(), O_CREAT | O_RDWR, 0777, 1);
+            }
+
+            sem_getvalue(sem_mutex[i], &val);
+            if (val != 1) {
+                print_message("[SHM] Can not set semaphore mutex " + std::to_string(i) + " to value 1.", MessageLevel::ERROR);
+                return false;
+            }
+
         }
 
-        int val = 0;
-        sem_getvalue(sem_mutex, &val);
-        std::cout << "value of sem_mutex is: " << val << std::endl;
-        if (val != 1) {
-            sem_destroy(sem_mutex);
-            sem_unlink(EC_SEM_MUTEX);
-            sem_mutex = sem_open(EC_SEM_MUTEX, O_CREAT | O_RDWR, 0777, 1);
-        }
-
-        sem_getvalue(sem_mutex, &val);
-        if (val != 1) {
-            print_message("[SHM] Can not set semaphore mutex to 1.", MessageLevel::ERROR);
-            return false;
-        }
-
+        //////////////////// Shared Memory Object //////////////////////////
         using namespace boost::interprocess;
         shared_memory_object::remove(EC_SHM);
 
@@ -405,13 +413,18 @@ public:
     /// \brief
     /// \return
     bool getSharedMemory() {
+
         mode_t mask = umask(0); // 取消屏蔽的权限位
 
-        sem_mutex = sem_open(EC_SEM_MUTEX, O_CREAT, 0777, 1);
-        if (sem_mutex == SEM_FAILED) {
-            print_message("[SHM] Can not open or create semaphore mutex.", MessageLevel::ERROR);
-            return false;
+        sem_mutex.resize(EC_SEM_NUM);
+        for(int i = 0; i < EC_SEM_NUM; i++) {
+            sem_mutex[i] = sem_open((EC_SEM_MUTEX + std::to_string(i)).c_str(), O_CREAT, 0777, 1);
+            if (sem_mutex[i] == SEM_FAILED) {
+                print_message("[SHM] Can not open or create semaphore mutex " + std::to_string(i) + ".", MessageLevel::ERROR);
+                return false;
+            }
         }
+
 
         using namespace boost::interprocess;
         managedSharedMemory = new managed_shared_memory{open_or_create, EC_SHM, EC_SHM_MAX_SIZE};
@@ -473,7 +486,7 @@ public:
     inline void
     setControlwordEC(int id, uint16_t ctrlword) { ecatSlaveVec->at(id).outputs.control_word = ctrlword; }
 
-    inline void waitForSignal() { sem_wait(sem_mutex); }
+    inline void waitForSignal(int id = 0) { sem_wait(sem_mutex[id]); }
 
 //    inline void unlock() { sem_post(sem_mutex); }
 

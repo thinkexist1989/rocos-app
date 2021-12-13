@@ -127,7 +127,7 @@ namespace rocos {
         return 0;
     }
 
-    void HardwareInterface::waitForSignal() {
+    void HardwareInterface::waitForSignal(int id) {
         usleep(1000);
     }
 

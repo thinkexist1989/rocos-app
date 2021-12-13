@@ -22,10 +22,18 @@
 
 namespace rocos {
 
-    Drive::Drive(HardwareInterface *hw, int id) : _hw_interface(hw),
-                                                  _id(id)
-    {
+    Drive::Drive(boost::shared_ptr<HardwareInterface> hw, int id) : _hw_interface(hw),
+                                                                    _id(id) {
+        _currentDriveState = _hw_interface->getDriverState(_id);
+        std::cout << "Curr Drive State: " << _currentDriveState << std::endl;
+//        _targetDriveState = DriveState::SwitchOnDisabled;
+        _targetDriveState = _currentDriveState;
 
+        _hw_interface->setTargetPositionRaw(_id, _hw_interface->getActualPositionRaw(_id));
+
+        _isThreadRunning = true;
+        _thread = boost::make_shared<boost::thread>(boost::bind(&Drive::workingThread, this));
+        _thread->detach();
     }
 
     bool Drive::setDriverState(const DriveState &driveState, bool waitForState) {
@@ -81,7 +89,8 @@ namespace rocos {
             // able to change it's state.
             if ((boost::chrono::duration_cast<boost::chrono::microseconds>(
                     boost::chrono::system_clock::now() - driveStateChangeStartTimePoint)).count() >
-                10000) { // TODO: configuration_.driveStateChangeMaxTimeout
+                100000) { //wait for 100ms  TODO: configuration_.driveStateChangeMaxTimeout
+                std::cout << "It takes too long to switch state!" << std::endl;
                 break;
             }
             // unlock the mutex during sleep time
@@ -98,6 +107,7 @@ namespace rocos {
     Controlword Drive::getNextStateTransitionControlword(const DriveState &requestedDriveState,
                                                          const DriveState &currentDriveState) {
         Controlword controlword;
+//        controlword = _controlword;
         controlword.setAllFalse();
         switch (requestedDriveState) {
             case DriveState::SwitchOnDisabled:
@@ -258,11 +268,12 @@ namespace rocos {
 
     void Drive::engageStateMachine() {
 // locking the mutex
-        boost::lock_guard<boost::recursive_mutex> lock(_mutex);
+//        boost::lock_guard<boost::recursive_mutex> lock(_mutex);
 
         // elapsed time since the last new controlword
         auto microsecondsSinceChange =
-                (boost::chrono::duration_cast<boost::chrono::microseconds>(boost::chrono::system_clock::now() - _driveStateChangeTimePoint)).count();
+                (boost::chrono::duration_cast<boost::chrono::microseconds>(
+                        boost::chrono::system_clock::now() - _driveStateChangeTimePoint)).count();
 
         // get the current state
         // since we wait until "hasRead" is true, this is guaranteed to be a newly
@@ -285,11 +296,36 @@ namespace rocos {
             // get the next controlword from the state machine
             _controlword = getNextStateTransitionControlword(_targetDriveState, _currentDriveState);
             _driveStateChangeTimePoint = boost::chrono::system_clock::now();
+//            std::cout << _controlword << std::endl;
+            _hw_interface->setControlwordRaw(_id, _controlword.getRawControlword()); // set control word
+
         }
 
         // set the "hasRead" variable to false such that there will definitely be a
         // new reading when this method is called again
 //        hasRead_ = false;
+    }
+
+    bool Drive::setEnabled(bool waitForState) {
+        setDriverState(DriveState::OperationEnabled, waitForState);
+    }
+
+    bool Drive::setDisabled(bool waitForState) {
+        setDriverState(DriveState::SwitchOnDisabled, waitForState);
+    }
+
+    void Drive::waitForSignal() {
+        _hw_interface->waitForSignal(_id);
+    }
+
+    void Drive::workingThread() {
+        std::cout << "Drive " << _id << " is running on thread " << boost::this_thread::get_id() << std::endl;
+        while (_isThreadRunning) {
+            waitForSignal();
+            _currentDriveState = _hw_interface->getDriverState(_id);
+            engageStateMachine();
+        }
+        std::cout << "Drive " << _id << "thread is terminated." << std::endl;
     }
 
 }
