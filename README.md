@@ -6,6 +6,7 @@
 -->
 
 <div align="center">
+  <img src="./rocos-app.png" alt="" height="150">
   <h1>ROCOS-Application</h1>
   <blockquote>The Application of Robotics for ROCOS </blockquote>
 </div>
@@ -42,5 +43,6 @@ ROCOS-App is the application of robotics, which is designed as the robot control
 
 ## Contributor
 
-:bust_in_silhouette:[**Yang Luo**](mailto:luoyang@sia.cn)
+:bust_in_silhouette: **Yang Luo (luoyang@sia.cn)**
 
+:framed_picture: Icon Designed by :**Yuhan Ying (1027649507@qq.com)**

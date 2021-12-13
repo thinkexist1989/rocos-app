@@ -83,10 +83,11 @@ add_library(hardware
         src/hardware.cpp
         src/hardware_interface.cpp
         src/hardware_sim.cpp
-        )
+)
 target_link_libraries(hardware
         PUBLIC
-        ${DEP_LIBS})
+        ${DEP_LIBS}
+)
 add_library(rocos::hardware ALIAS hardware)
 
 
@@ -94,10 +95,12 @@ add_library(rocos::hardware ALIAS hardware)
 add_library(drive
         SHARED
         src/drive.cpp
-        )
+        src/drive_guard.cpp
+)
 target_link_libraries(drive
         PUBLIC
-        rocos::hardware)
+        rocos::hardware
+)
 add_library(rocos::drive ALIAS drive)
 
 

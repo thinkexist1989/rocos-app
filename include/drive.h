@@ -27,10 +27,12 @@
 #include <boost/thread/lock_guard.hpp>
 #include <boost/thread/recursive_mutex.hpp>
 
+#include <drive_guard.h>
+
 namespace rocos {
 
     class Drive {
-
+        friend class DriveGuard;
     public:
         Drive(boost::shared_ptr<HardwareInterface> hw, int id);
 
@@ -40,15 +42,15 @@ namespace rocos {
 
         void waitForSignal();
 
-    public:
+    private:
         std::string _name {};
         Statusword _statusword {};
         Controlword _controlword {};
         DriveState _currentDriveState {DriveState::NA};
         DriveState _targetDriveState {DriveState::NA};
 
-        bool _conductStateChange {false};
-        std::atomic<bool> _stateChangeSuccessful {false};
+        bool _conductStateChange {false}; //是否启动状态机 默认不启动
+        std::atomic<bool> _stateChangeSuccessful {false}; //当前状态切换是否成功
 
         Timestamp _driveStateChangeTimePoint;
 
@@ -67,7 +69,6 @@ namespace rocos {
         Controlword getNextStateTransitionControlword(const DriveState &requestedDriveState,
                                                               const DriveState &currentDriveState);
 
-        void workingThread();
 
     protected:
 
@@ -79,9 +80,7 @@ namespace rocos {
 
         bool _isEnabled {false};
 
-        boost::shared_ptr<boost::thread> _thread {nullptr};
-
-        bool _isThreadRunning {false};
+        boost::shared_ptr<DriveGuard> _driveGuard {nullptr};
 
     };
 }

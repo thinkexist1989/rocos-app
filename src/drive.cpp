@@ -24,6 +24,10 @@ namespace rocos {
 
     Drive::Drive(boost::shared_ptr<HardwareInterface> hw, int id) : _hw_interface(hw),
                                                                     _id(id) {
+
+        _driveGuard = DriveGuard::getInstance(); // 获取DriveGuard单例句柄
+        _driveGuard->addDrive(this); // 将Drive实例添加到_driveGuard中来更新数据
+
         _currentDriveState = _hw_interface->getDriverState(_id);
         std::cout << "Curr Drive State: " << _currentDriveState << std::endl;
 //        _targetDriveState = DriveState::SwitchOnDisabled;
@@ -31,9 +35,6 @@ namespace rocos {
 
         _hw_interface->setTargetPositionRaw(_id, _hw_interface->getActualPositionRaw(_id));
 
-        _isThreadRunning = true;
-        _thread = boost::make_shared<boost::thread>(boost::bind(&Drive::workingThread, this));
-        _thread->detach();
     }
 
     bool Drive::setDriverState(const DriveState &driveState, bool waitForState) {
@@ -307,25 +308,15 @@ namespace rocos {
     }
 
     bool Drive::setEnabled(bool waitForState) {
-        setDriverState(DriveState::OperationEnabled, waitForState);
+        return setDriverState(DriveState::OperationEnabled, waitForState);
     }
 
     bool Drive::setDisabled(bool waitForState) {
-        setDriverState(DriveState::SwitchOnDisabled, waitForState);
+        return setDriverState(DriveState::SwitchOnDisabled, waitForState);
     }
 
     void Drive::waitForSignal() {
         _hw_interface->waitForSignal(_id);
-    }
-
-    void Drive::workingThread() {
-        std::cout << "Drive " << _id << " is running on thread " << boost::this_thread::get_id() << std::endl;
-        while (_isThreadRunning) {
-            waitForSignal();
-            _currentDriveState = _hw_interface->getDriverState(_id);
-            engageStateMachine();
-        }
-        std::cout << "Drive " << _id << "thread is terminated." << std::endl;
     }
 
 }
