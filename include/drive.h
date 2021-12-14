@@ -29,6 +29,8 @@
 
 #include <drive_guard.h>
 
+#include <interpolate.h>
+
 namespace rocos {
 
     class Drive {
@@ -42,12 +44,31 @@ namespace rocos {
 
         void waitForSignal();
 
+        inline Controlword getControlword() { return _controlword; }
+        inline Statusword  getStatusword() { return  _statusword; }
+        inline DriveState getDriveState() { return _currentDriveState; }
+
+        void setMode(ModeOfOperation mode);
+        void setPositionInCnt(int32_t pos);
+        void setVelocityInCnt(int32_t vel);
+        void SetTorqueInCnt(int16_t tor);
+
+        int32_t getPositionInCnt();
+        int32_t getVelocityInCnt();
+        int16_t getTorqueInCnt();
+
+        inline int getId() { return _id; }
+
+        void moveToPositionInCnt(int32_t pos, double max_vel, double max_acc, double max_jerk = std::numeric_limits<double>::max(), ProfileType type = trapezoid); // Motion with interpolate
+
     private:
         std::string _name {};
         Statusword _statusword {};
         Controlword _controlword {};
         DriveState _currentDriveState {DriveState::NA};
         DriveState _targetDriveState {DriveState::NA};
+
+        ModeOfOperation _mode {ModeOfOperation::CyclicSynchronousPositionMode};
 
         bool _conductStateChange {false}; //是否启动状态机 默认不启动
         std::atomic<bool> _stateChangeSuccessful {false}; //当前状态切换是否成功
@@ -57,6 +78,8 @@ namespace rocos {
         uint16_t _numberOfSuccessfulTargetStateReadings {0};
 
         mutable boost::recursive_mutex _mutex; // TODO: change name!!!!
+
+        double _ratio {1.0}; // Ratio = input / output
 
     protected:
 

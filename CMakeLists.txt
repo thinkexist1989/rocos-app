@@ -96,6 +96,8 @@ add_library(drive
         SHARED
         src/drive.cpp
         src/drive_guard.cpp
+        src/interpolate.cpp
+        src/robotMath.cpp
 )
 target_link_libraries(drive
         PUBLIC

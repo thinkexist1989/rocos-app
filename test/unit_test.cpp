@@ -145,21 +145,54 @@ TEST_CASE("Drive") {
     boost::shared_ptr<HardwareInterface> hw = boost::make_shared<Hardware>();
 
     Drive drive(hw, 1);
-    usleep(1000000);
-
-    drive.setEnabled();
-    std::cout << "After Enabled: \n" << drive._currentDriveState << std::endl;
-
-    usleep(1000000);
-    drive.setDisabled();
-    std::cout << "After Disabled: \n" << drive._currentDriveState << std::endl;
 
     usleep(1000000);
     drive.setEnabled();
-    std::cout << "After Enabled: \n" << drive._currentDriveState << std::endl;
+    std::cout << "After Enabled: \n" << drive.getDriveState() << std::endl;
 
     usleep(1000000);
     drive.setDisabled();
-    std::cout << "After Disabled: \n" << drive._currentDriveState << std::endl;
+    std::cout << "After Disabled: \n" << drive.getDriveState() << std::endl;
+
+
+    usleep(1000000);
+    drive.setMode(rocos::ModeOfOperation::CyclicSynchronousPositionMode);
+//    drive.setVelocityInCnt(100000);
+    drive.setEnabled();
+    std::cout << drive.getPositionInCnt() << std::endl;
+
+    drive.moveToPositionInCnt(500000, 100000, 100000);
+
+    std::cout << "Curr State \n" << drive.getDriveState() << std::endl;
+
+    usleep(1000000); // 10s
+    drive.setDisabled();
+
+}
+
+TEST_CASE("Sync motion") {
+    using namespace rocos;
+    boost::shared_ptr<HardwareInterface> hw = boost::make_shared<Hardware>();
+    std::vector<Drive*> drives;
+    for(int i = 0; i < 4; i++) {
+        drives.push_back(new Drive(hw, i));
+    }
+
+    usleep(1000000);
+    for(auto& drive : drives) {
+        drive->setEnabled();
+        std::cout << "Drive " << drive->getId() << " After Enabled: \n" << drive->getDriveState() << std::endl;
+    }
+
+    drives[0]->moveToPositionInCnt(0, 100000, 100000);
+    drives[1]->moveToPositionInCnt(0, 100000, 100000);
+    drives[2]->moveToPositionInCnt(0, 100000, 100000);
+    drives[3]->moveToPositionInCnt(0, 5000000, 5000000);
+
+//    drives[0]->moveToPositionInCnt(500000, 100000, 100000);
+//    drives[1]->moveToPositionInCnt(500000, 100000, 100000);
+//    drives[2]->moveToPositionInCnt(500000, 100000, 100000);
+//    drives[3]->moveToPositionInCnt(25000000, 5000000, 5000000);
+
 
 }

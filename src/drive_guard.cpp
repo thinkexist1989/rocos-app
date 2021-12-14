@@ -63,4 +63,6 @@ namespace rocos {
         std::cout << "Drive Guard thread is terminated." << std::endl;
     }
 
+    boost::shared_ptr<DriveGuard> DriveGuard::_instance = nullptr; // 单例模式对象
+
 }

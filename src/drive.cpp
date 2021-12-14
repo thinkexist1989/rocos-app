@@ -33,7 +33,9 @@ namespace rocos {
 //        _targetDriveState = DriveState::SwitchOnDisabled;
         _targetDriveState = _currentDriveState;
 
-        _hw_interface->setTargetPositionRaw(_id, _hw_interface->getActualPositionRaw(_id));
+        _hw_interface->setTargetPositionRaw(_id, _hw_interface->getActualPositionRaw(_id)); // set Current Pos
+
+        _hw_interface->setModeOfOperation(_id, _mode); // Default CSP
 
     }
 
@@ -88,10 +90,9 @@ namespace rocos {
             // break the loop if the state change takes too long
             // this prevents a freezing of the end user's program if the hardware is not
             // able to change it's state.
-            if ((boost::chrono::duration_cast<boost::chrono::microseconds>(
-                    boost::chrono::system_clock::now() - driveStateChangeStartTimePoint)).count() >
-                100000) { //wait for 100ms  TODO: configuration_.driveStateChangeMaxTimeout
-                std::cout << "It takes too long to switch state!" << std::endl;
+            auto duration_us = boost::chrono::duration_cast<boost::chrono::microseconds>(boost::chrono::system_clock::now() - driveStateChangeStartTimePoint);
+            if ( duration_us.count() > 150000) { //wait for 100ms  TODO: configuration_.driveStateChangeMaxTimeout
+                std::cout << "It takes too long (" << duration_us.count() / 1000.0 << " ms) to switch state!" << std::endl;
                 break;
             }
             // unlock the mutex during sleep time
@@ -317,6 +318,74 @@ namespace rocos {
 
     void Drive::waitForSignal() {
         _hw_interface->waitForSignal(_id);
+    }
+
+    void Drive::setMode(ModeOfOperation mode) {
+        _hw_interface->setModeOfOperation(_id, mode);
+    }
+
+    void Drive::setPositionInCnt(int32_t pos) {
+        _hw_interface->setTargetPositionRaw(_id, pos);
+    }
+
+    void Drive::setVelocityInCnt(int32_t vel) {
+        _hw_interface->setTargetVelocityRaw(_id, vel);
+    }
+
+    void Drive::SetTorqueInCnt(int16_t tor) {
+        _hw_interface->setTargetTorqueRaw(_id, tor);
+    }
+
+    int32_t Drive::getPositionInCnt() {
+        return _hw_interface->getActualPositionRaw(_id);
+    }
+
+    int32_t Drive::getVelocityInCnt() {
+        return _hw_interface->getActualVelocityRaw(_id);
+    }
+
+    int16_t Drive::getTorqueInCnt() {
+        return _hw_interface->getActualTorqueRaw(_id);
+    }
+
+    void Drive::moveToPositionInCnt(int32_t pos, double max_vel, double max_acc, double max_jerk, ProfileType type) {
+        auto p0 = _hw_interface->getActualPositionRaw(_id);
+        R_INTERP_BASE* interp;
+        switch (type) {
+            case trapezoid:
+                interp = new Trapezoid;
+                ((Trapezoid*)interp)->planTrapezoidProfile(0, p0, pos, 0, 0, max_vel, max_acc);
+                break;
+            case doubleS:
+                interp = new DoubleS;
+                ((DoubleS*)interp)->planDoubleSProfile(0, p0, pos, 0, 0, max_vel, max_acc, max_jerk);
+                break;
+            default:
+                std::cout << "Not Supported Profile Type" << std::endl;
+                return;
+        }
+
+        double dt = 0.0;
+        double duration = interp->getDuration();
+        std::cout << "interp duration is: " << duration << std::endl;
+
+        while(dt <= duration && interp->isValidMovement()) {
+            waitForSignal();
+            switch (_mode) {
+                case ModeOfOperation::CyclicSynchronousPositionMode:
+                    _hw_interface->setTargetPositionRaw(_id, interp->pos(dt));
+                    break;
+                case ModeOfOperation::CyclicSynchronousVelocityMode:
+                    _hw_interface->setTargetVelocityRaw(_id, interp->vel(dt));
+                    break;
+                default:
+                    std::cout << "Only Supported CSP and CSV" << std::endl;
+            }
+            dt += 0.001;
+        }
+
+        delete interp;
+
     }
 
 }
