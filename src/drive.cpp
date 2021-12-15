@@ -321,7 +321,8 @@ namespace rocos {
     }
 
     void Drive::setMode(ModeOfOperation mode) {
-        _hw_interface->setModeOfOperation(_id, mode);
+        _mode = mode;
+        _hw_interface->setModeOfOperation(_id, _mode);
     }
 
     void Drive::setPositionInCnt(int32_t pos) {

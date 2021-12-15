@@ -176,6 +176,7 @@ TEST_CASE("Sync motion") {
     std::vector<Drive*> drives;
     for(int i = 0; i < 4; i++) {
         drives.push_back(new Drive(hw, i));
+        drives[i]->setMode(rocos::ModeOfOperation::CyclicSynchronousPositionMode);
     }
 
     usleep(1000000);
@@ -184,15 +185,15 @@ TEST_CASE("Sync motion") {
         std::cout << "Drive " << drive->getId() << " After Enabled: \n" << drive->getDriveState() << std::endl;
     }
 
-    drives[0]->moveToPositionInCnt(0, 100000, 100000);
-    drives[1]->moveToPositionInCnt(0, 100000, 100000);
-    drives[2]->moveToPositionInCnt(0, 100000, 100000);
-    drives[3]->moveToPositionInCnt(0, 5000000, 5000000);
+//    drives[0]->moveToPositionInCnt(0, 100000, 100000);
+//    drives[1]->moveToPositionInCnt(0, 100000, 100000);
+//    drives[2]->moveToPositionInCnt(0, 100000, 100000);
+//    drives[3]->moveToPositionInCnt(0, 5000000, 5000000);
 
-//    drives[0]->moveToPositionInCnt(500000, 100000, 100000);
-//    drives[1]->moveToPositionInCnt(500000, 100000, 100000);
-//    drives[2]->moveToPositionInCnt(500000, 100000, 100000);
-//    drives[3]->moveToPositionInCnt(25000000, 5000000, 5000000);
+    drives[0]->moveToPositionInCnt(500000, 100000, 100000);
+    drives[1]->moveToPositionInCnt(500000, 100000, 100000);
+    drives[2]->moveToPositionInCnt(500000, 100000, 100000);
+    drives[3]->moveToPositionInCnt(25000000, 5000000, 5000000);
 
 
 }
