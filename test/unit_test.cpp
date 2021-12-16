@@ -12,6 +12,8 @@
 
 #include <drive.h>
 
+#include <robot.h>
+
 #include <iostream>
 
 TEST_CASE("Hello World") {
@@ -170,30 +172,56 @@ TEST_CASE("Drive") {
 
 }
 
-TEST_CASE("Sync motion") {
+TEST_CASE("Async motion") {
     using namespace rocos;
     boost::shared_ptr<HardwareInterface> hw = boost::make_shared<Hardware>();
-    std::vector<Drive*> drives;
-    for(int i = 0; i < 4; i++) {
+    std::vector<Drive *> drives;
+    for (int i = 0; i < 4; i++) {
         drives.push_back(new Drive(hw, i));
         drives[i]->setMode(rocos::ModeOfOperation::CyclicSynchronousPositionMode);
     }
 
     usleep(1000000);
-    for(auto& drive : drives) {
+    for (auto &drive: drives) {
         drive->setEnabled();
         std::cout << "Drive " << drive->getId() << " After Enabled: \n" << drive->getDriveState() << std::endl;
     }
 
-//    drives[0]->moveToPositionInCnt(0, 100000, 100000);
-//    drives[1]->moveToPositionInCnt(0, 100000, 100000);
-//    drives[2]->moveToPositionInCnt(0, 100000, 100000);
-//    drives[3]->moveToPositionInCnt(0, 5000000, 5000000);
+    drives[0]->moveToPositionInCnt(0, 100000, 100000);
+    drives[1]->moveToPositionInCnt(0, 100000, 100000);
+    drives[2]->moveToPositionInCnt(0, 100000, 100000);
+    drives[3]->moveToPositionInCnt(0, 5000000, 5000000);
 
     drives[0]->moveToPositionInCnt(500000, 100000, 100000);
     drives[1]->moveToPositionInCnt(500000, 100000, 100000);
     drives[2]->moveToPositionInCnt(500000, 100000, 100000);
     drives[3]->moveToPositionInCnt(25000000, 5000000, 5000000);
 
+
+}
+
+
+TEST_CASE("Sync motion") {
+    using namespace rocos;
+    boost::shared_ptr<HardwareInterface> hw = boost::make_shared<Hardware>();
+    Robot robot(hw);
+
+    robot.setEnabled();
+
+    std::vector<double> max_vel{100000, 100000, 100000, 5000000};
+    std::vector<double> max_acc{100000, 100000, 100000, 5000000};
+    std::vector<double> max_jerk(4, std::numeric_limits<double>::max());
+
+    for (int i = 0; i < 10; i++) {
+        std::vector<double> pos{0, 0, 0, 0};
+
+        robot.moveJ(pos, max_vel, max_acc, max_jerk);
+
+        pos = {500000, 500000, 500000, 25000000};
+
+        robot.moveJ(pos, max_vel, max_acc, max_jerk);
+    }
+
+    robot.setDisabled();
 
 }

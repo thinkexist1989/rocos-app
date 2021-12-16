@@ -17,7 +17,7 @@
 // Shenyang Institute of Automation, Chinese Academy of Sciences.
 // email: luoyang@sia.cn
 
-#include <ethercat/hardware_interface.h>
+#include <include/hardware_interface.h>
 
 #include <boost/core/ignore_unused.hpp>
 

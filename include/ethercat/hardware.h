@@ -28,7 +28,7 @@
 
 #include <ethercat/ecat_config.hpp>
 
-#include <ethercat/hardware_interface.h>
+#include <hardware_interface.h>
 
 
 #include <boost/smart_ptr.hpp>

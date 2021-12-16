@@ -1,0 +1,96 @@
+// Copyright 2021, Yang Luo"
+// This program is free software: you can redistribute it and/or modify
+// it under the terms of the GNU General Public License as published by
+// the Free Software Foundation, either version 3 of the License, or
+// (at your option) any later version.
+//
+// This program is distributed in the hope that it will be useful,
+// but WITHOUT ANY WARRANTY; without even the implied warranty of
+// MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+// GNU General Public License for more details.
+//
+// You should have received a copy of the GNU General Public License
+// along with this program.  If not, see <http://www.gnu.org/licenses/>.
+//
+// @Author
+// Yang Luo, PHD
+// Shenyang Institute of Automation, Chinese Academy of Sciences.
+// email: luoyang@sia.cn
+
+syntax = "proto3";
+
+package rocos;
+
+option java_outer_classname = "RobotStateProto";
+
+import "header.proto"; // Standard header of gRPC
+import "geometry.proto";
+import "google/protobuf/wrappers.proto";
+import "google/protobuf/timestamp.proto";
+
+// Proto containing the state of a joint on the robot. This can be used with the robot skeleton to
+// update the current view of the robot.
+message JointState {
+    // This name maps directly to the joints in the URDF.
+    string name = 1;
+    // This is typically an angle in radians as joints are typically revolute. However, for
+    // translational joints this could be a distance in meters.
+    google.protobuf.DoubleValue position = 2;
+    // The joint velocity in [m/s].
+    google.protobuf.DoubleValue velocity = 3;
+    // The joint acceleration in [m/s^2].
+    google.protobuf.DoubleValue acceleration = 4;
+
+    // This is typically a torque in Newton meters as joints are typically revolute. However, for
+    // translational joints this could be a force in Newtons.
+    google.protobuf.DoubleValue load = 5;
+}
+
+// The kinematic state of the robot describes the current estimated positions of the robot body and joints throughout the world.
+// It includes a transform snapshot of the robot’s current known frames as well as joint states and the velocity of the body.
+message KinematicState {
+    // Joint state of all robot joints.
+    repeated JointState joint_states = 2;
+
+    // Robot clock timestamp corresponding to these readings.
+    google.protobuf.Timestamp acquisition_timestamp = 30;
+
+    // A tree-based collection of transformations, which will include the transformations to the
+    // robot body ("body") in addition to transformations to the common frames ("world", "dr") and
+    // ground plane estimate "gpe".
+    // All transforms within the snapshot are at the acquisition time of kinematic state.
+    FrameTreeSnapshot transforms_snapshot = 31;
+
+    // Velocity of the body frame with respect to vision frame and expressed in vision frame.
+    // The linear velocity is applied at the origin of the body frame.
+    SE3Velocity velocity_of_body_in_vision = 8;
+    // Velocity of the body frame with respect to odom frame and expressed in odom frame.
+    // Again, the linear velocity is applied at the origin of the body frame.
+    SE3Velocity velocity_of_body_in_odom = 12;
+
+    // Previous fields in the protobuf that are now reserved.
+    reserved 1, 3, 4, 5, 6, 9, 10, 11;
+}
+
+message HardwareState {
+    enum HardwareType {
+        HW_TYPE_UNKNOWN = 0;
+        HW_TYPE_SIM = 1;
+        HW_TYPE_ETHERCAT = 2;
+        HW_TYPE_CAN = 3;      // reserved
+        HW_TYPE_PROFINET =4;  // reserved
+    }
+    HardwareType hw_type = 1;
+
+}
+
+message HardwareStateRequest {
+    //Common request header.
+    RequestHeader header = 1;
+}
+
+message HardwareStateResponse {
+    //Common request header.
+    ResponseHeader header = 1;
+    HardwareState hw_state = 2;
+}

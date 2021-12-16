@@ -20,7 +20,7 @@
 #ifndef ROCOS_APP_HARDWARE_SIM_H
 #define ROCOS_APP_HARDWARE_SIM_H
 
-#include <ethercat/hardware_interface.h>
+#include <hardware_interface.h>
 #include <vector>
 
 namespace rocos {

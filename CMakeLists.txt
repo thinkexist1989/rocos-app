@@ -71,8 +71,8 @@ foreach (GFIL ${GRPC_FILES}) #grpc gen
     get_filename_component(GRPC_NAME ${GFIL} NAME_WE)
 
     # Generated sources
-    set(GRPC_SRC "${CMAKE_BINARY_DIR}/${GRPC_NAME}.pb.cc")
-    set(GRPC_HDR "${CMAKE_BINARY_DIR}/${GRPC_NAME}.pb.h")
+    set(GRPC_SRC "${CMAKE_BINARY_DIR}/${GRPC_NAME}.grpc.pb.cc")
+    set(GRPC_HDR "${CMAKE_BINARY_DIR}/${GRPC_NAME}.grpc.pb.h")
     add_custom_command(
             OUTPUT "${GRPC_SRC}" "${GRPC_HDR}"
             COMMAND ${_PROTOBUF_PROTOC}
@@ -166,6 +166,7 @@ add_library(drive
         src/drive_guard.cpp
         src/interpolate.cpp
         src/robotMath.cpp
+        src/robot.cpp
         )
 target_link_libraries(drive
         PUBLIC

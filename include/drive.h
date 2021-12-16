@@ -20,7 +20,7 @@
 #ifndef ROCOS_APP_DRIVE_H
 #define ROCOS_APP_DRIVE_H
 
-#include <ethercat/hardware_interface.h>
+#include <include/hardware_interface.h>
 
 #include <boost/shared_ptr.hpp>
 #include <boost/thread.hpp>
@@ -35,51 +35,77 @@ namespace rocos {
 
     class Drive {
         friend class DriveGuard;
+
     public:
         Drive(boost::shared_ptr<HardwareInterface> hw, int id);
 
         bool setDriverState(const DriveState &driveState, bool waitForState);
+
         bool setEnabled(bool waitForState = true);
+
         bool setDisabled(bool waitForState = true);
 
         void waitForSignal();
 
         inline Controlword getControlword() { return _controlword; }
-        inline Statusword  getStatusword() { return  _statusword; }
+
+        inline Statusword getStatusword() { return _statusword; }
+
         inline DriveState getDriveState() { return _currentDriveState; }
 
         void setMode(ModeOfOperation mode);
+
         void setPositionInCnt(int32_t pos);
+
         void setVelocityInCnt(int32_t vel);
-        void SetTorqueInCnt(int16_t tor);
+
+        void setTorqueInCnt(int16_t tor);
+
+        void setPosition(double pos);
+
+        void setVelocity(double vel);
+
+        void setTorque(double tor);
 
         int32_t getPositionInCnt();
+
         int32_t getVelocityInCnt();
+
         int16_t getTorqueInCnt();
 
-        inline int getId() { return _id; }
+        double getPosition();
 
-        void moveToPositionInCnt(int32_t pos, double max_vel, double max_acc, double max_jerk = std::numeric_limits<double>::max(), ProfileType type = trapezoid); // Motion with interpolate
+        double getVelocity();
+
+        double getTorque();
+
+        inline int getId() const { return _id; }
+
+        inline ModeOfOperation getMode() const { return _mode; }
+
+        void moveToPositionInCnt(int32_t pos, double max_vel, double max_acc,
+                                 double max_jerk = std::numeric_limits<double>::max(),
+                                 ProfileType type = trapezoid); // Motion with interpolate
 
     private:
-        std::string _name {};
-        Statusword _statusword {};
-        Controlword _controlword {};
-        DriveState _currentDriveState {DriveState::NA};
-        DriveState _targetDriveState {DriveState::NA};
+        std::string _name{};
+        Statusword _statusword{};
+        Controlword _controlword{};
+        DriveState _currentDriveState{DriveState::NA};
+        DriveState _targetDriveState{DriveState::NA};
 
-        ModeOfOperation _mode {ModeOfOperation::CyclicSynchronousPositionMode};
+        ModeOfOperation _mode{ModeOfOperation::CyclicSynchronousPositionMode};
 
-        bool _conductStateChange {false}; //是否启动状态机 默认不启动
-        std::atomic<bool> _stateChangeSuccessful {false}; //当前状态切换是否成功
+        bool _conductStateChange{false}; //是否启动状态机 默认不启动
+        std::atomic<bool> _stateChangeSuccessful{false}; //当前状态切换是否成功
 
         Timestamp _driveStateChangeTimePoint;
 
-        uint16_t _numberOfSuccessfulTargetStateReadings {0};
+        uint16_t _numberOfSuccessfulTargetStateReadings{0};
 
         mutable boost::recursive_mutex _mutex; // TODO: change name!!!!
 
-        double _ratio {1.0}; // Ratio = input / output
+        double _ratio{1.0}; // Ratio = input / output
 
     protected:
 
@@ -90,20 +116,20 @@ namespace rocos {
         /// \param currentDriveState
         /// \return the controlword to be sent
         Controlword getNextStateTransitionControlword(const DriveState &requestedDriveState,
-                                                              const DriveState &currentDriveState);
+                                                      const DriveState &currentDriveState);
 
 
     protected:
 
-        boost::shared_ptr<HardwareInterface> _hw_interface {nullptr}; // The pointer of HardwareInterface instance
-        int _id {0}; // drive id in bus
-        double _reduction_ratio {1.0}; // reduction ratio
-        double _minPosLimit {-2.0};
-        double _maxPosLimit {2.0};
+        boost::shared_ptr<HardwareInterface> _hw_interface{nullptr}; // The pointer of HardwareInterface instance
+        int _id{0}; // drive id in bus
+        double _reduction_ratio{1.0}; // reduction ratio
+        double _minPosLimit{-2.0};
+        double _maxPosLimit{2.0};
 
-        bool _isEnabled {false};
+        bool _isEnabled{false};
 
-        boost::shared_ptr<DriveGuard> _driveGuard {nullptr};
+        boost::shared_ptr<DriveGuard> _driveGuard{nullptr};
 
     };
 }
