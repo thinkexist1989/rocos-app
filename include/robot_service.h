@@ -21,20 +21,25 @@
 #define ROCOS_APP_ROBOT_SERVICE_H
 
 #include <boost/smart_ptr.hpp>
+#include <boost/thread.hpp>
 
 #include <grpcpp/grpcpp.h>
 #include <grpcpp/health_check_service_interface.h>
 #include <grpcpp/ext/proto_server_reflection_plugin.h>
 
-#include <cmake-build-release-remote-host-advantech/robot_service.grpc.pb.h>
+//#include <cmake-build-release-remote-host-advantech/robot_service.grpc.pb.h>
 #include "robot_service.grpc.pb.h"
 
 namespace rocos {
     class Robot;
 
     class RobotServiceImpl final : public RobotService::Service {
-    public:
+    private:
         RobotServiceImpl(boost::shared_ptr<Robot> robot);
+        ~RobotServiceImpl();
+
+    public:
+        static boost::shared_ptr<RobotServiceImpl> getInstance(boost::shared_ptr<Robot> robot);
 
         grpc::Status ReadRobotState(::grpc::ServerContext *context, const ::rocos::RobotStateRequest *request,
                                     ::rocos::RobotStateResponse *response) override;
@@ -42,8 +47,23 @@ namespace rocos {
         grpc::Status WriteRobotCommmand(::grpc::ServerContext *context, const ::rocos::RobotCommandRequest *request,
                                         ::rocos::RobotCommandResponse *response) override;
 
+        void runServer(const std::string& address = "0.0.0.0:30001");
+
+        void stopServer();
+
     private:
-        boost::shared_ptr<Robot> _robot {nullptr};
+        void serverThread(const std::string& address);
+
+    private:
+        static boost::shared_ptr<RobotServiceImpl> _instance;
+        boost::shared_ptr<Robot> _robotPtr {nullptr};
+
+        std::unique_ptr<grpc::Server> _server {nullptr};
+
+        boost::shared_ptr<boost::thread> _thread {nullptr};
+
+        bool _isThreadRunning {false};
+
     };
 
 }
