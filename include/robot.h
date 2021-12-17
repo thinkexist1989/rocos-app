@@ -38,15 +38,28 @@ namespace rocos {
 
         explicit Robot(boost::shared_ptr<HardwareInterface> hw);
 
-        void moveJ(const std::vector<double>& pos,
-                   const std::vector<double>& max_vel,
-                   const std::vector<double>& max_acc,
-                   const std::vector<double>& max_jerk,
+        void moveJ(const std::vector<double> &pos,
+                   const std::vector<double> &max_vel,
+                   const std::vector<double> &max_acc,
+                   const std::vector<double> &max_jerk,
                    Synchronization sync = SYNC_TIME,
                    ProfileType type = ProfileType::trapezoid);
 
         void setEnabled();
+
         void setDisabled();
+
+        inline int getJointNum() { return _jntNum; }
+
+        inline int getJointStatus(int id) { return _joints[id]->getDriveStateRPC(); }
+
+        inline double getJointPosition(int id) { return _joints[id]->getPosition(); }
+
+        inline double getJointVelocity(int id) { return _joints[id]->getVelocity(); }
+
+        inline double getJointTorque(int id) { return _joints[id]->getTorque(); }
+
+        inline double getJointLoadTorque(int id) { return _joints[id]->getLoadTorque(); }
 
     protected:
         void addAllJoints();

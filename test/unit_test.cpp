@@ -9,12 +9,9 @@
 
 #include <ethercat/hardware.h>
 #include <ethercat/hardware_sim.h>
-
 #include <drive.h>
-
 #include <robot.h>
 
-#include <iostream>
 
 TEST_CASE("Hello World") {
     std::cout << "hello world!" << std::endl;
@@ -143,6 +140,7 @@ TEST_CASE("HardwareSim") {
 }
 
 TEST_CASE("Drive") {
+
     using namespace rocos;
     boost::shared_ptr<HardwareInterface> hw = boost::make_shared<Hardware>();
 
@@ -200,7 +198,6 @@ TEST_CASE("Async motion") {
 
 }
 
-
 TEST_CASE("Sync motion") {
     using namespace rocos;
     boost::shared_ptr<HardwareInterface> hw = boost::make_shared<Hardware>();
@@ -223,5 +220,9 @@ TEST_CASE("Sync motion") {
     }
 
     robot.setDisabled();
+
+}
+
+TEST_CASE("gRPC communication") {
 
 }

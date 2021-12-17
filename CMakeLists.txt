@@ -86,12 +86,16 @@ foreach (GFIL ${GRPC_FILES}) #grpc gen
     list(APPEND GRPC_HDRS ${GRPC_HDR})
 endforeach ()
 
+# Include generated *.pb.h files
+include_directories("${CMAKE_CURRENT_BINARY_DIR}")
+
 add_library(protocol
         SHARED
         ${PROTO_SRCS}
         ${PROTO_HDRS}
         ${GRPC_SRCS}
         ${GRPC_HRDS}
+        src/robot_service.cpp
         )
 target_link_libraries(protocol
         PUBLIC
@@ -200,5 +204,6 @@ target_link_libraries(unit_test
         PRIVATE
         rocos::hardware
         rocos::drive
+        rocos::protocol
         )
 add_test(NAME unit_test COMMAND unit_test)

@@ -21,10 +21,22 @@ syntax = "proto3";
 
 package rocos;
 
-option java_outer_classname = "RobotStateServiceProto";
+option java_outer_classname = "RobotStateProto";
 
-import "hardware_state.proto";
+import "header.proto"; // Standard header of gRPC
+import "google/protobuf/wrappers.proto";
 
-service HardwareStateService {
-    rpc  GetHardwareState(HardwareStateRequest) returns (HardwareStateResponse) {}
+message RobotCommand {
+
+}
+
+message RobotCommandRequest {
+    //Common request header.
+    RequestHeader header = 1;
+    RobotCommand command = 2;
+}
+
+message RobotCommandResponse {
+    //Common request header.
+    ResponseHeader header = 1;
 }

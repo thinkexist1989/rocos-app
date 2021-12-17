@@ -52,6 +52,16 @@ namespace rocos {
         inline Statusword getStatusword() { return _statusword; }
 
         inline DriveState getDriveState() { return _currentDriveState; }
+        inline int getDriveStateRPC() {
+            if(_currentDriveState == DriveState::Fault)
+                return 3;
+            else if(_currentDriveState == DriveState::OperationEnabled)
+                return 2;
+            else if(_currentDriveState == DriveState::NA)
+                return 0;
+            else
+                return 1;
+        }
 
         void setMode(ModeOfOperation mode);
 
@@ -73,11 +83,15 @@ namespace rocos {
 
         int16_t getTorqueInCnt();
 
+        int16_t getLoadTorqueInCnt();
+
         double getPosition();
 
         double getVelocity();
 
         double getTorque();
+
+        double getLoadTorque();
 
         inline int getId() const { return _id; }
 

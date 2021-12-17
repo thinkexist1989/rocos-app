@@ -339,6 +339,10 @@ namespace rocos {
         return getTorqueInCnt();
     }
 
+    double Drive::getLoadTorque() {
+        return getLoadTorqueInCnt();
+    }
+
     void Drive::setPositionInCnt(int32_t pos) {
         _hw_interface->setTargetPositionRaw(_id, pos);
     }
@@ -361,6 +365,10 @@ namespace rocos {
 
     int16_t Drive::getTorqueInCnt() {
         return _hw_interface->getActualTorqueRaw(_id);
+    }
+
+    int16_t Drive::getLoadTorqueInCnt() {
+        return _hw_interface->getLoadTorqueRaw(_id);
     }
 
     void Drive::moveToPositionInCnt(int32_t pos, double max_vel, double max_acc, double max_jerk, ProfileType type) {
