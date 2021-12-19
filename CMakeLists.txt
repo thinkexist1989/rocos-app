@@ -114,6 +114,14 @@ find_package(yaml-cpp REQUIRED)
 find_package(Threads REQUIRED)
 find_package(Qt5 REQUIRED COMPONENTS Core)
 
+##################
+##       3rdparty         ##
+##################
+add_subdirectory(3rdparty/kdl)
+add_subdirectory(3rdparty/nlopt)
+add_subdirectory(3rdparty/trac_ik)
+add_subdirectory(3rdparty/kdl_parser)
+
 
 ###########
 ## Build ##
