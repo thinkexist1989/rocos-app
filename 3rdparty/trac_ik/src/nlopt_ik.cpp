@@ -198,7 +198,8 @@ namespace NLOPT_IK
 
         if (chain.getNrOfJoints() < 2)
         {
-            // ROS_WARN_THROTTLE(1.0, "NLOpt_IK can only be run for chains of length 2 or more");
+            std::cout << "WARNING :"
+                      << "NLOpt_IK can only be run for chains of length 2 or more";
             return;
         }
         opt = nlopt::opt(nlopt::LD_SLSQP, _chain.getNrOfJoints());
@@ -287,15 +288,16 @@ namespace NLOPT_IK
         int rc = fksolver.JntToCart(q, currentPose);
 
         if (rc < 0)
-            //ROS_FATAL_STREAM("KDL FKSolver is failing: " << q.data);
+            std::cout << "KDL FKSolver is failing: " << q.data;
 
-            if (std::isnan(currentPose.p.x()))
-            {
-                // ROS_ERROR("NaNs from NLOpt!!");
-                error[0] = std::numeric_limits<float>::max();
-                progress = -1;
-                return;
-            }
+        if (std::isnan(currentPose.p.x()))
+        {
+            std::cout << "ERROR :"
+                      << "NaNs from NLOpt!!";
+            error[0] = std::numeric_limits<float>::max();
+            progress = -1;
+            return;
+        }
 
         KDL::Twist delta_twist = KDL::diffRelative(targetPose, currentPose);
 
@@ -336,15 +338,16 @@ namespace NLOPT_IK
         int rc = fksolver.JntToCart(q, currentPose);
 
         if (rc < 0)
-            //ROS_FATAL_STREAM("KDL FKSolver is failing: " << q.data);
+            std::cout << "KDL FKSolver is failing: " << q.data;
 
-            if (std::isnan(currentPose.p.x()))
-            {
-                //ROS_ERROR("NaNs from NLOpt!!");
-                error[0] = std::numeric_limits<float>::max();
-                progress = -1;
-                return;
-            }
+        if (std::isnan(currentPose.p.x()))
+        {
+            std::cout << "ERROR :"
+                      << "NaNs from NLOpt!!";
+            error[0] = std::numeric_limits<float>::max();
+            progress = -1;
+            return;
+        }
 
         KDL::Twist delta_twist = KDL::diffRelative(targetPose, currentPose);
 
@@ -385,15 +388,16 @@ namespace NLOPT_IK
         int rc = fksolver.JntToCart(q, currentPose);
 
         if (rc < 0)
-            //ROS_FATAL_STREAM("KDL FKSolver is failing: " << q.data);
+            std::cout << "KDL FKSolver is failing: " << q.data;
 
-            if (std::isnan(currentPose.p.x()))
-            {
-                //ROS_ERROR("NaNs from NLOpt!!");
-                error[0] = std::numeric_limits<float>::max();
-                progress = -1;
-                return;
-            }
+        if (std::isnan(currentPose.p.x()))
+        {
+            std::cout << "ERROR :"
+                      << "NaNs from NLOpt!!";
+            error[0] = std::numeric_limits<float>::max();
+            progress = -1;
+            return;
+        }
 
         KDL::Twist delta_twist = KDL::diffRelative(targetPose, currentPose);
 
@@ -439,13 +443,14 @@ namespace NLOPT_IK
 
         if (chain.getNrOfJoints() < 2)
         {
-            //ROS_ERROR_THROTTLE(1.0, "NLOpt_IK can only be run for chains of length 2 or more");
+            std::cout << "ERROR ："
+                      << "NLOpt_IK can only be run for chains of length 2 or more";
             return -3;
         }
 
         if (q_init.data.size() != types.size())
         {
-            //ROS_ERROR_THROTTLE(1.0, "IK seeded with wrong number of joints.  Expected %d but got %d", (int)types.size(), (int)q_init.data.size());
+            printf(" ERROR : IK seeded with wrong number of joints.  Expected %d but got %d", (int)types.size(), (int)q_init.data.size());
             return -3;
         }
 

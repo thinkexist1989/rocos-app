@@ -394,7 +394,7 @@ namespace TRAC_IK
 
         if (!initialized)
         {
-            //  ROS_ERROR("TRAC-IK was not properly initialized with a valid chain or limits.  IK cannot proceed");
+            std::cout << "ERROR :" << ("TRAC-IK was not properly initialized with a valid chain or limits.  IK cannot proceed");
             return -1;
         }
 
