@@ -26,6 +26,7 @@ option java_outer_classname = "RobotStateProto";
 import "header.proto"; // Standard header of gRPC
 import "geometry.proto";
 import "google/protobuf/wrappers.proto";
+import "google/protobuf/timestamp.proto";
 
 // Proto containing the state of a joint on the robot. This can be used with the robot skeleton to
 // update the current view of the robot.
@@ -89,6 +90,15 @@ message HardwareState {
         HW_TYPE_PROFINET =4;  // reserved
     }
     HardwareType hw_type = 1;
+
+    google.protobuf.Timestamp timestamp = 2;
+
+    double min_cycle_time = 3;
+    double max_cycle_time = 4;
+    double current_cycle_time = 5;
+
+    int32 slave_num = 6;
+
 }
 
 message RobotStateRequest {

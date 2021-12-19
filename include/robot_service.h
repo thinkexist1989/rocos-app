@@ -35,11 +35,11 @@ namespace rocos {
 
     class RobotServiceImpl final : public RobotService::Service {
     private:
-        RobotServiceImpl(boost::shared_ptr<Robot> robot);
-        ~RobotServiceImpl();
+        explicit RobotServiceImpl(Robot* robot);
+        ~RobotServiceImpl() override;
 
     public:
-        static boost::shared_ptr<RobotServiceImpl> getInstance(boost::shared_ptr<Robot> robot);
+        static boost::shared_ptr<RobotServiceImpl> getInstance(Robot* robot);
 
         grpc::Status ReadRobotState(::grpc::ServerContext *context, const ::rocos::RobotStateRequest *request,
                                     ::rocos::RobotStateResponse *response) override;
@@ -47,7 +47,7 @@ namespace rocos {
         grpc::Status WriteRobotCommmand(::grpc::ServerContext *context, const ::rocos::RobotCommandRequest *request,
                                         ::rocos::RobotCommandResponse *response) override;
 
-        void runServer(const std::string& address = "0.0.0.0:30001");
+        void runServer(const std::string& address = "0.0.0.0:30001", bool isDetached = false);
 
         void stopServer();
 

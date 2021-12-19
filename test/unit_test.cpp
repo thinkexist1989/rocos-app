@@ -11,6 +11,7 @@
 #include <ethercat/hardware_sim.h>
 #include <drive.h>
 #include <robot.h>
+#include <robot_service.h>
 
 
 TEST_CASE("Hello World") {
@@ -224,5 +225,13 @@ TEST_CASE("Sync motion") {
 }
 
 TEST_CASE("gRPC communication") {
+    using namespace rocos;
+    boost::shared_ptr<HardwareInterface> hw = boost::make_shared<HardwareSim>(5);
+
+    Robot robot(hw);
+
+    auto robotService = RobotServiceImpl::getInstance(&robot);
+
+    robotService->runServer();
 
 }

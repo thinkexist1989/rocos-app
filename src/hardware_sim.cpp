@@ -19,7 +19,7 @@ namespace rocos {
         _type = HW_SIM;
         for (auto& s: _statuswordVec) {
             s.setFromRawStatusword(4663); // in simulation all is enabled forever.
-            std::cout << "Init raw status word" <<  s << std::endl;
+//            std::cout << "Init raw status word" <<  s << std::endl;
         }
     }
 

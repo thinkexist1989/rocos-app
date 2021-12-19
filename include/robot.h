@@ -29,6 +29,8 @@
 namespace rocos {
 
     class Robot {
+        friend class RobotServiceImpl;
+
     public:
         enum Synchronization {
             SYNC_NONE,
@@ -49,7 +51,7 @@ namespace rocos {
 
         void setDisabled();
 
-        inline int getJointNum() { return _jntNum; }
+        inline int getJointNum() const { return _jntNum; }
 
         inline int getJointStatus(int id) { return _joints[id]->getDriveStateRPC(); }
 
@@ -61,12 +63,22 @@ namespace rocos {
 
         inline double getJointLoadTorque(int id) { return _joints[id]->getLoadTorque(); }
 
+        inline void setJointPosition(int id, double pos) { _joints[id]->setPosition(pos); }
+
+        inline void setJointVelocity(int id, double vel) { _joints[id]->setVelocity(vel); }
+
+        inline void setJointTorque(int id, double tor) { _joints[id]->setTorque(tor); }
+
     protected:
         void addAllJoints();
 
     protected:
         boost::shared_ptr<HardwareInterface> _hw_interface{nullptr};
         std::vector<boost::shared_ptr<Drive>> _joints;
+
+        std::vector<double> _targetPositions;
+        std::vector<double> _targetVelocities;
+        std::vector<double> _targetTorques;
 
         int _jntNum;
     };

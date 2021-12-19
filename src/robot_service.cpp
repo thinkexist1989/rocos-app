@@ -28,7 +28,7 @@
 namespace rocos {
     using namespace google::protobuf::util; //使用命名空间
 
-    RobotServiceImpl::RobotServiceImpl(boost::shared_ptr<Robot> robot) : _robotPtr(std::move(robot)) {
+    RobotServiceImpl::RobotServiceImpl(Robot* robot) : _robotPtr(robot) {
 
     }
 
@@ -36,7 +36,7 @@ namespace rocos {
 
     }
 
-    boost::shared_ptr<RobotServiceImpl> RobotServiceImpl::getInstance(boost::shared_ptr<Robot> robot) {
+    boost::shared_ptr<RobotServiceImpl> RobotServiceImpl::getInstance(Robot* robot) {
         if (_instance == nullptr) {
             _instance.reset(new RobotServiceImpl(robot), [](RobotServiceImpl *t) { delete t; }); // 因为默认访问不了private 析构函数,需传入删除器
         }
@@ -49,7 +49,8 @@ namespace rocos {
         //ResponseHeader
         *response->mutable_header()->mutable_response_timestamp() = TimeUtil::GetCurrentTime(); // response timestamp
 
-        //Robotstate.JointState
+        auto robotState = response->mutable_robot_state();
+        // JointState
         for(int i = 0; i < _robotPtr->getJointNum(); i++) {
             JointState jointState;
             jointState.set_status(static_cast<JointState_Status>(_robotPtr->getJointStatus(i)));
@@ -58,8 +59,18 @@ namespace rocos {
             jointState.set_acceleration(_robotPtr->getJointTorque(i));
             jointState.set_load(_robotPtr->getJointLoadTorque(i));
 
-            *response->mutable_robot_state()->add_joint_states() = jointState;
+            *robotState->add_joint_states() = jointState;
         }
+
+        // Hardware State
+        auto hw_state = response->mutable_robot_state()->mutable_hw_state();
+        hw_state->set_hw_type(
+                static_cast<HardwareState_HardwareType>(_robotPtr->_hw_interface->getHardwareType()));
+        hw_state->set_min_cycle_time(_robotPtr->_hw_interface->getMinCycleTime());
+        hw_state->set_max_cycle_time(_robotPtr->_hw_interface->getMaxCycleTime());
+        hw_state->set_current_cycle_time(_robotPtr->_hw_interface->getCurrCycleTime());
+        hw_state->set_slave_num(_robotPtr->_hw_interface->getSlaveNumber());
+
 
         return grpc::Status::OK;
     }
@@ -71,9 +82,15 @@ namespace rocos {
         return grpc::Status::OK;
     }
 
-    void RobotServiceImpl::runServer(const std::string& address) {
+    void RobotServiceImpl::runServer(const std::string& address, bool isDetached) {
         _thread = boost::make_shared<boost::thread>(boost::bind(&RobotServiceImpl::serverThread, this, address));
-        _thread->detach();
+        if(isDetached) {
+            _thread->detach();
+        }
+        else{
+            _thread->join();
+        }
+
     }
 
     void RobotServiceImpl::stopServer() {
