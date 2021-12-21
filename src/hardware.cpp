@@ -118,4 +118,8 @@ namespace rocos {
         return status.getDriveState();
     }
 
+    std::string Hardware::getSlaveName(int id) {
+        return ecPtr->ecatSlaveNameVec->at(id).c_str();
+    }
+
 }

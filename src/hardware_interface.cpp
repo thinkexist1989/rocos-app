@@ -131,5 +131,9 @@ namespace rocos {
         usleep(1000);
     }
 
+    std::string HardwareInterface::getSlaveName(int id) {
+        return std::string();
+    }
+
 }
 

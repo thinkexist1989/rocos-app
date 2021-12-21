@@ -91,6 +91,9 @@ namespace rocos {
 
         /// scale a planned profile to a longer duration
         virtual double scaleToDuration(double newDuration) { return newDuration; };
+
+        virtual void planProfile(double t0, double p0, double pf,
+                           double v0, double vf, double v_limit, double a_limit, double j_limit) { };
     };
 
 // 速度T型波
@@ -128,6 +131,9 @@ namespace rocos {
 
         void planTrapezoidProfile(double t0, double p0, double pf,
                                   double v0, double vf, double v_limit, double a_limit);
+
+        void planProfile(double t0, double p0, double pf, double v0, double vf, double v_limit, double a_limit,
+                         double j_limit) override;
 
     private:
         void trapezoid_check_T(double t0, double p0, double pf,
@@ -179,6 +185,9 @@ namespace rocos {
 
         void planDoubleSProfile(double t0, double p0, double pf,
                                 double v0, double vf, double v_limit, double a_limit, double j_limit);
+
+        void planProfile(double t0, double p0, double pf, double v0, double vf, double v_limit, double a_limit,
+                         double j_limit) override;
 
     private:
         void doubleS_check_T(double t0, double p0, double pf,

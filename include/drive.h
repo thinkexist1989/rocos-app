@@ -95,6 +95,8 @@ namespace rocos {
 
         inline int getId() const { return _id; }
 
+        inline std::string getName() { return _hw_interface->getSlaveName(_id); }
+
         inline ModeOfOperation getMode() const { return _mode; }
 
         void moveToPositionInCnt(int32_t pos, double max_vel, double max_acc,
@@ -132,6 +134,16 @@ namespace rocos {
         Controlword getNextStateTransitionControlword(const DriveState &requestedDriveState,
                                                       const DriveState &currentDriveState);
 
+    public:
+        void setMaxVel(double maxVel) { _max_vel = maxVel; }
+        double getMaxVel() const { return _max_vel; }
+
+        void setMaxAcc(double maxAcc) { _max_acc = maxAcc; }
+        double getMaxAcc() const { return _max_acc; }
+
+        void setMaxJerk(double maxJerk) { _max_jerk = maxJerk; }
+        double getMaxJerk() const { return _max_jerk; }
+
 
     protected:
 
@@ -140,6 +152,13 @@ namespace rocos {
         double _reduction_ratio{1.0}; // reduction ratio
         double _minPosLimit{-2.0};
         double _maxPosLimit{2.0};
+
+        //TODO:
+        double _max_vel {100000.0};
+        double _max_acc {100000.0};
+        double _max_jerk {100000.0};
+
+        int32_t offsetPosInCnt {0}; // zero position in Cnt
 
         bool _isEnabled{false};
 

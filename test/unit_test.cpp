@@ -224,9 +224,36 @@ TEST_CASE("Sync motion") {
 
 }
 
+TEST_CASE("Robot Motion Thread") {
+    using namespace rocos;
+//    boost::shared_ptr<HardwareInterface> hw = boost::make_shared<HardwareSim>(5);
+    boost::shared_ptr<HardwareInterface> hw = boost::make_shared<Hardware>();
+
+    Robot robot(hw);
+
+    robot.setEnabled();
+
+    usleep(1000000);
+
+    std::vector<double> pos(4, 0);
+    std::vector<double> vel(4, 0);
+
+    robot.moveJ(pos, vel);
+
+    usleep(10000000);
+
+    std::vector<double> pos2(4, 500000);
+    robot.moveJ(pos2, vel);
+
+    usleep(10000000);
+}
+
+
+
 TEST_CASE("gRPC communication") {
     using namespace rocos;
-    boost::shared_ptr<HardwareInterface> hw = boost::make_shared<HardwareSim>(5);
+//    boost::shared_ptr<HardwareInterface> hw = boost::make_shared<HardwareSim>(5);
+    boost::shared_ptr<HardwareInterface> hw = boost::make_shared<Hardware>();
 
     Robot robot(hw);
 

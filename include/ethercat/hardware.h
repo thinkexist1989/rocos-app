@@ -66,6 +66,8 @@ namespace rocos {
 
         uint16_t getStatuswordRaw(int id) override;
 
+        std::string getSlaveName(int id) override;
+
         int32_t getSlaveNumber() override;
 
         void setControlwordRaw(int id, uint16_t ctrlwd) override;

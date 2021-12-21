@@ -53,6 +53,7 @@ namespace rocos {
         // JointState
         for(int i = 0; i < _robotPtr->getJointNum(); i++) {
             JointState jointState;
+            jointState.set_name(_robotPtr->getJointName(i));
             jointState.set_status(static_cast<JointState_Status>(_robotPtr->getJointStatus(i)));
             jointState.set_position(_robotPtr->getJointPosition(i));
             jointState.set_velocity(_robotPtr->getJointVelocity(i));
@@ -78,6 +79,16 @@ namespace rocos {
     grpc::Status
     RobotServiceImpl::WriteRobotCommmand(::grpc::ServerContext *context, const ::rocos::RobotCommandRequest *request,
                                          ::rocos::RobotCommandResponse *response) {
+        //ResponseHeader
+        *response->mutable_header()->mutable_response_timestamp() = TimeUtil::GetCurrentTime(); // response timestamp
+
+        //Process Request RobotCommand
+        if(request->command().has_enabled()) {
+            _robotPtr->setEnabled();
+        }
+        else if(request->command().has_disabled()) {
+            _robotPtr->setDisabled();
+        }
 
         return grpc::Status::OK;
     }

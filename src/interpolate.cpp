@@ -236,6 +236,11 @@ namespace rocos {
 // T型波
 #pragma region TRAPEZOID
 
+    void Trapezoid::planProfile(double t0, double p0, double pf, double v0, double vf, double v_limit, double a_limit,
+                                double j_limit) {
+        planTrapezoidProfile(t0, p0, pf, v0, vf, v_limit, a_limit);
+    }
+
     void Trapezoid::planTrapezoidProfile(double t0, double p0, double pf,
                                          double v0, double vf, double v_limit, double a_limit) {
         _plannedProfile = false;
@@ -327,7 +332,7 @@ namespace rocos {
 
     double Trapezoid::scaleToDuration(double newDuration) {
         if (newDuration < (_t[3] - _t[0])) {
-            DEBUG("New duration must be longer!\n");
+//            DEBUG("New duration must be longer!\n");
             return _t[3] - _t[0];
         }
 
@@ -522,6 +527,11 @@ namespace rocos {
 
 // S型波
 #pragma region DOUBLES
+
+    void DoubleS::planProfile(double t0, double p0, double pf, double v0, double vf, double v_limit, double a_limit,
+                              double j_limit) {
+        planDoubleSProfile(t0, p0, pf, v0, vf, v_limit, a_limit, j_limit);
+    }
 
     void DoubleS::planDoubleSProfile(double t0, double p0, double pf,
                                      double v0, double vf, double v_limit, double a_limit, double j_limit) {

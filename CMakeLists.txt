@@ -115,7 +115,7 @@ find_package(Threads REQUIRED)
 find_package(Qt5 REQUIRED COMPONENTS Core)
 
 ##################
-##       3rdparty         ##
+##   3rdparty   ##
 ##################
 add_subdirectory(3rdparty/kdl)
 add_subdirectory(3rdparty/nlopt)

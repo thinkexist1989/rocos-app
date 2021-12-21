@@ -26,8 +26,42 @@ option java_outer_classname = "RobotStateProto";
 import "header.proto"; // Standard header of gRPC
 import "google/protobuf/wrappers.proto";
 
-message RobotCommand {
+enum Synchronization {
+    SYNC_NONE = 0;
+    SYNC_TIME = 1;
+    SYNC_PHASE = 2;
+}
 
+message Enabled {
+
+}
+
+message Disabled {
+
+}
+
+message SingleAxisMove {
+    int32 id = 1;
+    double pos = 2;
+    optional double max_vel = 3;
+    optional double max_acc = 4;
+    optional double max_jerk = 5;
+    optional double least_time = 6;
+}
+
+message MoveJ {
+    repeated double target_pos = 1;
+    repeated double target_vel = 2;
+    Synchronization synchronization = 3;
+}
+
+message RobotCommand {
+    oneof command {
+        Enabled enabled = 1;
+        Disabled disabled = 2;
+        SingleAxisMove single_axis_move = 3;
+        MoveJ   move_j = 4;
+    }
 }
 
 message RobotCommandRequest {
