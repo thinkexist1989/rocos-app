@@ -33,7 +33,7 @@ namespace rocos {
     }
 
     RobotServiceImpl::~RobotServiceImpl() {
-
+        _server->Shutdown();
     }
 
     boost::shared_ptr<RobotServiceImpl> RobotServiceImpl::getInstance(Robot *robot) {
