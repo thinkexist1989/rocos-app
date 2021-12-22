@@ -44,7 +44,13 @@ namespace rocos {
 
         void setEnabled();
 
+        inline void setJointEnabled(int id) { _joints[id]->setEnabled(); }
+
         void setDisabled();
+
+        inline void setJointDisabled(int id) { _joints[id]->setDisabled(); }
+
+        inline void setJointMode(int id, ModeOfOperation mode) {_joints[id]->setMode(mode); }
 
         inline int getJointNum() const { return _jntNum; }
 

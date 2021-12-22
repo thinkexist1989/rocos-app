@@ -194,7 +194,9 @@ add_executable(${PROJECT_NAME} src/rocosAppMain.cpp)
 target_link_libraries(${PROJECT_NAME}
         PRIVATE
         Qt5::Core
+        rocos::hardware
         rocos::drive
+        rocos::protocol
         )
 
 #############

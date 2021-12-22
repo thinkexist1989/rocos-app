@@ -32,12 +32,24 @@ enum Synchronization {
     SYNC_PHASE = 2;
 }
 
-message Enabled {
-
+enum Mode {
+    MODE_CSP = 0;
+    MODE_CSV = 1;
+    MODE_CST = 2;
 }
 
-message Disabled {
+/////// SingleAxisCommand ////////////
+message SingleAxisEnabled {
+    int32 id = 1;
+}
 
+message SingleAxisDisabled {
+    int32 id = 1;
+}
+
+message SingleAxisMode {
+    int32 id = 1;
+    Mode mode = 2;
 }
 
 message SingleAxisMove {
@@ -49,18 +61,69 @@ message SingleAxisMove {
     optional double least_time = 6;
 }
 
+message SingleAxisCommand {
+    oneof command {
+        SingleAxisEnabled enabled = 1;
+        SingleAxisDisabled disabled = 2;
+        SingleAxisMode mode = 3;
+        SingleAxisMove move = 4;
+    }
+}
+
+/////// MultiAxisCommand ////////////
+message MultiAxisEnabled {
+}
+
+message MultiAxisDisabled {
+}
+
+message MultiAxisMode {
+    Mode mode = 1;
+}
+
+message MultiAxisMove {
+    repeated double target_pos = 1;
+    repeated double target_vel = 2;
+    Synchronization synchronization = 3;
+}
+
+message MultiAxisCommand {
+    oneof command {
+        MultiAxisEnabled enabled = 1;
+        MultiAxisDisabled disabled = 2;
+        MultiAxisMode mode = 3;
+        MultiAxisMove move = 4;
+    }
+}
+
+
+/////// General Command /////////////
+message Enabled {
+    repeated double target_pos = 1;
+    repeated double target_vel = 2;
+}
+
+message Disabled {
+
+}
+
 message MoveJ {
     repeated double target_pos = 1;
     repeated double target_vel = 2;
     Synchronization synchronization = 3;
 }
 
+
+
+///////////////////////////////////////
+
 message RobotCommand {
     oneof command {
         Enabled enabled = 1;
         Disabled disabled = 2;
-        SingleAxisMove single_axis_move = 3;
-        MoveJ   move_j = 4;
+        MoveJ   move_j = 3;
+        SingleAxisCommand single_axis_command = 4;
+        MultiAxisCommand multi_axis_command = 5;
     }
 }
 

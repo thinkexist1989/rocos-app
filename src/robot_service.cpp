@@ -28,7 +28,7 @@
 namespace rocos {
     using namespace google::protobuf::util; //使用命名空间
 
-    RobotServiceImpl::RobotServiceImpl(Robot* robot) : _robotPtr(robot) {
+    RobotServiceImpl::RobotServiceImpl(Robot *robot) : _robotPtr(robot) {
 
     }
 
@@ -36,9 +36,10 @@ namespace rocos {
 
     }
 
-    boost::shared_ptr<RobotServiceImpl> RobotServiceImpl::getInstance(Robot* robot) {
+    boost::shared_ptr<RobotServiceImpl> RobotServiceImpl::getInstance(Robot *robot) {
         if (_instance == nullptr) {
-            _instance.reset(new RobotServiceImpl(robot), [](RobotServiceImpl *t) { delete t; }); // 因为默认访问不了private 析构函数,需传入删除器
+            _instance.reset(new RobotServiceImpl(robot),
+                            [](RobotServiceImpl *t) { delete t; }); // 因为默认访问不了private 析构函数,需传入删除器
         }
         return _instance;
     }
@@ -51,7 +52,7 @@ namespace rocos {
 
         auto robotState = response->mutable_robot_state();
         // JointState
-        for(int i = 0; i < _robotPtr->getJointNum(); i++) {
+        for (int i = 0; i < _robotPtr->getJointNum(); i++) {
             JointState jointState;
             jointState.set_name(_robotPtr->getJointName(i));
             jointState.set_status(static_cast<JointState_Status>(_robotPtr->getJointStatus(i)));
@@ -83,22 +84,54 @@ namespace rocos {
         *response->mutable_header()->mutable_response_timestamp() = TimeUtil::GetCurrentTime(); // response timestamp
 
         //Process Request RobotCommand
-        if(request->command().has_enabled()) {
+        if (request->command().has_enabled()) {
             _robotPtr->setEnabled();
-        }
-        else if(request->command().has_disabled()) {
+        } else if (request->command().has_disabled()) {
             _robotPtr->setDisabled();
+        } else if (request->command().has_move_j()) {
+
+        }
+            /////////// Single Axis Command //////////////
+        else if (request->command().has_single_axis_command()) {
+            auto singleAxisCmd = request->command().single_axis_command();
+
+            if (singleAxisCmd.has_enabled()) {                 ///////// enabled
+                _robotPtr->setJointEnabled(singleAxisCmd.enabled().id());
+            } else if (singleAxisCmd.has_disabled()) {        ///////// disabled
+                _robotPtr->setJointDisabled(singleAxisCmd.disabled().id());
+            } else if (singleAxisCmd.has_mode()) {           /////////// mode
+                ModeOfOperation modeOfOperation;
+                switch (singleAxisCmd.mode().mode()) {
+                    case MODE_CSP:
+                        modeOfOperation = ModeOfOperation::CyclicSynchronousPositionMode;
+                        break;
+                    case MODE_CSV:
+                        modeOfOperation = ModeOfOperation::CyclicSynchronousVelocityMode;
+                        break;
+                    case MODE_CST:
+                        modeOfOperation = ModeOfOperation::CyclicSynchronousTorqueMode;
+                        break;
+                }
+                _robotPtr->setJointMode(singleAxisCmd.mode().id(), modeOfOperation);
+            } else if (singleAxisCmd.has_move()) {         /////////// move
+//                _robotPtr.
+            }
+
+
+        }
+            /////////// Multi Axis Command //////////////
+        else if (request->command().has_multi_axis_command()) {
+//            _robotPtr->setJointDisabled(request->command().single_axis_disabled().id());
         }
 
         return grpc::Status::OK;
     }
 
-    void RobotServiceImpl::runServer(const std::string& address, bool isDetached) {
+    void RobotServiceImpl::runServer(const std::string &address, bool isDetached) {
         _thread = boost::make_shared<boost::thread>(boost::bind(&RobotServiceImpl::serverThread, this, address));
-        if(isDetached) {
+        if (isDetached) {
             _thread->detach();
-        }
-        else{
+        } else {
             _thread->join();
         }
 
@@ -108,7 +141,7 @@ namespace rocos {
         _server->Shutdown();
     }
 
-    void RobotServiceImpl::serverThread(const std::string& address) {
+    void RobotServiceImpl::serverThread(const std::string &address) {
         _isThreadRunning = true;
 
         grpc::EnableDefaultHealthCheckService(true);

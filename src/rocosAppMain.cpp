@@ -28,6 +28,11 @@
 //#include <QFile>
 
 #include <iostream>
+#include <ethercat/hardware.h>
+#include <ethercat/hardware_sim.h>
+#include <drive.h>
+#include <robot.h>
+#include <robot_service.h>
 
 bool isRuning = true;
 
@@ -48,8 +53,17 @@ int main(int argc, char *argv[]) {
         std::cout << "\033[1;31m" << "Can not catch SIGINT" << "\033[0m" << std::endl;
     }
 
+    using namespace rocos;
+//    boost::shared_ptr<HardwareInterface> hw = boost::make_shared<HardwareSim>(5);
+    boost::shared_ptr<HardwareInterface> hw = boost::make_shared<Hardware>();
+
+    Robot robot(hw);
+
+    auto robotService = RobotServiceImpl::getInstance(&robot);
 
     //------------------------wait----------------------------------
+    robotService->runServer();
+
     return 0;
 }
 
