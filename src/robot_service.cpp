@@ -101,7 +101,7 @@ namespace rocos {
                 _robotPtr->setJointDisabled(singleAxisCmd.disabled().id());
             } else if (singleAxisCmd.has_mode()) {           /////////// mode
                 ModeOfOperation modeOfOperation;
-                switch (singleAxisCmd.mode().mode()) {
+                switch (singleAxisCmd.mode().value()) {
                     case MODE_CSP:
                         modeOfOperation = ModeOfOperation::CyclicSynchronousPositionMode;
                         break;
@@ -109,18 +109,70 @@ namespace rocos {
                         modeOfOperation = ModeOfOperation::CyclicSynchronousVelocityMode;
                         break;
                     case MODE_CST:
-                        modeOfOperation = ModeOfOperation::CyclicSynchronousTorqueMode;
+                        std::cout << "CST is not implemented!" << std::endl;
+//                        modeOfOperation = ModeOfOperation::CyclicSynchronousTorqueMode;
                         break;
                 }
                 _robotPtr->setJointMode(singleAxisCmd.mode().id(), modeOfOperation);
             } else if (singleAxisCmd.has_move()) {         /////////// move
-//                _robotPtr.
+                double max_vel = -1, max_acc = -1, max_jerk = -1, least_time = -1;
+                if (singleAxisCmd.move().has_max_vel())
+                    max_vel = singleAxisCmd.move().max_vel();
+                if (singleAxisCmd.move().has_max_acc())
+                    max_acc = singleAxisCmd.move().max_acc();
+                if (singleAxisCmd.move().has_max_jerk())
+                    max_jerk = singleAxisCmd.move().max_jerk();
+                if (singleAxisCmd.move().has_least_time())
+                    least_time = singleAxisCmd.move().least_time();
+
+//                std::cout << "max_vel: " << max_vel << "; max_acc: " << max_acc << "; max_jerk: " << max_jerk << std::endl;
+
+                _robotPtr->moveSingleAxis(singleAxisCmd.move().id(), singleAxisCmd.move().pos(), 0.0, max_vel, max_acc,
+                                          max_jerk, least_time);
+
             }
-
-
         }
             /////////// Multi Axis Command //////////////
         else if (request->command().has_multi_axis_command()) {
+            auto multiAxisCmd = request->command().multi_axis_command();
+            if (multiAxisCmd.has_enabled()) {
+                _robotPtr->setEnabled();
+            } else if (multiAxisCmd.has_disabled()) {
+                _robotPtr->setDisabled();
+            } else if (multiAxisCmd.has_mode()) {
+                for(int i = 0; i < _robotPtr->_jntNum; i++) {
+                    ModeOfOperation modeOfOperation;
+                    switch (multiAxisCmd.mode().value().at(i)) {
+                        case MODE_CSP:
+                            modeOfOperation = ModeOfOperation::CyclicSynchronousPositionMode;
+                            break;
+                        case MODE_CSV:
+                            modeOfOperation = ModeOfOperation::CyclicSynchronousVelocityMode;
+                            break;
+                        case MODE_CST:
+                            std::cout << "CST is not implemented!" << std::endl;
+//                        modeOfOperation = ModeOfOperation::CyclicSynchronousTorqueMode;
+                            break;
+                    }
+                    _robotPtr->setJointMode(i, modeOfOperation);
+                }
+            }else if(multiAxisCmd.has_sync()) {
+                _robotPtr->setSynchronization(static_cast<Robot::Synchronization>(multiAxisCmd.sync().value()));
+            }
+            else if (multiAxisCmd.has_move()) {
+                for(int i = 0; i < _robotPtr->_jntNum; i++) {
+
+                    _robotPtr->moveSingleAxis(i,
+                                              multiAxisCmd.move().target_pos().at(i),
+                                              0.0,
+                                              multiAxisCmd.move().max_vel().at(i),
+                                              multiAxisCmd.move().max_acc().at(i),
+                                              multiAxisCmd.move().max_jerk().at(i),
+                                              -1);
+
+                }
+
+            }
 //            _robotPtr->setJointDisabled(request->command().single_axis_disabled().id());
         }
 

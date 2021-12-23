@@ -50,7 +50,7 @@ namespace rocos {
 
         inline void setJointDisabled(int id) { _joints[id]->setDisabled(); }
 
-        inline void setJointMode(int id, ModeOfOperation mode) {_joints[id]->setMode(mode); }
+        inline void setJointMode(int id, ModeOfOperation mode) { _joints[id]->setMode(mode); }
 
         inline int getJointNum() const { return _jntNum; }
 
@@ -84,6 +84,13 @@ namespace rocos {
                             double max_acc = -1,
                             double max_jerk = -1,
                             double least_time = -1);
+
+        void moveMultiAxis(const std::vector<double> &target_pos,
+                           const std::vector<double> &target_vel,
+                           const std::vector<double> &max_vel,
+                           const std::vector<double> &max_acc,
+                           const std::vector<double> &max_jerk,
+                           double least_time = -1);
 
         inline void setJntVelLimits(std::vector<double> &max_vel) {
             _max_vel = max_vel;

@@ -199,7 +199,15 @@ namespace rocos {
             _hw_interface->waitForSignal(9);
 
             // Trajectory generating......
+            max_time = 0.0;
             for (int i = 0; i < _jntNum; ++i) {
+                if (_joints[i]->getDriveState() != DriveState::OperationEnabled) {
+                    _targetPositions[i] = _joints[i]->getPosition();
+//                    _targetPositionsPrev[i] = _targetPositions[i];
+
+                    continue; // Disabled, ignore
+                }
+
                 if (fabs(_targetPositions[i] != _targetPositionsPrev[i]) || _needPlan[i]) { // need update
                     _targetPositionsPrev[i] = _targetPositions[i]; // assign to current target position
 
@@ -301,5 +309,31 @@ namespace rocos {
             _leastMotionTime = least_time;
 
         _needPlan[id] = true;
+    }
+
+    void Robot::moveMultiAxis(const vector<double> &target_pos, const vector<double> &target_vel,
+                              const vector<double> &max_vel, const vector<double> &max_acc,
+                              const vector<double> &max_jerk, double least_time) {
+        if ((target_pos.size() != _jntNum) || (target_vel.size() != _jntNum) || (max_vel.size() != _jntNum) ||
+            (max_acc.size() != _jntNum) || (max_jerk.size() != _jntNum)) {
+            std::cout << "[ERROR] moveMultiAxis: wrong size!" << std::endl;
+        }
+
+        for (int id = 0; id < _jntNum; id++) {
+            _targetPositions[id] = target_pos[id];
+            _targetVelocities[id] = target_vel[id];
+
+            if (max_vel[id] != -1)
+                _max_vel[id] = max_vel[id];
+            if (max_acc[id] != -1)
+                _max_acc[id] = max_acc[id];
+            if (max_jerk[id] != -1)
+                _max_jerk[id] = max_jerk[id];
+
+            _needPlan[id] = true;
+        }
+
+        if (least_time != -1)
+            _leastMotionTime = least_time;
     }
 }

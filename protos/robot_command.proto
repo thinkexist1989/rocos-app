@@ -49,7 +49,7 @@ message SingleAxisDisabled {
 
 message SingleAxisMode {
     int32 id = 1;
-    Mode mode = 2;
+    Mode value = 2;
 }
 
 message SingleAxisMove {
@@ -78,13 +78,19 @@ message MultiAxisDisabled {
 }
 
 message MultiAxisMode {
-    Mode mode = 1;
+    repeated Mode value = 1;
+}
+
+message MultiAxisSync {
+    Synchronization value = 1;
 }
 
 message MultiAxisMove {
     repeated double target_pos = 1;
-    repeated double target_vel = 2;
-    Synchronization synchronization = 3;
+    repeated double max_vel = 3;
+    repeated double max_acc = 4;
+    repeated double max_jerk = 5;
+    double least_time = 6;
 }
 
 message MultiAxisCommand {
@@ -92,7 +98,8 @@ message MultiAxisCommand {
         MultiAxisEnabled enabled = 1;
         MultiAxisDisabled disabled = 2;
         MultiAxisMode mode = 3;
-        MultiAxisMove move = 4;
+        MultiAxisSync sync = 4;
+        MultiAxisMove move = 5;
     }
 }
 
