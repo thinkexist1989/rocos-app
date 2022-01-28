@@ -32,7 +32,7 @@ Shenyang Institute of Automation, Chinese Academy of Sciences.
 #define ECAT_CONFIG_HPP_INCLUDED
 
 #define ROCOS_APP_ENABLED
-//#define ROCOS_ECM_ENABLED
+#define ROCOS_ECM_ENABLED
 
 #include <yaml-cpp/yaml.h>
 #include <iostream>
@@ -79,6 +79,7 @@ Shenyang Institute of Automation, Chinese Academy of Sciences.
 
 enum INPUTS //
 {
+    INPUT_GRP_NAME, // group_name
     STATUS_WORD,
     POSITION_ACTUAL_VALUE,
     VELOCITY_ACTUAL_VALUE,
@@ -86,6 +87,7 @@ enum INPUTS //
     LOAD_TORQUE_VALUE
 };
 enum OUTPUTS {
+    OUTPUT_GRP_NAME, // group_name
     MODE_OF_OPERATION,
     CONTROL_WORD,
     TARGET_POSITION,
@@ -167,6 +169,7 @@ class SlaveConfig {
 public:
     SlaveConfig() {
         // EtherCAT Process Data Input default Name Mapping
+        ecInpMap[INPUT_GRP_NAME] = "Inputs";
         ecInpMap[STATUS_WORD] = "Status word";
         ecInpMap[POSITION_ACTUAL_VALUE] = "Position actual value";
         ecInpMap[VELOCITY_ACTUAL_VALUE] = "Velocity actual value";
@@ -180,6 +183,7 @@ public:
         ecInpOffsets[LOAD_TORQUE_VALUE] = 0;
 
         // EtherCAT Process Data Output default Name Mapping
+        ecOutpMap[OUTPUT_GRP_NAME] = "Outputs";
         ecOutpMap[MODE_OF_OPERATION] = "Mode of operation";
         ecOutpMap[CONTROL_WORD] = "Control word";
         ecOutpMap[TARGET_POSITION] = "Target Position";
@@ -232,6 +236,8 @@ std::string configFileName{};
 
     std::string name{"default_robot"};
 
+    std::string license {"12345678-12345678-12345678F"};
+
     uint32_t loop_hz{1000};
 
     int slave_number{0};
@@ -268,6 +274,9 @@ public:
 
         name = robot["name"].as<std::string>();
         print_message("[YAML] Robot name is: " + name, MessageLevel::NORMAL);
+
+        if(robot["license"])
+            license = robot["license"].as<std::string>();
 
         loop_hz = robot["loop_hz"].as<uint32_t>();
 
@@ -310,6 +319,8 @@ public:
                           MessageLevel::NORMAL);
 
             /// Process Data Input Mapping
+            if (slaves[i]["inputs"]["group_name"])
+                slaveCfg[id].ecInpMap[INPUT_GRP_NAME] = slaves[i]["inputs"]["group_name"].as<std::string>();
             if (slaves[i]["inputs"]["status_word"])
                 slaveCfg[id].ecInpMap[STATUS_WORD] = slaves[i]["inputs"]["status_word"].as<std::string>();
             if (slaves[i]["inputs"]["position_actual_value"])
@@ -322,6 +333,8 @@ public:
                 slaveCfg[id].ecInpMap[LOAD_TORQUE_VALUE] = slaves[i]["inputs"]["load_torque_value"].as<std::string>();
 
             /// Process Data Out Mapping
+            if (slaves[i]["outputs"]["group_name"])
+                slaveCfg[id].ecOutpMap[OUTPUT_GRP_NAME] = slaves[i]["outputs"]["group_name"].as<std::string>();
             if (slaves[i]["outputs"]["mode_of_operation"])
                 slaveCfg[id].ecOutpMap[MODE_OF_OPERATION] = slaves[i]["outputs"]["mode_of_operation"].as<std::string>();
             if (slaves[i]["outputs"]["control_word"])
@@ -347,11 +360,11 @@ public:
 
 
     std::string getEcInpVarName(int jntId, INPUTS enumEcInp) {
-        return slaveCfg[jntId].name + ".Inputs." + slaveCfg[jntId].ecInpMap[enumEcInp];
+        return slaveCfg[jntId].name + "." + slaveCfg[jntId].ecInpMap[INPUT_GRP_NAME] + "." + slaveCfg[jntId].ecInpMap[enumEcInp];
     }
 
     std::string getEcOutpVarName(int jntId, OUTPUTS enumEcOutp) {
-        return slaveCfg[jntId].name + ".Outputs." + slaveCfg[jntId].ecOutpMap[enumEcOutp];
+        return slaveCfg[jntId].name + "." + slaveCfg[jntId].ecOutpMap[OUTPUT_GRP_NAME] + "." + slaveCfg[jntId].ecOutpMap[enumEcOutp];
     }
 
     bool createSharedMemory() {
@@ -371,7 +384,7 @@ public:
             std::cout << "value of sem_mutex is: " << val << std::endl;
             if (val != 1) {
                 sem_destroy(sem_mutex[i]);
-                sem_unlink(EC_SEM_MUTEX);
+                sem_unlink((EC_SEM_MUTEX + std::to_string(i)).c_str());
                 sem_mutex[i] = sem_open((EC_SEM_MUTEX + std::to_string(i)).c_str(), O_CREAT | O_RDWR, 0777, 1);
             }
 
