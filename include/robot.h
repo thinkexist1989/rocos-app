@@ -42,6 +42,8 @@ namespace rocos {
 
         explicit Robot(boost::shared_ptr<HardwareInterface> hw);
 
+        bool switchHW(boost::shared_ptr<HardwareInterface> hw); //切换硬件指针
+
         void setEnabled();
 
         inline void setJointEnabled(int id) { _joints[id]->setEnabled(); }
@@ -72,12 +74,23 @@ namespace rocos {
 
         inline void setJointTorque(int id, double tor) { _joints[id]->setTorque(tor); }
 
-
+        /// 多关节运动
+        /// \param target_pos 位置
+        /// \param target_vel 速度
+        /// \param sync 同步模式
         void moveJ(const std::vector<double> &target_pos,
                    const std::vector<double> &target_vel,
                    Synchronization sync = SYNC_TIME
         );
 
+        /// 单关节运动
+        /// \param id 关节ID
+        /// \param pos 位置
+        /// \param vel 速度
+        /// \param max_vel 最大速度
+        /// \param max_acc 最大加速度
+        /// \param max_jerk 最大加加速度
+        /// \param least_time 最短运行时间
         void moveSingleAxis(int id, double pos,
                             double vel = 0.0,
                             double max_vel = -1,
@@ -85,6 +98,13 @@ namespace rocos {
                             double max_jerk = -1,
                             double least_time = -1);
 
+        /// \brief 多轴运动
+        /// \param target_pos 位置
+        /// \param target_vel 速度
+        /// \param max_vel 最大速度
+        /// \param max_acc 最大加速度
+        /// \param max_jerk 最大加加速度
+        /// \param least_time 最短运行时间
         void moveMultiAxis(const std::vector<double> &target_pos,
                            const std::vector<double> &target_vel,
                            const std::vector<double> &max_vel,
@@ -92,69 +112,103 @@ namespace rocos {
                            const std::vector<double> &max_jerk,
                            double least_time = -1);
 
+        /// \brief 设置多关节速度约束
+        /// \param max_vel 速度约束值
         inline void setJntVelLimits(std::vector<double> &max_vel) {
             _max_vel = max_vel;
             _needPlan.resize(_jntNum, true);
         }
 
+        /// \brief 获取多关节速度约束
+        /// \return 速度约束值
         inline std::vector<double> getJntVelLimits() { return _max_vel; };
 
+        /// \brief 设置单关节速度约束
+        /// \param id 关节ID
+        /// \param max_vel 速度约束值
         inline void setJntVelLimit(int id, double max_vel) {
             _max_vel[id] = max_vel;
             _needPlan[id] = true;
         }
 
+        /// \brief 获取单关节速度约束
+        /// \param id 关节ID
+        /// \return 速度约束值
         inline double getJntVelLimit(int id) { return _max_vel[id]; }
 
+        /// \brief 设置关节加速度约束
+        /// \param max_acc 加速度约束值
         inline void setJntAccLimits(std::vector<double> &max_acc) {
             _max_acc = max_acc;
             _needPlan.resize(_jntNum, true);
         }
 
+        /// \brief 获取多关节加速度约束
+        /// \return 加速度约束值
         inline std::vector<double> getJntAccLimits() { return _max_acc; }
 
+        /// \brief 设置单关节加速度约束
+        /// \param id 关节ID
+        /// \param max_acc 加速度约束值
         inline void setJntAccLimit(int id, double max_acc) {
             _max_acc[id] = max_acc;
             _needPlan[id] = true;
         }
 
+        /// \brief 获取单关节加速度约束
+        /// \param id 关节ID
+        /// \return 加速度约束值
         inline double getJntAccLimit(int id) { return _max_acc[id]; }
 
+        /// \brief 设置多关节加加速约束
+        /// \param max_jerk 多关节加加速约束值
         inline void setJntJerkLimits(std::vector<double> &max_jerk) {
             _max_jerk = max_jerk;
             _needPlan.resize(_jntNum, true);
         }
 
+        /// \brief 获取多关节加加速约束
+        /// \return 多关节加加速约束值
         inline std::vector<double> getJntJerkLimits() { return _max_jerk; }
 
+        /// \brief 设置单关节加加速度约束
+        /// \param id 关节id
+        /// \param max_jerk 关节加加速约束值
         inline void setJntJerkLimit(int id, double max_jerk) {
             _max_jerk[id] = max_jerk;
             _needPlan[id] = true;
         }
 
+        /// \brief 获取单关节加加速度约束
+        /// \param id 关节ID
+        /// \return 关节加加速约束值
         inline double getJntJerkLimit(int id) { return _max_jerk[id]; }
 
+        /// \brief 设置规划Profile类型
+        /// \param type Trapezoid、DoubleS
         inline void setProfileType(ProfileType type) {
             _profileType = type;
             _needPlan.resize(_jntNum, true);
         }
 
+        /// \brief 设置同步模式
+        /// \param sync 无同步、时间同步、相位同步
         inline void setSynchronization(Synchronization sync) {
             _sync = sync;
             _needPlan.resize(_jntNum, true);
         }
 
 
-        void startMotionThread();
-
-        void stopMotionThread();
-
-        void motionThreadHandler();
+        /*****轨迹规划线程相关*****/
+        void startMotionThread(); // 启动轨迹规划线程
+        void stopMotionThread(); // 停止轨迹规划线程
+        void motionThreadHandler(); // 轨迹规划相关处理句柄
 
     protected:
         void addAllJoints();
 
     public: // TODO: need changed to private
+        // 测试用MoveJ
         void moveJ(const std::vector<double> &pos,
                    const std::vector<double> &max_vel,
                    const std::vector<double> &max_acc,
@@ -193,7 +247,7 @@ namespace rocos {
         bool _isRunning{false};
         bool _isExit{false};
 
-        std::vector<bool> _needPlan;
+        std::vector<bool> _needPlan; // 是否需要重新规划标志
     };
 
 }

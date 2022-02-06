@@ -20,6 +20,13 @@
 #ifndef ROCOS_APP_DRIVE_GUARD_H
 #define ROCOS_APP_DRIVE_GUARD_H
 
+/* DriveGuard类采用单例模式进行设计
+ * 每一个驱动器都会添加到DriveGuard中进行监测
+ *
+ * 这个类作为驱动器状态监测类，用于监测所有驱动器状态，状态机切换
+ * 后续会添加驱动器位置超限监测、速度超限监测等
+ */
+
 #include <boost/noncopyable.hpp>
 #include <boost/smart_ptr.hpp>
 #include <boost/thread.hpp>
@@ -45,7 +52,7 @@ namespace rocos {
     private:
         static boost::shared_ptr<DriveGuard> _instance; // 单例模式对象
 
-        std::vector<Drive*> _drives;
+        std::vector<Drive*> _drives; // 用于保存驱动器指针
 
         boost::shared_ptr<boost::thread> _thread {nullptr};
 

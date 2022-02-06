@@ -52,12 +52,13 @@ namespace rocos {
         inline Statusword getStatusword() { return _statusword; }
 
         inline DriveState getDriveState() { return _currentDriveState; }
+
         inline int getDriveStateRPC() {
-            if(_currentDriveState == DriveState::Fault)
+            if (_currentDriveState == DriveState::Fault)
                 return 3;
-            else if(_currentDriveState == DriveState::OperationEnabled)
+            else if (_currentDriveState == DriveState::OperationEnabled)
                 return 2;
-            else if(_currentDriveState == DriveState::NA)
+            else if (_currentDriveState == DriveState::NA)
                 return 0;
             else
                 return 1;
@@ -104,11 +105,11 @@ namespace rocos {
                                  ProfileType type = trapezoid); // Motion with interpolate
 
     private:
-        std::string _name{};
-        Statusword _statusword{};
-        Controlword _controlword{};
-        DriveState _currentDriveState{DriveState::NA};
-        DriveState _targetDriveState{DriveState::NA};
+        std::string _name{}; // 关节名称
+        Statusword _statusword{}; // 状态字
+        Controlword _controlword{}; // 控制字
+        DriveState _currentDriveState{DriveState::NA}; // 驱动器当前状态
+        DriveState _targetDriveState{DriveState::NA}; // 驱动器目标状态
 
         ModeOfOperation _mode{ModeOfOperation::CyclicSynchronousPositionMode};
 
@@ -121,7 +122,14 @@ namespace rocos {
 
         mutable boost::recursive_mutex _mutex; // TODO: change name!!!!
 
-        double _ratio{1.0}; // Ratio = input / output
+        double _ratio{1.0}; // TODO: 暂时没用 Ratio = input / output
+
+        int32_t _offsetPosInCnt{0}; // zero position in Cnt 零位偏移量
+
+//        double _cntPerUnit{131072 / M_PI};// 每个单位对应脉冲数，比如cnt/rad, cnt/r, cnt/m 2^17=131072
+        double _cntPerUnit{991232.0 / M_PI};// 每个单位对应脉冲数，比如cnt/rad, cnt/r, cnt/m 2^17=131072
+
+        double _torquePerUnit{1.0}; // 每个力矩单位对应的脉冲数，比如cnt/N，通常返回值是千分之一
 
     protected:
 
@@ -135,14 +143,27 @@ namespace rocos {
                                                       const DriveState &currentDriveState);
 
     public:
-        void setMaxVel(double maxVel) { _max_vel = maxVel; }
-        double getMaxVel() const { return _max_vel; }
+        ///////////规划约束相关///////////////
+        inline void setMaxVel(double maxVel) { _max_vel = maxVel; } // 设置最大速度
 
-        void setMaxAcc(double maxAcc) { _max_acc = maxAcc; }
-        double getMaxAcc() const { return _max_acc; }
+        inline double getMaxVel() const { return _max_vel; } // 获取最大速度
 
-        void setMaxJerk(double maxJerk) { _max_jerk = maxJerk; }
-        double getMaxJerk() const { return _max_jerk; }
+        void setMaxAcc(double maxAcc) { _max_acc = maxAcc; } // 设置最大加速度
+
+        inline double getMaxAcc() const { return _max_acc; } // 获取最大加速度
+
+        inline void setMaxJerk(double maxJerk) { _max_jerk = maxJerk; } // 设置最大加加速度
+
+        inline double getMaxJerk() const { return _max_jerk; } // 获取最大加加速度
+
+        ///////////单位转换相关///////////////
+        inline void setCntPerUnit(double val) { _cntPerUnit = val; } // 设置位置、速度转换
+
+        inline double getCntPerUnit() { return _cntPerUnit; } // 获取位置、速度转换
+
+        inline void setTorquePerUnit(double val) { _torquePerUnit = val; } // 设置力矩转换
+
+        inline double setTorquePerUnit() { return _torquePerUnit; } // 获取力矩转换
 
 
     protected:
@@ -153,12 +174,11 @@ namespace rocos {
         double _minPosLimit{-2.0};
         double _maxPosLimit{2.0};
 
-        //TODO:
-        double _max_vel {100000.0};
-        double _max_acc {100000.0};
-        double _max_jerk {100000.0};
+        //TODO: 变换单位
+        double _max_vel{1.0}; // [UserUnit]/s，比如 rad/s, mm/s
+        double _max_acc{1.0}; // [UserUnit]/s^2，比如 rad/s^2
+        double _max_jerk{10.0}; // [UserUnit]/s^3，比如 rad/s^3
 
-        int32_t offsetPosInCnt {0}; // zero position in Cnt
 
         bool _isEnabled{false};
 

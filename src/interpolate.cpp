@@ -1,5 +1,5 @@
 
-#pragma once
+//#pragma once
 
 #include <cstdio>
 #include "interpolate.h"
@@ -48,6 +48,8 @@ namespace rocos {
                 break;
 
         }
+
+        return ret;
     }
 
     double PULSE::vel(double time) {
@@ -71,6 +73,8 @@ namespace rocos {
                 return ret;
                 break;
         }
+
+        return ret;
     }
 
 // 通用插补

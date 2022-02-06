@@ -65,6 +65,12 @@ namespace rocos {
         }
     }
 
+    //TODO: 切换HW指针
+    bool Robot::switchHW(boost::shared_ptr<HardwareInterface> hw) {
+        return false;
+    }
+
+
     void
     Robot::moveJ(const std::vector<double> &pos, const std::vector<double> &max_vel, const std::vector<double> &max_acc,
                  const std::vector<double> &max_jerk, Robot::Synchronization sync, ProfileType type) {
@@ -294,6 +300,14 @@ namespace rocos {
 
     }
 
+    /// 设置单轴运动
+    /// \param id 轴ID
+    /// \param pos 目标位置
+    /// \param vel 目标速度
+    /// \param max_vel 最大速度
+    /// \param max_acc 最大加速度
+    /// \param max_jerk 最大加加速度
+    /// \param least_time 最短运行时间
     void Robot::moveSingleAxis(int id, double pos, double vel, double max_vel, double max_acc, double max_jerk,
                                double least_time) {
         _targetPositions[id] = pos;
@@ -311,6 +325,13 @@ namespace rocos {
         _needPlan[id] = true;
     }
 
+    /// 设置多轴运动
+    /// \param target_pos 目标位置
+    /// \param target_vel 目标速度
+    /// \param max_vel 最大速度
+    /// \param max_acc 最大加速度
+    /// \param max_jerk 最大加加速度
+    /// \param least_time 最短运行时间
     void Robot::moveMultiAxis(const vector<double> &target_pos, const vector<double> &target_vel,
                               const vector<double> &max_vel, const vector<double> &max_acc,
                               const vector<double> &max_jerk, double least_time) {
@@ -336,4 +357,5 @@ namespace rocos {
         if (least_time != -1)
             _leastMotionTime = least_time;
     }
+
 }

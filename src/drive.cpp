@@ -108,6 +108,10 @@ namespace rocos {
         return success;
     }
 
+    /// \brief 获取下一个状态控制字
+    /// \param requestedDriveState 请求的驱动器状态
+    /// \param currentDriveState  当前的驱动器状态
+    /// \return 返回控制字
     Controlword Drive::getNextStateTransitionControlword(const DriveState &requestedDriveState,
                                                          const DriveState &currentDriveState) {
         Controlword controlword;
@@ -270,6 +274,7 @@ namespace rocos {
         return controlword;
     }
 
+    /// \brief 处理状态机，在DriveGuard线程中循环调用
     void Drive::engageStateMachine() {
 // locking the mutex
 //        boost::lock_guard<boost::recursive_mutex> lock(_mutex);
@@ -310,33 +315,48 @@ namespace rocos {
 //        hasRead_ = false;
     }
 
+    /// \brief 上使能驱动器
+    /// \param waitForState 是否阻塞？
+    /// \return 是否上使能成功
     bool Drive::setEnabled(bool waitForState) {
         return setDriverState(DriveState::OperationEnabled, waitForState);
     }
 
+    /// \brief 下使能驱动器
+    /// \param waitForState 是否阻塞？
+    /// \return 是否下使能成功
     bool Drive::setDisabled(bool waitForState) {
         return setDriverState(DriveState::SwitchOnDisabled, waitForState);
     }
 
+    /// \brief 等待同步信号
     void Drive::waitForSignal() {
         _hw_interface->waitForSignal(_id);
     }
 
+    /// \brief 设置驱动器模式
+    /// \param mode CSP, CSV, CST
     void Drive::setMode(ModeOfOperation mode) {
         _mode = mode;
         _hw_interface->setModeOfOperation(_id, _mode);
     }
 
+    /// \brief 获取位置
+    /// \return 位置值[User Custom Unit]
     double Drive::getPosition() {
-        return getPositionInCnt();
+        return getPositionInCnt() / _cntPerUnit; // 单位转换
     }
 
+    /// \brief 获取速度
+    /// \return 速度值[User Custom Unit]
     double Drive::getVelocity() {
-        return getVelocityInCnt();
+        return getVelocityInCnt() / _cntPerUnit; // 单位转换
     }
 
+    /// \brief 获取力矩
+    /// \return 力矩值
     double Drive::getTorque() {
-        return getTorqueInCnt();
+        return getTorqueInCnt(); // TODO:单位转换
     }
 
     double Drive::getLoadTorque() {
@@ -344,7 +364,7 @@ namespace rocos {
     }
 
     void Drive::setPositionInCnt(int32_t pos) {
-        _hw_interface->setTargetPositionRaw(_id, pos);
+        _hw_interface->setTargetPositionRaw(_id, pos + _offsetPosInCnt); // 加上偏移量
     }
 
     void Drive::setVelocityInCnt(int32_t vel) {
@@ -356,7 +376,7 @@ namespace rocos {
     }
 
     int32_t Drive::getPositionInCnt() {
-        return _hw_interface->getActualPositionRaw(_id);
+        return _hw_interface->getActualPositionRaw(_id) - _offsetPosInCnt; // 减去偏移量
     }
 
     int32_t Drive::getVelocityInCnt() {
@@ -412,15 +432,18 @@ namespace rocos {
     }
 
     void Drive::setPosition(double pos) {
-        setPositionInCnt(pos);
+        auto posInCnt = static_cast<int32_t>(pos * _cntPerUnit);
+        setPositionInCnt(posInCnt);
     }
 
     void Drive::setVelocity(double vel) {
-        setVelocityInCnt(vel);
+        auto velInCnt = static_cast<int32_t>(vel * _cntPerUnit);
+        setVelocityInCnt(velInCnt);
     }
 
     void Drive::setTorque(double tor) {
-        setTorqueInCnt(tor);
+        auto torInCnt = static_cast<int16_t>(tor * _torquePerUnit);
+        setTorqueInCnt(torInCnt);
     }
 
 }
