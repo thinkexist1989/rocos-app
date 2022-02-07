@@ -53,6 +53,8 @@ message JointState {
     }
     // The joint status
     Status status = 6;
+
+    bool raw_data = 7;
 }
 
 message FlangeState {
@@ -104,6 +106,7 @@ message HardwareState {
 message RobotStateRequest {
     //Common request header.
     RequestHeader header = 1;
+    optional bool raw_data = 2; // 是否返回原始数据
 }
 
 message RobotStateResponse {

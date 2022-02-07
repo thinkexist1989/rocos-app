@@ -24,6 +24,7 @@ package rocos;
 option java_outer_classname = "RobotStateProto";
 
 import "header.proto"; // Standard header of gRPC
+import "geometry.proto";
 import "google/protobuf/wrappers.proto";
 
 enum Synchronization {
@@ -59,6 +60,7 @@ message SingleAxisMove {
     optional double max_acc = 4;
     optional double max_jerk = 5;
     optional double least_time = 6;
+    optional bool   raw_data = 7;
 }
 
 message SingleAxisCommand {
@@ -90,7 +92,8 @@ message MultiAxisMove {
     repeated double max_vel = 3;
     repeated double max_acc = 4;
     repeated double max_jerk = 5;
-    double least_time = 6;
+    optional double least_time = 6;
+    optional bool raw_data = 7;
 }
 
 message MultiAxisCommand {
@@ -111,13 +114,24 @@ message Enabled {
 }
 
 message Disabled {
+}
 
+// 查询或设置零位偏移
+message ZeroOffset {
+    repeated google.protobuf.Int32Value value = 1;
+}
+
+// 查询或设置单位转换
+message CntPerUnit {
+    repeated google.protobuf.DoubleValue value = 1;
 }
 
 message MoveJ {
     repeated double target_pos = 1;
-    repeated double target_vel = 2;
-    Synchronization synchronization = 3;
+}
+
+message MoveL {
+    SE3Pose target_pos = 1;
 }
 
 

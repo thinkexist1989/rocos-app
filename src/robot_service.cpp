@@ -141,7 +141,7 @@ namespace rocos {
                 _robotPtr->setDisabled();
             } else if (multiAxisCmd.has_mode()) {
                 for(int i = 0; i < _robotPtr->_jntNum; i++) {
-                    ModeOfOperation modeOfOperation;
+                    ModeOfOperation modeOfOperation = ModeOfOperation::CyclicSynchronousPositionMode;
                     switch (multiAxisCmd.mode().value().at(i)) {
                         case MODE_CSP:
                             modeOfOperation = ModeOfOperation::CyclicSynchronousPositionMode;
