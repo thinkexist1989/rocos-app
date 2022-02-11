@@ -33,4 +33,19 @@ message JointInfo {
   double cnt_per_unit = 2; // 每个用户单位对应多少脉冲数
   double torque_per_unit = 3; // 每个用户单位对应多少Torque值
   double ratio = 4; // 关节减速比
+  string user_unit_name = 5; // 用户单位的名称，可能是rad, m, mm等
+}
+
+// The Infomation of the robot
+message RobotInfo {
+  repeated JointInfo joint_infos = 1; //包含所有关节信息
+}
+
+message RobotInfoRequest {
+  RequestHeader header = 1; // Common request header.
+}
+
+message RobotInfoResponse {
+  ResponseHeader header = 1; //Common request header.
+  RobotInfo robot_info = 2; // 机器人信息
 }
