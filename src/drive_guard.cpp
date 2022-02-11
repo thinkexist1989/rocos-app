@@ -24,9 +24,9 @@
 namespace rocos {
 
     DriveGuard::DriveGuard() {
-        _isThreadRunning = true;
-        _thread = boost::make_shared<boost::thread>(boost::bind(&DriveGuard::workingThread, this));
-        _thread->detach();
+        is_thread_running_ = true;
+        thread_ = boost::make_shared<boost::thread>(boost::bind(&DriveGuard::workingThread, this));
+        thread_->detach();
     }
 
     DriveGuard::~DriveGuard() {
@@ -34,25 +34,25 @@ namespace rocos {
     }
 
     boost::shared_ptr<DriveGuard> DriveGuard::getInstance() {
-        if (_instance == nullptr) {
-            _instance.reset(new DriveGuard(), [](DriveGuard *t) { delete t; }); // 因为默认访问不了private 析构函数,需传入删除器
+        if (instance_ == nullptr) {
+            instance_.reset(new DriveGuard(), [](DriveGuard *t) { delete t; }); // 因为默认访问不了private 析构函数,需传入删除器
         }
-        return _instance;
+        return instance_;
     }
 
     void DriveGuard::addDrive(Drive *drive) {
-        _drives.push_back(drive); //将驱动器添加到_drives中
+        drives_.push_back(drive); //将驱动器添加到_drives中
     }
 
     void DriveGuard::workingThread() {
         std::cout << "Drive Guard is running on thread " << boost::this_thread::get_id() << std::endl;
-        while (_isThreadRunning) {
+        while (is_thread_running_) {
 
-            for (auto &d: _drives) {
+            for (auto &d: drives_) {
 
-                d->_currentDriveState = d->_hw_interface->getDriverState(d->_id);
+                d->current_drive_state_ = d->hw_interface_->getDriverState(d->id_);
 
-                if (d->_conductStateChange)
+                if (d->conduct_state_change_)
                     d->engageStateMachine();
 
             }
@@ -63,6 +63,6 @@ namespace rocos {
         std::cout << "Drive Guard thread is terminated." << std::endl;
     }
 
-    boost::shared_ptr<DriveGuard> DriveGuard::_instance = nullptr; // 单例模式对象
+    boost::shared_ptr<DriveGuard> DriveGuard::instance_ = nullptr; // 单例模式对象
 
 }

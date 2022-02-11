@@ -28,20 +28,20 @@
 namespace rocos {
     using namespace google::protobuf::util; //使用命名空间
 
-    RobotServiceImpl::RobotServiceImpl(Robot *robot) : _robotPtr(robot) {
+    RobotServiceImpl::RobotServiceImpl(Robot *robot) : robot_ptr_(robot) {
 
     }
 
     RobotServiceImpl::~RobotServiceImpl() {
-        _server->Shutdown();
+        server_ptr_->Shutdown();
     }
 
     boost::shared_ptr<RobotServiceImpl> RobotServiceImpl::getInstance(Robot *robot) {
-        if (_instance == nullptr) {
-            _instance.reset(new RobotServiceImpl(robot),
+        if (instance_ == nullptr) {
+            instance_.reset(new RobotServiceImpl(robot),
                             [](RobotServiceImpl *t) { delete t; }); // 因为默认访问不了private 析构函数,需传入删除器
         }
-        return _instance;
+        return instance_;
     }
 
     grpc::Status
@@ -52,14 +52,14 @@ namespace rocos {
 
         auto robotState = response->mutable_robot_state();
         // JointState
-        for (int i = 0; i < _robotPtr->getJointNum(); i++) {
+        for (int i = 0; i < robot_ptr_->getJointNum(); i++) {
             JointState jointState;
-            jointState.set_name(_robotPtr->getJointName(i));
-            jointState.set_status(static_cast<JointState_Status>(_robotPtr->getJointStatus(i)));
-            jointState.set_position(_robotPtr->getJointPosition(i));
-            jointState.set_velocity(_robotPtr->getJointVelocity(i));
-            jointState.set_acceleration(_robotPtr->getJointTorque(i));
-            jointState.set_load(_robotPtr->getJointLoadTorque(i));
+            jointState.set_name(robot_ptr_->getJointName(i));
+            jointState.set_status(static_cast<JointState_Status>(robot_ptr_->getJointStatus(i)));
+            jointState.set_position(robot_ptr_->getJointPosition(i));
+            jointState.set_velocity(robot_ptr_->getJointVelocity(i));
+            jointState.set_acceleration(robot_ptr_->getJointTorque(i));
+            jointState.set_load(robot_ptr_->getJointLoadTorque(i));
 
             *robotState->add_joint_states() = jointState;
         }
@@ -67,11 +67,11 @@ namespace rocos {
         // Hardware State
         auto hw_state = response->mutable_robot_state()->mutable_hw_state();
         hw_state->set_hw_type(
-                static_cast<HardwareState_HardwareType>(_robotPtr->_hw_interface->getHardwareType()));
-        hw_state->set_min_cycle_time(_robotPtr->_hw_interface->getMinCycleTime());
-        hw_state->set_max_cycle_time(_robotPtr->_hw_interface->getMaxCycleTime());
-        hw_state->set_current_cycle_time(_robotPtr->_hw_interface->getCurrCycleTime());
-        hw_state->set_slave_num(_robotPtr->_hw_interface->getSlaveNumber());
+                static_cast<HardwareState_HardwareType>(robot_ptr_->hw_interface_->getHardwareType()));
+        hw_state->set_min_cycle_time(robot_ptr_->hw_interface_->getMinCycleTime());
+        hw_state->set_max_cycle_time(robot_ptr_->hw_interface_->getMaxCycleTime());
+        hw_state->set_current_cycle_time(robot_ptr_->hw_interface_->getCurrCycleTime());
+        hw_state->set_slave_num(robot_ptr_->hw_interface_->getSlaveNumber());
 
 
         return grpc::Status::OK;
@@ -85,9 +85,9 @@ namespace rocos {
 
         //Process Request RobotCommand
         if (request->command().has_enabled()) {
-            _robotPtr->setEnabled();
+            robot_ptr_->setEnabled();
         } else if (request->command().has_disabled()) {
-            _robotPtr->setDisabled();
+            robot_ptr_->setDisabled();
         } else if (request->command().has_move_j()) {
 
         }
@@ -96,9 +96,9 @@ namespace rocos {
             auto singleAxisCmd = request->command().single_axis_command();
 
             if (singleAxisCmd.has_enabled()) {                 ///////// enabled
-                _robotPtr->setJointEnabled(singleAxisCmd.enabled().id());
+                robot_ptr_->setJointEnabled(singleAxisCmd.enabled().id());
             } else if (singleAxisCmd.has_disabled()) {        ///////// disabled
-                _robotPtr->setJointDisabled(singleAxisCmd.disabled().id());
+                robot_ptr_->setJointDisabled(singleAxisCmd.disabled().id());
             } else if (singleAxisCmd.has_mode()) {           /////////// mode
                 ModeOfOperation modeOfOperation;
                 switch (singleAxisCmd.mode().value()) {
@@ -113,7 +113,7 @@ namespace rocos {
 //                        modeOfOperation = ModeOfOperation::CyclicSynchronousTorqueMode;
                         break;
                 }
-                _robotPtr->setJointMode(singleAxisCmd.mode().id(), modeOfOperation);
+                robot_ptr_->setJointMode(singleAxisCmd.mode().id(), modeOfOperation);
             } else if (singleAxisCmd.has_move()) {         /////////// move
                 double max_vel = -1, max_acc = -1, max_jerk = -1, least_time = -1;
                 if (singleAxisCmd.move().has_max_vel())
@@ -127,8 +127,8 @@ namespace rocos {
 
 //                std::cout << "max_vel: " << max_vel << "; max_acc: " << max_acc << "; max_jerk: " << max_jerk << std::endl;
 
-                _robotPtr->moveSingleAxis(singleAxisCmd.move().id(), singleAxisCmd.move().pos(), 0.0, max_vel, max_acc,
-                                          max_jerk, least_time);
+                robot_ptr_->moveSingleAxis(singleAxisCmd.move().id(), singleAxisCmd.move().pos(), 0.0, max_vel, max_acc,
+                                           max_jerk, least_time);
 
             }
         }
@@ -136,11 +136,11 @@ namespace rocos {
         else if (request->command().has_multi_axis_command()) {
             auto multiAxisCmd = request->command().multi_axis_command();
             if (multiAxisCmd.has_enabled()) {
-                _robotPtr->setEnabled();
+                robot_ptr_->setEnabled();
             } else if (multiAxisCmd.has_disabled()) {
-                _robotPtr->setDisabled();
+                robot_ptr_->setDisabled();
             } else if (multiAxisCmd.has_mode()) {
-                for(int i = 0; i < _robotPtr->_jntNum; i++) {
+                for(int i = 0; i < robot_ptr_->jnt_num_; i++) {
                     ModeOfOperation modeOfOperation = ModeOfOperation::CyclicSynchronousPositionMode;
                     switch (multiAxisCmd.mode().value().at(i)) {
                         case MODE_CSP:
@@ -154,47 +154,47 @@ namespace rocos {
 //                        modeOfOperation = ModeOfOperation::CyclicSynchronousTorqueMode;
                             break;
                     }
-                    _robotPtr->setJointMode(i, modeOfOperation);
+                    robot_ptr_->setJointMode(i, modeOfOperation);
                 }
             }else if(multiAxisCmd.has_sync()) {
-                _robotPtr->setSynchronization(static_cast<Robot::Synchronization>(multiAxisCmd.sync().value()));
+                robot_ptr_->setSynchronization(static_cast<Robot::Synchronization>(multiAxisCmd.sync().value()));
             }
             else if (multiAxisCmd.has_move()) {
-                for(int i = 0; i < _robotPtr->_jntNum; i++) {
+                for(int i = 0; i < robot_ptr_->jnt_num_; i++) {
 
-                    _robotPtr->moveSingleAxis(i,
-                                              multiAxisCmd.move().target_pos().at(i),
-                                              0.0,
-                                              multiAxisCmd.move().max_vel().at(i),
-                                              multiAxisCmd.move().max_acc().at(i),
-                                              multiAxisCmd.move().max_jerk().at(i),
-                                              -1);
+                    robot_ptr_->moveSingleAxis(i,
+                                               multiAxisCmd.move().target_pos().at(i),
+                                               0.0,
+                                               multiAxisCmd.move().max_vel().at(i),
+                                               multiAxisCmd.move().max_acc().at(i),
+                                               multiAxisCmd.move().max_jerk().at(i),
+                                               -1);
 
                 }
 
             }
-//            _robotPtr->setJointDisabled(request->command().single_axis_disabled().id());
+//            robot_ptr_->setJointDisabled(request->command().single_axis_disabled().id());
         }
 
         return grpc::Status::OK;
     }
 
     void RobotServiceImpl::runServer(const std::string &address, bool isDetached) {
-        _thread = boost::make_shared<boost::thread>(boost::bind(&RobotServiceImpl::serverThread, this, address));
+        thread_ = boost::make_shared<boost::thread>(boost::bind(&RobotServiceImpl::serverThread, this, address));
         if (isDetached) {
-            _thread->detach();
+            thread_->detach();
         } else {
-            _thread->join();
+            thread_->join();
         }
 
     }
 
     void RobotServiceImpl::stopServer() {
-        _server->Shutdown();
+        server_ptr_->Shutdown();
     }
 
     void RobotServiceImpl::serverThread(const std::string &address) {
-        _isThreadRunning = true;
+        is_thread_running_ = true;
 
         grpc::EnableDefaultHealthCheckService(true);
         grpc::reflection::InitProtoReflectionServerBuilderPlugin();
@@ -208,17 +208,17 @@ namespace rocos {
         builder.RegisterService(this);
 
         // Finally assemble the server.
-        _server = builder.BuildAndStart();
+        server_ptr_ = builder.BuildAndStart();
         std::cout << "Server listening on " << address << std::endl;
 
         // Wait for the server to shutdown. Note that some other thread must be
         // responsible for shutting down the server for this call to ever return.
 
-        _server->Wait();
+        server_ptr_->Wait();
 
-        _isThreadRunning = false;
+        is_thread_running_ = false;
     }
 
-    boost::shared_ptr<RobotServiceImpl> RobotServiceImpl::_instance = nullptr; // 单例模式对象
+    boost::shared_ptr<RobotServiceImpl> RobotServiceImpl::instance_ = nullptr; // 单例模式对象
 
 }

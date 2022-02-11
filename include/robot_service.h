@@ -55,14 +55,14 @@ namespace rocos {
         void serverThread(const std::string& address);
 
     private:
-        static boost::shared_ptr<RobotServiceImpl> _instance;
-        boost::shared_ptr<Robot> _robotPtr {nullptr};
+        static boost::shared_ptr<RobotServiceImpl> instance_;
+        boost::shared_ptr<Robot> robot_ptr_ {nullptr};
 
-        std::unique_ptr<grpc::Server> _server {nullptr};
+        std::unique_ptr<grpc::Server> server_ptr_ {nullptr};
 
-        boost::shared_ptr<boost::thread> _thread {nullptr};
+        boost::shared_ptr<boost::thread> thread_ {nullptr};
 
-        bool _isThreadRunning {false};
+        bool is_thread_running_ {false};
 
     };
 

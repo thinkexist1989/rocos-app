@@ -46,33 +46,33 @@ namespace rocos {
 
         void setEnabled();
 
-        inline void setJointEnabled(int id) { _joints[id]->setEnabled(); }
+        inline void setJointEnabled(int id) { joints_[id]->setEnabled(); }
 
         void setDisabled();
 
-        inline void setJointDisabled(int id) { _joints[id]->setDisabled(); }
+        inline void setJointDisabled(int id) { joints_[id]->setDisabled(); }
 
-        inline void setJointMode(int id, ModeOfOperation mode) { _joints[id]->setMode(mode); }
+        inline void setJointMode(int id, ModeOfOperation mode) { joints_[id]->setMode(mode); }
 
-        inline int getJointNum() const { return _jntNum; }
+        inline int getJointNum() const { return jnt_num_; }
 
-        inline std::string getJointName(int id) { return _joints[id]->getName(); }
+        inline std::string getJointName(int id) { return joints_[id]->getName(); }
 
-        inline int getJointStatus(int id) { return _joints[id]->getDriveStateRPC(); }
+        inline int getJointStatus(int id) { return joints_[id]->getDriveStateRPC(); }
 
-        inline double getJointPosition(int id) { return _joints[id]->getPosition(); }
+        inline double getJointPosition(int id) { return joints_[id]->getPosition(); }
 
-        inline double getJointVelocity(int id) { return _joints[id]->getVelocity(); }
+        inline double getJointVelocity(int id) { return joints_[id]->getVelocity(); }
 
-        inline double getJointTorque(int id) { return _joints[id]->getTorque(); }
+        inline double getJointTorque(int id) { return joints_[id]->getTorque(); }
 
-        inline double getJointLoadTorque(int id) { return _joints[id]->getLoadTorque(); }
+        inline double getJointLoadTorque(int id) { return joints_[id]->getLoadTorque(); }
 
-        inline void setJointPosition(int id, double pos) { _joints[id]->setPosition(pos); }
+        inline void setJointPosition(int id, double pos) { joints_[id]->setPosition(pos); }
 
-        inline void setJointVelocity(int id, double vel) { _joints[id]->setVelocity(vel); }
+        inline void setJointVelocity(int id, double vel) { joints_[id]->setVelocity(vel); }
 
-        inline void setJointTorque(int id, double tor) { _joints[id]->setTorque(tor); }
+        inline void setJointTorque(int id, double tor) { joints_[id]->setTorque(tor); }
 
         /// 多关节运动
         /// \param target_pos 位置
@@ -115,87 +115,87 @@ namespace rocos {
         /// \brief 设置多关节速度约束
         /// \param max_vel 速度约束值
         inline void setJntVelLimits(std::vector<double> &max_vel) {
-            _max_vel = max_vel;
-            _needPlan.resize(_jntNum, true);
+            max_vel_ = max_vel;
+            need_plan_.resize(jnt_num_, true);
         }
 
         /// \brief 获取多关节速度约束
         /// \return 速度约束值
-        inline std::vector<double> getJntVelLimits() { return _max_vel; };
+        inline std::vector<double> getJntVelLimits() { return max_vel_; };
 
         /// \brief 设置单关节速度约束
         /// \param id 关节ID
         /// \param max_vel 速度约束值
         inline void setJntVelLimit(int id, double max_vel) {
-            _max_vel[id] = max_vel;
-            _needPlan[id] = true;
+            max_vel_[id] = max_vel;
+            need_plan_[id] = true;
         }
 
         /// \brief 获取单关节速度约束
         /// \param id 关节ID
         /// \return 速度约束值
-        inline double getJntVelLimit(int id) { return _max_vel[id]; }
+        inline double getJntVelLimit(int id) { return max_vel_[id]; }
 
         /// \brief 设置关节加速度约束
         /// \param max_acc 加速度约束值
         inline void setJntAccLimits(std::vector<double> &max_acc) {
-            _max_acc = max_acc;
-            _needPlan.resize(_jntNum, true);
+            max_acc_ = max_acc;
+            need_plan_.resize(jnt_num_, true);
         }
 
         /// \brief 获取多关节加速度约束
         /// \return 加速度约束值
-        inline std::vector<double> getJntAccLimits() { return _max_acc; }
+        inline std::vector<double> getJntAccLimits() { return max_acc_; }
 
         /// \brief 设置单关节加速度约束
         /// \param id 关节ID
         /// \param max_acc 加速度约束值
         inline void setJntAccLimit(int id, double max_acc) {
-            _max_acc[id] = max_acc;
-            _needPlan[id] = true;
+            max_acc_[id] = max_acc;
+            need_plan_[id] = true;
         }
 
         /// \brief 获取单关节加速度约束
         /// \param id 关节ID
         /// \return 加速度约束值
-        inline double getJntAccLimit(int id) { return _max_acc[id]; }
+        inline double getJntAccLimit(int id) { return max_acc_[id]; }
 
         /// \brief 设置多关节加加速约束
         /// \param max_jerk 多关节加加速约束值
         inline void setJntJerkLimits(std::vector<double> &max_jerk) {
-            _max_jerk = max_jerk;
-            _needPlan.resize(_jntNum, true);
+            max_jerk_ = max_jerk;
+            need_plan_.resize(jnt_num_, true);
         }
 
         /// \brief 获取多关节加加速约束
         /// \return 多关节加加速约束值
-        inline std::vector<double> getJntJerkLimits() { return _max_jerk; }
+        inline std::vector<double> getJntJerkLimits() { return max_jerk_; }
 
         /// \brief 设置单关节加加速度约束
         /// \param id 关节id
         /// \param max_jerk 关节加加速约束值
         inline void setJntJerkLimit(int id, double max_jerk) {
-            _max_jerk[id] = max_jerk;
-            _needPlan[id] = true;
+            max_jerk_[id] = max_jerk;
+            need_plan_[id] = true;
         }
 
         /// \brief 获取单关节加加速度约束
         /// \param id 关节ID
         /// \return 关节加加速约束值
-        inline double getJntJerkLimit(int id) { return _max_jerk[id]; }
+        inline double getJntJerkLimit(int id) { return max_jerk_[id]; }
 
         /// \brief 设置规划Profile类型
         /// \param type Trapezoid、DoubleS
         inline void setProfileType(ProfileType type) {
-            _profileType = type;
-            _needPlan.resize(_jntNum, true);
+            profile_type_ = type;
+            need_plan_.resize(jnt_num_, true);
         }
 
         /// \brief 设置同步模式
         /// \param sync 无同步、时间同步、相位同步
         inline void setSynchronization(Synchronization sync) {
-            _sync = sync;
-            _needPlan.resize(_jntNum, true);
+            sync_ = sync;
+            need_plan_.resize(jnt_num_, true);
         }
 
 
@@ -217,37 +217,37 @@ namespace rocos {
                    ProfileType type = ProfileType::trapezoid);
 
     protected:
-        boost::shared_ptr<HardwareInterface> _hw_interface{nullptr};
-        std::vector<boost::shared_ptr<Drive>> _joints;
+        boost::shared_ptr<HardwareInterface> hw_interface_{nullptr};
+        std::vector<boost::shared_ptr<Drive>> joints_;
 
-        std::vector<double> _targetPositions;     // 当前目标位置
-        std::vector<double> _targetPositionsPrev; // 上一次的目标位置
+        std::vector<double> target_positions_;     // 当前目标位置
+        std::vector<double> target_positions_prev_; // 上一次的目标位置
 
-        std::vector<double> _targetVelocities;
-        std::vector<double> _targetTorques;
+        std::vector<double> target_velocities_;
+        std::vector<double> target_torques_;
 
-        std::vector<double> _pos;
-        std::vector<double> _vel;
-        std::vector<double> _acc;
+        std::vector<double> pos_;
+        std::vector<double> vel_;
+        std::vector<double> acc_;
 
-        std::vector<double> _max_vel;
-        std::vector<double> _max_acc;
-        std::vector<double> _max_jerk;
+        std::vector<double> max_vel_;
+        std::vector<double> max_acc_;
+        std::vector<double> max_jerk_;
 
-        std::vector<R_INTERP_BASE *> _interp;
+        std::vector<R_INTERP_BASE *> interp_;
 
-        ProfileType _profileType{trapezoid};
+        ProfileType profile_type_{trapezoid};
 
-        int _jntNum;
+        int jnt_num_;
 
-        double _leastMotionTime{0.0};
+        double least_motion_time_{0.0};
 
-        Synchronization _sync{SYNC_TIME};
+        Synchronization sync_{SYNC_TIME};
 
-        bool _isRunning{false};
-        bool _isExit{false};
+        bool is_running_{false};
+        bool is_exit_{false};
 
-        std::vector<bool> _needPlan; // 是否需要重新规划标志
+        std::vector<bool> need_plan_; // 是否需要重新规划标志
     };
 
 }

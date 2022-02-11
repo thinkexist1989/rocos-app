@@ -47,18 +47,18 @@ namespace rocos {
 
         void waitForSignal();
 
-        inline Controlword getControlword() { return _controlword; }
+        inline Controlword getControlword() { return controlword_; }
 
-        inline Statusword getStatusword() { return _statusword; }
+        inline Statusword getStatusword() { return statusword_; }
 
-        inline DriveState getDriveState() { return _currentDriveState; }
+        inline DriveState getDriveState() { return current_drive_state_; }
 
         inline int getDriveStateRPC() {
-            if (_currentDriveState == DriveState::Fault)
+            if (current_drive_state_ == DriveState::Fault)
                 return 3;
-            else if (_currentDriveState == DriveState::OperationEnabled)
+            else if (current_drive_state_ == DriveState::OperationEnabled)
                 return 2;
-            else if (_currentDriveState == DriveState::NA)
+            else if (current_drive_state_ == DriveState::NA)
                 return 0;
             else
                 return 1;
@@ -94,42 +94,42 @@ namespace rocos {
 
         double getLoadTorque();
 
-        inline int getId() const { return _id; }
+        inline int getId() const { return id_; }
 
-        inline std::string getName() { return _hw_interface->getSlaveName(_id); }
+        inline std::string getName() { return hw_interface_->getSlaveName(id_); }
 
-        inline ModeOfOperation getMode() const { return _mode; }
+        inline ModeOfOperation getMode() const { return mode_; }
 
         void moveToPositionInCnt(int32_t pos, double max_vel, double max_acc,
                                  double max_jerk = std::numeric_limits<double>::max(),
                                  ProfileType type = trapezoid); // Motion with interpolate
 
     private:
-        std::string _name{}; // 关节名称
-        Statusword _statusword{}; // 状态字
-        Controlword _controlword{}; // 控制字
-        DriveState _currentDriveState{DriveState::NA}; // 驱动器当前状态
-        DriveState _targetDriveState{DriveState::NA}; // 驱动器目标状态
+        std::string name_{}; // 关节名称
+        Statusword statusword_{}; // 状态字
+        Controlword controlword_{}; // 控制字
+        DriveState current_drive_state_{DriveState::NA}; // 驱动器当前状态
+        DriveState target_drive_state_{DriveState::NA}; // 驱动器目标状态
 
-        ModeOfOperation _mode{ModeOfOperation::CyclicSynchronousPositionMode};
+        ModeOfOperation mode_{ModeOfOperation::CyclicSynchronousPositionMode};
 
-        bool _conductStateChange{false}; //是否启动状态机 默认不启动
-        std::atomic<bool> _stateChangeSuccessful{false}; //当前状态切换是否成功
+        bool conduct_state_change_{false}; //是否启动状态机 默认不启动
+        std::atomic<bool> state_change_successful_{false}; //当前状态切换是否成功
 
-        Timestamp _driveStateChangeTimePoint;
+        Timestamp drive_state_change_time_point_;
 
-        uint16_t _numberOfSuccessfulTargetStateReadings{0};
+        uint16_t num_of_successful_target_state_readings_{0};
 
-        mutable boost::recursive_mutex _mutex; // TODO: change name!!!!
+        mutable boost::recursive_mutex mutex_; // TODO: change name!!!!
 
-        double _ratio{1.0}; // TODO: 暂时没用 Ratio = input / output
+        double ratio_{1.0}; // TODO: 暂时没用 Ratio = input / output
 
-        int32_t _offsetPosInCnt{0}; // zero position in Cnt 零位偏移量
+        int32_t offset_pos_cnt_{0}; // zero position in Cnt 零位偏移量
 
-//        double _cntPerUnit{131072 / (2*M_PI) };// 每个单位对应脉冲数，比如cnt/rad, cnt/r, cnt/m 2^17=131072
-        double _cntPerUnit{991232.0 / (2*M_PI) };// 每个单位对应脉冲数，比如cnt/rad, cnt/r, cnt/m 2^17=131072
+//        double cnt_per_unit_{131072 / (2*M_PI) };// 每个单位对应脉冲数，比如cnt/rad, cnt/r, cnt/m 2^17=131072
+        double cnt_per_unit_{991232.0 / (2 * M_PI) };// 每个单位对应脉冲数，比如cnt/rad, cnt/r, cnt/m 2^17=131072
 
-        double _torquePerUnit{1.0}; // 每个力矩单位对应的脉冲数，比如cnt/N，通常返回值是千分之一
+        double torque_per_unit_{1.0}; // 每个力矩单位对应的脉冲数，比如cnt/N，通常返回值是千分之一
 
     protected:
 
@@ -144,45 +144,45 @@ namespace rocos {
 
     public:
         ///////////规划约束相关///////////////
-        inline void setMaxVel(double maxVel) { _max_vel = maxVel; } // 设置最大速度
+        inline void setMaxVel(double maxVel) { max_vel_ = maxVel; } // 设置最大速度
 
-        inline double getMaxVel() const { return _max_vel; } // 获取最大速度
+        inline double getMaxVel() const { return max_vel_; } // 获取最大速度
 
-        void setMaxAcc(double maxAcc) { _max_acc = maxAcc; } // 设置最大加速度
+        void setMaxAcc(double maxAcc) { max_acc_ = maxAcc; } // 设置最大加速度
 
-        inline double getMaxAcc() const { return _max_acc; } // 获取最大加速度
+        inline double getMaxAcc() const { return max_acc_; } // 获取最大加速度
 
-        inline void setMaxJerk(double maxJerk) { _max_jerk = maxJerk; } // 设置最大加加速度
+        inline void setMaxJerk(double maxJerk) { max_jerk_ = maxJerk; } // 设置最大加加速度
 
-        inline double getMaxJerk() const { return _max_jerk; } // 获取最大加加速度
+        inline double getMaxJerk() const { return max_jerk_; } // 获取最大加加速度
 
         ///////////单位转换相关///////////////
-        inline void setCntPerUnit(double val) { _cntPerUnit = val; } // 设置位置、速度转换
+        inline void setCntPerUnit(double val) { cnt_per_unit_ = val; } // 设置位置、速度转换
 
-        inline double getCntPerUnit() { return _cntPerUnit; } // 获取位置、速度转换
+        inline double getCntPerUnit() { return cnt_per_unit_; } // 获取位置、速度转换
 
-        inline void setTorquePerUnit(double val) { _torquePerUnit = val; } // 设置力矩转换
+        inline void setTorquePerUnit(double val) { torque_per_unit_ = val; } // 设置力矩转换
 
-        inline double setTorquePerUnit() { return _torquePerUnit; } // 获取力矩转换
+        inline double setTorquePerUnit() { return torque_per_unit_; } // 获取力矩转换
 
 
     protected:
 
-        boost::shared_ptr<HardwareInterface> _hw_interface{nullptr}; // The pointer of HardwareInterface instance
-        int _id{0}; // drive id in bus
-        double _reduction_ratio{1.0}; // reduction ratio
-        double _minPosLimit{-2.0};
-        double _maxPosLimit{2.0};
+        boost::shared_ptr<HardwareInterface> hw_interface_{nullptr}; // The pointer of HardwareInterface instance
+        int id_{0}; // drive id in bus
+        double reduction_ratio_{1.0}; // reduction ratio
+        double min_pos_limit_{-2.0};
+        double max_pos_limit_{2.0};
 
         //TODO: 变换单位
-        double _max_vel{1.0}; // [UserUnit]/s，比如 rad/s, mm/s
-        double _max_acc{1.0}; // [UserUnit]/s^2，比如 rad/s^2
-        double _max_jerk{10.0}; // [UserUnit]/s^3，比如 rad/s^3
+        double max_vel_{1.0}; // [UserUnit]/s，比如 rad/s, mm/s
+        double max_acc_{1.0}; // [UserUnit]/s^2，比如 rad/s^2
+        double max_jerk_{10.0}; // [UserUnit]/s^3，比如 rad/s^3
 
 
-        bool _isEnabled{false};
+        bool is_enabled_{false};
 
-        boost::shared_ptr<DriveGuard> _driveGuard{nullptr};
+        boost::shared_ptr<DriveGuard> drive_guard_{nullptr};
 
     };
 }

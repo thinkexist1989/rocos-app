@@ -22,20 +22,20 @@
 
 namespace rocos {
 
-    Drive::Drive(boost::shared_ptr<HardwareInterface> hw, int id) : _hw_interface(hw),
-                                                                    _id(id) {
+    Drive::Drive(boost::shared_ptr<HardwareInterface> hw, int id) : hw_interface_(hw),
+                                                                    id_(id) {
 
-        _driveGuard = DriveGuard::getInstance(); // 获取DriveGuard单例句柄
-        _driveGuard->addDrive(this); // 将Drive实例添加到_driveGuard中来更新数据
+        drive_guard_ = DriveGuard::getInstance(); // 获取DriveGuard单例句柄
+        drive_guard_->addDrive(this); // 将Drive实例添加到_driveGuard中来更新数据
 
-        _currentDriveState = _hw_interface->getDriverState(_id);
-        std::cout << "Curr Drive State: " << _currentDriveState << std::endl;
-//        _targetDriveState = DriveState::SwitchOnDisabled;
-        _targetDriveState = _currentDriveState;
+        current_drive_state_ = hw_interface_->getDriverState(id_);
+        std::cout << "Curr Drive State: " << current_drive_state_ << std::endl;
+//        target_drive_state_ = DriveState::SwitchOnDisabled;
+        target_drive_state_ = current_drive_state_;
 
-        _hw_interface->setTargetPositionRaw(_id, _hw_interface->getActualPositionRaw(_id)); // set Current Pos
+        hw_interface_->setTargetPositionRaw(id_, hw_interface_->getActualPositionRaw(id_)); // set Current Pos
 
-        _hw_interface->setModeOfOperation(_id, _mode); // Default CSP
+        hw_interface_->setModeOfOperation(id_, mode_); // Default CSP
 
     }
 
@@ -47,24 +47,24 @@ namespace rocos {
         ** mutex_ must be unlocked periodically such that PDO writing (and thus state
         ** changes) may occur at all!
         */
-//        _mutex.lock();
+//        mutex_.lock();
 
         // reset the "stateChangeSuccessful_" flag to false such that a new successful
         // state change can be detected
-        _stateChangeSuccessful = false;
+        state_change_successful_ = false;
 
         // make the state machine realize that a state change will have to happen
-        _conductStateChange = true;
+        conduct_state_change_ = true;
 
         // overwrite the target drive state
-        _targetDriveState = driveState;
+        target_drive_state_ = driveState;
 
         // set the hasRead flag to false such that at least one new reading will be
         // available when starting the state change
 //        hasRead_ = false;
 
         // set the time point of the last pdo change to now
-        _driveStateChangeTimePoint = boost::chrono::system_clock::now();
+        drive_state_change_time_point_ = boost::chrono::system_clock::now();
 
         // set a temporary time point to prevent getting caught in an infinite loop
         auto driveStateChangeStartTimePoint = boost::chrono::system_clock::now();
@@ -82,7 +82,7 @@ namespace rocos {
 
         while (true) {
             // break loop as soon as the state change was successful
-            if (_stateChangeSuccessful) {
+            if (state_change_successful_) {
                 success = true;
                 break;
             }
@@ -98,13 +98,13 @@ namespace rocos {
                 break;
             }
             // unlock the mutex during sleep time
-//            _mutex.unlock();
+//            mutex_.unlock();
             boost::this_thread::sleep_for(boost::chrono::milliseconds(1));
             // lock the mutex to be able to check the success flag
-//            _mutex.lock();
+//            mutex_.lock();
         }
         // unlock the mutex one last time
-//        _mutex.unlock();
+//        mutex_.unlock();
         return success;
     }
 
@@ -115,14 +115,14 @@ namespace rocos {
     Controlword Drive::getNextStateTransitionControlword(const DriveState &requestedDriveState,
                                                          const DriveState &currentDriveState) {
         Controlword controlword;
-//        controlword = _controlword;
+//        controlword = controlword_;
         controlword.setAllFalse();
         switch (requestedDriveState) {
             case DriveState::SwitchOnDisabled:
                 switch (currentDriveState) {
                     case DriveState::SwitchOnDisabled:
                         std::cerr << "[rocos::Drive::getNextStateTransitionControlword] "
-                                  << "drive state has already been reached for '" << _name << "'" << std::endl;
+                                  << "drive state has already been reached for '" << name_ << "'" << std::endl;
 //                        MELO_ERROR_STREAM("[elmo_ethercat_sdk:Elmo::getNextStateTransitionControlword] "
 //                                                  << "drive state has already been reached for '"
 //                                                  << name_ << "'");
@@ -145,7 +145,7 @@ namespace rocos {
                         break;
                     default:
                         std::cerr << "[rocos::Drive::getNextStateTransitionControlword] "
-                                  << "PDO state transition not implemented for '" << _name << "'" << std::endl;
+                                  << "PDO state transition not implemented for '" << name_ << "'" << std::endl;
 //                        MELO_ERROR_STREAM("[elmo_ethercat_sdk:Elmo::getNextStateTransitionControlword] "
 //                                                  <<
 //                                                  << name_ << "'");
@@ -160,7 +160,7 @@ namespace rocos {
                         break;
                     case DriveState::ReadyToSwitchOn:
                         std::cerr << "[rocos::Drive::getNextStateTransitionControlword] "
-                                  << "drive state has already been reached for '" << _name << "'" << std::endl;
+                                  << "drive state has already been reached for '" << name_ << "'" << std::endl;
                         break;
                     case DriveState::SwitchedOn:
                         controlword.setStateTransition6();
@@ -176,7 +176,7 @@ namespace rocos {
                         break;
                     default:
                         std::cerr << "[rocos::Drive::getNextStateTransitionControlword] "
-                                  << "PDO state transition not implemented for '" << _name << "'" << std::endl;
+                                  << "PDO state transition not implemented for '" << name_ << "'" << std::endl;
 
                 }
                 break;
@@ -191,7 +191,7 @@ namespace rocos {
                         break;
                     case DriveState::SwitchedOn:
                         std::cerr << "[rocos::Drive::getNextStateTransitionControlword] "
-                                  << "drive state has already been reached for '" << _name << "'" << std::endl;
+                                  << "drive state has already been reached for '" << name_ << "'" << std::endl;
                         break;
                     case DriveState::OperationEnabled:
                         controlword.setStateTransition5();
@@ -204,7 +204,7 @@ namespace rocos {
                         break;
                     default:
                         std::cerr << "[rocos::Drive::getNextStateTransitionControlword] "
-                                  << "PDO state transition not implemented for '" << _name << "'" << std::endl;
+                                  << "PDO state transition not implemented for '" << name_ << "'" << std::endl;
 
                 }
                 break;
@@ -222,7 +222,7 @@ namespace rocos {
                         break;
                     case DriveState::OperationEnabled:
                         std::cerr << "[rocos::Drive::getNextStateTransitionControlword] "
-                                  << "drive state has already been reached for '" << _name << "'" << std::endl;
+                                  << "drive state has already been reached for '" << name_ << "'" << std::endl;
                         break;
                     case DriveState::QuickStopActive:
                         controlword.setStateTransition12();
@@ -232,7 +232,7 @@ namespace rocos {
                         break;
                     default:
                         std::cerr << "[rocos::Drive::getNextStateTransitionControlword] "
-                                  << "PDO state transition not implemented for '" << _name << "'" << std::endl;
+                                  << "PDO state transition not implemented for '" << name_ << "'" << std::endl;
 
                 }
                 break;
@@ -253,21 +253,21 @@ namespace rocos {
                         break;
                     case DriveState::QuickStopActive:
                         std::cerr << "[rocos::Drive::getNextStateTransitionControlword] "
-                                  << "drive state has already been reached for '" << _name << "'" << std::endl;
+                                  << "drive state has already been reached for '" << name_ << "'" << std::endl;
                         break;
                     case DriveState::Fault:
                         controlword.setStateTransition15();
                         break;
                     default:
                         std::cerr << "[rocos::Drive::getNextStateTransitionControlword] "
-                                  << "PDO state transition not implemented for '" << _name << "'" << std::endl;
+                                  << "PDO state transition not implemented for '" << name_ << "'" << std::endl;
 
                 }
                 break;
 
             default:
                 std::cerr << "[rocos::Drive::getNextStateTransitionControlword] "
-                          << "PDO state cannot be reached for '" << _name << "'" << std::endl;
+                          << "PDO state cannot be reached for '" << name_ << "'" << std::endl;
 
         }
 
@@ -277,12 +277,12 @@ namespace rocos {
     /// \brief 处理状态机，在DriveGuard线程中循环调用
     void Drive::engageStateMachine() {
 // locking the mutex
-//        boost::lock_guard<boost::recursive_mutex> lock(_mutex);
+//        boost::lock_guard<boost::recursive_mutex> lock(mutex_);
 
         // elapsed time since the last new controlword
         auto microsecondsSinceChange =
                 (boost::chrono::duration_cast<boost::chrono::microseconds>(
-                        boost::chrono::system_clock::now() - _driveStateChangeTimePoint)).count();
+                        boost::chrono::system_clock::now() - drive_state_change_time_point_)).count();
 
         // get the current state
         // since we wait until "hasRead" is true, this is guaranteed to be a newly
@@ -290,23 +290,23 @@ namespace rocos {
 //        const DriveState currentDriveState = reading_.getDriveState();
 
         // check if the state change already was successful:
-        if (_currentDriveState == _targetDriveState) {
-            _numberOfSuccessfulTargetStateReadings++;
+        if (current_drive_state_ == target_drive_state_) {
+            num_of_successful_target_state_readings_++;
 //            if (numberOfSuccessfulTargetStateReadings_ >= configuration_.minNumberOfSuccessfulTargetStateReadings) {
-            if (_numberOfSuccessfulTargetStateReadings >= 3) {
+            if (num_of_successful_target_state_readings_ >= 3) {
                 // disable the state machine
-                _conductStateChange = false;
-                _numberOfSuccessfulTargetStateReadings = 0;
-                _stateChangeSuccessful = true;
+                conduct_state_change_ = false;
+                num_of_successful_target_state_readings_ = 0;
+                state_change_successful_ = true;
                 return;
             }
 //        } else if (microsecondsSinceChange > configuration_.driveStateChangeMinTimeout) {
         } else if (microsecondsSinceChange > 20000) {
             // get the next controlword from the state machine
-            _controlword = getNextStateTransitionControlword(_targetDriveState, _currentDriveState);
-            _driveStateChangeTimePoint = boost::chrono::system_clock::now();
-//            std::cout << _controlword << std::endl;
-            _hw_interface->setControlwordRaw(_id, _controlword.getRawControlword()); // set control word
+            controlword_ = getNextStateTransitionControlword(target_drive_state_, current_drive_state_);
+            drive_state_change_time_point_ = boost::chrono::system_clock::now();
+//            std::cout << controlword_ << std::endl;
+            hw_interface_->setControlwordRaw(id_, controlword_.getRawControlword()); // set control word
 
         }
 
@@ -331,26 +331,26 @@ namespace rocos {
 
     /// \brief 等待同步信号
     void Drive::waitForSignal() {
-        _hw_interface->waitForSignal(_id);
+        hw_interface_->waitForSignal(id_);
     }
 
     /// \brief 设置驱动器模式
     /// \param mode CSP, CSV, CST
     void Drive::setMode(ModeOfOperation mode) {
-        _mode = mode;
-        _hw_interface->setModeOfOperation(_id, _mode);
+        mode_ = mode;
+        hw_interface_->setModeOfOperation(id_, mode_);
     }
 
     /// \brief 获取位置
     /// \return 位置值[User Custom Unit]
     double Drive::getPosition() {
-        return getPositionInCnt() / _cntPerUnit; // 单位转换
+        return getPositionInCnt() / cnt_per_unit_; // 单位转换
     }
 
     /// \brief 获取速度
     /// \return 速度值[User Custom Unit]
     double Drive::getVelocity() {
-        return getVelocityInCnt() / _cntPerUnit; // 单位转换
+        return getVelocityInCnt() / cnt_per_unit_; // 单位转换
     }
 
     /// \brief 获取力矩
@@ -364,35 +364,35 @@ namespace rocos {
     }
 
     void Drive::setPositionInCnt(int32_t pos) {
-        _hw_interface->setTargetPositionRaw(_id, pos + _offsetPosInCnt); // 加上偏移量
+        hw_interface_->setTargetPositionRaw(id_, pos + offset_pos_cnt_); // 加上偏移量
     }
 
     void Drive::setVelocityInCnt(int32_t vel) {
-        _hw_interface->setTargetVelocityRaw(_id, vel);
+        hw_interface_->setTargetVelocityRaw(id_, vel);
     }
 
     void Drive::setTorqueInCnt(int16_t tor) {
-        _hw_interface->setTargetTorqueRaw(_id, tor);
+        hw_interface_->setTargetTorqueRaw(id_, tor);
     }
 
     int32_t Drive::getPositionInCnt() {
-        return _hw_interface->getActualPositionRaw(_id) - _offsetPosInCnt; // 减去偏移量
+        return hw_interface_->getActualPositionRaw(id_) - offset_pos_cnt_; // 减去偏移量
     }
 
     int32_t Drive::getVelocityInCnt() {
-        return _hw_interface->getActualVelocityRaw(_id);
+        return hw_interface_->getActualVelocityRaw(id_);
     }
 
     int16_t Drive::getTorqueInCnt() {
-        return _hw_interface->getActualTorqueRaw(_id);
+        return hw_interface_->getActualTorqueRaw(id_);
     }
 
     int16_t Drive::getLoadTorqueInCnt() {
-        return _hw_interface->getLoadTorqueRaw(_id);
+        return hw_interface_->getLoadTorqueRaw(id_);
     }
 
     void Drive::moveToPositionInCnt(int32_t pos, double max_vel, double max_acc, double max_jerk, ProfileType type) {
-        auto p0 = _hw_interface->getActualPositionRaw(_id);
+        auto p0 = hw_interface_->getActualPositionRaw(id_);
         R_INTERP_BASE *interp;
         switch (type) {
             case trapezoid:
@@ -414,12 +414,12 @@ namespace rocos {
 
         while (dt <= duration && interp->isValidMovement()) {
             waitForSignal();
-            switch (_mode) {
+            switch (mode_) {
                 case ModeOfOperation::CyclicSynchronousPositionMode:
-                    _hw_interface->setTargetPositionRaw(_id, interp->pos(dt));
+                    hw_interface_->setTargetPositionRaw(id_, interp->pos(dt));
                     break;
                 case ModeOfOperation::CyclicSynchronousVelocityMode:
-                    _hw_interface->setTargetVelocityRaw(_id, interp->vel(dt));
+                    hw_interface_->setTargetVelocityRaw(id_, interp->vel(dt));
                     break;
                 default:
                     std::cout << "Only Supported CSP and CSV" << std::endl;
@@ -432,17 +432,17 @@ namespace rocos {
     }
 
     void Drive::setPosition(double pos) {
-        auto posInCnt = static_cast<int32_t>(pos * _cntPerUnit);
+        auto posInCnt = static_cast<int32_t>(pos * cnt_per_unit_);
         setPositionInCnt(posInCnt);
     }
 
     void Drive::setVelocity(double vel) {
-        auto velInCnt = static_cast<int32_t>(vel * _cntPerUnit);
+        auto velInCnt = static_cast<int32_t>(vel * cnt_per_unit_);
         setVelocityInCnt(velInCnt);
     }
 
     void Drive::setTorque(double tor) {
-        auto torInCnt = static_cast<int16_t>(tor * _torquePerUnit);
+        auto torInCnt = static_cast<int16_t>(tor * torque_per_unit_);
         setTorqueInCnt(torInCnt);
     }
 

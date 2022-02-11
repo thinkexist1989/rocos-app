@@ -50,13 +50,13 @@ namespace rocos {
         void workingThread();
 
     private:
-        static boost::shared_ptr<DriveGuard> _instance; // 单例模式对象
+        static boost::shared_ptr<DriveGuard> instance_; // 单例模式对象
 
-        std::vector<Drive*> _drives; // 用于保存驱动器指针
+        std::vector<Drive*> drives_; // 用于保存驱动器指针
 
-        boost::shared_ptr<boost::thread> _thread {nullptr};
+        boost::shared_ptr<boost::thread> thread_ {nullptr};
 
-        bool _isThreadRunning {false};
+        bool is_thread_running_ {false};
 
 
 

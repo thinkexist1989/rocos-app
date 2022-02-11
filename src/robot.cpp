@@ -21,35 +21,35 @@
 
 namespace rocos {
 
-    Robot::Robot(boost::shared_ptr<HardwareInterface> hw) : _hw_interface(hw) {
+    Robot::Robot(boost::shared_ptr<HardwareInterface> hw) : hw_interface_(hw) {
 
         addAllJoints();
 
-        _targetPositions.resize(_jntNum);
-        _targetPositionsPrev.resize(_jntNum);
-        _targetVelocities.resize(_jntNum);
-        _targetTorques.resize(_jntNum);
-        _pos.resize(_jntNum);
-        _vel.resize(_jntNum);
-        _acc.resize(_jntNum);
-        _max_vel.resize(_jntNum);
-        _max_acc.resize(_jntNum);
-        _max_jerk.resize(_jntNum);
-        _interp.resize(_jntNum);
+        target_positions_.resize(jnt_num_);
+        target_positions_prev_.resize(jnt_num_);
+        target_velocities_.resize(jnt_num_);
+        target_torques_.resize(jnt_num_);
+        pos_.resize(jnt_num_);
+        vel_.resize(jnt_num_);
+        acc_.resize(jnt_num_);
+        max_vel_.resize(jnt_num_);
+        max_acc_.resize(jnt_num_);
+        max_jerk_.resize(jnt_num_);
+        interp_.resize(jnt_num_);
 
-        for (int i = 0; i < _jntNum; ++i) {
-            _pos[i] = _joints[i]->getPosition();
-            _targetPositions[i] = _pos[i];
-            _targetPositionsPrev[i] = _pos[i];
+        for (int i = 0; i < jnt_num_; ++i) {
+            pos_[i] = joints_[i]->getPosition();
+            target_positions_[i] = pos_[i];
+            target_positions_prev_[i] = pos_[i];
 
-            _vel[i] = _joints[i]->getVelocity();
-            _targetVelocities[i] = _vel[i];
+            vel_[i] = joints_[i]->getVelocity();
+            target_velocities_[i] = vel_[i];
 
-            _targetTorques[i] = _joints[i]->getTorque();
+            target_torques_[i] = joints_[i]->getTorque();
 
-            _max_vel[i] = _joints[i]->getMaxVel();
-            _max_acc[i] = _joints[i]->getMaxAcc();
-            _max_jerk[i] = _joints[i]->getMaxJerk();
+            max_vel_[i] = joints_[i]->getMaxVel();
+            max_acc_[i] = joints_[i]->getMaxAcc();
+            max_jerk_[i] = joints_[i]->getMaxJerk();
         }
 
         startMotionThread();
@@ -57,11 +57,11 @@ namespace rocos {
     }
 
     void Robot::addAllJoints() {
-        _jntNum = _hw_interface->getSlaveNumber();
-        _joints.clear();
-        for (int i = 0; i < _jntNum; i++) {
-            _joints.push_back(boost::make_shared<Drive>(_hw_interface, i));
-            _joints[i]->setMode(ModeOfOperation::CyclicSynchronousPositionMode);
+        jnt_num_ = hw_interface_->getSlaveNumber();
+        joints_.clear();
+        for (int i = 0; i < jnt_num_; i++) {
+            joints_.push_back(boost::make_shared<Drive>(hw_interface_, i));
+            joints_[i]->setMode(ModeOfOperation::CyclicSynchronousPositionMode);
         }
     }
 
@@ -75,19 +75,19 @@ namespace rocos {
     Robot::moveJ(const std::vector<double> &pos, const std::vector<double> &max_vel, const std::vector<double> &max_acc,
                  const std::vector<double> &max_jerk, Robot::Synchronization sync, ProfileType type) {
 
-        if (pos.size() != _jntNum || max_vel.size() != _jntNum || max_acc.size() != _jntNum ||
-            max_jerk.size() != _jntNum) {
+        if (pos.size() != jnt_num_ || max_vel.size() != jnt_num_ || max_acc.size() != jnt_num_ ||
+            max_jerk.size() != jnt_num_) {
             std::cout << "[ERROR] MoveJ => Error Input Vector Size!" << std::endl;
             return;
         }
 
-        std::vector<R_INTERP_BASE *> interp(_jntNum);
+        std::vector<R_INTERP_BASE *> interp(jnt_num_);
 
         double max_time = 0.0;
 
         // Start trajectory generation....
-        for (int i = 0; i < _jntNum; i++) {
-            auto p0 = _joints[i]->getPosition();
+        for (int i = 0; i < jnt_num_; i++) {
+            auto p0 = joints_[i]->getPosition();
             switch (type) {
                 case trapezoid:
                     interp[i] = new Trapezoid;
@@ -118,18 +118,18 @@ namespace rocos {
         // Start moving....
         double dt = 0.0;
         while (dt <= max_time) {
-            _hw_interface->waitForSignal(9);
+            hw_interface_->waitForSignal(9);
 
-            for (int i = 0; i < _jntNum; i++) {
+            for (int i = 0; i < jnt_num_; i++) {
                 if (!interp[i]->isValidMovement()) {
                     continue;
                 }
-                switch (_joints[i]->getMode()) {
+                switch (joints_[i]->getMode()) {
                     case ModeOfOperation::CyclicSynchronousPositionMode:
-                        _joints[i]->setPosition(interp[i]->pos(dt));
+                        joints_[i]->setPosition(interp[i]->pos(dt));
                         break;
                     case ModeOfOperation::CyclicSynchronousVelocityMode:
-                        _joints[i]->setVelocity(interp[i]->vel(dt));
+                        joints_[i]->setVelocity(interp[i]->vel(dt));
                         break;
                     default:
                         std::cout << "Only Supported CSP and CSV" << std::endl;
@@ -146,133 +146,133 @@ namespace rocos {
     }
 
     void Robot::setEnabled() {
-        for_each(_joints.begin(), _joints.end(), [=](boost::shared_ptr<Drive> &d) { d->setEnabled(); });
+        for_each(joints_.begin(), joints_.end(), [=](boost::shared_ptr<Drive> &d) { d->setEnabled(); });
     }
 
     void Robot::setDisabled() {
-        for_each(_joints.begin(), _joints.end(), [=](boost::shared_ptr<Drive> &d) { d->setDisabled(); });
+        for_each(joints_.begin(), joints_.end(), [=](boost::shared_ptr<Drive> &d) { d->setDisabled(); });
     }
 
     void Robot::startMotionThread() {
-        _isRunning = true;
+        is_running_ = true;
         boost::thread(&Robot::motionThreadHandler, this).detach();
     }
 
     void Robot::stopMotionThread() {
-        _isRunning = false;
+        is_running_ = false;
     }
 
     void Robot::motionThreadHandler() {
 
         std::cout << "Motion thread is running on thread " << boost::this_thread::get_id() << std::endl;
 
-        _targetPositions.resize(_jntNum);
-        _targetPositionsPrev.resize(_jntNum);
-        _targetVelocities.resize(_jntNum);
-        _targetTorques.resize(_jntNum);
-        _pos.resize(_jntNum);
-        _vel.resize(_jntNum);
-        _acc.resize(_jntNum);
-        _max_vel.resize(_jntNum);
-        _max_acc.resize(_jntNum);
-        _max_jerk.resize(_jntNum);
-        _interp.resize(_jntNum);
-        _needPlan.resize(_jntNum, false);
+        target_positions_.resize(jnt_num_);
+        target_positions_prev_.resize(jnt_num_);
+        target_velocities_.resize(jnt_num_);
+        target_torques_.resize(jnt_num_);
+        pos_.resize(jnt_num_);
+        vel_.resize(jnt_num_);
+        acc_.resize(jnt_num_);
+        max_vel_.resize(jnt_num_);
+        max_acc_.resize(jnt_num_);
+        max_jerk_.resize(jnt_num_);
+        interp_.resize(jnt_num_);
+        need_plan_.resize(jnt_num_, false);
 
-        for (int i = 0; i < _jntNum; ++i) {
-            _pos[i] = _joints[i]->getPosition();
-            _targetPositions[i] = _pos[i];
-            _targetPositionsPrev[i] = _pos[i];
+        for (int i = 0; i < jnt_num_; ++i) {
+            pos_[i] = joints_[i]->getPosition();
+            target_positions_[i] = pos_[i];
+            target_positions_prev_[i] = pos_[i];
 
-            _vel[i] = _joints[i]->getVelocity();
-            _targetVelocities[i] = _vel[i];
+            vel_[i] = joints_[i]->getVelocity();
+            target_velocities_[i] = vel_[i];
 
-            _targetTorques[i] = _joints[i]->getTorque();
+            target_torques_[i] = joints_[i]->getTorque();
 
-            if (_profileType == trapezoid) {
-                _interp[i] = new Trapezoid;
-            } else if (_profileType == doubleS) {
-                _interp[i] = new DoubleS;
+            if (profile_type_ == trapezoid) {
+                interp_[i] = new Trapezoid;
+            } else if (profile_type_ == doubleS) {
+                interp_[i] = new DoubleS;
             }
 
         }
 
-        std::vector<double> dt(_jntNum, 0.0); // delta T
+        std::vector<double> dt(jnt_num_, 0.0); // delta T
         double max_time = 0.0;
 
-        while (_isRunning) { // while start
+        while (is_running_) { // while start
 
-            _hw_interface->waitForSignal(9);
+            hw_interface_->waitForSignal(9);
 
             // Trajectory generating......
             max_time = 0.0;
-            for (int i = 0; i < _jntNum; ++i) {
-                if (_joints[i]->getDriveState() != DriveState::OperationEnabled) {
-                    _targetPositions[i] = _joints[i]->getPosition();
-//                    _targetPositionsPrev[i] = _targetPositions[i];
+            for (int i = 0; i < jnt_num_; ++i) {
+                if (joints_[i]->getDriveState() != DriveState::OperationEnabled) {
+                    target_positions_[i] = joints_[i]->getPosition();
+//                    target_positions_prev_[i] = target_positions_[i];
 
                     continue; // Disabled, ignore
                 }
 
-                if (fabs(_targetPositions[i] != _targetPositionsPrev[i]) || _needPlan[i]) { // need update
-                    _targetPositionsPrev[i] = _targetPositions[i]; // assign to current target position
+                if (fabs(target_positions_[i] != target_positions_prev_[i]) || need_plan_[i]) { // need update
+                    target_positions_prev_[i] = target_positions_[i]; // assign to current target position
 
-                    _interp[i]->planProfile(0, // t
-                                            _pos[i], // p0
-                                            _targetPositionsPrev[i], // pf
-                                            _vel[i],  // v0
-                                            _targetVelocities[i], // vf
-                                            _max_vel[i],
-                                            _max_acc[i],
-                                            _max_jerk[i]);
+                    interp_[i]->planProfile(0, // t
+                                            pos_[i], // p0
+                                            target_positions_prev_[i], // pf
+                                            vel_[i],  // v0
+                                            target_velocities_[i], // vf
+                                            max_vel_[i],
+                                            max_acc_[i],
+                                            max_jerk_[i]);
 
                     dt[i] = 0.0; // once regenerate, dt = 0.0
                     // consider at least execute time
-                    if (_interp[i]->getDuration() < _leastMotionTime) {
-                        _interp[i]->scaleToDuration(_leastMotionTime);
+                    if (interp_[i]->getDuration() < least_motion_time_) {
+                        interp_[i]->scaleToDuration(least_motion_time_);
                     }
                     // record max_time
-                    max_time = max(max_time, _interp[i]->getDuration()); // get max duration time
+                    max_time = max(max_time, interp_[i]->getDuration()); // get max duration time
 
-                    _needPlan[i] = false;
+                    need_plan_[i] = false;
                 }
             }
 
             // Sync scaling....
-            if (_sync == SYNC_TIME) {
-                for_each(_interp.begin(), _interp.end(), [=](R_INTERP_BASE *p) { p->scaleToDuration(max_time); });
-            } else if (_sync == SYNC_NONE) {
+            if (sync_ == SYNC_TIME) {
+                for_each(interp_.begin(), interp_.end(), [=](R_INTERP_BASE *p) { p->scaleToDuration(max_time); });
+            } else if (sync_ == SYNC_NONE) {
 
-            } else if (_sync == SYNC_PHASE) {
+            } else if (sync_ == SYNC_PHASE) {
                 std::cout << "[WARNING] Phase sync has not implemented...instead of time sync." << std::endl;
-                for_each(_interp.begin(), _interp.end(), [=](R_INTERP_BASE *p) { p->scaleToDuration(max_time); });
+                for_each(interp_.begin(), interp_.end(), [=](R_INTERP_BASE *p) { p->scaleToDuration(max_time); });
             }
 
 
             // Start moving....
-            for (int i = 0; i < _jntNum; ++i) {
-                if (_joints[i]->getDriveState() != DriveState::OperationEnabled) {
+            for (int i = 0; i < jnt_num_; ++i) {
+                if (joints_[i]->getDriveState() != DriveState::OperationEnabled) {
                     continue; // Disabled, ignore
                 }
 
-                if (_interp[i]->isValidMovement()) {
+                if (interp_[i]->isValidMovement()) {
                     dt[i] += 0.001;
-                    _pos[i] = _interp[i]->pos(dt[i]);
-                    _vel[i] = _interp[i]->vel((dt[i]));
+                    pos_[i] = interp_[i]->pos(dt[i]);
+                    vel_[i] = interp_[i]->vel((dt[i]));
 
-                    switch (_joints[i]->getMode()) {
+                    switch (joints_[i]->getMode()) {
                         case ModeOfOperation::CyclicSynchronousPositionMode:
-                            _joints[i]->setPosition(_pos[i]);
+                            joints_[i]->setPosition(pos_[i]);
                             break;
                         case ModeOfOperation::CyclicSynchronousVelocityMode:
-                            _joints[i]->setVelocity(_vel[i]);
+                            joints_[i]->setVelocity(vel_[i]);
                             break;
                         default:
                             std::cout << "Only Supported CSP and CSV" << std::endl;
                     }
 
                 } else {
-                    _vel[i] = 0.0;
+                    vel_[i] = 0.0;
                 }
 
             }
@@ -286,17 +286,17 @@ namespace rocos {
     }
 
     void Robot::moveJ(const vector<double> &target_pos, const vector<double> &target_vel, Robot::Synchronization sync) {
-        if ((target_pos.size() != _jntNum) || (target_vel.size() != _jntNum)) {
+        if ((target_pos.size() != jnt_num_) || (target_vel.size() != jnt_num_)) {
             std::cout << "[ERROR] MoveJ => Error Input Vector Size!" << std::endl;
             return;
         }
 
-        _sync = sync;
+        sync_ = sync;
 
-        _targetPositions = target_pos;
-        _targetVelocities = target_vel;
+        target_positions_ = target_pos;
+        target_velocities_ = target_vel;
 
-        _needPlan.resize(_jntNum, true);
+        need_plan_.resize(jnt_num_, true);
 
     }
 
@@ -310,19 +310,19 @@ namespace rocos {
     /// \param least_time 最短运行时间
     void Robot::moveSingleAxis(int id, double pos, double vel, double max_vel, double max_acc, double max_jerk,
                                double least_time) {
-        _targetPositions[id] = pos;
-        _targetVelocities[id] = vel;
+        target_positions_[id] = pos;
+        target_velocities_[id] = vel;
 
         if (max_vel != -1)
-            _max_vel[id] = max_vel;
+            max_vel_[id] = max_vel;
         if (max_acc != -1)
-            _max_acc[id] = max_acc;
+            max_acc_[id] = max_acc;
         if (max_jerk != -1)
-            _max_jerk[id] = max_jerk;
+            max_jerk_[id] = max_jerk;
         if (least_time != -1)
-            _leastMotionTime = least_time;
+            least_motion_time_ = least_time;
 
-        _needPlan[id] = true;
+        need_plan_[id] = true;
     }
 
     /// 设置多轴运动
@@ -335,27 +335,27 @@ namespace rocos {
     void Robot::moveMultiAxis(const vector<double> &target_pos, const vector<double> &target_vel,
                               const vector<double> &max_vel, const vector<double> &max_acc,
                               const vector<double> &max_jerk, double least_time) {
-        if ((target_pos.size() != _jntNum) || (target_vel.size() != _jntNum) || (max_vel.size() != _jntNum) ||
-            (max_acc.size() != _jntNum) || (max_jerk.size() != _jntNum)) {
+        if ((target_pos.size() != jnt_num_) || (target_vel.size() != jnt_num_) || (max_vel.size() != jnt_num_) ||
+            (max_acc.size() != jnt_num_) || (max_jerk.size() != jnt_num_)) {
             std::cout << "[ERROR] moveMultiAxis: wrong size!" << std::endl;
         }
 
-        for (int id = 0; id < _jntNum; id++) {
-            _targetPositions[id] = target_pos[id];
-            _targetVelocities[id] = target_vel[id];
+        for (int id = 0; id < jnt_num_; id++) {
+            target_positions_[id] = target_pos[id];
+            target_velocities_[id] = target_vel[id];
 
             if (max_vel[id] != -1)
-                _max_vel[id] = max_vel[id];
+                max_vel_[id] = max_vel[id];
             if (max_acc[id] != -1)
-                _max_acc[id] = max_acc[id];
+                max_acc_[id] = max_acc[id];
             if (max_jerk[id] != -1)
-                _max_jerk[id] = max_jerk[id];
+                max_jerk_[id] = max_jerk[id];
 
-            _needPlan[id] = true;
+            need_plan_[id] = true;
         }
 
         if (least_time != -1)
-            _leastMotionTime = least_time;
+            least_motion_time_ = least_time;
     }
 
 }
