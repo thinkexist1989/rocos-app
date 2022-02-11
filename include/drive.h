@@ -126,8 +126,8 @@ namespace rocos {
 
         int32_t offset_pos_cnt_{0}; // zero position in Cnt 零位偏移量
 
-//        double cnt_per_unit_{131072 / (2*M_PI) };// 每个单位对应脉冲数，比如cnt/rad, cnt/r, cnt/m 2^17=131072
-        double cnt_per_unit_{991232.0 / (2 * M_PI) };// 每个单位对应脉冲数，比如cnt/rad, cnt/r, cnt/m 2^17=131072
+        double cnt_per_unit_{131072 / (2*M_PI) };// 每个单位对应脉冲数，比如cnt/rad, cnt/r, cnt/m 2^17=131072
+//        double cnt_per_unit_{991232.0 / (2 * M_PI) };// 每个单位对应脉冲数，比如cnt/rad, cnt/r, cnt/m 2^17=131072
 
         double torque_per_unit_{1.0}; // 每个力矩单位对应的脉冲数，比如cnt/N，通常返回值是千分之一
 
