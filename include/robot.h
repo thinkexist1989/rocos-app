@@ -74,6 +74,28 @@ namespace rocos {
 
         inline void setJointTorque(int id, double tor) { joints_[id]->setTorque(tor); }
 
+        ////////////////////单位转换////////////////////////////
+        inline double getJointCntPerUnit(int id) { return joints_[id]->getCntPerUnit(); }
+
+        inline double getJointTorquePerUnit(int id) { return joints_[id]->getTorquePerUnit(); }
+
+        inline double getJointRatio(int id) { return joints_[id]->getRatio(); }
+
+        inline int32_t getJointPosZeroOffset(int id) { return joints_[id]->getPosZeroOffset(); }
+
+        inline std::string getJointUserUnitName(int id) { return joints_[id]->getUserUnitName(); }
+
+        inline void setJointCntPerUnit(int id, double cnt_per_unit) { joints_[id]->setCntPerUnit(cnt_per_unit); }
+
+        inline void setJointTorquePerUnit(int id, double tor_per_unit) { joints_[id]->setTorquePerUnit(tor_per_unit); }
+
+        inline void setJointRatio(int id, double ratio) { joints_[id]->setRatio(ratio); }
+
+        inline void setJointPosZeroOffset(int id, int32_t offset) { joints_[id]->setPosZeroOffset(offset); }
+
+        inline void setJointUserUnitName(int id, std::string name) { joints_[id]->setUserUnitName(name); }
+
+
         /// 多关节运动
         /// \param target_pos 位置
         /// \param target_vel 速度

@@ -131,6 +131,8 @@ namespace rocos {
 
         double torque_per_unit_{1.0}; // 每个力矩单位对应的脉冲数，比如cnt/N，通常返回值是千分之一
 
+        std::string user_unit_name_{"rad"}; //用户单位名称
+
     protected:
 
         void engageStateMachine();
@@ -157,14 +159,25 @@ namespace rocos {
         inline double getMaxJerk() const { return max_jerk_; } // 获取最大加加速度
 
         ///////////单位转换相关///////////////
+        inline void setPosZeroOffset(int32_t offset) { offset_pos_cnt_ = offset; } // 设置位置零点偏移
+
+        inline int32_t getPosZeroOffset() { return offset_pos_cnt_; } //获取位置零点偏移
+
         inline void setCntPerUnit(double val) { cnt_per_unit_ = val; } // 设置位置、速度转换
 
         inline double getCntPerUnit() { return cnt_per_unit_; } // 获取位置、速度转换
 
         inline void setTorquePerUnit(double val) { torque_per_unit_ = val; } // 设置力矩转换
 
-        inline double setTorquePerUnit() { return torque_per_unit_; } // 获取力矩转换
+        inline double getTorquePerUnit() { return torque_per_unit_; } // 获取力矩转换
 
+        inline void setRatio(double ratio) { ratio_ = ratio; } // 设置减速比
+
+        inline double getRatio() { return ratio_; }; // 获取减速比
+
+        inline void setUserUnitName(std::string name) { user_unit_name_ = name; } // 设置用户单位名称
+
+        inline std::string getUserUnitName() { return user_unit_name_; } // 获取用户单位名称
 
     protected:
 

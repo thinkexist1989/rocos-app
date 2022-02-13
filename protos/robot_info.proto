@@ -33,7 +33,8 @@ message JointInfo {
   double cnt_per_unit = 2; // 每个用户单位对应多少脉冲数
   double torque_per_unit = 3; // 每个用户单位对应多少Torque值
   double ratio = 4; // 关节减速比
-  string user_unit_name = 5; // 用户单位的名称，可能是rad, m, mm等
+  int32  pos_zero_offset = 5; //关节零位偏移
+  string user_unit_name = 6; // 用户单位的名称，可能是rad, m, mm等
 }
 
 // The Infomation of the robot

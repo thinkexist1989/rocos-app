@@ -45,6 +45,29 @@ namespace rocos {
     }
 
     grpc::Status
+    RobotServiceImpl::ReadRobotInfo(::grpc::ServerContext *context, const ::rocos::RobotInfoRequest *request,
+                                    ::rocos::RobotInfoResponse *response) {
+        //ResponseHeader
+        *response->mutable_header()->mutable_response_timestamp() = TimeUtil::GetCurrentTime(); // response timestamp
+
+        auto robotInfo = response->mutable_robot_info();
+        // JointInfo
+        for(int i = 0; i <robot_ptr_->getJointNum(); ++i) {
+            JointInfo jointInfo;
+            jointInfo.set_name(robot_ptr_->getJointName(i));
+            jointInfo.set_cnt_per_unit(robot_ptr_->getJointCntPerUnit(i));
+            jointInfo.set_torque_per_unit(robot_ptr_->getJointTorquePerUnit(i));
+            jointInfo.set_ratio(robot_ptr_->getJointRatio(i));
+            jointInfo.set_user_unit_name(robot_ptr_->getJointUserUnitName(i));
+            jointInfo.set_pos_zero_offset(robot_ptr_->getJointPosZeroOffset(i));
+
+            *robotInfo->add_joint_infos() = jointInfo;
+        }
+
+        return grpc::Status::OK;
+    }
+
+    grpc::Status
     RobotServiceImpl::ReadRobotState(::grpc::ServerContext *context, const ::rocos::RobotStateRequest *request,
                                      ::rocos::RobotStateResponse *response) {
         //ResponseHeader
@@ -52,7 +75,7 @@ namespace rocos {
 
         auto robotState = response->mutable_robot_state();
         // JointState
-        for (int i = 0; i < robot_ptr_->getJointNum(); i++) {
+        for (int i = 0; i < robot_ptr_->getJointNum(); ++i) {
             JointState jointState;
             jointState.set_name(robot_ptr_->getJointName(i));
             jointState.set_status(static_cast<JointState_Status>(robot_ptr_->getJointStatus(i)));
@@ -219,6 +242,6 @@ namespace rocos {
         is_thread_running_ = false;
     }
 
-    boost::shared_ptr<RobotServiceImpl> RobotServiceImpl::instance_ = nullptr; // 单例模式对象
+    boost::shared_ptr<RobotServiceImpl> RobotServiceImpl::instance_ = nullptr;    // 单例模式对象
 
 }

@@ -25,9 +25,13 @@ option java_outer_classname = "RobotServiceProto";
 
 import "robot_command.proto";
 import "robot_state.proto";
+import "robot_info.proto";
 
 service RobotService {
-    // Get robot state information
+    // Receive robot info information
+    rpc ReadRobotInfo(RobotInfoRequest) returns (RobotInfoResponse) {}
+    // Receive robot state information
     rpc ReadRobotState(RobotStateRequest) returns (RobotStateResponse) {}
+    // Send Robot Command
     rpc WriteRobotCommmand(RobotCommandRequest) returns (RobotCommandResponse) {}
 }
