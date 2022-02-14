@@ -54,8 +54,8 @@ int main(int argc, char *argv[]) {
     }
 
     using namespace rocos;
-//    boost::shared_ptr<HardwareInterface> hw = boost::make_shared<HardwareSim>(5);
-    boost::shared_ptr<HardwareInterface> hw = boost::make_shared<Hardware>();
+    boost::shared_ptr<HardwareInterface> hw = boost::make_shared<HardwareSim>(6); // 仿真
+//    boost::shared_ptr<HardwareInterface> hw = boost::make_shared<Hardware>();
 
     Robot robot(hw);
 

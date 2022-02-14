@@ -101,4 +101,8 @@ namespace rocos {
         }
     }
 
+    std::string HardwareSim::getSlaveName(int id) {
+        return (slave_name_format_ % id ).str();
+    }
+
 } // namespace rocos

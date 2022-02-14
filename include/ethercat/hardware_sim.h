@@ -22,6 +22,7 @@
 
 #include <hardware_interface.h>
 #include <vector>
+#include <boost/format.hpp>
 
 namespace rocos {
 
@@ -34,6 +35,8 @@ namespace rocos {
         Timestamp getTimestamp() override;
 
         int32_t getSlaveNumber() override;
+
+        std::string getSlaveName(int id) override;
 
         void setTargetPositionRaw(int id, int32_t pos) override;
 
@@ -76,6 +79,8 @@ namespace rocos {
         std::vector<Statusword> _statuswordVec;
         std::vector<int8_t> _modeVec;
         std::vector<DriveState> _driveStateVec;
+
+        boost::format slave_name_format_ {"Slave_100%1%[ SIM ]"};
     };
 
 }
