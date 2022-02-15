@@ -60,6 +60,7 @@ namespace rocos {
 
         inline int getJointStatus(int id) { return joints_[id]->getDriveStateRPC(); }
 
+        ///////////////////用户单位信息///////////////////////
         inline double getJointPosition(int id) { return joints_[id]->getPosition(); }
 
         inline double getJointVelocity(int id) { return joints_[id]->getVelocity(); }
@@ -73,6 +74,21 @@ namespace rocos {
         inline void setJointVelocity(int id, double vel) { joints_[id]->setVelocity(vel); }
 
         inline void setJointTorque(int id, double tor) { joints_[id]->setTorque(tor); }
+
+        /////////////////////获取原始信息//////////////////////////
+        inline int32_t getJointPositionRaw(int id) { return joints_[id]->getPositionInCnt(); }
+
+        inline int32_t getJointVelocityRaw(int id) { return joints_[id]->getVelocityInCnt(); }
+
+        inline int16_t getJointTorqueRaw(int id) { return joints_[id]->getTorqueInCnt(); }
+
+        inline int16_t getJointLoadTorqueRaw(int id) { return joints_[id]->getLoadTorqueInCnt(); }
+
+        inline void setJointPositionRaw(int id, int32_t pos) { joints_[id]->setPositionInCnt(pos); }
+
+        inline void setJointVelocityRaw(int id, int32_t vel) { joints_[id]->setVelocityInCnt(vel); }
+
+        inline void setJointTorqueRaw(int id, int16_t tor) { joints_[id]->setTorqueInCnt(tor); }
 
         ////////////////////单位转换////////////////////////////
         inline double getJointCntPerUnit(int id) { return joints_[id]->getCntPerUnit(); }

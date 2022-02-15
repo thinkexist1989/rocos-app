@@ -74,17 +74,34 @@ namespace rocos {
         *response->mutable_header()->mutable_response_timestamp() = TimeUtil::GetCurrentTime(); // response timestamp
 
         auto robotState = response->mutable_robot_state();
-        // JointState
-        for (int i = 0; i < robot_ptr_->getJointNum(); ++i) {
-            JointState jointState;
-            jointState.set_name(robot_ptr_->getJointName(i));
-            jointState.set_status(static_cast<JointState_Status>(robot_ptr_->getJointStatus(i)));
-            jointState.set_position(robot_ptr_->getJointPosition(i));
-            jointState.set_velocity(robot_ptr_->getJointVelocity(i));
-            jointState.set_acceleration(robot_ptr_->getJointTorque(i));
-            jointState.set_load(robot_ptr_->getJointLoadTorque(i));
+        if(request->has_raw_data() && request->raw_data()) { // 要求读取原始值 raw_data = true
+            // JointState
+            for (int i = 0; i < robot_ptr_->getJointNum(); ++i) {
+                JointState jointState;
+                jointState.set_name(robot_ptr_->getJointName(i));
+                jointState.set_status(static_cast<JointState_Status>(robot_ptr_->getJointStatus(i)));
+                jointState.set_position(robot_ptr_->getJointPositionRaw(i));
+                jointState.set_velocity(robot_ptr_->getJointVelocityRaw(i));
+                jointState.set_acceleration(robot_ptr_->getJointTorqueRaw(i));
+                jointState.set_load(robot_ptr_->getJointLoadTorque(i));
+                jointState.set_raw_data(true);
 
-            *robotState->add_joint_states() = jointState;
+                *robotState->add_joint_states() = jointState;
+            }
+        }
+        else { // 用户单位值 raw_data = false
+            // JointState
+            for (int i = 0; i < robot_ptr_->getJointNum(); ++i) {
+                JointState jointState;
+                jointState.set_name(robot_ptr_->getJointName(i));
+                jointState.set_status(static_cast<JointState_Status>(robot_ptr_->getJointStatus(i)));
+                jointState.set_position(robot_ptr_->getJointPosition(i));
+                jointState.set_velocity(robot_ptr_->getJointVelocity(i));
+                jointState.set_acceleration(robot_ptr_->getJointTorque(i));
+                jointState.set_load(robot_ptr_->getJointLoadTorque(i));
+
+                *robotState->add_joint_states() = jointState;
+            }
         }
 
         // Hardware State
@@ -139,14 +156,27 @@ namespace rocos {
                 robot_ptr_->setJointMode(singleAxisCmd.mode().id(), modeOfOperation);
             } else if (singleAxisCmd.has_move()) {         /////////// move
                 double max_vel = -1, max_acc = -1, max_jerk = -1, least_time = -1;
-                if (singleAxisCmd.move().has_max_vel())
-                    max_vel = singleAxisCmd.move().max_vel();
-                if (singleAxisCmd.move().has_max_acc())
-                    max_acc = singleAxisCmd.move().max_acc();
-                if (singleAxisCmd.move().has_max_jerk())
-                    max_jerk = singleAxisCmd.move().max_jerk();
-                if (singleAxisCmd.move().has_least_time())
-                    least_time = singleAxisCmd.move().least_time();
+                if(singleAxisCmd.move().has_raw_data() && singleAxisCmd.move().raw_data()) {
+                    //TODO: 需要进行变换
+//                    if (singleAxisCmd.move().has_max_vel())
+//                        max_vel = singleAxisCmd.move().max_vel();
+//                    if (singleAxisCmd.move().has_max_acc())
+//                        max_acc = singleAxisCmd.move().max_acc();
+//                    if (singleAxisCmd.move().has_max_jerk())
+//                        max_jerk = singleAxisCmd.move().max_jerk();
+//                    if (singleAxisCmd.move().has_least_time())
+//                        least_time = singleAxisCmd.move().least_time();
+                }
+                else {
+                    if (singleAxisCmd.move().has_max_vel())
+                        max_vel = singleAxisCmd.move().max_vel();
+                    if (singleAxisCmd.move().has_max_acc())
+                        max_acc = singleAxisCmd.move().max_acc();
+                    if (singleAxisCmd.move().has_max_jerk())
+                        max_jerk = singleAxisCmd.move().max_jerk();
+                    if (singleAxisCmd.move().has_least_time())
+                        least_time = singleAxisCmd.move().least_time();
+                }
 
 //                std::cout << "max_vel: " << max_vel << "; max_acc: " << max_acc << "; max_jerk: " << max_jerk << std::endl;
 
