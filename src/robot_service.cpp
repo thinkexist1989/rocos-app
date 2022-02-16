@@ -155,19 +155,23 @@ namespace rocos {
                 }
                 robot_ptr_->setJointMode(singleAxisCmd.mode().id(), modeOfOperation);
             } else if (singleAxisCmd.has_move()) {         /////////// move
-                double max_vel = -1, max_acc = -1, max_jerk = -1, least_time = -1;
+                auto id = singleAxisCmd.move().id();
+                double pos = -1, max_vel = -1, max_acc = -1, max_jerk = -1, least_time = -1;
                 if(singleAxisCmd.move().has_raw_data() && singleAxisCmd.move().raw_data()) {
-                    //TODO: 需要进行变换
-//                    if (singleAxisCmd.move().has_max_vel())
-//                        max_vel = singleAxisCmd.move().max_vel();
-//                    if (singleAxisCmd.move().has_max_acc())
-//                        max_acc = singleAxisCmd.move().max_acc();
-//                    if (singleAxisCmd.move().has_max_jerk())
-//                        max_jerk = singleAxisCmd.move().max_jerk();
-//                    if (singleAxisCmd.move().has_least_time())
-//                        least_time = singleAxisCmd.move().least_time();
+                    //TODO: 需要进行变换，但不用加入offset，offset为底层使用
+                    auto cnt_per_unit = robot_ptr_->getJointCntPerUnit(id);
+                    pos = singleAxisCmd.move().pos() / cnt_per_unit;
+                    if (singleAxisCmd.move().has_max_vel())
+                        max_vel = singleAxisCmd.move().max_vel() / cnt_per_unit;
+                    if (singleAxisCmd.move().has_max_acc())
+                        max_acc = singleAxisCmd.move().max_acc() / cnt_per_unit;
+                    if (singleAxisCmd.move().has_max_jerk())
+                        max_jerk = singleAxisCmd.move().max_jerk();
+                    if (singleAxisCmd.move().has_least_time())
+                        least_time = singleAxisCmd.move().least_time();
                 }
                 else {
+                    pos = singleAxisCmd.move().pos();
                     if (singleAxisCmd.move().has_max_vel())
                         max_vel = singleAxisCmd.move().max_vel();
                     if (singleAxisCmd.move().has_max_acc())
@@ -180,7 +184,7 @@ namespace rocos {
 
 //                std::cout << "max_vel: " << max_vel << "; max_acc: " << max_acc << "; max_jerk: " << max_jerk << std::endl;
 
-                robot_ptr_->moveSingleAxis(singleAxisCmd.move().id(), singleAxisCmd.move().pos(), 0.0, max_vel, max_acc,
+                robot_ptr_->moveSingleAxis(id, pos , 0.0, max_vel, max_acc,
                                            max_jerk, least_time);
 
             }
@@ -213,17 +217,31 @@ namespace rocos {
                 robot_ptr_->setSynchronization(static_cast<Robot::Synchronization>(multiAxisCmd.sync().value()));
             }
             else if (multiAxisCmd.has_move()) {
-                for(int i = 0; i < robot_ptr_->jnt_num_; i++) {
+                if(multiAxisCmd.move().has_raw_data() && multiAxisCmd.move().raw_data()) {
+                    for(int i = 0; i < robot_ptr_->jnt_num_; i++) {
+                        auto cnt_per_unit = robot_ptr_->getJointCntPerUnit(i);
+                        robot_ptr_->moveSingleAxis(i,
+                                                   multiAxisCmd.move().target_pos().at(i) / cnt_per_unit,
+                                                   0.0,
+                                                   multiAxisCmd.move().max_vel().at(i) / cnt_per_unit,
+                                                   multiAxisCmd.move().max_acc().at(i) / cnt_per_unit,
+                                                   multiAxisCmd.move().max_jerk().at(i) / cnt_per_unit,
+                                                   -1);
 
-                    robot_ptr_->moveSingleAxis(i,
-                                               multiAxisCmd.move().target_pos().at(i),
-                                               0.0,
-                                               multiAxisCmd.move().max_vel().at(i),
-                                               multiAxisCmd.move().max_acc().at(i),
-                                               multiAxisCmd.move().max_jerk().at(i),
-                                               -1);
-
+                    }
                 }
+                else {
+                    for(int i = 0; i < robot_ptr_->jnt_num_; i++) {
+                        robot_ptr_->moveSingleAxis(i,
+                                                   multiAxisCmd.move().target_pos().at(i),
+                                                   0.0,
+                                                   multiAxisCmd.move().max_vel().at(i),
+                                                   multiAxisCmd.move().max_acc().at(i),
+                                                   multiAxisCmd.move().max_jerk().at(i),
+                                                   -1);
+                    }
+                }
+
 
             }
 //            robot_ptr_->setJointDisabled(request->command().single_axis_disabled().id());
