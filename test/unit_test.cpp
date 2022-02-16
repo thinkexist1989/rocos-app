@@ -63,7 +63,7 @@ TEST_CASE("Hardware") {
 
         double i = 0.0;
         while (i <= 2 * M_PI) {
-            hw->waitForSignal();
+            hw->waitForSignal(0);
             int32_t p = pos + 80000.0 * sin(i);
             hw->setTargetPositionRaw(id, p);
             i += 0.0005;
@@ -124,7 +124,7 @@ TEST_CASE("HardwareSim") {
 
         double i = 0.0;
         while (i <= 2 * M_PI) {
-            hw->waitForSignal();
+            hw->waitForSignal(0);
             int32_t p = pos + 80000.0 * sin(i);
             hw->setTargetPositionRaw(id, p);
             i += 0.0005;

@@ -69,7 +69,7 @@ namespace rocos {
 
         virtual std::string getSlaveName(int id); // slave name
 
-        virtual void waitForSignal(int id = 0);    // Signal of Bus
+        virtual void waitForSignal(int id);    // Signal of Bus
 
         ///////////////////////Raw Data/////////////////////////
         virtual void setTargetPositionRaw(int id, int32_t pos);

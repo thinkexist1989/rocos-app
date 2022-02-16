@@ -23,6 +23,7 @@
 #include <hardware_interface.h>
 #include <vector>
 #include <boost/format.hpp>
+#include <random>
 
 namespace rocos {
 
@@ -68,6 +69,14 @@ namespace rocos {
         ////////////////// SPECIAL ///////////////////////////////
         void setSlaveNumber(int slave_num);
 
+        inline double getMaxCycleTime() override { return max_cycle_time_; }
+
+        inline double getMinCycleTime() override { return min_cycle_time_; }
+
+        inline double getAvgCycleTime() override { return avg_cycle_time_; }
+
+        inline double getCurrCycleTime() override;
+
     private:
         int _slaveNumber;
         std::vector<int32_t> _positionVec;
@@ -81,6 +90,14 @@ namespace rocos {
         std::vector<DriveState> _driveStateVec;
 
         boost::format slave_name_format_ {"Slave_100%1%[ SIM ]"};
+
+        double min_cycle_time_ {30000.0}; //最小循环时间，初值给一个很大的值
+        double max_cycle_time_ {0.0};
+        double avg_cycle_time_ {1000.0};
+        double curr_cycle_time_ {0.0};
+
+        std::default_random_engine generator;
+        std::uniform_real_distribution<double> rand_num {-10.0, 10.0};
     };
 
 }

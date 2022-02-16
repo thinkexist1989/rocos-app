@@ -17,7 +17,7 @@ namespace rocos {
                                               _driveStateVec(slave_num, DriveState::OperationEnabled) {
 
         _type = HW_SIM;
-        for (auto& s: _statuswordVec) {
+        for (auto &s: _statuswordVec) {
             s.setFromRawStatusword(4663); // in simulation all is enabled forever.
 //            std::cout << "Init raw status word" <<  s << std::endl;
         }
@@ -102,7 +102,15 @@ namespace rocos {
     }
 
     std::string HardwareSim::getSlaveName(int id) {
-        return (slave_name_format_ % id ).str();
+        return (slave_name_format_ % id).str();
+    }
+
+
+    double HardwareSim::getCurrCycleTime() {
+        curr_cycle_time_ = 1000.0 + rand_num(generator);
+        min_cycle_time_ = curr_cycle_time_ < min_cycle_time_ ? curr_cycle_time_ : min_cycle_time_;
+        max_cycle_time_ = curr_cycle_time_ > max_cycle_time_ ? curr_cycle_time_ : max_cycle_time_;
+        return curr_cycle_time_;
     }
 
 } // namespace rocos
