@@ -95,7 +95,7 @@ add_library(protocol
         ${PROTO_HDRS}
         ${GRPC_SRCS}
         ${GRPC_HRDS}
-        src/robot_service.cpp
+        src/robot_service.cc
         )
 target_link_libraries(protocol
         PUBLIC
@@ -113,6 +113,7 @@ find_package(Boost REQUIRED COMPONENTS date_time filesystem system chrono thread
 find_package(yaml-cpp REQUIRED)
 find_package(Threads REQUIRED)
 find_package(Qt5 REQUIRED COMPONENTS Core)
+find_package(Eigen3 REQUIRED)
 
 ##################
 ##   3rdparty   ##
@@ -156,13 +157,13 @@ set(DEP_LIBS
 ######### Library Hardware ###############
 add_library(hardware
         SHARED
-        src/command.cpp
-        src/status_word.cpp
-        src/control_word.cpp
-        src/drive_state.cpp
-        src/hardware.cpp
-        src/hardware_interface.cpp
-        src/hardware_sim.cpp
+        src/command.cc
+        src/status_word.cc
+        src/control_word.cc
+        src/drive_state.cc
+        src/hardware.cc
+        src/hardware_interface.cc
+        src/hardware_sim.cc
         )
 target_link_libraries(hardware
         PUBLIC
@@ -174,11 +175,11 @@ add_library(rocos::hardware ALIAS hardware)
 ########## Library Drive #################
 add_library(drive
         SHARED
-        src/drive.cpp
-        src/drive_guard.cpp
-        src/interpolate.cpp
-        src/robotMath.cpp
-        src/robot.cpp
+        src/drive.cc
+        src/drive_guard.cc
+        src/interpolate.cc
+        src/robotMath.cc
+        src/robot.cc
         )
 target_link_libraries(drive
         PUBLIC
@@ -186,9 +187,22 @@ target_link_libraries(drive
         )
 add_library(rocos::drive ALIAS drive)
 
+########## Library kinematics #################
+add_library(kinematics
+        SHARED
+        src/kinematics.cc
+        )
+target_link_libraries(kinematics
+        PUBLIC
+        Eigen3::Eigen
+        nlopt
+        orocos-kdl
+        trac_ik
+        )
+add_library(rocos::kinematics ALIAS kinematics)
 
 ########## Executable RocosAppMain ################
-add_executable(${PROJECT_NAME} src/rocosAppMain.cpp)
+add_executable(${PROJECT_NAME} src/rocosAppMain.cc)
 
 ## Specify libraries to link a library or executable target against
 target_link_libraries(${PROJECT_NAME}
@@ -209,7 +223,7 @@ target_link_libraries(${PROJECT_NAME}
 #############
 
 enable_testing()
-add_executable(unit_test test/unit_test.cpp)
+add_executable(unit_test test/unit_test.cc)
 target_link_libraries(unit_test
         PRIVATE
         rocos::hardware
