@@ -25,12 +25,15 @@ namespace rocos {
 
     DriveGuard::DriveGuard() {
         is_thread_running_ = true;
-        thread_ = boost::make_shared<boost::thread>(boost::bind(&DriveGuard::workingThread, this));
-        thread_->detach();
+        thread_ = boost::make_shared<boost::thread>(&DriveGuard::workingThread, this);
+//        thread_ = boost::make_shared<boost::thread>(boost::bind(&DriveGuard::workingThread, this));
+//        thread_->detach();
     }
 
     DriveGuard::~DriveGuard() {
-
+        is_thread_running_ = false;
+        thread_->interrupt(); // 向线程发送结束请求
+        thread_->join(); // 等待线程结束
     }
 
     boost::shared_ptr<DriveGuard> DriveGuard::getInstance() {
@@ -58,7 +61,6 @@ namespace rocos {
             }
 
             usleep(10000);
-
         }
         std::cout << "Drive Guard thread is terminated." << std::endl;
     }

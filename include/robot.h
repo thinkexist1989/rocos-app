@@ -121,6 +121,10 @@ namespace rocos {
                    Synchronization sync = SYNC_TIME
         );
 
+
+        void stopSingleAxis(int id);
+        void stopMultiAxis();
+
         /// 单关节运动
         /// \param id 关节ID
         /// \param pos 位置
@@ -245,8 +249,8 @@ namespace rocos {
     protected:
         void addAllJoints();
 
-    public: // TODO: need changed to private
-        // 测试用MoveJ
+    public:
+        // TODO： 测试用MoveJ，阻塞运行，需要改为private
         void moveJ(const std::vector<double> &pos,
                    const std::vector<double> &max_vel,
                    const std::vector<double> &max_acc,
@@ -286,6 +290,9 @@ namespace rocos {
         bool is_exit_{false};
 
         std::vector<bool> need_plan_; // 是否需要重新规划标志
+
+        boost::shared_ptr<boost::thread> otg_motion_thread_ {nullptr}; //otg在线规划线程
+
     };
 
 }

@@ -71,6 +71,7 @@ namespace rocos {
     }
 
 
+    //TODO: 测试用MoveJ，阻塞运行，需要改为private
     void
     Robot::moveJ(const std::vector<double> &pos, const std::vector<double> &max_vel, const std::vector<double> &max_acc,
                  const std::vector<double> &max_jerk, Robot::Synchronization sync, ProfileType type) {
@@ -155,11 +156,14 @@ namespace rocos {
 
     void Robot::startMotionThread() {
         is_running_ = true;
-        boost::thread(&Robot::motionThreadHandler, this).detach();
+        otg_motion_thread_ = boost::make_shared<boost::thread>(&Robot::motionThreadHandler, this);
+//        boost::thread(&Robot::motionThreadHandler, this);
     }
 
     void Robot::stopMotionThread() {
         is_running_ = false;
+        otg_motion_thread_->interrupt();
+        otg_motion_thread_->join(); //等待运动线程结束
     }
 
     void Robot::motionThreadHandler() {
@@ -257,8 +261,9 @@ namespace rocos {
 
                 if (interp_[i]->isValidMovement()) {
                     dt[i] += 0.001;
-                    pos_[i] = interp_[i]->pos(dt[i]);
+                    pos_[i] = interp_[i]->pos(dt[i]);  //当前位置更新
                     vel_[i] = interp_[i]->vel((dt[i]));
+                    acc_[i] = interp_[i]->acc(dt[i]);
 
                     switch (joints_[i]->getMode()) {
                         case ModeOfOperation::CyclicSynchronousPositionMode:
@@ -298,6 +303,28 @@ namespace rocos {
 
         need_plan_.resize(jnt_num_, true);
 
+    }
+
+    /// \brief 停止单轴运动
+    /// \param id 轴ID
+    void Robot::stopSingleAxis(int id) {
+        double dt = fabs(vel_[id]) / max_acc_[id]; // 所需要的减速时间
+//        target_positions_[id] = pos_[id] + 2*( dt * vel_[id] / 2.0); //TODO：这个减速段计算有问题
+        target_positions_[id] = pos_[id];
+        target_velocities_[id] = 0.0;
+        least_motion_time_ = 0.0;
+
+
+        std::cout << "max_acc: " << max_acc_[id] << "; pos: " << pos_[id] << "; vel: " << vel_[id] << std::endl;
+        std::cout << "dt: " << dt << "; target_positions: " << target_positions_[id] << std::endl;
+
+//        need_plan_[id] = true;
+    }
+
+    void Robot::stopMultiAxis() {
+        for (int id = 0; id < jnt_num_; ++id) {
+            stopSingleAxis(id);
+        }
     }
 
     /// 设置单轴运动
@@ -340,7 +367,7 @@ namespace rocos {
             std::cout << "[ERROR] moveMultiAxis: wrong size!" << std::endl;
         }
 
-        for (int id = 0; id < jnt_num_; id++) {
+        for (int id = 0; id < jnt_num_; ++id) {
             target_positions_[id] = target_pos[id];
             target_velocities_[id] = target_vel[id];
 
@@ -357,5 +384,6 @@ namespace rocos {
         if (least_time != -1)
             least_motion_time_ = least_time;
     }
+
 
 }

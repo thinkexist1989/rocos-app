@@ -63,12 +63,17 @@ message SingleAxisMove {
     optional bool   raw_data = 7;
 }
 
+message SingleAxisStop {
+    int32 id = 1;
+}
+
 message SingleAxisCommand {
     oneof command {
         SingleAxisEnabled enabled = 1;
         SingleAxisDisabled disabled = 2;
         SingleAxisMode mode = 3;
         SingleAxisMove move = 4;
+        SingleAxisStop stop = 5; //增加停止命令，可以以允许的最大加速度立刻停止
     }
 }
 
@@ -96,6 +101,9 @@ message MultiAxisMove {
     optional bool raw_data = 7;
 }
 
+message MultiAxisStop {
+}
+
 message MultiAxisCommand {
     oneof command {
         MultiAxisEnabled enabled = 1;
@@ -103,6 +111,7 @@ message MultiAxisCommand {
         MultiAxisMode mode = 3;
         MultiAxisSync sync = 4;
         MultiAxisMove move = 5;
+        MultiAxisStop stop = 6; //增加停止命令，每个轴都可以以允许的最大加速度立刻停止
     }
 }
 
