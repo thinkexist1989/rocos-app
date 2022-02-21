@@ -278,9 +278,9 @@ namespace rocos {
         //
         //	   v |	_________
         //		 | /         \
-	//       |/           \
-	//       |             \
-	//	     |              |
+	    //       |/           \
+	    //       |             \
+	    //	     |              |
         //       0-1--------2---3--> t
         // let Ta Tv Td be the acceleration cursing and deceleration time interval
         // so, pf - p0 = v0*Ta +0.5*_a[1]*Ta*Ta + _v[1]*Tv + vf*Td - 0.5*_a[3]*Td*Td
