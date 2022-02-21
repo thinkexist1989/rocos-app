@@ -309,22 +309,44 @@ namespace rocos {
     /// \param id 轴ID
     void Robot::stopSingleAxis(int id) {
         double dt = fabs(vel_[id]) / max_acc_[id]; // 所需要的减速时间
-//        target_positions_[id] = pos_[id] + 2*( dt * vel_[id] / 2.0); //TODO：这个减速段计算有问题
-        target_positions_[id] = pos_[id];
+        target_positions_[id] = pos_[id] + 2*( dt * vel_[id] / 2.0); //TODO：这个减速段计算有问题
+//        target_positions_[id] = pos_[id];
         target_velocities_[id] = 0.0;
         least_motion_time_ = 0.0;
 
+        auto sync = sync_;
+        sync_ = SYNC_NONE; //停止时候就不需要同步了
 
         std::cout << "max_acc: " << max_acc_[id] << "; pos: " << pos_[id] << "; vel: " << vel_[id] << std::endl;
         std::cout << "dt: " << dt << "; target_positions: " << target_positions_[id] << std::endl;
 
-//        need_plan_[id] = true;
+        need_plan_[id] = true;
+
+//        usleep(dt * 1000000);
+//        sync_ = sync;
     }
 
     void Robot::stopMultiAxis() {
+//        auto sync = sync_;
+        sync_ = SYNC_NONE; //停止时候就不需要同步了
+
+        double wait_time = 0.0;
+
         for (int id = 0; id < jnt_num_; ++id) {
-            stopSingleAxis(id);
+            double dt = fabs(vel_[id]) / max_acc_[id]; // 所需要的减速时间
+            target_positions_[id] = pos_[id] + 2*( dt * vel_[id] / 2.0); //TODO：这个减速段计算有问题
+//        target_positions_[id] = pos_[id];
+            target_velocities_[id] = 0.0;
+            least_motion_time_ = 0.0;
+
+            std::cout << "max_acc: " << max_acc_[id] << "; pos: " << pos_[id] << "; vel: " << vel_[id] << std::endl;
+            std::cout << "dt: " << dt << "; target_positions: " << target_positions_[id] << std::endl;
+
+            need_plan_[id] = true;
+
+            wait_time = wait_time <= dt ? wait_time : dt;
         }
+
     }
 
     /// 设置单轴运动

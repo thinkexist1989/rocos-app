@@ -217,6 +217,10 @@ namespace rocos {
             } else if (multiAxisCmd.has_sync()) {
                 robot_ptr_->setSynchronization(static_cast<Robot::Synchronization>(multiAxisCmd.sync().value()));
             } else if (multiAxisCmd.has_move()) {
+                if(multiAxisCmd.move().has_sync()) { //设置同步模式
+                    robot_ptr_->setSynchronization(static_cast<Robot::Synchronization>(multiAxisCmd.move().sync()));
+                }
+
                 if (multiAxisCmd.move().has_raw_data() && multiAxisCmd.move().raw_data()) {
                     for (int i = 0; i < robot_ptr_->jnt_num_; i++) {
                         auto cnt_per_unit = robot_ptr_->getJointCntPerUnit(i);

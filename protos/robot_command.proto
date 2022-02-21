@@ -99,6 +99,7 @@ message MultiAxisMove {
     repeated double max_jerk = 5;
     optional double least_time = 6;
     optional bool raw_data = 7;
+    optional Synchronization sync = 8;
 }
 
 message MultiAxisStop {
