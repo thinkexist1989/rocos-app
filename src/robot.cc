@@ -309,7 +309,7 @@ namespace rocos {
     /// \param id 轴ID
     void Robot::stopSingleAxis(int id) {
         double dt = fabs(vel_[id]) / max_acc_[id]; // 所需要的减速时间
-        target_positions_[id] = pos_[id] + 2*( dt * vel_[id] / 2.0); //TODO：这个减速段计算有问题
+        target_positions_[id] = pos_[id] + dt * vel_[id] / 2.0; //TODO：这个减速段计算有问题
 //        target_positions_[id] = pos_[id];
         target_velocities_[id] = 0.0;
         least_motion_time_ = 0.0;
