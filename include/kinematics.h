@@ -24,6 +24,7 @@
 #include <urdf_model/model.h>
 
 #include <kdl/frames.hpp>
+#include <kdl/frames_io.hpp>
 #include <kdl/chain.hpp>
 
 #include <trac_ik/trac_ik.hpp> //逆运动学处理
@@ -31,6 +32,20 @@
 namespace rocos {
 
     class Kinematics {
+    public:
+
+        void initialize();
+
+        //TODO: for test;
+        static void getChain(KDL::Chain& chain, KDL::JntArray& q_min, KDL::JntArray& q_max);
+
+    private:
+        KDL::Chain chain_; // KDL运动链
+        KDL::JntArray q_min_; // 关节最小位置
+        KDL::JntArray q_max_; // 关节最大位置
+
+        std::unique_ptr<KDL::ChainFkSolverPos_recursive> fk_solver;
+        std::unique_ptr<TRAC_IK::TRAC_IK> ik_solver;
 
     };
 
