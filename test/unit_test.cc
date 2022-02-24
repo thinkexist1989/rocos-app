@@ -12,6 +12,7 @@
 #include <drive.h>
 #include <robot.h>
 #include <robot_service.h>
+#include <kinematics.h>
 
 
 TEST_CASE("Hello World") {
@@ -260,5 +261,27 @@ TEST_CASE("gRPC communication") {
     auto robotService = RobotServiceImpl::getInstance(&robot);
 
     robotService->runServer();
+
+}
+
+TEST_CASE("Kinematics") {
+    using namespace rocos;
+
+    Kinematics kin;
+
+    JntArray q(6);
+    q.data << 0.0, 0.0, 0.0, 0.0, 0.0, 0.0;
+
+    std::cout << "q: " << q.data << std::endl;
+
+    Frame p;
+    kin.JntToCart(q, p);
+    std::cout << "pos 1: " << std::endl;
+    std::cout << p.p << std::endl;
+
+    q.data << 0.0, M_PI_2, 0.0, 0.0, 0.0, 0.0;
+    kin.JntToCart(q, p);
+    std::cout << "pos 2: " << std::endl;
+    std::cout << p.p << std::endl;
 
 }

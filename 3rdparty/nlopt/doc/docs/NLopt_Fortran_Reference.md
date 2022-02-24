@@ -51,7 +51,7 @@ call nlo_create(opt, algorithm, n)
 ```
 
 
-given an `integer` `algorithm` (see [NLopt Algorithms](NLopt_Algorithms.md) for possible values, defined in the `nlopt.f` include file) and the `integer` dimensionality of the problem (`n`, the number of optimization parameters). Just as in C, the algorithm is specified by constants of the form `NLOPT_MMA`, `NLOPT_COBYLA`, etcetera. If the constructor succeeds, `opt` will be nonzero after nlo_create, so you can check for an error by checking whether `opt` is zero (if you do this, be sure to initialize it to zero before calling nlo_create).
+given an `integer` `algorithm` (see [NLopt Algorithms](NLopt_Algorithms.md) for possible values, defined in the `nlopt.f` include file) and the `integer` dimensionality of the problem (`n`, the number of optimization parameters). Just as in C, the algorithm is specified by constants of the form `NLOPT_MMA`, `NLOPT_COBYLA`, etcetera. If the constructor succeeds, `opt` will be nonzero after nlo_create, so you can check for an error by checking whether `opt` is zero (if you do this, be sure to Initialize it to zero before calling nlo_create).
 
 When you are finished with the object, you must deallocate its associated storage by calling:
 

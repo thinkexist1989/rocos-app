@@ -49,7 +49,7 @@ namespace KDL {
     {
       if (type != RotAxis && type != TransAxis) throw joint_type_ex;
 
-      // initialize
+      // Initialize
       joint_pose.p = origin;
       joint_pose.M = Rotation::Rot2(axis, offset);
       q_previous = 0;
@@ -63,7 +63,7 @@ namespace KDL {
     {
       if (type != RotAxis && type != TransAxis) throw joint_type_ex;
 
-      // initialize
+      // Initialize
       joint_pose.p = origin;
       joint_pose.M = Rotation::Rot2(axis, offset);
       q_previous = 0;

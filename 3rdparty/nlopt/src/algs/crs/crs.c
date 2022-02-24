@@ -65,7 +65,7 @@ static void random_trial(crs_data *d, double *x, rb_node *best)
      int n = d->n, n1 = n+1, i, k, i0, jn;
      double *ps = d->ps, *xi;
 
-     /* initialize x to x_0 = best point */
+     /* Initialize x to x_0 = best point */
      memcpy(x, best->k + 1, sizeof(double) * n);
      i0 = (best->k - ps) / n1;
 

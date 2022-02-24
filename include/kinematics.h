@@ -30,22 +30,29 @@
 #include <trac_ik/trac_ik.hpp> //逆运动学处理
 
 namespace rocos {
+    using namespace KDL;
 
     class Kinematics {
     public:
+        Kinematics();
+        ~Kinematics();
 
-        void initialize();
+        void Initialize();
+
+        int JntToCart(const JntArray& q_in, Frame& p_out);
+        int CartToJnt(const JntArray &q_init, const Frame &p_in, JntArray &q_out);
 
         //TODO: for test;
-        static void getChain(KDL::Chain& chain, KDL::JntArray& q_min, KDL::JntArray& q_max);
+        static void getChainTechServo(KDL::Chain& chain, KDL::JntArray& q_min, KDL::JntArray& q_max);
+        static void getChain7Dofs(KDL::Chain& chain, KDL::JntArray& q_min, KDL::JntArray& q_max);
 
     private:
         KDL::Chain chain_; // KDL运动链
         KDL::JntArray q_min_; // 关节最小位置
         KDL::JntArray q_max_; // 关节最大位置
 
-        std::unique_ptr<KDL::ChainFkSolverPos_recursive> fk_solver;
-        std::unique_ptr<TRAC_IK::TRAC_IK> ik_solver;
+        std::unique_ptr<KDL::ChainFkSolverPos_recursive> fk_solver_;
+        std::unique_ptr<TRAC_IK::TRAC_IK> ik_solver_;
 
     };
 

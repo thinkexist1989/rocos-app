@@ -2,7 +2,7 @@
    A C-program for MT19937, with initialization improved 2002/1/26.
    Coded by Takuji Nishimura and Makoto Matsumoto.
 
-   Before using, initialize the state by using nlopt_init_genrand(seed)
+   Before using, Initialize the state by using nlopt_init_genrand(seed)
    or nlopt_init_by_array(init_key, key_length).
 
    Copyright (C) 1997 - 2002, Makoto Matsumoto and Takuji Nishimura,
@@ -132,7 +132,7 @@ static uint32_t nlopt_genrand_int32(void)
 
 #if 0 /* not used in NLopt */
 
-/* initialize by an array with array-length */
+/* Initialize by an array with array-length */
 /* init_key is the array for initializing keys */
 /* key_length is its length */
 /* slight change for C++, 2004/2/26 */

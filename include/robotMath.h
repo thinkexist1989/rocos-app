@@ -1,10 +1,6 @@
-
-
 #ifndef ROBOTMATH_H_
 #define ROBOTMATH_H_
 
-
-#pragma once
 #include <math.h>
 #include <vector>
 #include <string.h>
@@ -20,7 +16,8 @@
 #endif // MIN_VALUE_EQ_ZERO
 
 #ifndef PI
-#define PI 3.141592653589793238
+//#define PI 3.141592653589793238
+const double PI = 3.141592653589793238;
 #endif // !PI
 
 #ifndef INVALID

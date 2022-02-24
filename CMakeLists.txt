@@ -229,5 +229,6 @@ target_link_libraries(unit_test
         rocos::hardware
         rocos::drive
         rocos::protocol
+        rocos::kinematics
         )
 add_test(NAME unit_test COMMAND unit_test)
