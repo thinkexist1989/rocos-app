@@ -269,19 +269,31 @@ TEST_CASE("Kinematics") {
 
     Kinematics kin;
 
+
+    std::cout << "FK test: " << std::endl;
     JntArray q(6);
     q.data << 0.0, 0.0, 0.0, 0.0, 0.0, 0.0;
-
-    std::cout << "q: " << q.data << std::endl;
 
     Frame p;
     kin.JntToCart(q, p);
     std::cout << "pos 1: " << std::endl;
+
     std::cout << p.p << std::endl;
 
     q.data << 0.0, M_PI_2, 0.0, 0.0, 0.0, 0.0;
     kin.JntToCart(q, p);
     std::cout << "pos 2: " << std::endl;
     std::cout << p.p << std::endl;
+
+
+    std::cout << "IK test: " << std::endl;
+    JntArray q_out(6);
+    q.data << 0.0, M_PI_4, 0.0, 0.0, 0.0, 0.0;
+
+    int res = kin.CartToJnt(q, p, q_out);
+    if(res < 0)
+        std::cout <<"ik solve failed"  << std::endl;
+    std::cout << "q_out: " << std::endl;
+    std::cout << q_out.data << std::endl;
 
 }

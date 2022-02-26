@@ -62,28 +62,29 @@ namespace rocos {
         q_min.resize(7);
         q_max.resize(7);
         //joint 0
-        kin_chain.addSegment(Segment(Joint(Joint::None), Frame::DH_Craig1989(0.0, 0.0, 0.0, 0.0)));
-        //joint 1
         kin_chain.addSegment(Segment(Joint(Joint::RotZ), Frame::DH_Craig1989(0.0, 0.0, 0.3393, 0.0)));
         q_min(0) = -168.0 / 180.0 * M_PI ; q_max(0) = 168.0 / 180.0 * M_PI; //见调试总结，关节限位值
-        //joint 2
+        //joint 1
         kin_chain.addSegment(Segment(Joint(Joint::RotZ), Frame::DH_Craig1989(0.0, M_PI_2, 0.0, 0.0)));
         q_min(1) = -130.5 / 180.0 * M_PI ; q_max(1) = 130.5 / 180.0 * M_PI; //见调试总结，关节限位值
-        //joint 3
+        //joint 2
         kin_chain.addSegment(Segment(Joint(Joint::RotZ), Frame::DH_Craig1989(0.0, -M_PI_2, 0.3977, 0.0)));
         q_min(2) = -159.5 / 180.0 * M_PI ; q_max(2) = 159.5 / 180.0 * M_PI; //见调试总结，关节限位值
-        //joint 4
+        //joint 3
         kin_chain.addSegment(Segment(Joint(Joint::RotZ), Frame::DH_Craig1989(0.0, M_PI_2, 0.0, 0.0)));
         q_min(3) = -131.5 / 180.0 * M_PI ; q_max(3) = 131.5 / 180.0 * M_PI; //见调试总结，关节限位值
-        //joint 5
+        //joint 4
         kin_chain.addSegment(Segment(Joint(Joint::RotZ), Frame::DH_Craig1989(0.0, -M_PI_2, 0.3925, 0.0)));
         q_min(4) = -159.0 / 180.0 * M_PI ; q_max(4) = 159.0 / 180.0 * M_PI; //见调试总结，关节限位值
-        //joint 6
+        //joint 5
         kin_chain.addSegment(Segment(Joint(Joint::RotZ), Frame::DH_Craig1989(0.0, M_PI_2, 0.0, 0.0)));
         q_min(5) = -124.5 / 180.0 * M_PI ; q_max(5) = 124.5 / 180.0 * M_PI; //见调试总结，关节限位值
-        //joint 7
+        //joint 6
         kin_chain.addSegment(Segment(Joint(Joint::RotZ), Frame::DH_Craig1989(0.0, -M_PI_2, 0.2145, 0.0)));
         q_min(5) = -167.5 / 180.0 * M_PI ; q_max(6) = 167.5 / 180.0 * M_PI; //见调试总结，关节限位值
+        //joint 7
+        kin_chain.addSegment(Segment(Joint(Joint::Fixed), Frame::DH_Craig1989(0.0, 0.0, 0.0, 0.0)));
+
 
         chain = kin_chain;
     }

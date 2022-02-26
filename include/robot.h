@@ -26,6 +26,7 @@
 #include <drive.h>
 
 #include <interpolate.h>
+#include <kinematics.h>
 
 
 namespace rocos {
@@ -292,6 +293,8 @@ namespace rocos {
         std::vector<bool> need_plan_; // 是否需要重新规划标志
 
         boost::shared_ptr<boost::thread> otg_motion_thread_ {nullptr}; //otg在线规划线程
+
+        Kinematics kinematics;
 
     };
 
