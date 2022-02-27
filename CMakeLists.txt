@@ -199,6 +199,8 @@ endforeach ()
 # Include generated *.pb.h files
 include_directories("${CMAKE_CURRENT_BINARY_DIR}")
 
+########## Library protocol #################
+
 add_library(protocol
         SHARED
         ${PROTO_SRCS}
