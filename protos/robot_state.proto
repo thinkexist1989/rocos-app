@@ -69,6 +69,10 @@ message BaseState {
     SE3Pose pose = 1;
 }
 
+message ObjectState {
+    SE3Pose pose = 1;
+}
+
 // The current state of the robot.
 message RobotState {
     // Joint state
@@ -81,6 +85,8 @@ message RobotState {
     ToolState   tool_state = 4;
     // Base state
     BaseState   base_state = 5;
+    // Object state
+    ObjectState obj_state = 6;
 }
 
 message HardwareState {
