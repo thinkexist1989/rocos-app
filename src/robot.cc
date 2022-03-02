@@ -208,7 +208,11 @@ namespace rocos {
 
             hw_interface_->waitForSignal(9);
 
-            // Trajectory generating......
+            //!< Update Flange State
+            updateCartesianInfo();
+
+
+            //!< Trajectory generating......
             max_time = 0.0;
             for (int i = 0; i < jnt_num_; ++i) {
                 if (joints_[i]->getDriveState() != DriveState::OperationEnabled) {
@@ -242,7 +246,7 @@ namespace rocos {
                 }
             }
 
-            // Sync scaling....
+            //!< Sync scaling....
             if (sync_ == SYNC_TIME) {
                 for_each(interp_.begin(), interp_.end(), [=](R_INTERP_BASE *p) { p->scaleToDuration(max_time); });
             } else if (sync_ == SYNC_NONE) {
@@ -253,7 +257,7 @@ namespace rocos {
             }
 
 
-            // Start moving....
+            //!< Start moving....
             for (int i = 0; i < jnt_num_; ++i) {
                 if (joints_[i]->getDriveState() != DriveState::OperationEnabled) {
                     continue; // Disabled, ignore

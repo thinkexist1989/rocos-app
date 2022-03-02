@@ -112,6 +112,21 @@ namespace rocos {
         hw_state->set_current_cycle_time(robot_ptr_->hw_interface_->getCurrCycleTime());
         hw_state->set_slave_num(robot_ptr_->hw_interface_->getSlaveNumber());
 
+        // Flange State
+        auto flange = robot_ptr_->getFlange();
+        auto flange_state = response->mutable_robot_state()->mutable_flange_state();
+        auto position = flange_state->mutable_pose()->mutable_position();
+        position->set_x(flange.p.x());
+        position->set_y(flange.p.y());
+        position->set_z(flange.p.z());
+        auto rotation = flange_state->mutable_pose()->mutable_rotation();
+        double x,y,z,w;
+        flange.M.GetQuaternion(x,y,z,w);
+        rotation->set_x(x);
+        rotation->set_y(y);
+        rotation->set_z(z);
+        rotation->set_w(w);
+
 
         return grpc::Status::OK;
     }

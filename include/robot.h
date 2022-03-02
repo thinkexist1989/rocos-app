@@ -28,6 +28,8 @@
 #include <interpolate.h>
 #include <kinematics.h>
 
+#include <Eigen/StdVector> //!< Eigen官网说明 https://eigen.tuxfamily.org/dox/group__TopicStlContainers.html
+
 
 namespace rocos {
 
@@ -124,6 +126,7 @@ namespace rocos {
 
 
         void stopSingleAxis(int id);
+
         void stopMultiAxis();
 
         /// 单关节运动
@@ -241,6 +244,9 @@ namespace rocos {
             need_plan_.resize(jnt_num_, true);
         }
 
+        inline Frame getFlange() { return flange_; }
+        inline Frame getTool() { return tool_; }
+        inline Frame getObject() { return object_; }
 
         /*****轨迹规划线程相关*****/
         void startMotionThread(); // 启动轨迹规划线程
@@ -249,6 +255,24 @@ namespace rocos {
 
     protected:
         void addAllJoints();
+
+        int JntToCart(const JntArray &q_in, Frame &p_out) { return kinematics_.JntToCart(q_in, p_out); }
+
+        int CartToJnt(const JntArray &q_init, const Frame &p_in, JntArray &q_out) {
+            kinematics_.CartToJnt(q_init, p_in, q_out);
+        }
+
+        //! 更新法兰系,工具系,工件系pose
+        void updateCartesianInfo() {
+            JntArray q_in(jnt_num_);
+            q_in.data = Eigen::Map<Eigen::VectorXd, Eigen::Unaligned>(pos_.data(), pos_.size());
+//            std::cout << q_in.data << std::endl;
+
+            //Flange Reference
+            JntToCart(q_in, flange_);
+//            std::cout << "OK" << std::endl;
+        }
+
 
     public:
         // TODO： 测试用MoveJ，阻塞运行，需要改为private
@@ -292,9 +316,13 @@ namespace rocos {
 
         std::vector<bool> need_plan_; // 是否需要重新规划标志
 
-        boost::shared_ptr<boost::thread> otg_motion_thread_ {nullptr}; //otg在线规划线程
+        boost::shared_ptr<boost::thread> otg_motion_thread_{nullptr}; //otg在线规划线程
 
-        Kinematics kinematics;
+        Kinematics kinematics_;
+
+        Frame flange_; //!< 法兰位置姿态
+        Frame tool_; //!< 工具位置姿态
+        Frame object_; //!< 工件位置姿态
 
     };
 
