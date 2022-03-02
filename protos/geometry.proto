@@ -340,3 +340,9 @@ message Vec3Value {
     google.protobuf.DoubleValue y = 2;
     google.protobuf.DoubleValue z = 3;
 }
+
+
+// 关节矩阵
+message JointArray {
+    repeated double data = 1;
+}

@@ -138,18 +138,98 @@ message CntPerUnit {
 
 /////// Motion Command /////////////
 
-
 message MoveJ {
-    repeated double q = 1; //关节
+    JointArray q = 1; //关节
+    double speed = 2;
+    double acceleration = 3;
+    double time = 4;
+    double radius = 5;
+    bool asynchronous = 6;
+}
 
+message MoveJ_IK {
+    SE3Pose pose = 1;
+    double speed = 2;
+    double acceleration = 3;
+    double time = 4;
+    double radius = 5;
+    bool asynchronous = 6;
 }
 
 message MoveL {
-    SE3Pose target_pos = 1;
+    SE3Pose pose = 1;
+    double speed = 2;
+    double acceleration = 3;
+    bool asynchronous = 4;
 }
 
+message MoveL_FK {
+    JointArray q = 1;
+    double speed = 2;
+    double acceleration = 3;
+    double time = 4;
+    double radius = 5;
+    bool asynchronous = 6;
+}
 
+message MoveC {
+    SE3Pose pose_via = 1;
+    SE3Pose pose_to = 2;
+    double speed = 3;
+    double acceleration = 4;
+    double time = 5;
+    double radius = 6;
+    enum OrientationMode {
+        UNCONSTRAINED = 0;
+            FIXED = 1;
+    }
+    OrientationMode mode = 7;
+    bool asynchronous = 8;
+}
 
+message MoveP {
+    SE3Pose pose = 1;
+    double speed = 2;
+    double acceleration = 3;
+    double time = 4;
+    double radius = 5;
+    bool asynchronous = 6;
+}
+
+// Path
+message Path {
+    message PathEntry {
+        enum MoveType {
+            MOVE_J = 0;
+            MOVE_L = 1;
+            MOVE_P = 2;
+            MOVE_C = 3;
+        }
+        MoveType type = 1;
+
+        oneof param {
+            JointArray q = 2;
+            SE3Pose pose = 3;
+        }
+
+    }
+    repeated PathEntry waypoints = 1;
+}
+//MovePath
+message MovePath {
+    Path path = 1;
+    bool asynchronous = 2;
+}
+
+message MotionCommand {
+    oneof command {
+        MoveJ move_j = 1;
+        MoveL move_l = 2;
+        MoveC move_c = 3;
+        MoveP move_p = 4;
+        MovePath move_path = 5;
+    }
+}
 
 ///////////////////////////////////////
 
@@ -160,6 +240,7 @@ message RobotCommand {
         MoveJ   move_j = 3;
         SingleAxisCommand single_axis_command = 4;
         MultiAxisCommand multi_axis_command = 5;
+        MotionCommand motion_command = 6;
     }
 }
 
