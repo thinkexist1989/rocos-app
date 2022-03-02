@@ -136,13 +136,18 @@ message CntPerUnit {
     repeated google.protobuf.DoubleValue value = 1;
 }
 
+/////// Motion Command /////////////
+
+
 message MoveJ {
-    repeated double target_pos = 1;
+    repeated double q = 1; //关节
+
 }
 
 message MoveL {
     SE3Pose target_pos = 1;
 }
+
 
 
 
