@@ -411,5 +411,35 @@ namespace rocos {
             least_motion_time_ = least_time;
     }
 
+    /////// Motion Command /////////////
+
+    int Robot::MoveJ(JntArray q, double speed, double acceleration, double time, double radius, bool asynchronous) {
+        return 0;
+    }
+
+    int Robot::MoveJ_IK(Frame pose, double speed, double acceleration, double time, double radius, bool asynchronous) {
+        return 0;
+    }
+
+    int Robot::MoveL(Frame pose, double speed, double acceleration, double time, double radius, bool asynchronous) {
+        return 0;
+    }
+
+    int Robot::MoveL_FK(JntArray q, double speed, double acceleration, double time, double radius, bool asynchronous) {
+        return 0;
+    }
+
+    int Robot::MoveC(Frame pose_via, Frame pose_to, double speed, double acceleration, double time, double radius,
+                     Robot::OrientationMode mode, bool asynchronous) {
+        return 0;
+    }
+
+    int Robot::MoveP(Frame pose, double speed, double acceleration, double time, double radius, bool asynchronous) {
+        return 0;
+    }
+
+    int Robot::MovePath(const Path &path, bool asynchronous) {
+        return 0;
+    }
 
 }

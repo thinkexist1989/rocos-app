@@ -160,7 +160,9 @@ message MoveL {
     SE3Pose pose = 1;
     double speed = 2;
     double acceleration = 3;
-    bool asynchronous = 4;
+    double time = 4;
+    double radius = 5;
+    bool asynchronous = 6;
 }
 
 message MoveL_FK {

@@ -32,7 +32,30 @@
 
 
 namespace rocos {
+    //! Class PathEntry is used by Class Path
+    class PathEntry {
+    public:
+        enum MoveType {
+            MOVE_J,
+            MOVE_L,
+            MOVE_P,
+            MOVE_C
+        };
 
+    private:
+        MoveType type_;
+        JntArray q_;
+        Frame pose_;
+
+    };
+
+    //! Class Path is used by MovePath
+    class Path {
+    private:
+        std::vector<PathEntry> waypoints_;
+    };
+
+    //! Class Robot
     class Robot {
         friend class RobotServiceImpl;
 
@@ -41,6 +64,11 @@ namespace rocos {
             SYNC_NONE,
             SYNC_TIME,
             SYNC_PHASE
+        };
+
+        enum OrientationMode {
+            UNCONSTRAINED,
+            FIXED
         };
 
         explicit Robot(boost::shared_ptr<HardwareInterface> hw);
@@ -245,7 +273,9 @@ namespace rocos {
         }
 
         inline Frame getFlange() { return flange_; }
+
         inline Frame getTool() { return tool_; }
+
         inline Frame getObject() { return object_; }
 
         /*****轨迹规划线程相关*****/
@@ -275,6 +305,110 @@ namespace rocos {
 
 
     public:
+        //! \brief 关节运动
+        //! \param q 各个关节位置
+        //! \param speed 关节速度限制（leading axis）
+        //! \param acceleration 关节加速度限制
+        //! \param time 最短运行时间
+        //! \param radius 过渡半径
+        //! \param asynchronous 是否异步运行
+        //! \return 错误标志位,成功返回0
+        int MoveJ(JntArray q,
+                  double speed = 1.05,
+                  double acceleration = 1.4,
+                  double time = 0.0,
+                  double radius = 0.0,
+                  bool asynchronous = false);
+
+        //! \brief 关节运动到指定笛卡尔位姿
+        //! \param pose 位姿
+        //! \param speed 关节速度限制（leading axis）
+        //! \param acceleration 关节加速度限制
+        //! \param time 最短运行时间
+        //! \param radius 过渡半径
+        //! \param asynchronous 是否异步运行
+        //! \return 错误标志位,成功返回0
+        int MoveJ_IK(Frame pose,
+                     double speed = 1.05,
+                     double acceleration = 1.4,
+                     double time = 0.0,
+                     double radius = 0.0,
+                     bool asynchronous = false);
+
+        //! \brief 直线运动到指定位姿
+        //! \param pose 位姿
+        //! \param speed 关节速度限制（leading axis）
+        //! \param acceleration 关节加速度限制
+        //! \param time 最短运行时间
+        //! \param radius 过渡半径
+        //! \param asynchronous 是否异步运行
+        //! \return 错误标志位,成功返回0
+        int MoveL(Frame pose,
+                  double speed = 1.05,
+                  double acceleration = 1.4,
+                  double time = 0.0,
+                  double radius = 0.0,
+                  bool asynchronous = false);
+
+        //! \brief 直线运动到关节空间指定位置
+        //! \param q 关节位置
+        //! \param speed 关节速度限制（leading axis）
+        //! \param acceleration 关节加速度限制
+        //! \param time 最短运行时间
+        //! \param radius 过渡半径
+        //! \param asynchronous 是否异步运行
+        //! \return 错误标志位,成功返回0
+        int MoveL_FK(JntArray q,
+                     double speed = 1.05,
+                     double acceleration = 1.4,
+                     double time = 0.0,
+                     double radius = 0.0,
+                     bool asynchronous = false);
+
+        //! \brief 圆弧运动
+        //! \param pose_via 中间点
+        //! \param pose_to 目标点
+        //! \param speed 关节速度限制（leading axis）
+        //! \param acceleration 关节加速度限制
+        //! \param time 最短运行时间
+        //! \param radius 过渡半径
+        //! \param mode 姿态运行模式, UNCONSTRAINED姿态随动
+        //! \param asynchronous 是否异步运行
+        //! \return 错误标志位,成功返回0
+        int MoveC(Frame pose_via,
+                  Frame pose_to,
+                  double speed = 0.25,
+                  double acceleration = 1.2,
+                  double time = 0.0,
+                  double radius = 0.0,
+                  OrientationMode mode = UNCONSTRAINED,
+                  bool asynchronous = false);
+
+        //! \brief TODO: 什么是MoveP?
+        //! \param pose 位姿
+        //! \param speed 关节速度限制（leading axis）
+        //! \param acceleration 关节加速度限制
+        //! \param time 最短运行时间
+        //! \param radius 过渡半径
+        //! \param mode 姿态运行模式, UNCONSTRAINED姿态随动
+        //! \param asynchronous 是否异步运行
+        //! \return 错误标志位,成功返回0
+        int MoveP(Frame pose,
+                  double speed = 1.05,
+                  double acceleration = 1.4,
+                  double time = 0.0,
+                  double radius = 0.0,
+                  bool asynchronous = false);
+
+        //! \brief 沿指定路径运动
+        //! \param path 路径
+        //! \param asynchronous
+        //! \return 错误标志位,成功返回0
+        int MovePath(const Path &path,
+                     bool asynchronous = false);
+
+
+    private:
         // TODO： 测试用MoveJ，阻塞运行，需要改为private
         void moveJ(const std::vector<double> &pos,
                    const std::vector<double> &max_vel,
