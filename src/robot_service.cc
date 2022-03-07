@@ -135,7 +135,7 @@ namespace rocos {
     RobotServiceImpl::WriteRobotCommmand(::grpc::ServerContext *context, const ::rocos::RobotCommandRequest *request,
                                          ::rocos::RobotCommandResponse *response) {
         //ResponseHeader
-        *response->mutable_header()->mutable_response_timestamp() = TimeUtil::GetCurrentTime(); // response timestamp
+        *response->mutable_header()->mutable_response_timestamp() = TimeUtil::GetCurrentTime(); //!< response timestamp
 
         //Process Request RobotCommand
         if (request->command().has_enabled()) {
@@ -145,15 +145,15 @@ namespace rocos {
         } else if (request->command().has_move_j()) {
 
         }
-            /////////// Single Axis Command //////////////
+        //! Single Axis Command
         else if (request->command().has_single_axis_command()) {
             auto singleAxisCmd = request->command().single_axis_command();
 
-            if (singleAxisCmd.has_enabled()) {                 ///////// enabled
+            if (singleAxisCmd.has_enabled()) {                 //!< enabled
                 robot_ptr_->setJointEnabled(singleAxisCmd.enabled().id());
-            } else if (singleAxisCmd.has_disabled()) {        ///////// disabled
+            } else if (singleAxisCmd.has_disabled()) {        //!< disabled
                 robot_ptr_->setJointDisabled(singleAxisCmd.disabled().id());
-            } else if (singleAxisCmd.has_mode()) {           /////////// mode
+            } else if (singleAxisCmd.has_mode()) {           //!< mode
                 ModeOfOperation modeOfOperation;
                 switch (singleAxisCmd.mode().value()) {
                     case MODE_CSP:
@@ -205,7 +205,7 @@ namespace rocos {
                 robot_ptr_->stopSingleAxis(singleAxisCmd.stop().id());
             }
         }
-            /////////// Multi Axis Command //////////////
+        //! Multi Axis Command
         else if (request->command().has_multi_axis_command()) {
             auto multiAxisCmd = request->command().multi_axis_command();
             if (multiAxisCmd.has_enabled()) {
@@ -266,6 +266,27 @@ namespace rocos {
                 robot_ptr_->stopMultiAxis();
             }
 //            robot_ptr_->setJointDisabled(request->command().single_axis_disabled().id());
+        }
+        //! Motion Command
+        else if (request->command().has_motion_command()) {
+            auto motionCmd = request->command().motion_command();
+            if(motionCmd.has_move_j()) {
+                //! TODO: MoveJ
+
+            } else if(motionCmd.has_move_l()) {
+                //! TODO: MoveL
+
+            } else if(motionCmd.has_move_c()) {
+                //! TODO: MoveC
+
+            } else if(motionCmd.has_move_p()) {
+                //! TODO: MoveP
+
+            } else if(motionCmd.has_move_path()) {
+                //! TODO: MovePath
+                
+            }
+
         }
 
         return grpc::Status::OK;
