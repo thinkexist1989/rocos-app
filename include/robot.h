@@ -32,34 +32,34 @@
 
 
 namespace rocos {
-    //! Class PathEntry is used by Class Path
-    class PathEntry {
-    public:
-        enum MoveType {
-            MOVE_J,
-            MOVE_L,
-            MOVE_P,
-            MOVE_C
-        };
-
-    private:
-        MoveType type_;
-        JntArray q_;
-        Frame pose_;
-
-    };
-
-    //! Class Path is used by MovePath
-    class Path {
-    private:
-        std::vector<PathEntry> waypoints_;
-    };
-
     //! Class Robot
     class Robot {
         friend class RobotServiceImpl;
 
     public:
+        //! Class PathEntry is used by Class Path
+        class PathEntry {
+        public:
+            enum MoveType {
+                MOVE_J,
+                MOVE_L,
+                MOVE_P,
+                MOVE_C
+            };
+
+        private:
+            MoveType type_;
+            JntArray q_;
+            Frame pose_;
+
+        };
+
+        //! Class Path is used by MovePath
+        class Path {
+        private:
+            std::vector<PathEntry> waypoints_;
+        };
+
         enum Synchronization {
             SYNC_NONE,
             SYNC_TIME,

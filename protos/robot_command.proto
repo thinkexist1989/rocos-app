@@ -226,10 +226,12 @@ message MovePath {
 message MotionCommand {
     oneof command {
         MoveJ move_j = 1;
-        MoveL move_l = 2;
-        MoveC move_c = 3;
-        MoveP move_p = 4;
-        MovePath move_path = 5;
+        MoveJ_IK move_j_ik = 2;
+        MoveL move_l = 3;
+        MoveL_FK move_l_fk = 4;
+        MoveC move_c = 5;
+        MoveP move_p = 6;
+        MovePath move_path = 7;
     }
 }
 

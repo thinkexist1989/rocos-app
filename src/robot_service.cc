@@ -120,8 +120,8 @@ namespace rocos {
         position->set_y(flange.p.y());
         position->set_z(flange.p.z());
         auto rotation = flange_state->mutable_pose()->mutable_rotation();
-        double x,y,z,w;
-        flange.M.GetQuaternion(x,y,z,w);
+        double x, y, z, w;
+        flange.M.GetQuaternion(x, y, z, w);
         rotation->set_x(x);
         rotation->set_y(y);
         rotation->set_z(z);
@@ -145,7 +145,7 @@ namespace rocos {
         } else if (request->command().has_move_j()) {
 
         }
-        //! Single Axis Command
+            //! Single Axis Command
         else if (request->command().has_single_axis_command()) {
             auto singleAxisCmd = request->command().single_axis_command();
 
@@ -205,7 +205,7 @@ namespace rocos {
                 robot_ptr_->stopSingleAxis(singleAxisCmd.stop().id());
             }
         }
-        //! Multi Axis Command
+            //! Multi Axis Command
         else if (request->command().has_multi_axis_command()) {
             auto multiAxisCmd = request->command().multi_axis_command();
             if (multiAxisCmd.has_enabled()) {
@@ -232,7 +232,7 @@ namespace rocos {
             } else if (multiAxisCmd.has_sync()) {
                 robot_ptr_->setSynchronization(static_cast<Robot::Synchronization>(multiAxisCmd.sync().value()));
             } else if (multiAxisCmd.has_move()) {
-                if(multiAxisCmd.move().has_sync()) { //设置同步模式
+                if (multiAxisCmd.move().has_sync()) { //设置同步模式
                     robot_ptr_->setSynchronization(static_cast<Robot::Synchronization>(multiAxisCmd.move().sync()));
                 }
 
@@ -267,24 +267,141 @@ namespace rocos {
             }
 //            robot_ptr_->setJointDisabled(request->command().single_axis_disabled().id());
         }
-        //! Motion Command
+            //! Motion Command
         else if (request->command().has_motion_command()) {
             auto motionCmd = request->command().motion_command();
-            if(motionCmd.has_move_j()) {
-                //! TODO: MoveJ
+            if (motionCmd.has_move_j()) {
+                std::cout << "Received MoveJ command!" << std::endl;
+                auto movej = motionCmd.move_j();
+                JntArray q(movej.q().data().size());
+                for (int i = 0; i < q.rows(); ++i) {
+                    q(i) = movej.q().data().at(i);
+                }
+                double speed = movej.speed();
+                double acceleration = movej.acceleration();
+                double time = movej.time();
+                double radius = movej.radius();
+                bool asynchronous = movej.asynchronous();
+                robot_ptr_->MoveJ(q, speed, acceleration, time, radius, asynchronous);
 
-            } else if(motionCmd.has_move_l()) {
-                //! TODO: MoveL
+            } else if (motionCmd.has_move_j_ik()) {
+                std::cout << "Received MoveJ_IK command!" << std::endl;
+                auto movej_ik = motionCmd.move_j_ik();
+                Frame pose;
+                pose.p.x(movej_ik.pose().position().x());
+                pose.p.y(movej_ik.pose().position().y());
+                pose.p.z(movej_ik.pose().position().z());
 
-            } else if(motionCmd.has_move_c()) {
-                //! TODO: MoveC
+                pose.M = Rotation::Quaternion(movej_ik.pose().rotation().x(),
+                                              movej_ik.pose().rotation().y(),
+                                              movej_ik.pose().rotation().z(),
+                                              movej_ik.pose().rotation().w());
 
-            } else if(motionCmd.has_move_p()) {
-                //! TODO: MoveP
+                double speed = movej_ik.speed();
+                double acceleration = movej_ik.acceleration();
+                double time = movej_ik.time();
+                double radius = movej_ik.radius();
+                bool asynchronous = movej_ik.asynchronous();
 
-            } else if(motionCmd.has_move_path()) {
+                robot_ptr_->MoveJ_IK(pose, speed, acceleration, time, radius, asynchronous);
+
+
+            } else if (motionCmd.has_move_l()) {
+                std::cout << "Received MoveL command!" << std::endl;
+                auto movel = motionCmd.move_l();
+                Frame pose;
+                pose.p.x(movel.pose().position().x());
+                pose.p.y(movel.pose().position().y());
+                pose.p.z(movel.pose().position().z());
+
+                pose.M = Rotation::Quaternion(movel.pose().rotation().x(),
+                                              movel.pose().rotation().y(),
+                                              movel.pose().rotation().z(),
+                                              movel.pose().rotation().w());
+
+                double speed = movel.speed();
+                double acceleration = movel.acceleration();
+                double time = movel.time();
+                double radius = movel.radius();
+                bool asynchronous = movel.asynchronous();
+
+                robot_ptr_->MoveL(pose, speed, acceleration, time, radius, asynchronous);
+
+            } else if (motionCmd.has_move_l_fk()) {
+                std::cout << "Received MoveL_FK command!" << std::endl;
+                auto movel_fk = motionCmd.move_l_fk();
+                JntArray q(movel_fk.q().data().size());
+                for (int i = 0; i < q.rows(); ++i) {
+                    q(i) = movel_fk.q().data().at(i);
+                }
+                double speed = movel_fk.speed();
+                double acceleration = movel_fk.acceleration();
+                double time = movel_fk.time();
+                double radius = movel_fk.radius();
+                bool asynchronous = movel_fk.asynchronous();
+
+                robot_ptr_->MoveL_FK(q, speed, acceleration, time, radius, asynchronous);
+
+            } else if (motionCmd.has_move_c()) {
+                std::cout << "Received MoveC command!" << std::endl;
+                auto movec = motionCmd.move_c();
+                Frame pose_via;
+                pose_via.p.x(movec.pose_via().position().x());
+                pose_via.p.y(movec.pose_via().position().y());
+                pose_via.p.z(movec.pose_via().position().z());
+
+                pose_via.M = Rotation::Quaternion(movec.pose_via().rotation().x(),
+                                                  movec.pose_via().rotation().y(),
+                                                  movec.pose_via().rotation().z(),
+                                                  movec.pose_via().rotation().w());
+
+                Frame pose_to;
+                pose_to.p.x(movec.pose_to().position().x());
+                pose_to.p.y(movec.pose_to().position().y());
+                pose_to.p.z(movec.pose_to().position().z());
+
+                pose_to.M = Rotation::Quaternion(movec.pose_to().rotation().x(),
+                                                  movec.pose_to().rotation().y(),
+                                                  movec.pose_to().rotation().z(),
+                                                  movec.pose_to().rotation().w());
+
+
+                auto speed = movec.speed();
+                auto acceleration = movec.acceleration();
+                auto time = movec.time();
+                auto radius = movec.radius();
+                auto asynchronous = movec.asynchronous();
+                auto mode = static_cast<Robot::OrientationMode>(movec.mode());
+
+                robot_ptr_->MoveC(pose_via, pose_to, speed, acceleration, time, radius, mode, asynchronous);
+
+            } else if (motionCmd.has_move_p()) {
+                std::cout << "Received MoveP command!" << std::endl;
+                auto movep = motionCmd.move_p();
+                Frame pose;
+                pose.p.x(movep.pose().position().x());
+                pose.p.y(movep.pose().position().y());
+                pose.p.z(movep.pose().position().z());
+
+                pose.M = Rotation::Quaternion(movep.pose().rotation().x(),
+                                              movep.pose().rotation().y(),
+                                              movep.pose().rotation().z(),
+                                              movep.pose().rotation().w());
+
+                auto speed = movep.speed();
+                auto acceleration = movep.acceleration();
+                auto time = movep.time();
+                auto radius = movep.radius();
+                auto asynchronous = movep.asynchronous();
+
+                robot_ptr_->MoveP(pose, speed, acceleration, time, radius, asynchronous);
+
+
+            } else if (motionCmd.has_move_path()) {
                 //! TODO: MovePath
-                
+                std::cout << "Received MovePath command!" << std::endl;
+
+
             }
 
         }

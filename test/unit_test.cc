@@ -214,11 +214,11 @@ TEST_CASE("Sync motion") {
     for (int i = 0; i < 10; i++) {
         std::vector<double> pos{0, 0, 0, 0};
 
-        robot.moveJ(pos, max_vel, max_acc, max_jerk);
+//        robot.moveJ(pos, max_vel, max_acc, max_jerk);
 
         pos = {500000, 500000, 500000, 25000000};
 
-        robot.moveJ(pos, max_vel, max_acc, max_jerk);
+//        robot.moveJ(pos, max_vel, max_acc, max_jerk);
     }
 
     robot.setDisabled();
