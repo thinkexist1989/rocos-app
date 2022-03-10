@@ -129,7 +129,7 @@ nlopt_result nldrmd_minimize_(int n, nlopt_func f, void *f_data,
 
      *fdiff = HUGE_VAL;
 
-     /* Initialize the simplex based on the starting xstep */
+     /* initialize the simplex based on the starting xstep */
      memcpy(pts+1, x, sizeof(double)*n);
      pts[0] = *minf;
      if (*minf < stop->minf_max) { ret=NLOPT_MINF_MAX_REACHED; goto done; }
@@ -179,7 +179,7 @@ nlopt_result nldrmd_minimize_(int n, nlopt_func f, void *f_data,
 
 	  *fdiff = fh - fl;
 
-	  if (init_diam == 0) /* Initialize diam. for psi convergence test */
+	  if (init_diam == 0) /* initialize diam. for psi convergence test */
 	       for (i = 0; i < n; ++i) init_diam += fabs(xl[i] - xh[i]);
 
 	  if (psi <= 0 && nlopt_stop_ftol(stop, fl, fh)) {

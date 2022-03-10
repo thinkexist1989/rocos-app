@@ -63,7 +63,7 @@ namespace KDL{
         virtual void updateInternalDataStructures();
 
     private:
-        ///Helper function to Initialize private members X, S, v, a, f
+        ///Helper function to initialize private members X, S, v, a, f
         void initAuxVariables();
 
         ///One recursion step

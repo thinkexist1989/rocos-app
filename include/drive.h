@@ -179,6 +179,9 @@ namespace rocos {
 
         inline std::string getUserUnitName() const { return user_unit_name_; } // 获取用户单位名称
 
+        inline  double getMaxPosLimit()const {  return  max_pos_limit_ ;}
+        inline  double getMinPosLimit()const {  return  min_pos_limit_ ;}
+
     protected:
 
         boost::shared_ptr<HardwareInterface> hw_interface_{nullptr}; // The pointer of HardwareInterface instance
