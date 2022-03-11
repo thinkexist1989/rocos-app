@@ -410,9 +410,9 @@ class Robot {
   //运动前初始化
   void InitBeforeMove();
   //运动前检查数据有效性
-  int Robot::CheckBeforeMove(const JntArray& q, double speed,
+  int CheckBeforeMove(const JntArray& q, double speed,
                              double acceleration, double time, double radius);
-  int Robot::CheckBeforeMove(const Frame& pos, double speed,
+  int CheckBeforeMove(const Frame& pos, double speed,
                              double acceleration, double time, double radius);
   //实际movej执行线程
   void RunMoveJ(JntArray q, double speed = 1.05, double acceleration = 1.4,
