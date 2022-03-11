@@ -438,6 +438,7 @@ int Robot::MoveJ(JntArray q, double speed, double acceleration, double time,
   }
 
   CheckBeforeMove(q, speed, acceleration, time, radius);
+  InitBeforeMove();
 
   if (is_running_movej)  //不是OTG规划，异步/同步都不能打断
   {
@@ -480,7 +481,18 @@ int Robot::MoveJ_IK(Frame pose, double speed, double acceleration, double time,
 
 int Robot::MoveL(Frame pose, double speed, double acceleration, double time,
                  double radius, bool asynchronous) {
+
+  if (radius) {
+    std::cerr << RED << " radius not supported yet" << WHITE << std::endl;
+    return -1;
+  }
+  if (time) {
+    std::cerr << RED << " time not supported yet" << WHITE << std::endl;
+    return -1;
+  }
+
   CheckBeforeMove(pose, speed, acceleration, time, radius);
+  InitBeforeMove();
 
   std::vector<double> UnitQuaternion_intep(const std::vector<double>& stat,
                                            const std::vector<double>&,
@@ -489,14 +501,15 @@ int Robot::MoveL(Frame pose, double speed, double acceleration, double time,
   //** 变量初始化 **//
   KDL::Vector Pstart = flange_.p;
   KDL::Vector Pend = pose.p;
+  KDL::Vector Plenght  =Pend- Pstart;
   std::vector<KDL::JntArray> traj;
   KDL::JntArray q_init(jnt_num_);
   KDL::JntArray q_target(jnt_num_);
   double s = 0;
   rocos::R_INTERP doubleS;
   bool isplanned = doubleS.planDoubleSPorfile(
-      0, 0, 1, 0, 0, speed, acceleration,
-      *std::min_element(std::begin(max_jerk_), std::end(max_jerk_)));
+      0, 0, 1, 0, 0, speed/ Plenght.Norm(), acceleration/Plenght.Norm(),
+      (*std::min_element(std::begin(max_jerk_), std::end(max_jerk_)))/Plenght.Norm() );
   if (!isplanned) {
     std::cerr << RED << "moveL trajectory"
               << "is infeasible " << WHITE << std::endl;
@@ -520,7 +533,7 @@ int Robot::MoveL(Frame pose, double speed, double acceleration, double time,
   //** 轨迹计算 **//
   for (int i = 0; i <= N; i++) {
     s = doubleS.pos(timegap * i);
-    KDL::Vector P = Pstart + (Pend - Pstart) * s;
+    KDL::Vector P = Pstart + Plenght * s;
     Quaternion_interp =
         UnitQuaternion_intep(Quaternion_start, Quaternion_end, s);
     KDL::Frame interp_frame(
