@@ -52,7 +52,7 @@ Robot::Robot(boost::shared_ptr<HardwareInterface> hw) : hw_interface_(hw) {
     max_jerk_[i] = joints_[i]->getMaxJerk();
   }
 
-//  startMotionThread(); //不启用
+  startMotionThread(); //不启用
 }
 
 void Robot::addAllJoints() {
@@ -216,89 +216,89 @@ void Robot::motionThreadHandler() {
     //!< Update Flange State
     updateCartesianInfo();
 
-    //!< Trajectory generating......
-    max_time = 0.0;
-    //** 轨迹生成 **//
-    for (int i = 0; i < jnt_num_; ++i) {
-      if (joints_[i]->getDriveState() != DriveState::OperationEnabled) {
-        target_positions_[i] = joints_[i]->getPosition();
-        //                    target_positions_prev_[i] = target_positions_[i];
-
-        continue;  // Disabled, ignore
-      }
-
-      if (fabs(target_positions_[i] != target_positions_prev_[i]) ||
-          need_plan_[i]) {  // need update
-        target_positions_prev_[i] =
-            target_positions_[i];  // assign to current target position
-
-        interp_[i]->planProfile(0,                          // t
-                                pos_[i],                    // p0
-                                target_positions_prev_[i],  // pf
-                                vel_[i],                    // v0
-                                target_velocities_[i],      // vf
-                                max_vel_[i], max_acc_[i], max_jerk_[i]);
-
-        dt[i] = 0.0;  // once regenerate, dt = 0.0
-        // consider at least execute time
-        if (interp_[i]->getDuration() < least_motion_time_) {
-          interp_[i]->scaleToDuration(least_motion_time_);
-        }
-        // record max_time
-        max_time =
-            max(max_time, interp_[i]->getDuration());  // get max duration time
-
-        need_plan_[i] = false;
-      }
-    }
-    //**-------------------------------**//
-
-    //!< Sync scaling....
-    //各关节时间同步
-    if (sync_ == SYNC_TIME) {
-      for_each(interp_.begin(), interp_.end(),
-               [=](R_INTERP_BASE* p) { p->scaleToDuration(max_time); });
-    }
-    //各关节无需同步
-    else if (sync_ == SYNC_NONE) {
-    }
-    //各关节相位同步
-    else if (sync_ == SYNC_PHASE) {
-      std::cout
-          << "[WARNING] Phase sync has not implemented...instead of time sync."
-          << std::endl;
-      for_each(interp_.begin(), interp_.end(),
-               [=](R_INTERP_BASE* p) { p->scaleToDuration(max_time); });
-    }
-
-    //!< Start moving....
-    for (int i = 0; i < jnt_num_; ++i) {
-      if (joints_[i]->getDriveState() != DriveState::OperationEnabled) {
-        continue;  // Disabled, ignore
-      }
-
-      if (interp_[i]->isValidMovement()) {
-        dt[i] += 0.001;
-        pos_[i] = interp_[i]->pos(dt[i]);  //当前位置更新
-        vel_[i] = interp_[i]->vel((dt[i]));
-        acc_[i] = interp_[i]->acc(dt[i]);
-
-        switch (joints_[i]->getMode()) {
-          case ModeOfOperation::CyclicSynchronousPositionMode:
-            joints_[i]->setPosition(pos_[i]);
-            break;
-          case ModeOfOperation::CyclicSynchronousVelocityMode:
-            joints_[i]->setVelocity(vel_[i]);
-            break;
-          default:
-            std::cout << "Only Supported CSP and CSV" << std::endl;
-        }
-      } else {
-        vel_[i] = 0.0;
-      }
-//      std::cout << " pos_[" << i << "]  = " << pos_[i] << std::endl;
-    }
-//    std::cout << "----------------------" << std::endl;
+//    //!< Trajectory generating......
+//    max_time = 0.0;
+//    //** 轨迹生成 **//
+//    for (int i = 0; i < jnt_num_; ++i) {
+//      if (joints_[i]->getDriveState() != DriveState::OperationEnabled) {
+//        target_positions_[i] = joints_[i]->getPosition();
+//        //                    target_positions_prev_[i] = target_positions_[i];
+//
+//        continue;  // Disabled, ignore
+//      }
+//
+//      if (fabs(target_positions_[i] != target_positions_prev_[i]) ||
+//          need_plan_[i]) {  // need update
+//        target_positions_prev_[i] =
+//            target_positions_[i];  // assign to current target position
+//
+//        interp_[i]->planProfile(0,                          // t
+//                                pos_[i],                    // p0
+//                                target_positions_prev_[i],  // pf
+//                                vel_[i],                    // v0
+//                                target_velocities_[i],      // vf
+//                                max_vel_[i], max_acc_[i], max_jerk_[i]);
+//
+//        dt[i] = 0.0;  // once regenerate, dt = 0.0
+//        // consider at least execute time
+//        if (interp_[i]->getDuration() < least_motion_time_) {
+//          interp_[i]->scaleToDuration(least_motion_time_);
+//        }
+//        // record max_time
+//        max_time =
+//            max(max_time, interp_[i]->getDuration());  // get max duration time
+//
+//        need_plan_[i] = false;
+//      }
+//    }
+//    //**-------------------------------**//
+//
+//    //!< Sync scaling....
+//    //各关节时间同步
+//    if (sync_ == SYNC_TIME) {
+//      for_each(interp_.begin(), interp_.end(),
+//               [=](R_INTERP_BASE* p) { p->scaleToDuration(max_time); });
+//    }
+//    //各关节无需同步
+//    else if (sync_ == SYNC_NONE) {
+//    }
+//    //各关节相位同步
+//    else if (sync_ == SYNC_PHASE) {
+//      std::cout
+//          << "[WARNING] Phase sync has not implemented...instead of time sync."
+//          << std::endl;
+//      for_each(interp_.begin(), interp_.end(),
+//               [=](R_INTERP_BASE* p) { p->scaleToDuration(max_time); });
+//    }
+//
+//    //!< Start moving....
+//    for (int i = 0; i < jnt_num_; ++i) {
+//      if (joints_[i]->getDriveState() != DriveState::OperationEnabled) {
+//        continue;  // Disabled, ignore
+//      }
+//
+//      if (interp_[i]->isValidMovement()) {
+//        dt[i] += 0.001;
+//        pos_[i] = interp_[i]->pos(dt[i]);  //当前位置更新
+//        vel_[i] = interp_[i]->vel((dt[i]));
+//        acc_[i] = interp_[i]->acc(dt[i]);
+//
+//        switch (joints_[i]->getMode()) {
+//          case ModeOfOperation::CyclicSynchronousPositionMode:
+//            joints_[i]->setPosition(pos_[i]);
+//            break;
+//          case ModeOfOperation::CyclicSynchronousVelocityMode:
+//            joints_[i]->setVelocity(vel_[i]);
+//            break;
+//          default:
+//            std::cout << "Only Supported CSP and CSV" << std::endl;
+//        }
+//      } else {
+//        vel_[i] = 0.0;
+//      }
+////      std::cout << " pos_[" << i << "]  = " << pos_[i] << std::endl;
+//    }
+////    std::cout << "----------------------" << std::endl;
   }
 
   // process before exit:
