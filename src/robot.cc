@@ -52,7 +52,7 @@ Robot::Robot(boost::shared_ptr<HardwareInterface> hw) : hw_interface_(hw) {
     max_jerk_[i] = joints_[i]->getMaxJerk();
   }
 
-  startMotionThread();
+//  startMotionThread(); //不启用
 }
 
 void Robot::addAllJoints() {
@@ -296,9 +296,9 @@ void Robot::motionThreadHandler() {
       } else {
         vel_[i] = 0.0;
       }
-      std::cout << " pos_[" << i << "]  = " << pos_[i] << std::endl;
+//      std::cout << " pos_[" << i << "]  = " << pos_[i] << std::endl;
     }
-    std::cout << "----------------------" << std::endl;
+//    std::cout << "----------------------" << std::endl;
   }
 
   // process before exit:
