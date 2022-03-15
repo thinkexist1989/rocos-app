@@ -278,6 +278,7 @@ grpc::Status RobotServiceImpl::WriteRobotCommmand(
       JntArray q(movej.q().data().size());
       for (int i = 0; i < q.rows(); ++i) {
         q(i) = movej.q().data().at(i);
+        std::cout << "q(" << i << "):" << q(i) << std::endl;
       }
       double speed = movej.speed();
       double acceleration = movej.acceleration();

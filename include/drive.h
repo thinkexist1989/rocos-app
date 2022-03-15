@@ -192,7 +192,7 @@ namespace rocos {
 
         //TODO: 变换单位
         double max_vel_{1.0}; // [UserUnit]/s，比如 rad/s, mm/s
-        double max_acc_{1.0}; // [UserUnit]/s^2，比如 rad/s^2
+        double max_acc_{10.0}; // [UserUnit]/s^2，比如 rad/s^2
         double max_jerk_{10.0}; // [UserUnit]/s^3，比如 rad/s^3
 
 
