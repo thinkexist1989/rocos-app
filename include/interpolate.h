@@ -82,7 +82,7 @@ namespace rocos {
 
         virtual double jerk(double t) const { return 0; }
 
-        // get the maximum velocity acceleration and jerk at of the profile
+        /// get the maximum velocity acceleration and jerk at of the profile
         virtual double max_vel() const = 0;
 
         virtual double max_acc() const = 0;

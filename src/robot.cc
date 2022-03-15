@@ -471,12 +471,13 @@ namespace rocos {
 
     int Robot::MoveJ_IK(Frame pose, double speed, double acceleration, double time,
                         double radius, bool asynchronous) {
+        std::cout << "MoveJ_IK pose: " <<  pose << std::endl;
         JntArray q_init(jnt_num_);
         JntArray q_target(jnt_num_);
         for (int i = 0; i < jnt_num_; i++) {
             q_init.data[i] = pos_[i];
         }
-        if (kinematics_.CartToJnt(q_init, pose, q_target) == -1) {
+        if (kinematics_.CartToJnt(q_init, pose, q_target) < 0 ) {
             std::cerr << RED << " CartToJnt fail" << WHITE << std::endl;
             return -1;
         }
@@ -498,30 +499,31 @@ namespace rocos {
         CheckBeforeMove(pose, speed, acceleration, time, radius);
         InitBeforeMove();
 
-        std::vector<double> UnitQuaternion_intep(const std::vector<double> &stat,
-                                                 const std::vector<double> &,
-                                                 double);  //函数声明
+//        std::vector<double> UnitQuaternion_intep(const std::vector<double> &stat,
+//                                                 const std::vector<double> &,
+//                                                 double);  //函数声明
 
         //** 变量初始化 **//
         KDL::Vector Pstart = flange_.p;
         KDL::Vector Pend = pose.p;
         KDL::Vector Plenght = Pend - Pstart;
-        std::vector<KDL::JntArray> traj;
+        traj_.clear();
         KDL::JntArray q_init(jnt_num_);
         KDL::JntArray q_target(jnt_num_);
         double s = 0;
-//        std::unique_ptr<R_INTERP> doubleS(new rocos::DoubleS);
-        rocos::R_INTERP doubleS;
-        bool isplanned = doubleS.planDoubleSPorfile(
+        std::unique_ptr<R_INTERP_BASE> doubleS(new rocos::DoubleS);
+//        rocos::R_INTERP doubleS;
+        doubleS->planProfile(
                 0, 0, 1, 0, 0, speed / Plenght.Norm(), acceleration / Plenght.Norm(),
                 (*std::min_element(std::begin(max_jerk_), std::end(max_jerk_))) / Plenght.Norm());
-        if (!isplanned) {
+
+        if (!doubleS->isValidMovement()) {
             std::cerr << RED << "moveL trajectory"
                       << "is infeasible " << WHITE << std::endl;
             return -1;
         }
         const double timegap = 0.001;  // 1000hz
-        int N = doubleS.getDuration() / timegap;
+        int N = doubleS->getDuration() / timegap;
         std::vector<double> Quaternion_start{0, 0, 0, 0};
         std::vector<double> Quaternion_end{0, 0, 0, 0};
         std::vector<double> Quaternion_interp{0, 0, 0, 0};
@@ -532,12 +534,12 @@ namespace rocos {
         //**-------------------------------**//
 
         for (int i = 0; i < jnt_num_; i++) {
-            q_init.data[i] = pos_[i];
+            q_init(i) = pos_[i];
         }
 
         //** 轨迹计算 **//
         for (int i = 0; i <= N; i++) {
-            s = doubleS.pos(timegap * i);
+            s = doubleS->pos(timegap * i);
             KDL::Vector P = Pstart + Plenght * s;
             Quaternion_interp =
                     UnitQuaternion_intep(Quaternion_start, Quaternion_end, s);
@@ -545,12 +547,12 @@ namespace rocos {
                     KDL::Rotation::Quaternion(Quaternion_interp[0], Quaternion_interp[1],
                                               Quaternion_interp[2], Quaternion_interp[3]),
                     P);
-            if (kinematics_.CartToJnt(q_init, interp_frame, q_target) == -1) {
+            if (kinematics_.CartToJnt(q_init, interp_frame, q_target) < 0) {
                 std::cerr << RED << " CartToJnt fail " << WHITE << std::endl;
                 return -1;
             }
             q_init = q_target;
-            traj[i] = q_target;
+            traj_.push_back(q_target); //TODO: 未初始化
         }
         //**-------------------------------**//
 
@@ -563,11 +565,11 @@ namespace rocos {
 
         if (asynchronous)  //异步执行
         {
-            movel_motion_thread_.reset(new boost::thread{&Robot::RunMoveL, this, traj});
+            movel_motion_thread_.reset(new boost::thread{&Robot::RunMoveL, this, traj_});
             is_running_movel = true;
         } else  //同步执行
         {
-            movej_motion_thread_.reset(new boost::thread{&Robot::RunMoveL, this, traj});
+            movej_motion_thread_.reset(new boost::thread{&Robot::RunMoveL, this, traj_});
             movej_motion_thread_->join();
             is_running_movel = false;
         }
@@ -710,6 +712,7 @@ namespace rocos {
         }
 
         //**-------------------------------**//
+        return 0;
     }
 
     void Robot::RunMoveJ(JntArray q, double speed, double acceleration, double time,
@@ -762,15 +765,19 @@ namespace rocos {
         is_running_movej = false;
     }
 
-    void Robot::RunMoveL(const std::vector<KDL::JntArray> &traj) {
+    void Robot::RunMoveL(const std::vector<KDL::JntArray>& traj) {
         InitBeforeMove();
+        std::cout << "No. of waypoints: " << traj.size() << std::endl;
         for (auto waypoints: traj) {
             for (int i = 0; i < jnt_num_; ++i) {
-                joints_[i]->setPosition(waypoints.data[i]);
+                pos_[i] = waypoints(i);
+                joints_[i]->setPosition(pos_[i]);
             }
 //    boost::this_thread::sleep_for(boost::chrono::milliseconds(1));
             hw_interface_->waitForSignal(0);
         }
+
+        is_running_movel = false; //TODO: added by Yangluo
     }
 
 /**
@@ -781,7 +788,7 @@ namespace rocos {
  * @param s 百分比
  * @return std::vector< double > 四元素x,y,z,w
  */
-    std::vector<double> UnitQuaternion_intep(const std::vector<double> &start,
+    std::vector<double> Robot::UnitQuaternion_intep(const std::vector<double> &start,
                                              const std::vector<double> &end,
                                              double s) {
         if (s > 1 || s < 0) {
@@ -822,7 +829,7 @@ namespace rocos {
  * @param s 百分比
  * @return KDL::Rotation
  */
-    KDL::Rotation RotAxisAngle(KDL::Rotation start, KDL::Rotation end, double s) {
+    KDL::Rotation Robot::RotAxisAngle(KDL::Rotation start, KDL::Rotation end, double s) {
         KDL::Rotation R_start_end = start.Inverse() * end;
         KDL::Vector axis;
         double angle = R_start_end.GetRotAngle(axis);
