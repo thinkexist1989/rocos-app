@@ -564,8 +564,8 @@ namespace rocos {
                       << "is infeasible " << WHITE << std::endl;
             return -1;
         }
-       double dt = 0;
-        double duration              = doubleS->getDuration( ) ;
+        double dt       = 0;
+        double duration = doubleS->getDuration( );
         std::vector< double > Quaternion_start{ 0, 0, 0, 0 };
         std::vector< double > Quaternion_end{ 0, 0, 0, 0 };
         std::vector< double > Quaternion_interp{ 0, 0, 0, 0 };
@@ -758,7 +758,8 @@ namespace rocos {
     {
         double dt       = 0.0;
         double max_time = 0.0;
-        std::cout << "Joint Pos: " << q.data << std::endl;
+        
+        std::cout << "Joint Pos: \n" << RED<<q.data << WHITE<<std::endl;
         for ( int i = 0; i < jnt_num_; ++i )
         {
             if ( q( i ) == pos_[ i ] )
@@ -781,6 +782,7 @@ namespace rocos {
             {
                 std::cerr << RED << "movej trajectory "
                           << "is infeasible " << WHITE << std::endl;
+                is_running_movej = false;
                 return;
             }
             max_time = max( max_time, interp_[ i ]->getDuration( ) );
@@ -811,19 +813,22 @@ namespace rocos {
         is_running_movej = false;
     }
 
-    void Robot::RunMoveL(const std::vector<KDL::JntArray>& traj) {
-        InitBeforeMove();
-        std::cout << "No. of waypoints: " << traj.size() << std::endl;
-        for (auto waypoints: traj) {
-            for (int i = 0; i < jnt_num_; ++i) {
-                pos_[i] = waypoints(i);
-                joints_[i]->setPosition(pos_[i]);
+    void Robot::RunMoveL( const std::vector< KDL::JntArray >& traj )
+    {
+
+        std::cout << "No. of waypoints: " << traj.size( ) << std::endl;
+        for ( auto waypoints : traj )
+        {
+            for ( int i = 0; i < jnt_num_; ++i )
+            {
+                pos_[ i ] = waypoints( i );
+                joints_[ i ]->setPosition( pos_[ i ] );
             }
             //    boost::this_thread::sleep_for(boost::chrono::milliseconds(1));
             hw_interface_->waitForSignal( 0 );
         }
 
-        is_running_movel = false; //TODO: added by Yangluo
+        is_running_movel = false;  //TODO: added by Yangluo
     }
 
     /**

@@ -413,8 +413,7 @@ namespace rocos {
         int MovePath(const Path &path, bool asynchronous = false);
 
     private:
-        //运动前初始化
-        void InitBeforeMove();
+
 
         //运动前检查数据有效性
         int CheckBeforeMove(const JntArray &q, double speed,
