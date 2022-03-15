@@ -510,6 +510,7 @@ namespace rocos {
         KDL::JntArray q_init(jnt_num_);
         KDL::JntArray q_target(jnt_num_);
         double s = 0;
+//        std::unique_ptr<R_INTERP> doubleS(new rocos::DoubleS);
         rocos::R_INTERP doubleS;
         bool isplanned = doubleS.planDoubleSPorfile(
                 0, 0, 1, 0, 0, speed / Plenght.Norm(), acceleration / Plenght.Norm(),
@@ -578,6 +579,7 @@ namespace rocos {
                         double radius, bool asynchronous) {
         KDL::Frame target;
         kinematics_.JntToCart(q, target);
+        std::cout << "Target pose is: " << target << std::endl;
         return MoveL(target, speed, acceleration, time, radius, asynchronous);
     }
 
@@ -661,6 +663,7 @@ namespace rocos {
             return -1;
         }
 
+        return 0;
         //**-------------------------------**//
     }
 
@@ -719,8 +722,10 @@ namespace rocos {
             if (q(i) == pos_[i]) {
                 std::cerr << RED << " Target pos[" << i << "]"
                           << "is same as  pos_[" << i << "]" << WHITE << std::endl;
+                need_plan_[i] = false;
                 continue;
             }
+            need_plan_[i] = true;
 
             interp_[i]->planProfile(0,          // t
                                     pos_[i],    // p0
@@ -742,6 +747,9 @@ namespace rocos {
 
         while (dt <= max_time) {
             for (int i = 0; i < jnt_num_; ++i) {
+                if(!need_plan_[i])
+                    continue;
+
                 pos_[i] = interp_[i]->pos(dt); //! 需要更新一下实时位置
                 joints_[i]->setPosition(pos_[i]);
             }
