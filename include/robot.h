@@ -425,8 +425,7 @@ namespace rocos {
 
         //实际movej执行线程
         void RunMoveJ(JntArray q, double speed = 1.05, double acceleration = 1.4,
-                      double time = 0.0, double radius = 0.0,
-                      bool asynchronous = false);
+                      double time = 0.0, double radius = 0.0);
 
         //实际movel执行线程
         void RunMoveL(const std::vector<KDL::JntArray>& traj);

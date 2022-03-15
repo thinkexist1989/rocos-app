@@ -37,19 +37,29 @@ namespace rocos {
         max_jerk_.resize(jnt_num_);
         interp_.resize(jnt_num_);
 
-        for (int i = 0; i < jnt_num_; ++i) {
-            pos_[i] = joints_[i]->getPosition();
-            target_positions_[i] = pos_[i];
-            target_positions_prev_[i] = pos_[i];
+        for ( int i = 0; i < jnt_num_; ++i )
+        {
+            pos_[ i ]                   = joints_[ i ]->getPosition( );
+            target_positions_[ i ]      = pos_[ i ];
+            target_positions_prev_[ i ] = pos_[ i ];
 
-            vel_[i] = joints_[i]->getVelocity();
-            target_velocities_[i] = vel_[i];
+            vel_[ i ]               = joints_[ i ]->getVelocity( );
+            target_velocities_[ i ] = vel_[ i ];
 
-            target_torques_[i] = joints_[i]->getTorque();
+            target_torques_[ i ] = joints_[ i ]->getTorque( );
 
-            max_vel_[i] = joints_[i]->getMaxVel();
-            max_acc_[i] = joints_[i]->getMaxAcc();
-            max_jerk_[i] = joints_[i]->getMaxJerk();
+            max_vel_[ i ]  = joints_[ i ]->getMaxVel( );
+            max_acc_[ i ]  = joints_[ i ]->getMaxAcc( );
+            max_jerk_[ i ] = joints_[ i ]->getMaxJerk( );
+
+            if ( profile_type_ == trapezoid )
+            {
+                interp_[ i ] = new Trapezoid;
+            }
+            else if ( profile_type_ == doubleS )
+            {
+                interp_[ i ] = new DoubleS;
+            }
         }
 
         startMotionThread(); //现在只计算JntToCart
@@ -476,7 +486,7 @@ namespace rocos {
         }
 
         CheckBeforeMove( q, speed, acceleration, time, radius );
-        InitBeforeMove( );
+   
 
         if ( is_running_movej )  //不是OTG规划，异步/同步都不能打断
         {
@@ -534,62 +544,61 @@ namespace rocos {
         }
 
         CheckBeforeMove( pose, speed, acceleration, time, radius );
-        InitBeforeMove( );
-
-//        std::vector<double> UnitQuaternion_intep(const std::vector<double> &stat,
-//                                                 const std::vector<double> &,
-//                                                 double);  //函数声明
 
         //** 变量初始化 **//
         KDL::Vector Pstart  = flange_.p;
         KDL::Vector Pend    = pose.p;
         KDL::Vector Plenght = Pend - Pstart;
-        traj_.clear();
-        KDL::JntArray q_init(jnt_num_);
-        KDL::JntArray q_target(jnt_num_);
+        traj_.clear( );
+        KDL::JntArray q_init( jnt_num_ );
+        KDL::JntArray q_target( jnt_num_ );
         double s = 0;
-        std::unique_ptr<R_INTERP_BASE> doubleS(new rocos::DoubleS);
-//        rocos::R_INTERP doubleS;
+        std::unique_ptr< R_INTERP_BASE > doubleS( new rocos::DoubleS );
         doubleS->planProfile(
-                0, 0, 1, 0, 0, speed / Plenght.Norm(), acceleration / Plenght.Norm(),
-                (*std::min_element(std::begin(max_jerk_), std::end(max_jerk_))) / Plenght.Norm());
+            0, 0, 1, 0, 0, speed / Plenght.Norm( ), acceleration / Plenght.Norm( ),
+            ( *std::min_element( std::begin( max_jerk_ ), std::end( max_jerk_ ) ) ) / Plenght.Norm( ) );
 
-        if (!doubleS->isValidMovement()) {
-            std::cerr << RED << "moveL trajectory"
+        if ( !doubleS->isValidMovement( ) )
+        {
+            std::cerr << RED << "moveL trajectory "
                       << "is infeasible " << WHITE << std::endl;
             return -1;
         }
-        const double timegap = 0.001;  // 1000hz
-        int N = doubleS->getDuration() / timegap;
-        std::vector<double> Quaternion_start{0, 0, 0, 0};
-        std::vector<double> Quaternion_end{0, 0, 0, 0};
-        std::vector<double> Quaternion_interp{0, 0, 0, 0};
-        flange_.M.GetQuaternion(Quaternion_start.at(0), Quaternion_start.at(1),
-                                Quaternion_start.at(2), Quaternion_start.at(3));
-        pose.M.GetQuaternion(Quaternion_end.at(0), Quaternion_end.at(1),
-                             Quaternion_end.at(2), Quaternion_end.at(3));
+       double dt = 0;
+        double duration              = doubleS->getDuration( ) ;
+        std::vector< double > Quaternion_start{ 0, 0, 0, 0 };
+        std::vector< double > Quaternion_end{ 0, 0, 0, 0 };
+        std::vector< double > Quaternion_interp{ 0, 0, 0, 0 };
+        flange_.M.GetQuaternion( Quaternion_start.at( 0 ), Quaternion_start.at( 1 ),
+                                 Quaternion_start.at( 2 ), Quaternion_start.at( 3 ) );
+        pose.M.GetQuaternion( Quaternion_end.at( 0 ), Quaternion_end.at( 1 ),
+                              Quaternion_end.at( 2 ), Quaternion_end.at( 3 ) );
         //**-------------------------------**//
 
-        for (int i = 0; i < jnt_num_; i++) {
-            q_init(i) = pos_[i];
+        for ( int i = 0; i < jnt_num_; i++ )
+        {
+            q_init( i ) = pos_[ i ];
         }
 
         //** 轨迹计算 **//
-        for (int i = 0; i <= N; i++) {
-            s = doubleS->pos(timegap * i);
+        while(dt<=duration)
+        {
+            s             = doubleS->pos(dt );
             KDL::Vector P = Pstart + Plenght * s;
             Quaternion_interp =
                 UnitQuaternion_intep( Quaternion_start, Quaternion_end, s );
             KDL::Frame interp_frame(
-                    KDL::Rotation::Quaternion(Quaternion_interp[0], Quaternion_interp[1],
-                                              Quaternion_interp[2], Quaternion_interp[3]),
-                    P);
-            if (kinematics_.CartToJnt(q_init, interp_frame, q_target) < 0) {
+                KDL::Rotation::Quaternion( Quaternion_interp[ 0 ], Quaternion_interp[ 1 ],
+                                           Quaternion_interp[ 2 ], Quaternion_interp[ 3 ] ),
+                P );
+            if ( kinematics_.CartToJnt( q_init, interp_frame, q_target ) < 0 )
+            {
                 std::cerr << RED << " CartToJnt fail " << WHITE << std::endl;
                 return -1;
             }
             q_init = q_target;
-            traj_.push_back(q_target); //TODO: 未初始化
+            traj_.push_back( q_target );  //TODO: 未初始化
+            dt+=0.001;
         }
         //**-------------------------------**//
 
@@ -602,13 +611,13 @@ namespace rocos {
 
         if ( asynchronous )  //异步执行
         {
-            movel_motion_thread_.reset(new boost::thread{&Robot::RunMoveL, this, traj_});
+            movel_motion_thread_.reset( new boost::thread{ &Robot::RunMoveL, this, traj_ } );
             is_running_movel = true;
         }
         else  //同步执行
         {
-            movej_motion_thread_.reset(new boost::thread{&Robot::RunMoveL, this, traj_});
-            movej_motion_thread_->join();
+            movej_motion_thread_.reset( new boost::thread{ &Robot::RunMoveL, this, traj_ } );
+            movej_motion_thread_->join( );
             is_running_movel = false;
         }
 
@@ -620,7 +629,7 @@ namespace rocos {
     {
         KDL::Frame target;
         kinematics_.JntToCart( q, target );
-        std::cout << "Target pose is: " << target << std::endl;
+        std::cout << "Target pose is: \n" << target << std::endl;
         return MoveL( target, speed, acceleration, time, radius, asynchronous );
     }
 
@@ -639,39 +648,7 @@ namespace rocos {
 
     int Robot::MovePath( const Path& path, bool asynchronous ) { return 0; }
 
-    void Robot::InitBeforeMove( )
-    {
-        //** vector 数组大小初始化 **//
-        pos_.resize( jnt_num_ );
-        vel_.resize( jnt_num_ );
-        acc_.resize( jnt_num_ );
-        max_vel_.resize( jnt_num_ );
-        max_acc_.resize( jnt_num_ );
-        max_jerk_.resize( jnt_num_ );
-        interp_.resize( jnt_num_ );
-        need_plan_.resize( jnt_num_, false );
 
-        //**-------------------------------**//
-
-        //** vector 数组数值初始化 **//
-        for ( int i = 0; i < jnt_num_; ++i )
-        {
-            pos_[ i ] = joints_[ i ]->getPosition( );
-            vel_[ i ] = joints_[ i ]->getVelocity( );
-            if ( profile_type_ == trapezoid )
-            {
-                interp_[ i ] = new Trapezoid;
-            }
-            else if ( profile_type_ == doubleS )
-            {
-                interp_[ i ] = new DoubleS;
-            }
-            max_vel_[ i ]  = joints_[ i ]->getMaxVel( );
-            max_acc_[ i ]  = joints_[ i ]->getMaxAcc( );
-            max_jerk_[ i ] = joints_[ i ]->getMaxJerk( );
-        }
-        //**-------------------------------**//
-    }
 
     int Robot::CheckBeforeMove( const JntArray& q, double speed, double acceleration,
                                 double time, double radius )
@@ -777,8 +754,7 @@ namespace rocos {
         return 0;
     }
 
-    void Robot::RunMoveJ( JntArray q, double speed, double acceleration, double time,
-                          double radius )
+    void Robot::RunMoveJ( JntArray q, double speed, double acceleration, double time,double radius )
     {
         double dt       = 0.0;
         double max_time = 0.0;
