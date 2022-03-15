@@ -21,41 +21,38 @@
 
 #include "my_include/text_color.hpp"
 
-namespace rocos
-{
-    Robot::Robot( boost::shared_ptr< HardwareInterface > hw ) : hw_interface_( hw )
-    {
-        addAllJoints( );
+namespace rocos {
+    Robot::Robot(boost::shared_ptr<HardwareInterface> hw) : hw_interface_(hw) {
+        addAllJoints();
 
-        target_positions_.resize( jnt_num_ );
-        target_positions_prev_.resize( jnt_num_ );
-        target_velocities_.resize( jnt_num_ );
-        target_torques_.resize( jnt_num_ );
-        pos_.resize( jnt_num_ );
-        vel_.resize( jnt_num_ );
-        acc_.resize( jnt_num_ );
-        max_vel_.resize( jnt_num_ );
-        max_acc_.resize( jnt_num_ );
-        max_jerk_.resize( jnt_num_ );
-        interp_.resize( jnt_num_ );
+        target_positions_.resize(jnt_num_);
+        target_positions_prev_.resize(jnt_num_);
+        target_velocities_.resize(jnt_num_);
+        target_torques_.resize(jnt_num_);
+        pos_.resize(jnt_num_);
+        vel_.resize(jnt_num_);
+        acc_.resize(jnt_num_);
+        max_vel_.resize(jnt_num_);
+        max_acc_.resize(jnt_num_);
+        max_jerk_.resize(jnt_num_);
+        interp_.resize(jnt_num_);
 
-        for ( int i = 0; i < jnt_num_; ++i )
-        {
-            pos_[ i ]                   = joints_[ i ]->getPosition( );
-            target_positions_[ i ]      = pos_[ i ];
-            target_positions_prev_[ i ] = pos_[ i ];
+        for (int i = 0; i < jnt_num_; ++i) {
+            pos_[i] = joints_[i]->getPosition();
+            target_positions_[i] = pos_[i];
+            target_positions_prev_[i] = pos_[i];
 
-            vel_[ i ]               = joints_[ i ]->getVelocity( );
-            target_velocities_[ i ] = vel_[ i ];
+            vel_[i] = joints_[i]->getVelocity();
+            target_velocities_[i] = vel_[i];
 
-            target_torques_[ i ] = joints_[ i ]->getTorque( );
+            target_torques_[i] = joints_[i]->getTorque();
 
-            max_vel_[ i ]  = joints_[ i ]->getMaxVel( );
-            max_acc_[ i ]  = joints_[ i ]->getMaxAcc( );
-            max_jerk_[ i ] = joints_[ i ]->getMaxJerk( );
+            max_vel_[i] = joints_[i]->getMaxVel();
+            max_acc_[i] = joints_[i]->getMaxAcc();
+            max_jerk_[i] = joints_[i]->getMaxJerk();
         }
 
-        startMotionThread( );  //不启用
+        startMotionThread(); //现在只计算JntToCart
     }
 
     void Robot::addAllJoints( )
@@ -239,91 +236,95 @@ namespace rocos
             hw_interface_->waitForSignal( 9 );
 
             //!< Update Flange State
-            updateCartesianInfo( );
+            updateCartesianInfo();
 
-            //    //!< Trajectory generating......
-            //    max_time = 0.0;
-            //    //** 轨迹生成 **//
-            //    for (int i = 0; i < jnt_num_; ++i) {
-            //      if (joints_[i]->getDriveState() != DriveState::OperationEnabled) {
-            //        target_positions_[i] = joints_[i]->getPosition();
-            //        //                    target_positions_prev_[i] = target_positions_[i];
-            //
-            //        continue;  // Disabled, ignore
-            //      }
-            //
-            //      if (fabs(target_positions_[i] != target_positions_prev_[i]) ||
-            //          need_plan_[i]) {  // need update
-            //        target_positions_prev_[i] =
-            //            target_positions_[i];  // assign to current target position
-            //
-            //        interp_[i]->planProfile(0,                          // t
-            //                                pos_[i],                    // p0
-            //                                target_positions_prev_[i],  // pf
-            //                                vel_[i],                    // v0
-            //                                target_velocities_[i],      // vf
-            //                                max_vel_[i], max_acc_[i], max_jerk_[i]);
-            //
-            //        dt[i] = 0.0;  // once regenerate, dt = 0.0
-            //        // consider at least execute time
-            //        if (interp_[i]->getDuration() < least_motion_time_) {
-            //          interp_[i]->scaleToDuration(least_motion_time_);
-            //        }
-            //        // record max_time
-            //        max_time =
-            //            max(max_time, interp_[i]->getDuration());  // get max duration time
-            //
-            //        need_plan_[i] = false;
-            //      }
-            //    }
-            //    //**-------------------------------**//
-            //
-            //    //!< Sync scaling....
-            //    //各关节时间同步
-            //    if (sync_ == SYNC_TIME) {
-            //      for_each(interp_.begin(), interp_.end(),
-            //               [=](R_INTERP_BASE* p) { p->scaleToDuration(max_time); });
-            //    }
-            //    //各关节无需同步
-            //    else if (sync_ == SYNC_NONE) {
-            //    }
-            //    //各关节相位同步
-            //    else if (sync_ == SYNC_PHASE) {
-            //      std::cout
-            //          << "[WARNING] Phase sync has not implemented...instead of time sync."
-            //          << std::endl;
-            //      for_each(interp_.begin(), interp_.end(),
-            //               [=](R_INTERP_BASE* p) { p->scaleToDuration(max_time); });
-            //    }
-            //
-            //    //!< Start moving....
-            //    for (int i = 0; i < jnt_num_; ++i) {
-            //      if (joints_[i]->getDriveState() != DriveState::OperationEnabled) {
-            //        continue;  // Disabled, ignore
-            //      }
-            //
-            //      if (interp_[i]->isValidMovement()) {
-            //        dt[i] += 0.001;
-            //        pos_[i] = interp_[i]->pos(dt[i]);  //当前位置更新
-            //        vel_[i] = interp_[i]->vel((dt[i]));
-            //        acc_[i] = interp_[i]->acc(dt[i]);
-            //
-            //        switch (joints_[i]->getMode()) {
-            //          case ModeOfOperation::CyclicSynchronousPositionMode:
-            //            joints_[i]->setPosition(pos_[i]);
-            //            break;
-            //          case ModeOfOperation::CyclicSynchronousVelocityMode:
-            //            joints_[i]->setVelocity(vel_[i]);
-            //            break;
-            //          default:
-            //            std::cout << "Only Supported CSP and CSV" << std::endl;
-            //        }
-            //      } else {
-            //        vel_[i] = 0.0;
-            //      }
-            ////      std::cout << " pos_[" << i << "]  = " << pos_[i] << std::endl;
-            //    }
-            ////    std::cout << "----------------------" << std::endl;
+//     //! 屏蔽开始
+//    //!< Trajectory generating......
+//    max_time = 0.0;
+//    //** 轨迹生成 **//
+//    for (int i = 0; i < jnt_num_; ++i) {
+//      if (joints_[i]->getDriveState() != DriveState::OperationEnabled) {
+//        target_positions_[i] = joints_[i]->getPosition();
+//        //                    target_positions_prev_[i] = target_positions_[i];
+//
+//        continue;  // Disabled, ignore
+//      }
+//
+//      if (fabs(target_positions_[i] != target_positions_prev_[i]) ||
+//          need_plan_[i]) {  // need update
+//        target_positions_prev_[i] =
+//            target_positions_[i];  // assign to current target position
+//
+//        interp_[i]->planProfile(0,                          // t
+//                                pos_[i],                    // p0
+//                                target_positions_prev_[i],  // pf
+//                                vel_[i],                    // v0
+//                                target_velocities_[i],      // vf
+//                                max_vel_[i], max_acc_[i], max_jerk_[i]);
+//
+//        dt[i] = 0.0;  // once regenerate, dt = 0.0
+//        // consider at least execute time
+//        if (interp_[i]->getDuration() < least_motion_time_) {
+//          interp_[i]->scaleToDuration(least_motion_time_);
+//        }
+//        // record max_time
+//        max_time =
+//            max(max_time, interp_[i]->getDuration());  // get max duration time
+//
+//        need_plan_[i] = false;
+//      }
+//    }
+//    //**-------------------------------**//
+//
+//    //!< Sync scaling....
+//    //各关节时间同步
+//    if (sync_ == SYNC_TIME) {
+//      for_each(interp_.begin(), interp_.end(),
+//               [=](R_INTERP_BASE* p) { p->scaleToDuration(max_time); });
+//    }
+//    //各关节无需同步
+//    else if (sync_ == SYNC_NONE) {
+//    }
+//    //各关节相位同步
+//    else if (sync_ == SYNC_PHASE) {
+//      std::cout
+//          << "[WARNING] Phase sync has not implemented...instead of time sync."
+//          << std::endl;
+//      for_each(interp_.begin(), interp_.end(),
+//               [=](R_INTERP_BASE* p) { p->scaleToDuration(max_time); });
+//    }
+//
+//    //!< Start moving....
+//    for (int i = 0; i < jnt_num_; ++i) {
+//      if (joints_[i]->getDriveState() != DriveState::OperationEnabled) {
+//        continue;  // Disabled, ignore
+//      }
+//
+//      if (interp_[i]->isValidMovement()) {
+//        dt[i] += 0.001;
+//        pos_[i] = interp_[i]->pos(dt[i]);  //当前位置更新
+//        vel_[i] = interp_[i]->vel((dt[i]));
+//        acc_[i] = interp_[i]->acc(dt[i]);
+//
+//        switch (joints_[i]->getMode()) {
+//          case ModeOfOperation::CyclicSynchronousPositionMode:
+//            joints_[i]->setPosition(pos_[i]);
+//            break;
+//          case ModeOfOperation::CyclicSynchronousVelocityMode:
+//            joints_[i]->setVelocity(vel_[i]);
+//            break;
+//          default:
+//            std::cout << "Only Supported CSP and CSV" << std::endl;
+//        }
+//      } else {
+//        vel_[i] = 0.0;
+//      }
+////      std::cout << " pos_[" << i << "]  = " << pos_[i] << std::endl;
+//    }
+//
+//    //! 屏蔽结束
+
+////    std::cout << "----------------------" << std::endl;
         }
 
         // process before exit:
@@ -463,7 +464,6 @@ namespace rocos
     int Robot::MoveJ( JntArray q, double speed, double acceleration, double time,
                       double radius, bool asynchronous )
     {
-        std::cout << "--- my movej ---" << std::endl;
         if ( radius )
         {
             std::cerr << RED << " radius not supported yet" << WHITE << std::endl;
@@ -511,7 +511,7 @@ namespace rocos
         JntArray q_target( jnt_num_ );
         for ( int i = 0; i < jnt_num_; i++ )
         {
-            q_init.data[ i ] = pos_[ i ];
+            q_init(i)= pos_[ i ];
         }
         if ( kinematics_.CartToJnt( q_init, pose, q_target ) == -1 )
         {
@@ -550,6 +550,7 @@ namespace rocos
         KDL::JntArray q_init( jnt_num_ );
         KDL::JntArray q_target( jnt_num_ );
         double s = 0;
+//        std::unique_ptr<R_INTERP> doubleS(new rocos::DoubleS);
         rocos::R_INTERP doubleS;
         bool isplanned = doubleS.planDoubleSPorfile(
             0, 0, 1, 0, 0, speed / Plenght.Norm( ), acceleration / Plenght.Norm( ),
@@ -623,8 +624,9 @@ namespace rocos
                          double radius, bool asynchronous )
     {
         KDL::Frame target;
-        kinematics_.JntToCart( q, target );
-        return MoveL( target, speed, acceleration, time, radius, asynchronous );
+        kinematics_.JntToCart(q, target);
+        std::cout << "Target pose is: " << target << std::endl;
+        return MoveL(target, speed, acceleration, time, radius, asynchronous);
     }
 
     int Robot::MoveC( Frame pose_via, Frame pose_to, double speed,
@@ -680,11 +682,9 @@ namespace rocos
                                 double time, double radius )
     {
         //** 数据有效性检查  **//
-        for ( int i = 0; i < jnt_num_; i++ )
-        {  //位置检查
-            if ( q.data[ i ] > joints_[ i ]->getMaxPosLimit( ) ||
-                 q.data[ i ] < joints_[ i ]->getMinPosLimit( ) )
-            {
+        for (int i = 0; i < jnt_num_; i++) {  //位置检查
+            if (q(i) > joints_[i]->getMaxPosLimit() ||
+                q(i)< joints_[i]->getMinPosLimit()) {
                 std::cerr << RED << " Pos command is out of range" << WHITE << std::endl;
                 return -1;
             }
@@ -722,6 +722,7 @@ namespace rocos
             return -1;
         }
 
+        return 0;
         //**-------------------------------**//
     }
 
@@ -729,9 +730,9 @@ namespace rocos
                                 double time, double radius )
     {
         //** 数据有效性检查  **//
-        KDL::JntArray q_init( jnt_num_ );
-        KDL::JntArray q_target( jnt_num_ );
-        for ( int i = 0; i < jnt_num_; i++ ) q_init.data[ i ] = pos_[ i ];
+        KDL::JntArray q_init(jnt_num_);
+        KDL::JntArray q_target(jnt_num_);
+        for (int i = 0; i < jnt_num_; i++) q_init(i) = pos_[i];
         //位置检查
         if ( kinematics_.CartToJnt( q_init, pos, q_target ) == -1 )
         {
@@ -781,48 +782,59 @@ namespace rocos
     void Robot::RunMoveJ( JntArray q, double speed, double acceleration, double time,
                           double radius, bool asynchronous )
     {
-         std::cout << "--- my run  movej ---" << std::endl;
         double dt       = 0.0;
         double max_time = 0.0;
-
+        std::cout << "Joint Pos: " << q.data << std::endl;
         for ( int i = 0; i < jnt_num_; ++i )
         {
-            if ( q.data[ i ] == pos_[ i ] )
+            if ( q( i ) == pos_[ i ] )
             {
                 std::cerr << RED << " Target pos[" << i << "]"
                           << "is same as  pos_[" << i << "]" << WHITE << std::endl;
+                need_plan_[ i ] = false;
                 continue;
             }
+            need_plan_[ i ] = true;
 
-            interp_[ i ]->planProfile( 0,            // t
-                                       pos_[ i ],    // p0
-                                       q.data[ i ],  // pf
-                                       vel_[ i ],    // v0
-                                       0,            // vf
+            interp_[ i ]->planProfile( 0,          // t
+                                       pos_[ i ],  // p0
+                                       q( i ),     // pf
+                                       vel_[ i ],  // v0
+                                       0,          // vf
                                        speed, acceleration, max_jerk_[ i ] );
 
             if ( !interp_[ i ]->isValidMovement( ) )
             {
-                std::cerr << RED << "movej trajectory"
+                std::cerr << RED << "movej trajectory "
                           << "is infeasible " << WHITE << std::endl;
                 return;
             }
             max_time = max( max_time, interp_[ i ]->getDuration( ) );
         }
 
-        for_each( interp_.begin( ), interp_.end( ),
-                  [ = ]( R_INTERP_BASE* p ) { p->scaleToDuration( max_time ); } );
+        for ( int i = 0; i < jnt_num_; i++ )
+        {
+            if ( need_plan_[ i ] )
 
-        while ( dt < max_time )
+                interp_[ i ]->scaleToDuration( max_time );
+        }
+
+        while ( dt <= max_time )
         {
             for ( int i = 0; i < jnt_num_; ++i )
-            {   
-                joints_[ i ]->setPosition( interp_[ i ]->pos( dt ) );
+            {
+                if ( !need_plan_[ i ] )
+                    continue;
+
+                pos_[ i ] = interp_[ i ]->pos( dt );  //! 需要更新一下实时位置
+                joints_[ i ]->setPosition( pos_[ i ] );
             }
             dt += 0.001;
             //    boost::this_thread::sleep_for(boost::chrono::milliseconds(1));
             hw_interface_->waitForSignal( 0 );
         }
+
+        is_running_movej = false;
     }
 
     void Robot::RunMoveL( const std::vector< KDL::JntArray >& traj )
