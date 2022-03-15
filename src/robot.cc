@@ -52,7 +52,7 @@ namespace rocos {
             max_jerk_[i] = joints_[i]->getMaxJerk();
         }
 
-        startMotionThread(); //不启用
+        startMotionThread(); //现在只计算JntToCart
     }
 
     void Robot::addAllJoints() {
@@ -216,6 +216,7 @@ namespace rocos {
             //!< Update Flange State
             updateCartesianInfo();
 
+//     //! 屏蔽开始
 //    //!< Trajectory generating......
 //    max_time = 0.0;
 //    //** 轨迹生成 **//
@@ -298,6 +299,9 @@ namespace rocos {
 //      }
 ////      std::cout << " pos_[" << i << "]  = " << pos_[i] << std::endl;
 //    }
+//
+//    //! 屏蔽结束
+
 ////    std::cout << "----------------------" << std::endl;
         }
 
@@ -623,8 +627,8 @@ namespace rocos {
                                double time, double radius) {
         //** 数据有效性检查  **//
         for (int i = 0; i < jnt_num_; i++) {  //位置检查
-            if (q.data[i] > joints_[i]->getMaxPosLimit() ||
-                q.data[i] < joints_[i]->getMinPosLimit()) {
+            if (q(i) > joints_[i]->getMaxPosLimit() ||
+                q(i)< joints_[i]->getMinPosLimit()) {
                 std::cerr << RED << " Pos command is out of range" << WHITE << std::endl;
                 return -1;
             }
@@ -665,7 +669,7 @@ namespace rocos {
         //** 数据有效性检查  **//
         KDL::JntArray q_init(jnt_num_);
         KDL::JntArray q_target(jnt_num_);
-        for (int i = 0; i < jnt_num_; i++) q_init.data[i] = pos_[i];
+        for (int i = 0; i < jnt_num_; i++) q_init(i) = pos_[i];
         //位置检查
         if (kinematics_.CartToJnt(q_init, pos, q_target) == -1) {
             std::cerr << RED << " Pos command is infeasible " << WHITE << std::endl;
@@ -710,9 +714,9 @@ namespace rocos {
         InitBeforeMove();
         double dt = 0.0;
         double max_time = 0.0;
-
+        std::cout << "Joint Pos: " << q.data << std::endl;
         for (int i = 0; i < jnt_num_; ++i) {
-            if (q.data[i] == pos_[i]) {
+            if (q(i) == pos_[i]) {
                 std::cerr << RED << " Target pos[" << i << "]"
                           << "is same as  pos_[" << i << "]" << WHITE << std::endl;
                 continue;
@@ -720,7 +724,7 @@ namespace rocos {
 
             interp_[i]->planProfile(0,          // t
                                     pos_[i],    // p0
-                                    q.data[i],  // pf
+                                    q(i),  // pf
                                     vel_[i],    // v0
                                     0,          // vf
                                     speed, acceleration, max_jerk_[i]);
@@ -736,15 +740,18 @@ namespace rocos {
         for_each(interp_.begin(), interp_.end(),
                  [=](R_INTERP_BASE *p) { p->scaleToDuration(max_time); });
 
-        while (dt < max_time) {
+        while (dt <= max_time) {
             for (int i = 0; i < jnt_num_; ++i) {
-                joints_[i]->setPosition(interp_[i]->pos(dt));
+                pos_[i] = interp_[i]->pos(dt); //! 需要更新一下实时位置
+                joints_[i]->setPosition(pos_[i]);
             }
             dt += 0.001;
 //    boost::this_thread::sleep_for(boost::chrono::milliseconds(1));
             hw_interface_->waitForSignal(0);
 
         }
+
+        is_running_movej = false;
     }
 
     void Robot::RunMoveL(const std::vector<KDL::JntArray> &traj) {
