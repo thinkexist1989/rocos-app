@@ -489,14 +489,14 @@ namespace rocos {
         {
             movej_motion_thread_.reset( new boost::thread{ &Robot::RunMoveJ, this, q,
                                                            speed, acceleration, time,
-                                                           radius, asynchronous } );
+                                                           radius } );
             is_running_movej = true;
         }
         else  //同步执行
         {
             movej_motion_thread_.reset( new boost::thread{ &Robot::RunMoveJ, this, q,
                                                            speed, acceleration, time,
-                                                           radius, asynchronous } );
+                                                           radius } );
             movej_motion_thread_->join( );
             is_running_movej = false;
         }
@@ -511,7 +511,7 @@ namespace rocos {
         JntArray q_target( jnt_num_ );
         for ( int i = 0; i < jnt_num_; i++ )
         {
-            q_init(i)= pos_[ i ];
+            q_init( i ) = pos_[ i ];
         }
         if ( kinematics_.CartToJnt( q_init, pose, q_target ) == -1 )
         {
@@ -550,19 +550,19 @@ namespace rocos {
         KDL::JntArray q_init( jnt_num_ );
         KDL::JntArray q_target( jnt_num_ );
         double s = 0;
-//        std::unique_ptr<R_INTERP> doubleS(new rocos::DoubleS);
+        //        std::unique_ptr<R_INTERP> doubleS(new rocos::DoubleS);
         rocos::R_INTERP doubleS;
         bool isplanned = doubleS.planDoubleSPorfile(
             0, 0, 1, 0, 0, speed / Plenght.Norm( ), acceleration / Plenght.Norm( ),
             ( *std::min_element( std::begin( max_jerk_ ), std::end( max_jerk_ ) ) ) / Plenght.Norm( ) );
         if ( !isplanned )
         {
-            std::cerr << RED << "moveL trajectory"
+            std::cerr << RED << "moveL trajectory "
                       << "is infeasible " << WHITE << std::endl;
             return -1;
         }
-        const double timegap = 0.001;  // 1000hz
-        int N                = doubleS.getDuration( ) / timegap;
+        double dt       = 0;
+        double duration = doubleS.getDuration( );
         std::vector< double > Quaternion_start{ 0, 0, 0, 0 };
         std::vector< double > Quaternion_end{ 0, 0, 0, 0 };
         std::vector< double > Quaternion_interp{ 0, 0, 0, 0 };
@@ -574,13 +574,14 @@ namespace rocos {
 
         for ( int i = 0; i < jnt_num_; i++ )
         {
-            q_init.data[ i ] = pos_[ i ];
+            q_init( i ) = pos_[ i ];
         }
 
         //** 轨迹计算 **//
-        for ( int i = 0; i <= N; i++ )
+        int i = 0;
+        while ( dt <= duration )
         {
-            s             = doubleS.pos( timegap * i );
+            s             = doubleS.pos( dt );
             KDL::Vector P = Pstart + Plenght * s;
             Quaternion_interp =
                 UnitQuaternion_intep( Quaternion_start, Quaternion_end, s );
@@ -593,8 +594,8 @@ namespace rocos {
                 std::cerr << RED << " CartToJnt fail " << WHITE << std::endl;
                 return -1;
             }
-            q_init    = q_target;
-            traj[ i ] = q_target;
+            q_init      = q_target;
+            traj[ i++ ] = q_target;
         }
         //**-------------------------------**//
 
@@ -624,9 +625,9 @@ namespace rocos {
                          double radius, bool asynchronous )
     {
         KDL::Frame target;
-        kinematics_.JntToCart(q, target);
+        kinematics_.JntToCart( q, target );
         std::cout << "Target pose is: " << target << std::endl;
-        return MoveL(target, speed, acceleration, time, radius, asynchronous);
+        return MoveL( target, speed, acceleration, time, radius, asynchronous );
     }
 
     int Robot::MoveC( Frame pose_via, Frame pose_to, double speed,
@@ -682,9 +683,11 @@ namespace rocos {
                                 double time, double radius )
     {
         //** 数据有效性检查  **//
-        for (int i = 0; i < jnt_num_; i++) {  //位置检查
-            if (q(i) > joints_[i]->getMaxPosLimit() ||
-                q(i)< joints_[i]->getMinPosLimit()) {
+        for ( int i = 0; i < jnt_num_; i++ )
+        {  //位置检查
+            if ( q( i ) > joints_[ i ]->getMaxPosLimit( ) ||
+                 q( i ) < joints_[ i ]->getMinPosLimit( ) )
+            {
                 std::cerr << RED << " Pos command is out of range" << WHITE << std::endl;
                 return -1;
             }
@@ -730,9 +733,9 @@ namespace rocos {
                                 double time, double radius )
     {
         //** 数据有效性检查  **//
-        KDL::JntArray q_init(jnt_num_);
-        KDL::JntArray q_target(jnt_num_);
-        for (int i = 0; i < jnt_num_; i++) q_init(i) = pos_[i];
+        KDL::JntArray q_init( jnt_num_ );
+        KDL::JntArray q_target( jnt_num_ );
+        for ( int i = 0; i < jnt_num_; i++ ) q_init( i ) = pos_[ i ];
         //位置检查
         if ( kinematics_.CartToJnt( q_init, pos, q_target ) == -1 )
         {
@@ -780,7 +783,7 @@ namespace rocos {
     }
 
     void Robot::RunMoveJ( JntArray q, double speed, double acceleration, double time,
-                          double radius, bool asynchronous )
+                          double radius )
     {
         double dt       = 0.0;
         double max_time = 0.0;
@@ -839,7 +842,6 @@ namespace rocos {
 
     void Robot::RunMoveL( const std::vector< KDL::JntArray >& traj )
     {
-        InitBeforeMove( );
         for ( auto waypoints : traj )
         {
             for ( int i = 0; i < jnt_num_; ++i )
@@ -849,6 +851,7 @@ namespace rocos {
             //    boost::this_thread::sleep_for(boost::chrono::milliseconds(1));
             hw_interface_->waitForSignal( 0 );
         }
+        is_running_movel = false;
     }
 
     /**
