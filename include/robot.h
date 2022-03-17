@@ -473,15 +473,13 @@ namespace rocos {
 
         bool is_running_{false};
         bool is_exit_{false};
-        bool is_running_movel{false};
-        bool is_running_movej{false};
+        bool is_running_motion{false};
 
         std::vector<bool> need_plan_;  // 是否需要重新规划标志
 
         boost::shared_ptr<boost::thread> otg_motion_thread_{
                 nullptr};  // otg在线规划线程
-        boost::shared_ptr<boost::thread> movej_motion_thread_{nullptr};  // movej线程
-        boost::shared_ptr<boost::thread> movel_motion_thread_{nullptr};  // movel线程
+        boost::shared_ptr<boost::thread> motion_thread_{nullptr};  // 执行motion线程
 
         Kinematics kinematics_;
 
