@@ -471,6 +471,13 @@ namespace rocos
         if ( least_time != -1 ) least_motion_time_ = least_time;
     }
 
+    //TODO 心跳刷新
+    void Robot::HeartKeepAlive( )
+    {
+        std::lock_guard< std::mutex > lck( tick_lock );
+        tick_count++;
+    }
+
     /////// Motion Command /////////////
 
     int Robot::MoveJ( JntArray q, double speed, double acceleration, double time,
@@ -778,6 +785,11 @@ namespace rocos
     {
         double dt       = 0.0;
         double max_time = 0.0;
+        int tick_count_;
+        {
+            std::lock_guard< std::mutex > lck( tick_lock );
+            tick_count_ = tick_count;
+        }
 
         std::cout << "Joint Pos: \n"
                   << RED << q.data << WHITE << std::endl;
@@ -812,10 +824,10 @@ namespace rocos
         for ( int i = 0; i < jnt_num_; i++ )
         {
             if ( need_plan_[ i ] )
-
                 interp_[ i ]->scaleToDuration( max_time );
         }
 
+        int count{ 0 };
         while ( dt <= max_time )
         {
             for ( int i = 0; i < jnt_num_; ++i )
@@ -827,7 +839,23 @@ namespace rocos
                 joints_[ i ]->setPosition( pos_[ i ] );
             }
             dt += 0.001;
-            //    boost::this_thread::sleep_for(boost::chrono::milliseconds(1));
+            if ( ++count == 100 )
+            {
+                count = 0;
+                {
+                    std::unique_lock< std::mutex > lck( tick_lock );
+                    if ( tick_count_ != tick_count )
+                        tick_count_ = tick_count;
+                    else
+                    {
+                        std::cout << RED << "Some errors such as disconnecting from the controller" << WHITE << std::endl;
+                        lck.unlock( );
+                        StopMotion( );
+                        is_running_motion = false;
+                        return;
+                    }
+                }
+            }
             hw_interface_->waitForSignal( 0 );
         }
 
@@ -836,29 +864,49 @@ namespace rocos
 
     void Robot::RunMoveL( const std::vector< KDL::JntArray >& traj )
     {
+        int tick_count_;
+        {
+            std::lock_guard< std::mutex > lck( tick_lock );
+            tick_count_ = tick_count;
+        }
         std::cout << "No. of waypoints: " << traj.size( ) << std::endl;
-        for ( auto waypoints : traj )
+
+        int count{ 0 };
+        for ( const auto& waypoints : traj )
         {
             for ( int i = 0; i < jnt_num_; ++i )
             {
                 pos_[ i ] = waypoints( i );
                 joints_[ i ]->setPosition( pos_[ i ] );
             }
-            //    boost::this_thread::sleep_for(boost::chrono::milliseconds(1));
+
+            if ( ++count == 100 )
+            {
+                count = 0;
+                {
+                    std::unique_lock< std::mutex > lck( tick_lock );
+                    if ( tick_count_ != tick_count )
+                        tick_count_ = tick_count;
+                    else
+                    {
+                        std::cout << RED << "Some errors such as disconnecting from the controller" << WHITE << std::endl;
+                        lck.unlock( );
+                        StopMotion( );
+                        is_running_motion = false;
+                        return;
+                    }
+                }
+            }
+
             hw_interface_->waitForSignal( 0 );
         }
 
         is_running_motion = false;  //TODO: added by Yangluo
     }
 
-    /**
- * @brief 姿态插值（四元素球面线性插值）
- *
- * @param start 开始姿态
- * @param end 结束姿态
- * @param s 百分比
- * @return std::vector< double > 四元素x,y,z,w
- */
+    //TODO 紧急停止
+    void Robot::StopMotion( ) {}
+
     std::vector< double > Robot::UnitQuaternion_intep( const std::vector< double >& start,
                                                        const std::vector< double >& end,
                                                        double s )
@@ -896,14 +944,6 @@ namespace rocos
         }
     }
 
-    /**
- * @brief 姿态插值（轴角法角度线性插值）
- *
- * @param start 开始姿态
- * @param end 结束姿态
- * @param s 百分比
- * @return KDL::Rotation
- */
     KDL::Rotation Robot::RotAxisAngle( KDL::Rotation start, KDL::Rotation end, double s )
     {
         KDL::Rotation R_start_end = start.Inverse( ) * end;

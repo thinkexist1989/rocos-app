@@ -412,6 +412,9 @@ namespace rocos {
         //! \return 错误标志位,成功返回0
         int MovePath(const Path &path, bool asynchronous = false);
 
+        //心跳保持，每次调用会使得心跳计数器自增+1
+        void HeartKeepAlive( );
+
     private:
 
 
@@ -429,11 +432,30 @@ namespace rocos {
         //实际movel执行线程
         void RunMoveL(const std::vector<KDL::JntArray>& traj);
 
-        static std::vector<double> UnitQuaternion_intep(const std::vector<double> &start,
-                                                        const std::vector<double> &end,
-                                                        double s);
+        //停止运动
+        void StopMotion( );
 
-        static KDL::Rotation RotAxisAngle(KDL::Rotation start, KDL::Rotation end, double s);
+        /**
+         * @brief 姿态插值（四元素球面线性插值）
+         *
+         * @param start 开始姿态
+         * @param end 结束姿态
+         * @param s 百分比
+         * @return std::vector< double > 四元素x,y,z,w
+         */
+        static std::vector< double > UnitQuaternion_intep( const std::vector< double >& start,
+                                                           const std::vector< double >& end,
+                                                           double s );
+
+        /**
+         * @brief 姿态插值（轴角法角度线性插值）
+         *
+         * @param start 开始姿态
+         * @param end 结束姿态
+         * @param s 百分比
+         * @return KDL::Rotation
+         */
+        static KDL::Rotation RotAxisAngle( KDL::Rotation start, KDL::Rotation end, double s );
 
     private:
         // TODO： 测试用MoveJ，阻塞运行，需要改为private
@@ -488,6 +510,8 @@ namespace rocos {
         Frame object_;  //!< 工件位置姿态
 
         std::vector<KDL::JntArray> traj_;
+        int tick_count{ 0 };
+        std::mutex tick_lock;
     };
 
 }  // namespace rocos
