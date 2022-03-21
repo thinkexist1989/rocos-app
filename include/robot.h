@@ -318,7 +318,7 @@ namespace rocos {
         }
 
         int CartToJnt(const JntArray &q_init, const Frame &p_in, JntArray &q_out) {
-            kinematics_.CartToJnt(q_init, p_in, q_out);
+            return kinematics_.CartToJnt(q_init, p_in, q_out);
         }
 
         //! 更新法兰系,工具系,工件系pose
