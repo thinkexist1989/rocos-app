@@ -685,6 +685,7 @@ namespace rocos
 
     int Robot::MovePath( const Path& path, bool asynchronous ) { return 0; }
 
+    
     int Robot::Dragging( Frame pose, double speed, double acceleration, double time,
                          double radius )
     {
@@ -974,6 +975,7 @@ namespace rocos
 
         is_running_motion = false;  //TODO: added by Yangluo
     }
+  
     void Robot::RunDragging( const std::vector< KDL::JntArray >& traj )
     {
         int count{ 0 };

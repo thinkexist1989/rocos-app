@@ -457,6 +457,16 @@ namespace rocos
         //! \return 错误标志位,成功返回0
         int MovePath( const Path& path, bool asynchronous = false );
 
+        /**
+         * @brief 拖动示教功能
+         * @note 第一次调用会启动线程，线程运行过程中需要至少100ms以内再次调用一次该函数（保持心跳）
+         * @param pose 目标位姿
+         * @param speed 速度
+         * @param acceleration 加速度 
+         * @param time 运行时间
+         * @param radius 过渡半径
+         * @return int <0表示发送错误
+         */
         int Dragging( Frame pose, double speed, double acceleration, double time,
                       double radius );
 
@@ -478,6 +488,7 @@ namespace rocos
         //实际movel执行线程
         void RunMoveL( const std::vector< KDL::JntArray >& traj );
 
+        
         //实际dragging执行线程
         void RunDragging( const std::vector< KDL::JntArray >& traj );
         //停止运动
