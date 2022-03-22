@@ -494,7 +494,11 @@ namespace rocos
             return -1;
         }
 
-        CheckBeforeMove( q, speed, acceleration, time, radius );
+        if ( CheckBeforeMove( q, speed, acceleration, time, radius ) < 0 )
+        {
+            std::cerr << RED << "MoveJ():given parameters is invalid" << WHITE << std::endl;
+            return -1;
+        }
 
         if ( is_running_motion )  //不是OTG规划，异步/同步都不能打断
         {
@@ -554,7 +558,11 @@ namespace rocos
             return -1;
         }
 
-        CheckBeforeMove( pose, speed, acceleration, time, radius );
+        if ( CheckBeforeMove( pose, speed, acceleration, time, radius ) < 0 )
+        {
+            std::cerr << RED << "MoveL():given parameters is invalid" << WHITE << std::endl;
+            return -1;
+        }
 
         //** 变量初始化 **//
         KDL::Vector Pstart  = flange_.p;
@@ -677,6 +685,115 @@ namespace rocos
 
     int Robot::MovePath( const Path& path, bool asynchronous ) { return 0; }
 
+    int Robot::Dragging( Frame pose, double speed, double acceleration, double time,
+                         double radius )
+    {
+        if ( radius )
+        {
+            std::cerr << RED << " dragging(): radius not supported yet" << WHITE << std::endl;
+            return -1;
+        }
+        if ( time )
+        {
+            std::cerr << RED << "dragging(): time not supported yet" << WHITE << std::endl;
+            return -1;
+        }
+
+        if ( CheckBeforeMove( pose, speed, acceleration, time, radius ) < 0 )
+        {
+            std::cerr << RED << "dragging():given parameters is invalid" << WHITE << std::endl;
+            return -1;
+        }
+
+        if ( is_running_motion )
+        {
+            std::cerr << GREEN << "dragging(): Motion is still running and keep heard alive"
+                      << WHITE << std::endl;
+            HeartKeepAlive( );
+            return 0;
+        }
+
+        //** 变量初始化 **//
+        KDL::Vector Pstart  = flange_.p;
+        KDL::Vector Pend    = pose.p;
+        KDL::Vector Plenght = Pend - Pstart;
+        traj_.clear( );
+        KDL::JntArray q_init( jnt_num_ );
+        KDL::JntArray q_target( jnt_num_ );
+        double s = 0;
+        std::unique_ptr< R_INTERP_BASE > doubleS( new rocos::DoubleS );
+        //**-------------------------------**//
+
+        //** 规划速度设置 **//
+        doubleS->planProfile(
+            0, 0, 1, 0, 0, speed / Plenght.Norm( ), acceleration / Plenght.Norm( ),
+            ( *std::min_element( std::begin( max_jerk_ ), std::end( max_jerk_ ) ) ) / Plenght.Norm( ) );
+
+        if ( !doubleS->isValidMovement( ) )
+        {
+            std::cerr << RED << "dragging():dragging trajectory "
+                      << "is infeasible " << WHITE << std::endl;
+            return -1;
+        }
+        //**-------------------------------**//
+
+        //** 变量初始化 **//
+        double dt       = 0;
+        double duration = doubleS->getDuration( );
+        std::vector< double > Quaternion_start{ 0, 0, 0, 0 };
+        std::vector< double > Quaternion_end{ 0, 0, 0, 0 };
+        std::vector< double > Quaternion_interp{ 0, 0, 0, 0 };
+        flange_.M.GetQuaternion( Quaternion_start.at( 0 ), Quaternion_start.at( 1 ),
+                                 Quaternion_start.at( 2 ), Quaternion_start.at( 3 ) );
+        pose.M.GetQuaternion( Quaternion_end.at( 0 ), Quaternion_end.at( 1 ),
+                              Quaternion_end.at( 2 ), Quaternion_end.at( 3 ) );
+        std::vector< double > max_step;
+        //**-------------------------------**//
+
+        for ( int i = 0; i < jnt_num_; i++ )
+        {
+            q_init( i ) = pos_[ i ];
+            max_step.push_back( max_vel_[ i ] * 0.001 );
+        }
+
+        //** 轨迹计算 **//
+        while ( dt <= duration )
+        {
+            s             = doubleS->pos( dt );
+            KDL::Vector P = Pstart + Plenght * s;
+            Quaternion_interp =
+                UnitQuaternion_intep( Quaternion_start, Quaternion_end, s );
+            KDL::Frame interp_frame(
+                KDL::Rotation::Quaternion( Quaternion_interp[ 0 ], Quaternion_interp[ 1 ],
+                                           Quaternion_interp[ 2 ], Quaternion_interp[ 3 ] ),
+                P );
+            if ( kinematics_.CartToJnt( q_init, interp_frame, q_target ) < 0 )
+            {
+                std::cerr << RED << " dragging():CartToJnt fail " << WHITE << std::endl;
+                return -1;
+            }
+            //防止奇异位置速度激增
+            for ( int i = 0; i < jnt_num_; i++ )
+            {
+                if ( abs( q_target( i ) - q_init( i ) ) > max_step[ i ] )
+                {
+                    std::cout << RED << "dragging():joint[" << i << "] speep is too  fast" << WHITE << std::endl;
+                    return -1;
+                }
+            }
+
+            q_init = q_target;
+            traj_.push_back( q_target );  //TODO: 未初始化
+            dt += 0.001;
+        }
+        //**-------------------------------**//
+
+        motion_thread_.reset( new boost::thread{ &Robot::RunDragging, this, traj_ } );
+        is_running_motion = true;
+
+        return 0;
+    }
+
     int Robot::CheckBeforeMove( const JntArray& q, double speed, double acceleration,
                                 double time, double radius )
     {
@@ -686,40 +803,40 @@ namespace rocos
             if ( q( i ) > joints_[ i ]->getMaxPosLimit( ) ||
                  q( i ) < joints_[ i ]->getMinPosLimit( ) )
             {
-                std::cerr << RED << " Pos command is out of range" << WHITE << std::endl;
+                std::cerr << RED << " CheckBeforeMove():  Pos command is out of range" << WHITE << std::endl;
                 return -1;
             }
             //速度检查
             if ( speed > joints_[ i ]->getMaxVel( ) ||
                  speed < ( -1 ) * joints_[ i ]->getMaxVel( ) )
             {
-                std::cerr << RED << "Vel command is out of range" << WHITE << std::endl;
+                std::cerr << RED << "CheckBeforeMove():  Vel command is out of range" << WHITE << std::endl;
                 return -1;
             }
             //加速度检查
             if ( acceleration > joints_[ i ]->getMaxAcc( ) ||
                  acceleration < ( -1 ) * joints_[ i ]->getMaxAcc( ) )
             {
-                std::cerr << RED << "Acc command is out of range" << WHITE << std::endl;
+                std::cerr << RED << "CheckBeforeMove(): Acc command is out of range" << WHITE << std::endl;
                 return -1;
             }
             //使能检查
             if ( joints_[ i ]->getDriveState( ) != DriveState::OperationEnabled )
             {
-                std::cerr << RED << "joints[" << i << "]"
+                std::cerr << RED << "CheckBeforeMove():  joints[" << i << "]"
                           << "is in OperationDisabled " << WHITE << std::endl;
                 return -1;
             }
         }
         if ( time < 0 )
         {
-            std::cerr << RED << "time is less than 0 invalidly" << WHITE << std::endl;
+            std::cerr << RED << "CheckBeforeMove():  time is less than 0 invalidly" << WHITE << std::endl;
             return -1;
         }
 
         if ( radius < 0 )
         {
-            std::cerr << RED << "radius is less than 0 invalidly" << WHITE << std::endl;
+            std::cerr << RED << "CheckBeforeMove():  radius is less than 0 invalidly" << WHITE << std::endl;
             return -1;
         }
 
@@ -735,9 +852,9 @@ namespace rocos
         KDL::JntArray q_target( jnt_num_ );
         for ( int i = 0; i < jnt_num_; i++ ) q_init( i ) = pos_[ i ];
         //位置检查
-        if ( kinematics_.CartToJnt( q_init, pos, q_target ) == -1 )
+        if ( kinematics_.CartToJnt( q_init, pos, q_target ) < 0 )
         {
-            std::cerr << RED << " Pos command is infeasible " << WHITE << std::endl;
+            std::cerr << RED << " CheckBeforeMove(): Pos command is infeasible " << WHITE << std::endl;
             return -1;
         }
 
@@ -747,33 +864,33 @@ namespace rocos
             if ( speed > joints_[ i ]->getMaxVel( ) ||
                  speed < ( -1 ) * joints_[ i ]->getMaxVel( ) )
             {
-                std::cerr << RED << "Vel command is out of range" << WHITE << std::endl;
+                std::cerr << RED << "CheckBeforeMove(): Vel command is out of range" << WHITE << std::endl;
                 return -1;
             }
             //加速度检查
             if ( acceleration > joints_[ i ]->getMaxAcc( ) ||
                  acceleration < ( -1 ) * joints_[ i ]->getMaxAcc( ) )
             {
-                std::cerr << RED << "Acc command is out of range" << WHITE << std::endl;
+                std::cerr << RED << "CheckBeforeMove(): Acc command is out of range" << WHITE << std::endl;
                 return -1;
             }
             //使能检查
             if ( joints_[ i ]->getDriveState( ) != DriveState::OperationEnabled )
             {
-                std::cerr << RED << "joints[" << i << "]"
+                std::cerr << RED << "CheckBeforeMove(): joints[" << i << "]"
                           << "is in OperationDisabled " << WHITE << std::endl;
                 return -1;
             }
         }
         if ( time < 0 )
         {
-            std::cerr << RED << "time is less than 0 invalidly" << WHITE << std::endl;
+            std::cerr << RED << "CheckBeforeMove(): time is less than 0 invalidly" << WHITE << std::endl;
             return -1;
         }
 
         if ( radius < 0 )
         {
-            std::cerr << RED << "radius is less than 0 invalidly" << WHITE << std::endl;
+            std::cerr << RED << "CheckBeforeMove(): radius is less than 0 invalidly" << WHITE << std::endl;
             return -1;
         }
 
@@ -785,11 +902,6 @@ namespace rocos
     {
         double dt       = 0.0;
         double max_time = 0.0;
-        int tick_count_;
-        {
-            std::lock_guard< std::mutex > lck( tick_lock );
-            tick_count_ = tick_count;
-        }
 
         std::cout << "Joint Pos: \n"
                   << RED << q.data << WHITE << std::endl;
@@ -827,7 +939,6 @@ namespace rocos
                 interp_[ i ]->scaleToDuration( max_time );
         }
 
-        int count{ 0 };
         while ( dt <= max_time )
         {
             for ( int i = 0; i < jnt_num_; ++i )
@@ -839,23 +950,7 @@ namespace rocos
                 joints_[ i ]->setPosition( pos_[ i ] );
             }
             dt += 0.001;
-            if ( ++count == 100 )
-            {
-                count = 0;
-                {
-                    std::unique_lock< std::mutex > lck( tick_lock );
-                    if ( tick_count_ != tick_count )
-                        tick_count_ = tick_count;
-                    else
-                    {
-                        std::cout << RED << "Some errors such as disconnecting from the controller" << WHITE << std::endl;
-                        lck.unlock( );
-                        StopMotion( );
-                        is_running_motion = false;
-                        return;
-                    }
-                }
-            }
+
             hw_interface_->waitForSignal( 0 );
         }
 
@@ -864,14 +959,31 @@ namespace rocos
 
     void Robot::RunMoveL( const std::vector< KDL::JntArray >& traj )
     {
-        int tick_count_;
+        std::cout << "No. of waypoints: " << traj.size( ) << std::endl;
+
+        for ( const auto& waypoints : traj )
+        {
+            for ( int i = 0; i < jnt_num_; ++i )
+            {
+                pos_[ i ] = waypoints( i );
+                joints_[ i ]->setPosition( pos_[ i ] );
+            }
+
+            hw_interface_->waitForSignal( 0 );
+        }
+
+        is_running_motion = false;  //TODO: added by Yangluo
+    }
+    void Robot::RunDragging( const std::vector< KDL::JntArray >& traj )
+    {
+        int count{ 0 };
+        int tick_count_{ 0 };
+
         {
             std::lock_guard< std::mutex > lck( tick_lock );
             tick_count_ = tick_count;
         }
-        std::cout << "No. of waypoints: " << traj.size( ) << std::endl;
 
-        int count{ 0 };
         for ( const auto& waypoints : traj )
         {
             for ( int i = 0; i < jnt_num_; ++i )
@@ -889,7 +1001,7 @@ namespace rocos
                         tick_count_ = tick_count;
                     else
                     {
-                        std::cout << RED << "Some errors such as disconnecting from the controller" << WHITE << std::endl;
+                        std::cout << RED << "RunDragging():Some errors such as disconnecting from the controller" << WHITE << std::endl;
                         lck.unlock( );
                         StopMotion( );
                         is_running_motion = false;
