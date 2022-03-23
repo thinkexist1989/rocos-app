@@ -171,11 +171,14 @@ namespace rocos {
 
         virtual double jerk(double t) const;
 
-        virtual bool isValidMovement() const;
+        virtual bool isValidMovement( ) const;
 
-        virtual double scaleToDuration(double newDuration);
+        virtual double scaleToDuration( double newDuration );
 
-        virtual ProfileType profileType() const { return doubleS; }
+        //!该时间缩放会对起始和终止速度乘以(Old_T/New_T)
+        virtual double JC_scaleToDuration( double newDuration );
+
+        virtual ProfileType profileType( ) const { return doubleS; }
 
         virtual double max_vel() const;
 

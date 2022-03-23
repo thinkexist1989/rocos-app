@@ -901,6 +901,15 @@ namespace rocos {
         return getDuration();
     }
 
+    double DoubleS::JC_scaleToDuration( double newDuration)
+    {
+        if ( newDuration == 0 ) return getDuration( );
+        double k = getDuration( ) / newDuration;
+
+        planDoubleSProfile( _t[0] ,_x[0], _x[7], _v[0], _v[7], k * max_vel(), k * k * max_acc(), k * k * k * max_jerk() );
+    }
+
+
     bool DoubleS::isValidMovement() const {
         return _plannedProfile;
     }

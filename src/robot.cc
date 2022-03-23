@@ -581,7 +581,7 @@ namespace rocos
 
         if ( !doubleS->isValidMovement( ) )
         {
-            std::cerr << RED << "moveL trajectory "
+            std::cerr << RED << "MoveL():moveL trajectory "
                       << "is infeasible " << WHITE << std::endl;
             return -1;
         }
@@ -619,7 +619,7 @@ namespace rocos
                 P );
             if ( kinematics_.CartToJnt( q_init, interp_frame, q_target ) < 0 )
             {
-                std::cerr << RED << " CartToJnt fail " << WHITE << std::endl;
+                std::cerr << RED << "MoveL(): CartToJnt fail " << WHITE << std::endl;
                 return -1;
             }
             //防止奇异位置速度激增
@@ -627,7 +627,7 @@ namespace rocos
             {
                 if ( abs( q_target( i ) - q_init( i ) ) > max_step[ i ] )
                 {
-                    std::cout << RED << "joint[" << i << "] speep is too  fast" << WHITE << std::endl;
+                    std::cout << RED << "MoveL():joint[" << i << "] speep is too  fast" << WHITE << std::endl;
                     return -1;
                 }
             }
@@ -685,7 +685,6 @@ namespace rocos
 
     int Robot::MovePath( const Path& path, bool asynchronous ) { return 0; }
 
-    
     int Robot::Dragging( Frame pose, double speed, double acceleration, double time,
                          double radius )
     {
@@ -726,6 +725,7 @@ namespace rocos
         //**-------------------------------**//
 
         //** 规划速度设置 **//
+        //TODO 完善速度规划
         doubleS->planProfile(
             0, 0, 1, 0, 0, speed / Plenght.Norm( ), acceleration / Plenght.Norm( ),
             ( *std::min_element( std::begin( max_jerk_ ), std::end( max_jerk_ ) ) ) / Plenght.Norm( ) );
@@ -903,9 +903,12 @@ namespace rocos
     {
         double dt       = 0.0;
         double max_time = 0.0;
+        std::vector< std::shared_ptr< DoubleS > > interp( jnt_num_ );
+        for ( auto& i : interp )
+            i.reset( new DoubleS{ } );
 
-        std::cout << "Joint Pos: \n"
-                  << RED << q.data << WHITE << std::endl;
+        // std::cout << "Joint Pos: \n"
+        //           << GREEN << q.data << WHITE << std::endl;
         for ( int i = 0; i < jnt_num_; ++i )
         {
             if ( q( i ) == pos_[ i ] )
@@ -917,27 +920,27 @@ namespace rocos
             }
             need_plan_[ i ] = true;
 
-            interp_[ i ]->planProfile( 0,          // t
+            interp[ i ]->planProfile( 0,          // t
                                        pos_[ i ],  // p0
                                        q( i ),     // pf
-                                       vel_[ i ],  // v0
+                                       0,  // v0
                                        0,          // vf
                                        speed, acceleration, max_jerk_[ i ] );
 
-            if ( !interp_[ i ]->isValidMovement( ) )
+            if ( !interp[ i ]->isValidMovement( ) )
             {
-                std::cerr << RED << "movej trajectory "
+                std::cerr << RED << "RunMoveJ():movej trajectory "
                           << "is infeasible " << WHITE << std::endl;
                 is_running_motion = false;
                 return;
             }
-            max_time = max( max_time, interp_[ i ]->getDuration( ) );
+            max_time = max( max_time, interp[ i ]->getDuration( ) );
         }
 
         for ( int i = 0; i < jnt_num_; i++ )
         {
             if ( need_plan_[ i ] )
-                interp_[ i ]->scaleToDuration( max_time );
+                interp[ i ]->JC_scaleToDuration( max_time );
         }
 
         while ( dt <= max_time )
@@ -947,7 +950,7 @@ namespace rocos
                 if ( !need_plan_[ i ] )
                     continue;
 
-                pos_[ i ] = interp_[ i ]->pos( dt );  //! 需要更新一下实时位置
+                pos_[ i ] = interp[ i ]->pos( dt );  //! 需要更新一下实时位置
                 joints_[ i ]->setPosition( pos_[ i ] );
             }
             dt += 0.001;
@@ -975,7 +978,7 @@ namespace rocos
 
         is_running_motion = false;  //TODO: added by Yangluo
     }
-  
+
     void Robot::RunDragging( const std::vector< KDL::JntArray >& traj )
     {
         int count{ 0 };
