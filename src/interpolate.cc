@@ -904,9 +904,12 @@ namespace rocos {
     double DoubleS::JC_scaleToDuration( double newDuration)
     {
         if ( newDuration == 0 ) return getDuration( );
+
         double k = getDuration( ) / newDuration;
 
         planDoubleSProfile( _t[0] ,_direction*_x[0], _direction*_x[7], _direction*_v[0], _direction*_v[7], k * max_vel(), k * k * max_acc(), k * k * k * max_jerk() );
+        
+        return getDuration( );
     }
 
 

@@ -19,7 +19,6 @@
 
 #include "robot.h"
 
-#include "my_include/text_color.hpp"
 
 namespace rocos
 {
@@ -612,7 +611,7 @@ namespace rocos
             s             = doubleS->pos( dt );
             KDL::Vector P = Pstart + Plenght * s;
             Quaternion_interp =
-                UnitQuaternion_intep( Quaternion_start, Quaternion_end, s );
+                JC_helper::UnitQuaternion_intep( Quaternion_start, Quaternion_end, s );
             KDL::Frame interp_frame(
                 KDL::Rotation::Quaternion( Quaternion_interp[ 0 ], Quaternion_interp[ 1 ],
                                            Quaternion_interp[ 2 ], Quaternion_interp[ 3 ] ),
@@ -684,6 +683,41 @@ namespace rocos
     }
 
     int Robot::MovePath( const Path& path, bool asynchronous ) { return 0; }
+
+    int Robot::MultiMoveL( std::vector< KDL::Frame >& traj, const std::vector< KDL::Frame >& point, std::vector< double > bound_dist, std::vector< double > max_path_v, std::vector< double > max_path_a )
+    {
+        // std::vector< int > traj_index;
+        // KDL::Frame Cart_point = flange_;
+        
+        // //一段轨迹不存在圆弧过渡处理
+        // if ( point.size( ) == 1 )
+        // {
+        //     link_trajectory( traj, Cart_point, point[ 0 ], 0, 0, max_path_v[ 0 ], max_path_a[ 0 ] );
+        //     traj_index.push_back( traj.size( ) );
+        // }
+        // else
+        // {
+        //     KDL::Frame Frame_motion_1;
+        //     KDL::Frame Frame_motion_2;
+        //     double motion_v_1;
+        //     double motion_v_2;
+        //     std::cout << GREEN << "***************第1次规划***************" << std::endl;
+        //     multi_link_trajectory( traj, Cart_point, point[ 0 ], point[ 1 ], Frame_motion_1, 0, motion_v_1, bound_dist[ 0 ], max_path_v[ 0 ], max_path_a[ 0 ], max_path_v[ 1 ] );
+        //     traj_index.push_back( traj.size( ) );
+
+        //     for ( int i = 1; i < ( point.size( ) - 1 ); i++ )
+        //     {
+        //         std::cout << GREEN << "***************第" << i + 1 << "次规划***************" << std::endl;
+        //         multi_link_trajectory( traj, Frame_motion_1, point[ i ], point[ i + 1 ], Frame_motion_2, motion_v_1, motion_v_2, bound_dist[ i ], max_path_v[ i ], max_path_a[ i ], max_path_v[ i + 1 ] );
+        //         Frame_motion_1 = Frame_motion_2;
+        //         motion_v_1     = motion_v_2;
+        //         traj_index.push_back( traj.size( ) );
+        //     }
+        //     std::cout << GREEN << "***************第" << point.size( ) << "次规划***************" << std::endl;
+        //     link_trajectory( traj, Frame_motion_1, point.back( ), motion_v_1, 0, max_path_v.back( ), max_path_a.back( ) );
+        //     traj_index.push_back( traj.size( ) );
+        // }
+    }
 
     int Robot::Dragging( Frame pose, double speed, double acceleration, double time,
                          double radius )
@@ -763,7 +797,7 @@ namespace rocos
             s             = doubleS->pos( dt );
             KDL::Vector P = Pstart + Plenght * s;
             Quaternion_interp =
-                UnitQuaternion_intep( Quaternion_start, Quaternion_end, s );
+                JC_helper::UnitQuaternion_intep( Quaternion_start, Quaternion_end, s );
             KDL::Frame interp_frame(
                 KDL::Rotation::Quaternion( Quaternion_interp[ 0 ], Quaternion_interp[ 1 ],
                                            Quaternion_interp[ 2 ], Quaternion_interp[ 3 ] ),
@@ -1024,49 +1058,6 @@ namespace rocos
     //TODO 紧急停止
     void Robot::StopMotion( ) {}
 
-    std::vector< double > Robot::UnitQuaternion_intep( const std::vector< double >& start,
-                                                       const std::vector< double >& end,
-                                                       double s )
-    {
-        if ( s > 1 || s < 0 )
-        {
-            std::cerr << "values of S outside interval [0,1]" << std::endl;
-        }
 
-        double cosTheta = start[ 0 ] * end[ 0 ] + start[ 1 ] * end[ 1 ] + start[ 2 ] * end[ 2 ] +
-                          start[ 3 ] * end[ 3 ];
-        std::vector< double > start_2 = start;
-
-        //** 这里是为了取最短路径 **//
-        if ( cosTheta < 0 )
-        {
-            for ( int i = 0; i < 4; i++ ) start_2[ i ] *= -1;
-            cosTheta *= -1;
-        }
-        //**-------------------------------**//
-
-        double theta = acos( cosTheta );
-        if ( theta == 0 || s == 0 )
-            return start_2;
-        else
-        {
-            double coefficient_1 = sin( ( 1 - s ) * theta ) / sin( theta );
-            double coefficient_2 = sin( ( s )*theta ) / sin( theta );
-
-            return std::vector< double >{
-                coefficient_1 * start_2[ 0 ] + coefficient_2 * end[ 0 ],
-                coefficient_1 * start_2[ 1 ] + coefficient_2 * end[ 1 ],
-                coefficient_1 * start_2[ 2 ] + coefficient_2 * end[ 2 ],
-                coefficient_1 * start_2[ 3 ] + coefficient_2 * end[ 3 ] };
-        }
-    }
-
-    KDL::Rotation Robot::RotAxisAngle( KDL::Rotation start, KDL::Rotation end, double s )
-    {
-        KDL::Rotation R_start_end = start.Inverse( ) * end;
-        KDL::Vector axis;
-        double angle = R_start_end.GetRotAngle( axis );
-        return start * KDL::Rotation::Rot2( axis, angle * s );
-    }
 
 }  // namespace rocos

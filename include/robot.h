@@ -25,6 +25,7 @@
 #include <interpolate.h>
 #include <kinematics.h>
 
+#include "JC_helper.hpp"
 #include <Eigen/StdVector>  //!< Eigen官网说明 https://eigen.tuxfamily.org/dox/group__TopicStlContainers.html
 #include <boost/smart_ptr.hpp>
 #include <vector>
@@ -362,7 +363,7 @@ namespace rocos
 
         int CartToJnt( const JntArray& q_init, const Frame& p_in, JntArray& q_out )
         {
-            kinematics_.CartToJnt( q_init, p_in, q_out );
+           return kinematics_.CartToJnt( q_init, p_in, q_out );
         }
 
         //! 更新法兰系,工具系,工件系pose
@@ -457,6 +458,8 @@ namespace rocos
         //! \return 错误标志位,成功返回0
         int MovePath( const Path& path, bool asynchronous = false );
 
+        int MultiMoveL( std::vector< KDL::Frame >& traj, const std::vector< KDL::Frame >& point, std::vector< double > bound_dist, std::vector< double > max_path_v, std::vector< double > max_path_a );
+
         /**
          * @brief 拖动示教功能
          * @note 第一次调用会启动线程，线程运行过程中需要至少100ms以内再次调用一次该函数（保持心跳）
@@ -488,41 +491,20 @@ namespace rocos
         //实际movel执行线程
         void RunMoveL( const std::vector< KDL::JntArray >& traj );
 
-        
         //实际dragging执行线程
         void RunDragging( const std::vector< KDL::JntArray >& traj );
         //停止运动
         void StopMotion( );
 
-        /**
-         * @brief 姿态插值（四元素球面线性插值）
-         *
-         * @param start 开始姿态
-         * @param end 结束姿态
-         * @param s 百分比
-         * @return std::vector< double > 四元素x,y,z,w
-         */
-        static std::vector< double > UnitQuaternion_intep( const std::vector< double >& start,
-                                                           const std::vector< double >& end,
-                                                           double s );
-
-        /**
-         * @brief 姿态插值（轴角法角度线性插值）
-         *
-         * @param start 开始姿态
-         * @param end 结束姿态
-         * @param s 百分比
-         * @return KDL::Rotation
-         */
-        static KDL::Rotation RotAxisAngle( KDL::Rotation start, KDL::Rotation end, double s );
 
     private:
         // TODO： 测试用MoveJ，阻塞运行，需要改为private
-        void moveJ( const std::vector< double >& pos, const std::vector< double >& max_vel,
-                    const std::vector< double >& max_acc,
-                    const std::vector< double >& max_jerk,
-                    Synchronization sync = SYNC_TIME,
-                    ProfileType type     = ProfileType::trapezoid );
+        void
+        moveJ( const std::vector< double >& pos, const std::vector< double >& max_vel,
+               const std::vector< double >& max_acc,
+               const std::vector< double >& max_jerk,
+               Synchronization sync = SYNC_TIME,
+               ProfileType type     = ProfileType::trapezoid );
 
     protected:
         boost::shared_ptr< HardwareInterface > hw_interface_{ nullptr };

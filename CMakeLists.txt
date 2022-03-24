@@ -136,6 +136,7 @@ add_library(rocos::kinematics ALIAS kinematics)
 add_library(robot
         SHARED
         src/robot.cc
+        src/JC_helper.cpp
         )
 target_link_libraries(robot
         PUBLIC
