@@ -19,7 +19,6 @@
 
 #include "robot.h"
 
-
 namespace rocos
 {
     Robot::Robot( boost::shared_ptr< HardwareInterface > hw ) : hw_interface_( hw )
@@ -684,39 +683,129 @@ namespace rocos
 
     int Robot::MovePath( const Path& path, bool asynchronous ) { return 0; }
 
-    int Robot::MultiMoveL( std::vector< KDL::Frame >& traj, const std::vector< KDL::Frame >& point, std::vector< double > bound_dist, std::vector< double > max_path_v, std::vector< double > max_path_a )
+    int Robot::MultiMoveL( const std::vector< KDL::Frame >& point, std::vector< double > bound_dist, std::vector< double > max_path_v, std::vector< double > max_path_a, bool asynchronous )
     {
-        // std::vector< int > traj_index;
-        // KDL::Frame Cart_point = flange_;
-        
-        // //一段轨迹不存在圆弧过渡处理
-        // if ( point.size( ) == 1 )
-        // {
-        //     link_trajectory( traj, Cart_point, point[ 0 ], 0, 0, max_path_v[ 0 ], max_path_a[ 0 ] );
-        //     traj_index.push_back( traj.size( ) );
-        // }
-        // else
-        // {
-        //     KDL::Frame Frame_motion_1;
-        //     KDL::Frame Frame_motion_2;
-        //     double motion_v_1;
-        //     double motion_v_2;
-        //     std::cout << GREEN << "***************第1次规划***************" << std::endl;
-        //     multi_link_trajectory( traj, Cart_point, point[ 0 ], point[ 1 ], Frame_motion_1, 0, motion_v_1, bound_dist[ 0 ], max_path_v[ 0 ], max_path_a[ 0 ], max_path_v[ 1 ] );
-        //     traj_index.push_back( traj.size( ) );
+        std::vector< KDL::Frame > traj_target;
+        std::vector< int > traj_index;
+        KDL::Frame Cart_point = flange_;
 
-        //     for ( int i = 1; i < ( point.size( ) - 1 ); i++ )
-        //     {
-        //         std::cout << GREEN << "***************第" << i + 1 << "次规划***************" << std::endl;
-        //         multi_link_trajectory( traj, Frame_motion_1, point[ i ], point[ i + 1 ], Frame_motion_2, motion_v_1, motion_v_2, bound_dist[ i ], max_path_v[ i ], max_path_a[ i ], max_path_v[ i + 1 ] );
-        //         Frame_motion_1 = Frame_motion_2;
-        //         motion_v_1     = motion_v_2;
-        //         traj_index.push_back( traj.size( ) );
-        //     }
-        //     std::cout << GREEN << "***************第" << point.size( ) << "次规划***************" << std::endl;
-        //     link_trajectory( traj, Frame_motion_1, point.back( ), motion_v_1, 0, max_path_v.back( ), max_path_a.back( ) );
-        //     traj_index.push_back( traj.size( ) );
-        // }
+        if ( point.size( ) == 0 )
+        {
+            std::cout << RED << "MultiMoveL(): point size is at least one or more" << std::endl;
+            return -1;
+        }
+        //一段轨迹不存在圆弧过渡处理
+        else if ( point.size( ) == 1 )
+        {
+            if ( JC_helper::link_trajectory( traj_target, Cart_point, point[ 0 ], 0, 0, max_path_v[ 0 ], max_path_a[ 0 ] ) < 0 )
+            {
+                std::cerr << RED << "MultiMoveL(): given parameters is invalid in the 1th planning "
+                          << WHITE << std::endl;
+                return -1;
+            }
+            traj_index.push_back( traj_target.size( ) );
+        }
+        else
+        {
+            KDL::Frame Frame_motion_1;
+            KDL::Frame Frame_motion_2;
+            double motion_v_1;
+            double motion_v_2;
+            int success{ 0 };
+            std::cout << GREEN << "***************第1次规划***************" << WHITE << std::endl;
+            success = JC_helper::multilink_trajectory( traj_target, Cart_point, point[ 0 ], point[ 1 ], Frame_motion_1, 0, motion_v_1, bound_dist[ 0 ], max_path_v[ 0 ], max_path_a[ 0 ], max_path_v[ 1 ] );
+            if ( success < 0 )
+            {
+                std::cerr << RED << "MultiMoveL(): given parameters is invalid in the 1th planning "
+                          << WHITE << std::endl;
+                return -1;
+            }
+            traj_index.push_back( traj_target.size( ) );
+
+            for ( int i = 1; i < ( point.size( ) - 1 ); i++ )
+            {
+                std::cout << GREEN << "***************第" << i + 1 << "次规划***************" << WHITE << std::endl;
+                success = JC_helper::multilink_trajectory( traj_target, Frame_motion_1, point[ i ], point[ i + 1 ], Frame_motion_2, motion_v_1, motion_v_2, bound_dist[ i ], max_path_v[ i ], max_path_a[ i ], max_path_v[ i + 1 ] );
+                if ( success < 0 )
+                {
+                    std::cerr << RED << "MultiMoveL(): given parameters is invalid in the " << i + 1 << "th planning "
+                              << WHITE << std::endl;
+                    return -1;
+                }
+                Frame_motion_1 = Frame_motion_2;
+                motion_v_1     = motion_v_2;
+                traj_index.push_back( traj_target.size( ) );
+            }
+            std::cout << GREEN << "***************第" << point.size( ) << "次规划***************" << WHITE << std::endl;
+            success = JC_helper::link_trajectory( traj_target, Frame_motion_1, point.back( ), motion_v_1, 0, max_path_v.back( ), max_path_a.back( ) );
+            if ( success < 0 )
+            {
+                std::cerr << RED << "MultiMoveL(): given parameters is invalid in the last of planning "
+                          << WHITE << std::endl;
+                return -1;
+            }
+            traj_index.push_back( traj_target.size( ) );
+            std::cout << GREEN << "***************规划全部完成***************" << WHITE << std::endl;
+        }
+
+        std::vector< double > max_step;
+        KDL::JntArray q_init( jnt_num_ );
+        KDL::JntArray q_target( jnt_num_ );
+        int count{ 0 };
+        for ( int i = 0; i < jnt_num_; i++ )
+        {
+            q_init( i )   = pos_[ i ];
+            q_target( i ) = pos_[ i ];
+            max_step.push_back( max_vel_[ i ] * 0.001 );
+        }
+
+        //** IK计算 **//
+        for ( const auto& pos_goal : traj_target )
+        {
+            q_init = q_target;
+            if ( kinematics_.CartToJnt( q_init, pos_goal, q_target ) < 0 )
+            {
+                int p = 0;
+                for ( int i = 0; i < traj_index.size( ); i++ )
+                    p = count < traj_index[ i ] ? i + 1 : p;  //找到是第几段轨迹IK失败
+                std::cerr << RED << "MultiMoveL():CartToJnt fail on the " << p << "th trajectory，please chose other interpolate Points "
+                          << WHITE << std::endl;
+                return -1;
+            }
+            //防止奇异位置速度激增
+            for ( int i = 0; i < jnt_num_; i++ )
+            {
+                if ( abs( q_target( i ) - q_init( i ) ) > max_step[ i ] )
+                {
+                    std::cout << RED << "MultiMoveL():joint[" << i << "] speep is too  fast" << WHITE << std::endl;
+                    return -1;
+                }
+            }
+            traj_.push_back( q_target );
+            count++;
+        }
+        //**-------------------------------**//
+
+        if ( is_running_motion )  //不是OTG规划，异步/同步都不能打断
+        {
+            std::cerr << RED << " Motion is still running and waiting for it to finish"
+                      << WHITE << std::endl;
+            motion_thread_->join( );
+        }
+
+        if ( asynchronous )  //异步执行
+        {
+            motion_thread_.reset( new boost::thread{ &Robot::RunMultiMoveL, this, traj_ } );
+            is_running_motion = true;
+        }
+        else  //同步执行
+        {
+            motion_thread_.reset( new boost::thread{ &Robot::RunMultiMoveL, this, traj_ } );
+            motion_thread_->join( );
+            is_running_motion = false;
+        }
+
+        return 0;
     }
 
     int Robot::Dragging( Frame pose, double speed, double acceleration, double time,
@@ -1013,6 +1102,22 @@ namespace rocos
         is_running_motion = false;  //TODO: added by Yangluo
     }
 
+    void Robot::RunMultiMoveL( const std::vector< KDL::JntArray >& traj )
+    {
+        for ( const auto& waypoints : traj )
+        {
+            for ( int i = 0; i < jnt_num_; ++i )
+            {
+                pos_[ i ] = waypoints( i );
+                joints_[ i ]->setPosition( pos_[ i ] );
+            }
+
+            hw_interface_->waitForSignal( 0 );
+        }
+
+        is_running_motion = false;
+    }
+
     void Robot::RunDragging( const std::vector< KDL::JntArray >& traj )
     {
         int count{ 0 };
@@ -1057,7 +1162,5 @@ namespace rocos
 
     //TODO 紧急停止
     void Robot::StopMotion( ) {}
-
-
 
 }  // namespace rocos

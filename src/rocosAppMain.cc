@@ -61,6 +61,31 @@ int main(int argc, char *argv[]) {
 
     auto robotService = RobotServiceImpl::getInstance(&robot);
 
+{//测试MultiMoveL
+            using namespace KDL;
+            Frame f_p1;
+            Frame f_p2;
+            Frame f_p3;
+            Frame f_p4;
+
+            f_p1 = robot.getFlange() * Frame{ KDL::Rotation::RotX( 90 * M_PI / 180 ), Vector{ 0.3, 0.0, 0 } };
+            f_p2 = f_p1 * Frame{ KDL::Rotation::RotY( 90 * M_PI / 180 ), Vector{ 0.0, -0.3, -0.0 } };
+            f_p3 = f_p2 * Frame{ KDL::Rotation::RotX( -90 * M_PI / 180 ), Vector{ 0.0, 0.0, -0.3 } };
+            f_p4 = f_p3 * Frame{ KDL::Rotation::RotZ( -90 * M_PI / 180 ), Vector{ 0.0, 0.0, 0.3 } };
+
+            std::vector< KDL::Frame > points{ f_p1,f_p2, f_p3, f_p4 };
+            std::vector< double > max_path_v{ 0.06, 0.12, 0.12, 0.24};
+            std::vector< double > max_path_a{ 0.06, 0.06, 0.06, 0.06};
+            std::vector< double > bound_dist{0.05,0.1,0.0,0.2};
+           robot. MultiMoveL( points, bound_dist, max_path_v, max_path_a, false );
+           //测试第二次
+           robot. MultiMoveL( points, bound_dist, max_path_v, max_path_a, false );
+
+
+}
+
+
+
     //------------------------wait----------------------------------
     robotService->runServer();
 

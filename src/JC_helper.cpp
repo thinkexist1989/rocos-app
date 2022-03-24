@@ -148,6 +148,7 @@ namespace JC_helper
             t_total = t_total + 0.002;
         }
         //**-------------------------------**//
+        return 0;
     }
 
     int multilink_trajectory( std::vector< KDL::Frame >& traj, const KDL::Frame& f_start, const KDL::Frame& f_mid, const KDL::Frame& f_end, KDL::Frame& next_f_start, double current_path_start_v, double& next_path_start_v, double bound_dist, double max_path_v, double max_path_a, double next_max_path_v )
@@ -220,7 +221,7 @@ namespace JC_helper
         if ( current_path_start_v <= eps && ( 1 - s_bound_dist_1 ) <= eps )
         {
             std::cout << RED << " the Link length is not allowed to be equal to 0,When Velocity of last motion is equal to 0" << GREEN << std::endl;
-            assert( 0 );
+            return -1;
         }
 
         Vector V_base_t = ab * ( ab * bc );  //圆弧中垂直于第一段直线的半径向量
@@ -334,6 +335,7 @@ namespace JC_helper
             t_total = t_total + 0.002;
         }
         //**-------------------------------**//
+        return 0;
     }
 
 }  // namespace JC_helper
