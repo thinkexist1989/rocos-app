@@ -907,8 +907,8 @@ namespace rocos
         for ( auto& i : interp )
             i.reset( new DoubleS{ } );
 
-        // std::cout << "Joint Pos: \n"
-        //           << GREEN << q.data << WHITE << std::endl;
+        std::cout << "Joint Pos: \n"
+                  << GREEN << q.data << WHITE << std::endl;
         for ( int i = 0; i < jnt_num_; ++i )
         {
             if ( q( i ) == pos_[ i ] )
@@ -920,12 +920,12 @@ namespace rocos
             }
             need_plan_[ i ] = true;
 
-            interp[ i ]->planProfile( 0,          // t
-                                       pos_[ i ],  // p0
-                                       q( i ),     // pf
-                                       0,  // v0
-                                       0,          // vf
-                                       speed, acceleration, max_jerk_[ i ] );
+            interp[ i ]->planDoubleSProfile( 0,          // t
+                                             pos_[ i ],  // p0
+                                             q( i ),     // pf
+                                             0,          // v0
+                                             0,          // vf
+                                             speed, acceleration, max_jerk_[ i ] );
 
             if ( !interp[ i ]->isValidMovement( ) )
             {
