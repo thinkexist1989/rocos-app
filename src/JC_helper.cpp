@@ -145,7 +145,7 @@ namespace JC_helper
             s_p = doubleS_P.pos( t_total );
             s_r = doubleS_R.pos( t_total );
             traj.push_back( link_trajectory( start, end, s_p, s_r ) );
-            t_total = t_total + 0.002;
+            t_total = t_total + 0.001;
         }
         //**-------------------------------**//
         return 0;
@@ -332,7 +332,7 @@ namespace JC_helper
                 traj.push_back( cirlular_trajectory( F_base_circlestart, F_base_circleend, F_base_circleCenter, s_p, s_r, alpha ) );
             }
 
-            t_total = t_total + 0.002;
+            t_total = t_total + 0.001;
         }
         //**-------------------------------**//
         return 0;

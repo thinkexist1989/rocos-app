@@ -697,6 +697,7 @@ namespace rocos
         //一段轨迹不存在圆弧过渡处理
         else if ( point.size( ) == 1 )
         {
+            std::cout << GREEN << "***************第1次规划***************" << WHITE << std::endl;
             if ( JC_helper::link_trajectory( traj_target, Cart_point, point[ 0 ], 0, 0, max_path_v[ 0 ], max_path_a[ 0 ] ) < 0 )
             {
                 std::cerr << RED << "MultiMoveL(): given parameters is invalid in the 1th planning "
@@ -712,6 +713,7 @@ namespace rocos
             double motion_v_1;
             double motion_v_2;
             int success{ 0 };
+
             std::cout << GREEN << "***************第1次规划***************" << WHITE << std::endl;
             success = JC_helper::multilink_trajectory( traj_target, Cart_point, point[ 0 ], point[ 1 ], Frame_motion_1, 0, motion_v_1, bound_dist[ 0 ], max_path_v[ 0 ], max_path_a[ 0 ], max_path_v[ 1 ] );
             if ( success < 0 )
@@ -736,6 +738,7 @@ namespace rocos
                 motion_v_1     = motion_v_2;
                 traj_index.push_back( traj_target.size( ) );
             }
+
             std::cout << GREEN << "***************第" << point.size( ) << "次规划***************" << WHITE << std::endl;
             success = JC_helper::link_trajectory( traj_target, Frame_motion_1, point.back( ), motion_v_1, 0, max_path_v.back( ), max_path_a.back( ) );
             if ( success < 0 )
@@ -745,17 +748,21 @@ namespace rocos
                 return -1;
             }
             traj_index.push_back( traj_target.size( ) );
-            std::cout << GREEN << "***************规划全部完成***************" << WHITE << std::endl;
         }
+        std::cout << GREEN << "***************规划全部完成***************" << WHITE << std::endl;
 
         std::vector< double > max_step;
         KDL::JntArray q_init( jnt_num_ );
         KDL::JntArray q_target( jnt_num_ );
         int count{ 0 };
+        int p = 0;  //表示当前正处理第几段轨迹
+
+        traj_.clear( );
+
         for ( int i = 0; i < jnt_num_; i++ )
         {
             q_init( i )   = pos_[ i ];
-            q_target( i ) = pos_[ i ];
+            q_target( i ) = q_init( i );
             max_step.push_back( max_vel_[ i ] * 0.001 );
         }
 
@@ -765,9 +772,8 @@ namespace rocos
             q_init = q_target;
             if ( kinematics_.CartToJnt( q_init, pos_goal, q_target ) < 0 )
             {
-                int p = 0;
                 for ( int i = 0; i < traj_index.size( ); i++ )
-                    p = count < traj_index[ i ] ? i + 1 : p;  //找到是第几段轨迹IK失败
+                    p = count < traj_index[ i ] ? i + 1 : p;  //找到当前是第几段轨迹
                 std::cerr << RED << "MultiMoveL():CartToJnt fail on the " << p << "th trajectory，please chose other interpolate Points "
                           << WHITE << std::endl;
                 return -1;
@@ -777,7 +783,13 @@ namespace rocos
             {
                 if ( abs( q_target( i ) - q_init( i ) ) > max_step[ i ] )
                 {
-                    std::cout << RED << "MultiMoveL():joint[" << i << "] speep is too  fast" << WHITE << std::endl;
+                    for ( int j = 0; j < traj_index.size( ); j++ )
+                        p = count < traj_index[ j ] ? ( j + 1 ) : p;  //找到当前是第几段轨迹
+                    std::cout << RED << "MultiMoveL():count =" << p << count << std::endl;
+                    std::cout << RED << "MultiMoveL():joint[" << i << "] speep is too  fast on the " << p << "th trajectory" << std::endl;
+                    std::cout << RED << "MultiMoveL():target speed = " << abs( q_target( i ) - q_init( i ) ) << "and  max_step=" << max_step[ i ] << std::endl;
+                    std::cout << RED << "MultiMoveL():q_target( " << i << " )  = " << q_target( i ) << std::endl;
+                    std::cout << RED << "MultiMoveL():q_init( " << i << " ) =" << q_init( i ) << WHITE << std::endl;
                     return -1;
                 }
             }

@@ -525,6 +525,10 @@ namespace rocos
         //停止运动
         void StopMotion( );
 
+public://为了测试MultiMovel()
+        void test_set_pos(int i ,double val){pos_[i]=val;}
+
+
     private:
         // TODO： 测试用MoveJ，阻塞运行，需要改为private
         void
