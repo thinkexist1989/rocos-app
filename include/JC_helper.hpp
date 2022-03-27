@@ -110,6 +110,46 @@ namespace JC_helper
       */
     int multilink_trajectory( std::vector< KDL::Frame >& traj, const KDL::Frame& f_start, const KDL::Frame& f_mid, const KDL::Frame& f_end, KDL::Frame& next_f_start, double current_path_start_v, double& next_path_start_v, double bound_dist, double max_path_v, double max_path_a, double next_max_path_v = 1 );
 
+/**
+ * @brief 给定三点，计算出圆心
+ * 
+ * @param center 
+ * @param f_p1 
+ * @param f_p2 
+ * @param f_p3 
+ * @return int 
+ */
+    int circle_center( KDL::Frame& center, const KDL::Frame& f_p1, const KDL::Frame& f_p2, const KDL::Frame& f_p3 );
+
+/**
+ * @brief movec轨迹计算
+ * 
+ * @param traj 输出计算结果
+ * @param f_p1 第一点
+ * @param f_p2 第二点
+ * @param f_p3 第三点
+ * @param max_path_v 最大速度
+ * @param max_path_a 最大加速度
+ * @param fixed_rotation 是否保持姿态：是->姿态不变；否->姿态指向圆心方向变换
+ * @return int 
+ */
+    int circle_trajectory( std::vector< KDL::Frame >& traj, const KDL::Frame& f_p1, const KDL::Frame& f_p2, const KDL::Frame& f_p3, double max_path_v = 0.01, double max_path_a = 0.01, bool fixed_rotation = true );
+
+/**
+ * @brief 位置保持，只旋转姿态
+ * 
+ * @param traj 输出计算结果
+ * @param f_p 位置保持
+ * @param f_r1 起始姿态
+ * @param f_r2 终止姿态
+ * @param max_path_v 最大速度
+ * @param max_path_a 最大加速度
+ * @param equivalent_radius 等效半径，用于乘以角度得到等效弧度
+ * @return int 
+ */
+    int rotation_trajectory( std::vector< KDL::Frame >& traj, const KDL::Vector& f_p, const KDL::Rotation& f_r1, const KDL::Rotation& f_r2, double max_path_v = 0.01, double max_path_a = 0.01, double equivalent_radius = 0.01 );
+
+
 }  // namespace JC_helper
 
 #endif

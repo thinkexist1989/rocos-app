@@ -116,16 +116,20 @@ namespace JC_helper
 
         doubleS_P.planDoubleSProfile( 0, 0, 1, v_start / path_length, v_end / path_length, max_path_v / path_length, max_path_a / path_length, max_path_a * 2 / path_length );
         bool isplanned = doubleS_P.isValidMovement( );
-        if ( !isplanned )
+        if ( !isplanned || !( doubleS_P.getDuration( ) > 0 ) )
         {
-            assert( isplanned && "Error_MotionPlanning_Not_Feasible：6-P" );
+            std::cout << RED << "link_trajectory():Error_MotionPlanning_Not_Feasible" << WHITE << std::endl;
+            ;
+            return -1;
         }
 
         doubleS_R.planDoubleSProfile( 0, 0, 1, 0, 0, max_path_v / path_length, max_path_a / path_length, max_path_a * 2 / path_length );
         isplanned = doubleS_R.isValidMovement( );
-        if ( !isplanned )
+        if ( !isplanned || !( doubleS_R.getDuration( ) > 0 ) )
         {
-            assert( isplanned && "Error_MotionPlanning_Not_Feasible：6-R" );
+            std::cout << RED << "link_trajectory():Error_MotionPlanning_Not_Feasible" << WHITE << std::endl;
+            ;
+            return -1;
         }
 
         if ( doubleS_R.getDuration( ) != doubleS_P.getDuration( ) )
@@ -145,9 +149,10 @@ namespace JC_helper
             s_p = doubleS_P.pos( t_total );
             s_r = doubleS_R.pos( t_total );
             traj.push_back( link_trajectory( start, end, s_p, s_r ) );
-            t_total = t_total + 0.002;
+            t_total = t_total + 0.001;
         }
         //**-------------------------------**//
+        return 0;
     }
 
     int multilink_trajectory( std::vector< KDL::Frame >& traj, const KDL::Frame& f_start, const KDL::Frame& f_mid, const KDL::Frame& f_end, KDL::Frame& next_f_start, double current_path_start_v, double& next_path_start_v, double bound_dist, double max_path_v, double max_path_a, double next_max_path_v )
@@ -187,7 +192,7 @@ namespace JC_helper
 
         if ( bound_dist >= bcdist )
         {
-            std::cout << RED << "bound_dist is too  large，try to decrease it" << GREEN << std::endl;
+            std::cout << RED << "multi_link_trajectory()：bound_dist is too  large，try to decrease it" << GREEN << std::endl;
         }
 
         if ( current_path_start_v > max_path_v )  //! 防止起始速度就超过最大可达线速度 ,理论上不可能发生
@@ -219,8 +224,8 @@ namespace JC_helper
 
         if ( current_path_start_v <= eps && ( 1 - s_bound_dist_1 ) <= eps )
         {
-            std::cout << RED << " the Link length is not allowed to be equal to 0,When Velocity of last motion is equal to 0" << GREEN << std::endl;
-            assert( 0 );
+            std::cout << RED << " multi_link_trajectory()：the Link length is not allowed to be equal to 0,When Velocity of last motion is equal to 0" << GREEN << std::endl;
+            return -1;
         }
 
         Vector V_base_t = ab * ( ab * bc );  //圆弧中垂直于第一段直线的半径向量
@@ -247,18 +252,18 @@ namespace JC_helper
         {
             doubleS_1_P.planDoubleSProfile( 0, 0, 1, current_path_start_v / dedist, s_cirlular_v, max_path_v / dedist, max_path_a / dedist, max_path_a * 2 / dedist );
             bool isplanned = doubleS_1_P.isValidMovement( );
-            if ( !isplanned )
+            if ( !isplanned || !( doubleS_1_P.getDuration( ) > 0 ) )
             {
-                std::cout << RED << "Linear trajectory planning fails,try to decrease given parameter [max_path_v] " << GREEN << std::endl;
-                assert( isplanned );
+                std::cout << RED << "multi_link_trajectory()：Linear trajectory planning fails,try to decrease given parameter [max_path_v] " << GREEN << std::endl;
+                return -1;
             }
 
             doubleS_1_R.planDoubleSProfile( 0, 0, 1, 0, 0, max_path_v / dedist, max_path_a / dedist, max_path_a * 2 / dedist );
             isplanned = doubleS_1_R.isValidMovement( );
-            if ( !isplanned )
+            if ( !isplanned || !( doubleS_1_R.getDuration( ) > 0 ) )
             {
-                std::cout << RED << "Linear trajectory planning fails,try to decrease given parameter [max_path_v] " << GREEN << std::endl;
-                assert( isplanned );
+                std::cout << RED << "multi_link_trajectory()：Linear trajectory planning fails,try to decrease given parameter [max_path_v] " << GREEN << std::endl;
+                return -1;
             }
 
             if ( doubleS_1_R.getDuration( ) != doubleS_1_P.getDuration( ) )
@@ -294,10 +299,10 @@ namespace JC_helper
 
             doubleS_2_R.planDoubleSProfile( 0, 0, 1, 0, 0, max_path_v / dedist, max_path_a / dedist, max_path_a * 2 / dedist );
             bool isplanned = doubleS_2_R.isValidMovement( );
-            if ( !isplanned )
+            if ( !isplanned || !( doubleS_2_R.getDuration( ) > 0 ) )
             {
-                std::cout << RED << "Circular trajectory planning fails,try to decrease given parameter [max_path_v] " << std::endl;
-                assert( isplanned );
+                std::cout << RED << "multi_link_trajectory()：Circular trajectory planning fails,try to decrease given parameter [max_path_v] " << std::endl;
+                return -1;
             }
 
             if ( doubleS_2_R.getDuration( ) != T_cirlular )
@@ -331,9 +336,172 @@ namespace JC_helper
                 traj.push_back( cirlular_trajectory( F_base_circlestart, F_base_circleend, F_base_circleCenter, s_p, s_r, alpha ) );
             }
 
-            t_total = t_total + 0.002;
+            t_total = t_total + 0.001;
         }
         //**-------------------------------**//
+        return 0;
+    }
+
+    int circle_center( KDL::Frame& center, const KDL::Frame& f_p1, const KDL::Frame& f_p2, const KDL::Frame& f_p3 )
+    {
+        const double eps = 1E-7;
+        using namespace KDL;
+        Vector v1 = f_p2.p - f_p1.p;
+        Vector v2 = f_p3.p - f_p1.p;
+
+        if ( v1.Normalize( ) < eps )
+        {
+            std::cout << RED << "circle_center():f_p1不能等于f_p2" << std::endl;
+            return -1;
+        }
+        if ( v2.Normalize( ) < eps )
+        {
+            std::cout << RED << "circle_center():f_p1不能等于f_p3" << std::endl;
+            return -1;
+        }
+
+        Vector axis_z{ v2 * v1 };
+
+        if ( axis_z.Normalize( ) < eps )
+        {
+            std::cout << RED << "circle_center():三点不能共线或过于趋向直线" << std::endl;
+            return -1;
+        }
+
+        Vector axis_x{ v1 };
+        Vector axis_y{ axis_z * axis_x };
+        axis_y.Normalize( );
+
+        v1 = f_p2.p - f_p1.p;
+        v2 = f_p3.p - f_p1.p;
+
+        //在新坐标系上
+        //f_p2 = [dot(v1,axis_x),0] = [bx,0]
+        //f_P3 = [dot(v2,axis_x),dot(v2,axis_y)=[cx,cy]
+        //圆心一定位于[bx/2,0]的直线上，所以假设圆心为[bx/2,0]
+        //在利用半径相等公式求解h
+
+        double bx = dot( v1, axis_x );
+        double cx = dot( v2, axis_x );
+        double cy = dot( v2, axis_y );
+
+        double h = ( ( cx - bx / 2 ) * ( cx - bx / 2 ) + cy * cy - ( bx / 2 ) * ( bx / 2 ) ) / ( 2 * cy );
+        center.p = f_p1.p + axis_x * ( bx / 2 ) + axis_y * h;
+        return 0;
+    }
+
+    int circle_trajectory( std::vector< KDL::Frame >& traj, const KDL::Frame& f_p1, const KDL::Frame& f_p2, const KDL::Frame& f_p3, double max_path_v, double max_path_a, bool fixed_rotation )
+    {
+        using namespace KDL;
+        const double epsilon = 1e-6;
+        Frame center;
+
+        if ( circle_center( center, f_p1, f_p2, f_p3 ) < 0 )  //找到圆心的位置
+        {
+            std::cout << RED << "circle_trajectory():unable to calculate center of circle" << std::endl;
+            return -1;
+        }
+
+        KDL::Vector axis_x = f_p1.p - center.p;
+
+        double radius = axis_x.Normalize( );
+
+        KDL::Vector axis_tem = f_p2.p - center.p;  //第二直线段上的半径段
+        axis_tem.Normalize( );
+
+        Vector axis_z( axis_x * axis_tem );  //向上的Z轴
+        if ( axis_z.Normalize( ) < epsilon )
+        {
+            std::cout << RED << "circle_trajectory():axis_x and axis_tem  cannot be parallel" << std::endl;
+            return -1;
+        }
+
+        Vector axis_y{ ( axis_z * axis_x ) };
+        axis_y.Normalize( );
+
+        KDL::Frame center_( KDL::Rotation{ axis_x, axis_y, axis_z }, center.p );  //确定圆心的方向
+
+        //** 计算旋转角度 **//
+        Vector f_p2_   = center_.Inverse( ) * f_p2.p;
+        Vector f_p3_   = center_.Inverse( ) * f_p3.p;
+        double theta12 = 0;
+        double theta13 = 0;
+        if ( f_p2_( 1 ) < 0 )
+            theta12 = atan2( f_p2_( 1 ), f_p2_( 0 ) ) + 2 * M_PI;
+        else
+            theta12 = atan2( f_p2_( 1 ), f_p2_( 0 ) );
+        if ( f_p3_( 1 ) < 0 )
+            theta13 = atan2( f_p3_( 1 ), f_p3_( 0 ) ) + 2 * M_PI;
+        else
+            theta13 = atan2( f_p3_( 1 ), f_p3_( 0 ) );
+        std::cout << BLUE << "theta13= " << theta13 * 180 / M_PI << GREEN << std::endl;
+        //**-------------------------------**//
+
+        rocos::DoubleS doubleS;
+        double path_length = ( radius * theta13 );
+        doubleS.planDoubleSProfile( 0, 0, 1, 0, 0, max_path_v / path_length, max_path_a / path_length, 2 * max_path_a / path_length );
+        bool success = doubleS.isValidMovement( );
+        if ( success < 0 || !( doubleS.getDuration( ) > 0 ) )
+        {
+            std::cout << RED << "circle_trajectory():planDoubleSProfile failed" << std::endl;
+            return -1;
+        }
+        double T_total = doubleS.getDuration( );
+        std::cout << BLUE << "T_total = " << T_total << GREEN << std::endl;
+
+        KDL::Rotation R_w_p1 = f_p1.M;
+        Vector Rotation_axis = R_w_p1.Inverse( ) * axis_z;
+
+        //** 轨迹规划 **//
+        double dt{ 0.0 };
+        double s{ 0.0 };
+        while ( dt <= T_total )
+        {
+            s = doubleS.pos( dt );
+            if ( fixed_rotation )
+                traj.push_back( KDL::Frame( R_w_p1, center_ * Vector{ radius * cos( s * theta13 ), radius * sin( s * theta13 ), 0 } ) );
+            else
+                traj.push_back( KDL::Frame( R_w_p1 * KDL::Rotation::Rot2( Rotation_axis, theta13 * s ), center_ * Vector{ radius * cos( s * theta13 ), radius * sin( s * theta13 ), 0 } ) );
+            dt += 0.001;
+        }
+        return 0;
+    }
+
+    int rotation_trajectory( std::vector< KDL::Frame >& traj, const KDL::Vector& f_p, const KDL::Rotation& f_r1, const KDL::Rotation& f_r2, double max_path_v , double max_path_a , double equivalent_radius  )
+    {
+        using namespace KDL;
+
+        KDL::Rotation R_r1_r2 = f_r1.Inverse( ) * f_r2;
+        KDL::Vector ration_axis;
+        double angle = R_r1_r2.GetRotAngle( ration_axis );
+        if ( angle == 0 )
+        {
+            std::cout << RED << "circle_trajectory(): given rotation parameters  cannot be the same   " << GREEN << std::endl;
+            return -1;
+        }
+
+        rocos::DoubleS doubleS;
+        double path_length = ( equivalent_radius * angle );
+        doubleS.planDoubleSProfile( 0, 0, 1, 0, 0, max_path_v / path_length, max_path_a / path_length, 2 * max_path_a / path_length );
+        bool success = doubleS.isValidMovement( );
+        if ( success < 0 || !( doubleS.getDuration( ) > 0 ) )
+        {
+            std::cout << RED << "circle_trajectory():planDoubleSProfile failed" << GREEN << std::endl;
+            return -1;
+        }
+        double T_total = doubleS.getDuration( );
+        std::cout << BLUE << "T_total = " << T_total << GREEN << std::endl;
+
+        //** 轨迹规划 **//
+        double dt{ 0.0 };
+        double s{ 0.0 };
+        while ( dt <= T_total )
+        {
+            s = doubleS.pos( dt );
+            traj.push_back( KDL::Frame( f_r1 * KDL::Rotation::Rot2( ration_axis, angle * s ), f_p ) );
+            dt += 0.001;
+        }
+        return 0;
     }
 
 }  // namespace JC_helper
