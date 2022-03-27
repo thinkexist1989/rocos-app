@@ -536,7 +536,7 @@ namespace rocos
         }
         if ( kinematics_.CartToJnt( q_init, pose, q_target ) < 0 )
         {
-            std::cerr << RED << " CartToJnt fail" << WHITE << std::endl;
+            std::cerr << RED << " MoveJ_IK():CartToJnt failed" << WHITE << std::endl;
             return -1;
         }
         return MoveJ( q_target, speed, acceleration, time, radius, asynchronous );
@@ -617,7 +617,7 @@ namespace rocos
                 P );
             if ( kinematics_.CartToJnt( q_init, interp_frame, q_target ) < 0 )
             {
-                std::cerr << RED << "MoveL(): CartToJnt fail " << WHITE << std::endl;
+                std::cerr << RED << "MoveL(): CartToJnt failed " << WHITE << std::endl;
                 return -1;
             }
             //防止奇异位置速度激增
@@ -672,6 +672,182 @@ namespace rocos
                       double acceleration, double time, double radius,
                       Robot::OrientationMode mode, bool asynchronous )
     {
+        if ( radius )
+        {
+            std::cerr << RED << " radius not supported yet" << WHITE << std::endl;
+            return -1;
+        }
+        if ( time )
+        {
+            std::cerr << RED << " time not supported yet" << WHITE << std::endl;
+            return -1;
+        }
+
+        if ( CheckBeforeMove( pose_via, speed, acceleration, time, radius ) < 0 )
+        {
+            std::cerr << RED << "MoveC():given parameters is invalid" << WHITE << std::endl;
+            return -1;
+        }
+
+        if ( CheckBeforeMove( pose_to, speed, acceleration, time, radius ) < 0 )
+        {
+            std::cerr << RED << "MoveC():given parameters is invalid" << WHITE << std::endl;
+            return -1;
+        }
+
+        //** 变量初始化 **//
+        traj_.clear( );
+        KDL::JntArray q_init( jnt_num_ );
+        KDL::JntArray q_target( jnt_num_ );
+        KDL::Frame f_flange = flange_;
+        double dt           = 0;
+        std::vector< double > max_step;
+        bool orientation_fixed = mode == Robot::OrientationMode::FIXED ? true : false;
+        std::vector< KDL::Frame > traj_target;
+        //**-------------------------------**//
+
+        for ( int i = 0; i < jnt_num_; i++ )
+        {
+            q_init( i ) = pos_[ i ];
+            max_step.push_back( max_vel_[ i ] * 0.001 );
+        }
+
+        if ( JC_helper::circle_trajectory( traj_target, f_flange, pose_via, pose_to, speed, acceleration, orientation_fixed ) < 0 )
+        {
+            std::cerr << RED << "MoveC(): circle trajectory planning fail " << WHITE << std::endl;
+            return -1;
+        }
+
+        //** 轨迹计算 **//
+        for ( const auto& target : traj_target )
+        {
+            if ( kinematics_.CartToJnt( q_init, target, q_target ) < 0 )
+            {
+                std::cerr << RED << "MoveC(): CartToJnt failed " << WHITE << std::endl;
+                return -1;
+            }
+            //防止奇异位置速度激增
+            for ( int i = 0; i < jnt_num_; i++ )
+            {
+                if ( abs( q_target( i ) - q_init( i ) ) > max_step[ i ] )
+                {
+                    std::cout << RED << "MoveC():joint[" << i << "] speep is too  fast" << WHITE << std::endl;
+                    return -1;
+                }
+            }
+
+            q_init = q_target;
+            traj_.push_back( q_target );
+            dt += 0.001;
+        }
+        //**-------------------------------**//
+
+        if ( is_running_motion )  //不是OTG规划，异步/同步都不能打断
+        {
+            std::cerr << RED << " Motion is still running and waiting for it to finish"
+                      << WHITE << std::endl;
+            motion_thread_->join( );
+        }
+
+        if ( asynchronous )  //异步执行
+        {
+            motion_thread_.reset( new boost::thread{ &Robot::RunMoveL, this, traj_ } );
+            is_running_motion = true;
+        }
+        else  //同步执行
+        {
+            motion_thread_.reset( new boost::thread{ &Robot::RunMoveL, this, traj_ } );
+            motion_thread_->join( );
+            is_running_motion = false;
+        }
+
+        return 0;
+    }
+
+    int Robot::MoveR( Rotation rotation_to, double speed,
+                      double acceleration, double time, bool asynchronous, double equivalent_radius )
+    {
+        if ( time )
+        {
+            std::cerr << RED << " MoveR():time not supported yet" << WHITE << std::endl;
+            return -1;
+        }
+
+        if ( CheckBeforeMove( Frame{ rotation_to, flange_.p }, speed, acceleration, time, equivalent_radius ) < 0 )
+        {
+            std::cerr << RED << "MoveR():given parameters is invalid" << WHITE << std::endl;
+            return -1;
+        }
+        if ( equivalent_radius < epsilon )
+        {
+            std::cerr << RED << " MoveR():equivalent_radius too small" << WHITE << std::endl;
+            return -1;
+        }
+        //** 变量初始化 **//
+        traj_.clear( );
+        KDL::JntArray q_init( jnt_num_ );
+        KDL::JntArray q_target( jnt_num_ );
+        KDL::Frame f_flange = flange_;
+        double dt           = 0;
+        std::vector< double > max_step;
+        std::vector< KDL::Frame > traj_target;
+        //**-------------------------------**//
+
+        for ( int i = 0; i < jnt_num_; i++ )
+        {
+            q_init( i ) = pos_[ i ];
+            max_step.push_back( max_vel_[ i ] * 0.001 );
+        }
+
+        if ( JC_helper::rotation_trajectory( traj_target, f_flange.p, f_flange.M, rotation_to, speed, acceleration, equivalent_radius ) < 0 )
+        {
+            std::cerr << RED << "MoveR():  Rotation trajectory planning fail " << WHITE << std::endl;
+            return -1;
+        }
+
+        //** 轨迹计算 **//
+        for ( const auto& target : traj_target )
+        {
+            if ( kinematics_.CartToJnt( q_init, target, q_target ) < 0 )
+            {
+                std::cerr << RED << "MoveR(): CartToJnt failed " << WHITE << std::endl;
+                return -1;
+            }
+            //防止奇异位置速度激增
+            for ( int i = 0; i < jnt_num_; i++ )
+            {
+                if ( abs( q_target( i ) - q_init( i ) ) > max_step[ i ] )
+                {
+                    std::cout << RED << "MoveR():joint[" << i << "] speep is too  fast" << WHITE << std::endl;
+                    return -1;
+                }
+            }
+
+            q_init = q_target;
+            traj_.push_back( q_target );
+            dt += 0.001;
+        }
+        //**-------------------------------**//
+
+        if ( is_running_motion )  //不是OTG规划，异步/同步都不能打断
+        {
+            std::cerr << RED << " Motion is still running and waiting for it to finish"
+                      << WHITE << std::endl;
+            motion_thread_->join( );
+        }
+
+        if ( asynchronous )  //异步执行
+        {
+            motion_thread_.reset( new boost::thread{ &Robot::RunMoveL, this, traj_ } );
+            is_running_motion = true;
+        }
+        else  //同步执行
+        {
+            motion_thread_.reset( new boost::thread{ &Robot::RunMoveL, this, traj_ } );
+            motion_thread_->join( );
+            is_running_motion = false;
+        }
+
         return 0;
     }
 
@@ -774,7 +950,7 @@ namespace rocos
             {
                 for ( int i = 0; i < traj_index.size( ); i++ )
                     p = count < traj_index[ i ] ? i + 1 : p;  //找到当前是第几段轨迹
-                std::cerr << RED << "MultiMoveL():CartToJnt fail on the " << p << "th trajectory，please chose other interpolate Points "
+                std::cerr << RED << "MultiMoveL():CartToJnt failed on the " << p << "th trajectory，please chose other interpolate Points "
                           << WHITE << std::endl;
                 return -1;
             }
@@ -865,7 +1041,7 @@ namespace rocos
             0, 0, 1, 0, 0, speed / Plenght.Norm( ), acceleration / Plenght.Norm( ),
             ( *std::min_element( std::begin( max_jerk_ ), std::end( max_jerk_ ) ) ) / Plenght.Norm( ) );
 
-        if ( !doubleS->isValidMovement(  ) || !(doubleS->getDuration()>0))
+        if ( !doubleS->isValidMovement( ) || !( doubleS->getDuration( ) > 0 ) )
         {
             std::cerr << RED << "dragging():dragging trajectory "
                       << "is infeasible " << WHITE << std::endl;
@@ -905,7 +1081,7 @@ namespace rocos
                 P );
             if ( kinematics_.CartToJnt( q_init, interp_frame, q_target ) < 0 )
             {
-                std::cerr << RED << " dragging():CartToJnt fail " << WHITE << std::endl;
+                std::cerr << RED << " dragging():CartToJnt failed " << WHITE << std::endl;
                 return -1;
             }
             //防止奇异位置速度激增
@@ -935,7 +1111,8 @@ namespace rocos
     {
         //** 数据有效性检查  **//
         for ( int i = 0; i < jnt_num_; i++ )
-        {  //位置检查
+        {  //TODO 这里的速度、加速度目前只针对关节空间进行检查
+            //位置检查
             if ( q( i ) > joints_[ i ]->getMaxPosLimit( ) ||
                  q( i ) < joints_[ i ]->getMinPosLimit( ) )
             {
@@ -995,7 +1172,7 @@ namespace rocos
         }
 
         for ( int i = 0; i < jnt_num_; i++ )
-        {
+        {  //TODO 这里的速度、加速度目前只针对关节空间进行检查
             //速度检查
             if ( speed > joints_[ i ]->getMaxVel( ) ||
                  speed < ( -1 ) * joints_[ i ]->getMaxVel( ) )
@@ -1018,12 +1195,13 @@ namespace rocos
                 return -1;
             }
         }
+        //总时间检查
         if ( time < 0 )
         {
             std::cerr << RED << "CheckBeforeMove(): time is less than 0 invalidly" << WHITE << std::endl;
             return -1;
         }
-
+        //过渡半径检查
         if ( radius < 0 )
         {
             std::cerr << RED << "CheckBeforeMove(): radius is less than 0 invalidly" << WHITE << std::endl;

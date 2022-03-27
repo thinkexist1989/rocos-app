@@ -459,6 +459,21 @@ namespace rocos
         int MovePath( const Path& path, bool asynchronous = false );
 
         /**
+         * @brief 保持末端位置，只旋转姿态
+         * 
+         * @param rotation_to 目标姿态
+         * @param speed 速度
+         * @param acceleration 加速度
+         * @param time 总时间
+         * @param equivalent_radius 等效半径，乘以旋转角度得等效弧度
+         * @param asynchronous 异步与否
+         * @return int 
+         */
+        int MoveR( Rotation rotation_to, double speed,
+                   double acceleration, double time, bool asynchronous , double equivalent_radius=0.01
+                  );
+
+        /**
          * @brief 多段直线的连续运动
          * @note 1、过渡半径bound_dist可以为0，表示终止速度为0；2、point[0]代表第一个目标点 
          * @param point 目标点集
@@ -525,9 +540,8 @@ namespace rocos
         //停止运动
         void StopMotion( );
 
-public://为了测试MultiMovel()
-        void test_set_pos(int i ,double val){pos_[i]=val;}
-
+    public:  //为了测试MultiMovel()
+        void test_set_pos( int i, double val ) { pos_[ i ] = val; }
 
     private:
         // TODO： 测试用MoveJ，阻塞运行，需要改为private

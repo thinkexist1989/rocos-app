@@ -68,7 +68,7 @@ int main( int argc, char* argv[] )
 
     auto robotService = RobotServiceImpl::getInstance( &robot );
 
-    {  //测试MultiMoveL
+    {  //测试
         using namespace KDL;
         Frame f_p1;
         Frame f_p2;
@@ -84,28 +84,66 @@ int main( int argc, char* argv[] )
         q( 4 ) = 90 * M_PI / 180;
         q( 5 ) = 0 * M_PI / 180;
 
-
-        for ( int i = 0; i < 6; i++ )
-        {
-            robot.test_set_pos( i, q( i ) );//?pos_资源竞争
-        std::this_thread::sleep_for(std::chrono::milliseconds(3));//?pos_资源竞争
-
-        }
-        std::this_thread::sleep_for(std::chrono::milliseconds(1500));
-
         kinematics_.JntToCart( q, f_p1 );
-        f_p1 = f_p1 * Frame{ KDL::Rotation::RotX( 90 * M_PI / 180 ), Vector{ 0.3, 0.0, 0 } };
-        f_p2 = f_p1 * Frame{ KDL::Rotation::RotY( 90 * M_PI / 180 ), Vector{ 0.0, -0.3, -0.0 } };
-        f_p3 = f_p2 * Frame{ KDL::Rotation::RotX( -90 * M_PI / 180 ), Vector{ 0.0, 0.0, -0.3 } };
-        f_p4 = f_p3 * Frame{ KDL::Rotation::RotZ( -90 * M_PI / 180 ), Vector{ 0.0, 0.0, 0.3 } };
 
-        std::vector< KDL::Frame > points{ f_p1, f_p2, f_p3, f_p4 };
-        std::vector< double > max_path_v{ 0.06, 0.04, 0.04, 0.06 };
-        std::vector< double > max_path_a{ 0.06, 0.06, 0.06, 0.06 };
-        std::vector< double > bound_dist{ 0.05, 0.0, 0.1, 0.0 };
+        {
+            //测试moveC
+            std::cout << "----------------test moveC start---------------" << std::endl;
+            f_p2 = f_p1 * Frame{ KDL::Rotation::RotX( 90 * M_PI / 180 ), Vector{ 0.0, -0.1, -0.1 } };
+            f_p3 = f_p1 * Frame{ KDL::Rotation::RotY( 90 * M_PI / 180 ), Vector{ 0.0, 0.0, -0.2 } };
 
-        robot.MultiMoveL( points, bound_dist, max_path_v, max_path_a, true );
-        robot.MultiMoveL( points, bound_dist, max_path_v, max_path_a, false );
+            for ( int i = 0; i < 6; i++ )
+            {
+                robot.test_set_pos( i, q( i ) );                                //?pos_资源竞争
+                std::this_thread::sleep_for( std::chrono::milliseconds( 3 ) );  //?pos_资源竞争
+            }
+            robot.MoveC( f_p2, f_p3, 0.05, 0.05, 0, 0, Robot::OrientationMode::FIXED, false );
+
+            for ( int i = 0; i < 6; i++ )
+            {
+                robot.test_set_pos( i, q( i ) );
+                std::this_thread::sleep_for( std::chrono::milliseconds( 3 ) );
+            }
+            // robot.MoveC( f_p2, f_p3, 0.01, 0.01, 0, 0, Robot::OrientationMode::UNCONSTRAINED, false );
+            std::cout << "----------------test moveC end---------------" << std::endl;
+        }
+
+        {  //测试moveR
+
+            std::cout << "----------------test moveR start---------------" << std::endl;
+            f_p2 = f_p1 * Frame{ KDL::Rotation::RotX( 90 * M_PI / 180 ) };
+
+            for ( int i = 0; i < 6; i++ )
+            {
+                robot.test_set_pos( i, q( i ) );                                //?pos_资源竞争
+                std::this_thread::sleep_for( std::chrono::milliseconds( 3 ) );  //?pos_资源竞争
+            }
+            robot.MoveR( f_p2.M, 0.01, 0.01, 0, false, 0.01 );
+            std::cout << "----------------test moveR end---------------" << std::endl;
+        }
+
+        {  //测试MultiMoveL
+            std::cout << "----------------test MultiMoveL start---------------" << std::endl;
+
+            for ( int i = 0; i < 6; i++ )
+            {
+                robot.test_set_pos( i, q( i ) );
+                std::this_thread::sleep_for( std::chrono::milliseconds( 3 ) );
+            }
+
+            f_p1 = f_p1 * Frame{ KDL::Rotation::RotX( 90 * M_PI / 180 ), Vector{ 0.3, 0.0, 0 } };
+            f_p2 = f_p1 * Frame{ KDL::Rotation::RotY( 90 * M_PI / 180 ), Vector{ 0.0, -0.3, -0.0 } };
+            f_p3 = f_p2 * Frame{ KDL::Rotation::RotX( -90 * M_PI / 180 ), Vector{ 0.0, 0.0, -0.3 } };
+            f_p4 = f_p3 * Frame{ KDL::Rotation::RotZ( -90 * M_PI / 180 ), Vector{ 0.0, 0.0, 0.3 } };
+
+            std::vector< KDL::Frame > points{ f_p1, f_p2, f_p3, f_p4 };
+            std::vector< double > max_path_v{ 0.06, 0.04, 0.04, 0.06 };
+            std::vector< double > max_path_a{ 0.06, 0.06, 0.06, 0.06 };
+            std::vector< double > bound_dist{ 0.05, 0.0, 0.1, 0.0 };
+
+            robot.MultiMoveL( points, bound_dist, max_path_v, max_path_a, true );
+            std::cout << "----------------test MultiMoveL end---------------" << std::endl;
+        }
     }
 
     //------------------------wait----------------------------------
