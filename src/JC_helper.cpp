@@ -116,16 +116,20 @@ namespace JC_helper
 
         doubleS_P.planDoubleSProfile( 0, 0, 1, v_start / path_length, v_end / path_length, max_path_v / path_length, max_path_a / path_length, max_path_a * 2 / path_length );
         bool isplanned = doubleS_P.isValidMovement( );
-        if ( !isplanned )
+        if ( !isplanned || !( doubleS_P.getDuration( ) > 0 ) )
         {
-            assert( isplanned && "Error_MotionPlanning_Not_Feasible：6-P" );
+            std::cout << RED << "link_trajectory():Error_MotionPlanning_Not_Feasible" << WHITE << std::endl;
+            ;
+            return -1;
         }
 
         doubleS_R.planDoubleSProfile( 0, 0, 1, 0, 0, max_path_v / path_length, max_path_a / path_length, max_path_a * 2 / path_length );
         isplanned = doubleS_R.isValidMovement( );
-        if ( !isplanned )
+        if ( !isplanned || !( doubleS_R.getDuration( ) > 0 ) )
         {
-            assert( isplanned && "Error_MotionPlanning_Not_Feasible：6-R" );
+            std::cout << RED << "link_trajectory():Error_MotionPlanning_Not_Feasible" << WHITE << std::endl;
+            ;
+            return -1;
         }
 
         if ( doubleS_R.getDuration( ) != doubleS_P.getDuration( ) )
@@ -188,7 +192,7 @@ namespace JC_helper
 
         if ( bound_dist >= bcdist )
         {
-            std::cout << RED << "bound_dist is too  large，try to decrease it" << GREEN << std::endl;
+            std::cout << RED << "multi_link_trajectory()：bound_dist is too  large，try to decrease it" << GREEN << std::endl;
         }
 
         if ( current_path_start_v > max_path_v )  //! 防止起始速度就超过最大可达线速度 ,理论上不可能发生
@@ -220,7 +224,7 @@ namespace JC_helper
 
         if ( current_path_start_v <= eps && ( 1 - s_bound_dist_1 ) <= eps )
         {
-            std::cout << RED << " the Link length is not allowed to be equal to 0,When Velocity of last motion is equal to 0" << GREEN << std::endl;
+            std::cout << RED << " multi_link_trajectory()：the Link length is not allowed to be equal to 0,When Velocity of last motion is equal to 0" << GREEN << std::endl;
             return -1;
         }
 
@@ -248,18 +252,18 @@ namespace JC_helper
         {
             doubleS_1_P.planDoubleSProfile( 0, 0, 1, current_path_start_v / dedist, s_cirlular_v, max_path_v / dedist, max_path_a / dedist, max_path_a * 2 / dedist );
             bool isplanned = doubleS_1_P.isValidMovement( );
-            if ( !isplanned )
+            if ( !isplanned || !( doubleS_1_P.getDuration( ) > 0 ) )
             {
-                std::cout << RED << "Linear trajectory planning fails,try to decrease given parameter [max_path_v] " << GREEN << std::endl;
-                assert( isplanned );
+                std::cout << RED << "multi_link_trajectory()：Linear trajectory planning fails,try to decrease given parameter [max_path_v] " << GREEN << std::endl;
+                return -1;
             }
 
             doubleS_1_R.planDoubleSProfile( 0, 0, 1, 0, 0, max_path_v / dedist, max_path_a / dedist, max_path_a * 2 / dedist );
             isplanned = doubleS_1_R.isValidMovement( );
-            if ( !isplanned )
+            if ( !isplanned || !( doubleS_1_R.getDuration( ) > 0 ) )
             {
-                std::cout << RED << "Linear trajectory planning fails,try to decrease given parameter [max_path_v] " << GREEN << std::endl;
-                assert( isplanned );
+                std::cout << RED << "multi_link_trajectory()：Linear trajectory planning fails,try to decrease given parameter [max_path_v] " << GREEN << std::endl;
+                return -1;
             }
 
             if ( doubleS_1_R.getDuration( ) != doubleS_1_P.getDuration( ) )
@@ -295,10 +299,10 @@ namespace JC_helper
 
             doubleS_2_R.planDoubleSProfile( 0, 0, 1, 0, 0, max_path_v / dedist, max_path_a / dedist, max_path_a * 2 / dedist );
             bool isplanned = doubleS_2_R.isValidMovement( );
-            if ( !isplanned )
+            if ( !isplanned || !( doubleS_2_R.getDuration( ) > 0 ) )
             {
-                std::cout << RED << "Circular trajectory planning fails,try to decrease given parameter [max_path_v] " << std::endl;
-                assert( isplanned );
+                std::cout << RED << "multi_link_trajectory()：Circular trajectory planning fails,try to decrease given parameter [max_path_v] " << std::endl;
+                return -1;
             }
 
             if ( doubleS_2_R.getDuration( ) != T_cirlular )

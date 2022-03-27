@@ -104,7 +104,7 @@ int main( int argc, char* argv[] )
         std::vector< double > max_path_a{ 0.06, 0.06, 0.06, 0.06 };
         std::vector< double > bound_dist{ 0.05, 0.0, 0.1, 0.0 };
 
-        robot.MultiMoveL( points, bound_dist, max_path_v, max_path_a, false );
+        robot.MultiMoveL( points, bound_dist, max_path_v, max_path_a, true );
         robot.MultiMoveL( points, bound_dist, max_path_v, max_path_a, false );
     }
 

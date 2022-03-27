@@ -577,7 +577,7 @@ namespace rocos
             0, 0, 1, 0, 0, speed / Plenght.Norm( ), acceleration / Plenght.Norm( ),
             ( *std::min_element( std::begin( max_jerk_ ), std::end( max_jerk_ ) ) ) / Plenght.Norm( ) );
 
-        if ( !doubleS->isValidMovement( ) )
+        if ( !doubleS->isValidMovement( ) || !( doubleS->getDuration( ) > 0 ) )
         {
             std::cerr << RED << "MoveL():moveL trajectory "
                       << "is infeasible " << WHITE << std::endl;
@@ -865,7 +865,7 @@ namespace rocos
             0, 0, 1, 0, 0, speed / Plenght.Norm( ), acceleration / Plenght.Norm( ),
             ( *std::min_element( std::begin( max_jerk_ ), std::end( max_jerk_ ) ) ) / Plenght.Norm( ) );
 
-        if ( !doubleS->isValidMovement( ) )
+        if ( !doubleS->isValidMovement(  ) || !(doubleS->getDuration()>0))
         {
             std::cerr << RED << "dragging():dragging trajectory "
                       << "is infeasible " << WHITE << std::endl;
@@ -1062,7 +1062,7 @@ namespace rocos
                                              0,          // vf
                                              speed, acceleration, max_jerk_[ i ] );
 
-            if ( !interp[ i ]->isValidMovement( ) )
+            if ( !interp[ i ]->isValidMovement( ) || !( interp[ i ]->getDuration( ) > 0 ) )
             {
                 std::cerr << RED << "RunMoveJ():movej trajectory "
                           << "is infeasible " << WHITE << std::endl;
