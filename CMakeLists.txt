@@ -71,6 +71,7 @@ link_directories(
 
 file(GLOB_RECURSE SRCS src/*.cpp)
 file(GLOB_RECURSE HDRS include/*.h include/*.hpp)
+file(GLOB_RECURSE CONFIG_FILE config/*.urdf)
 
 set(DEP_LIBS
         dl
@@ -239,6 +240,9 @@ target_link_libraries(${PROJECT_NAME}
 #############
 ## Install ##
 #############
+
+# Copy config files to bin/
+file(COPY ${CONFIG_FILE} DESTINATION ${CMAKE_BINARY_DIR}/bin)
 
 
 #############

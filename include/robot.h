@@ -30,6 +30,8 @@
 #include <boost/smart_ptr.hpp>
 #include <vector>
 
+#include <kdl_parser/kdl_parser.hpp> //!< 解析URDF文件
+
 namespace rocos
 {
     //! Class Robot
@@ -77,6 +79,8 @@ namespace rocos
         };
 
         explicit Robot( boost::shared_ptr< HardwareInterface > hw );
+
+        bool loadRobotDescription(const std::string& urdf_file_path);
 
         bool switchHW( boost::shared_ptr< HardwareInterface > hw );  //切换硬件指针
 

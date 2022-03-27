@@ -26,6 +26,7 @@
 #include <kdl/frames.hpp>
 #include <kdl/frames_io.hpp>
 #include <kdl/chain.hpp>
+#include <kdl/tree.hpp>
 
 #include <trac_ik/trac_ik.hpp> //逆运动学处理
 

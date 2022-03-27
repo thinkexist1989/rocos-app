@@ -297,3 +297,37 @@ TEST_CASE("Kinematics") {
     std::cout << q_out.data << std::endl;
 
 }
+
+void printLink(const KDL::SegmentMap::const_iterator & link, const std::string & prefix)
+{
+    std::cout << prefix << "- Segment " << GetTreeElementSegment(link->second).getName() <<
+              " has " << GetTreeElementChildren(link->second).size() << " children and joint name is " << GetTreeElementSegment(link->second).getJoint().getName() << std::endl;
+    for (unsigned int i = 0; i < GetTreeElementChildren(link->second).size(); i++) {
+        printLink(GetTreeElementChildren(link->second)[i], prefix + "  ");
+    }
+}
+
+
+TEST_CASE("URDF") {
+    urdf::ModelInterfaceSharedPtr robot_model = urdf::parseURDFFile("robot.urdf");
+    if (!robot_model) {
+        std::cerr << "Could not generate robot model" << std::endl;
+        return;
+    }
+
+    KDL::Tree my_tree;
+    bool bOk = kdl_parser::treeFromUrdfModel(*robot_model, my_tree);
+    if (!kdl_parser::treeFromUrdfModel(*robot_model, my_tree)) {
+        std::cerr << "Could not extract kdl tree" << std::endl;
+        return;
+    }
+
+    // walk through tree
+    std::cout << " ======================================" << std::endl;
+    std::cout << " Tree has " << my_tree.getNrOfSegments() << " link(s) and a root link" << std::endl;
+    std::cout << " ======================================" << std::endl;
+    KDL::SegmentMap::const_iterator root = my_tree.getRootSegment();
+
+    printLink(root, "");
+
+}
