@@ -36,6 +36,10 @@ namespace rocos {
     class Kinematics {
     public:
         Kinematics();
+        Kinematics(const std::string& urdf_file_path,
+                   const std::string& base_link,
+                   const std::string& tip);
+        Kinematics(KDL::Chain chain);
         ~Kinematics();
 
         void Initialize();

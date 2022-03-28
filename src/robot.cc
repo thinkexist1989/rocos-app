@@ -76,6 +76,14 @@ namespace rocos
         }
     }
 
+    bool Robot::loadRobotDescription(const string &urdf_file_path,
+                                     const string &base_link,
+                                     const string &tip) {
+
+
+        return false;
+    }
+
     // TODO: 切换HW指针
     bool Robot::switchHW( boost::shared_ptr< HardwareInterface > hw ) { return false; }
 

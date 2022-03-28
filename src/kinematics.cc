@@ -17,6 +17,18 @@ namespace rocos {
         Initialize();
     }
 
+    Kinematics::Kinematics(const std::string &urdf_file_path,
+                           const std::string &base_link,
+                           const std::string &tip) {
+
+    }
+
+    Kinematics::Kinematics(KDL::Chain chain) {
+        chain_ = chain;
+
+        Initialize();
+    }
+
     Kinematics::~Kinematics() {
 
     }

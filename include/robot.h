@@ -80,7 +80,9 @@ namespace rocos
 
         explicit Robot( boost::shared_ptr< HardwareInterface > hw );
 
-        bool loadRobotDescription(const std::string& urdf_file_path);
+        bool loadRobotDescription(const std::string& urdf_file_path,
+                                  const std::string& base_link,
+                                  const std::string& tip);
 
         bool switchHW( boost::shared_ptr< HardwareInterface > hw );  //切换硬件指针
 
