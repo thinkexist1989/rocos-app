@@ -298,7 +298,7 @@ TEST_CASE("Kinematics") {
 
 }
 
-void printLink(const KDL::SegmentMap::const_iterator & link, const std::string & prefix)
+void printLink(const KDL::SegmentMap::const_iterator & link, const std::string & prefix, tinyxml2::XMLDocument* xmlDocument = nullptr)
 {
     std::cout << prefix << "- Segment " << GetTreeElementSegment(link->second).getName() <<
               " has " << GetTreeElementChildren(link->second).size() << " children and joint name is " << GetTreeElementSegment(link->second).getJoint().getName() << std::endl;
@@ -327,6 +327,9 @@ TEST_CASE("URDF") {
     std::cout << " Tree has " << my_tree.getNrOfSegments() << " link(s) and a root link" << std::endl;
     std::cout << " ======================================" << std::endl;
     KDL::SegmentMap::const_iterator root = my_tree.getRootSegment();
+
+    tinyxml2::XMLDocument xml_doc;
+    xml_doc.LoadFile("robot.urdf");
 
     printLink(root, "");
 
