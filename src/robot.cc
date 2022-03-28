@@ -19,11 +19,15 @@
 
 #include "robot.h"
 
+#include <kdl_parser/kdl_parser.hpp> // 用于将urdf文件解析为KDL::Tree
+
 namespace rocos
 {
     Robot::Robot( boost::shared_ptr< HardwareInterface > hw ) : hw_interface_( hw )
     {
-        addAllJoints( );
+        parseUrdf("robot.urdf", "base_link", "link_6");
+
+//        addAllJoints( ); // TODO: 这个应该直接加到参数解析里面，解析之后加入关节，顺序和主站顺序可能不一样
 
         target_positions_.resize( jnt_num_ );
         target_positions_prev_.resize( jnt_num_ );
@@ -76,10 +80,62 @@ namespace rocos
         }
     }
 
-    bool Robot::loadRobotDescription(const string &urdf_file_path,
-                                     const string &base_link,
-                                     const string &tip) {
+    bool Robot::parseUrdf(const string &urdf_file_path,
+                          const string &base_link,
+                          const string &tip) {
 
+        KDL::Tree tree;
+        if(!kdl_parser::treeFromFile(urdf_file_path, tree)) {
+            // 解析失败
+            std::cerr << "[ERROR][rocos::robot] Could not extract urdf to kdl tree!" << std::endl;
+            return false;
+        }
+
+        if(!kinematics_.setChain(tree, base_link, tip)) {
+            std::cerr << "[ERROR][rocos::robot] Could not set kinematic chain!" << std::endl;
+            return false;
+        }
+
+        if(!parseDriveParamsFromUrdf(urdf_file_path)) {
+            std::cerr << "[ERROR][rocos::robot] Could not parse drive parameters!" << std::endl;
+            return false;
+        }
+
+        return true;
+    }
+
+    bool Robot::parseDriveParamsFromUrdf(const string &urdf_file_path) {
+        tinyxml2::XMLDocument xml_doc;
+        xml_doc.LoadFile(urdf_file_path.c_str()); // 解析urdf文件
+
+        auto robot = xml_doc.FirstChildElement("robot");
+
+        for(auto element = robot->FirstChildElement("joint"); element; element = element->NextSiblingElement("joint")) {
+            for(int i = 0; i < jnt_num_; ++i) {
+                if(element->Attribute("name") == kinematics_.getChain().getSegment(i).getJoint().getName()) {
+                    std::cout << "Joint" << std::endl
+                              <<     "\t name: " <<  element->Attribute("name") << "\n";
+                    auto hw = element->FirstChildElement("hardware");
+                    auto limit = hw->FirstChildElement("limit");
+                    std::cout <<     "   limits: \n"
+                              <<     "    - lower: " << atof(limit->Attribute("lower"))<< std::endl
+                              <<     "    - upper: " << atof(limit->Attribute("upper"))<< std::endl
+                              <<     "    - vel: " << atof(limit->Attribute("vel"))<< std::endl
+                              <<     "    - acc: " << atof(limit->Attribute("acc"))<< std::endl
+                              <<     "    - jerk: " << atof(limit->Attribute("jerk")) << std::endl;
+                    auto trans = hw->FirstChildElement("transform");
+                    std::cout <<     "  transform: \n"
+                              <<     "    - ratio: " << trans->FloatAttribute("ratio", 2.0) << std::endl
+                              <<     "    - offset_pos_cnt: " << trans->FloatAttribute("offset_pos_cnt", 1.0)<< std::endl
+                              <<     "    - cnt_per_unit: " << trans->FloatAttribute("cnt_per_unit", 22.0)<< std::endl
+                              <<     "    - torque_per_unit: " << trans->FloatAttribute("torque_per_unit", 33.0) << std::endl;
+                    if(trans->Attribute("user_unit_name"))
+                        std::cout << "    - user_unit_name: " << trans->Attribute("user_unit_name") << std::endl;
+                    else
+                        std::cout << "    - user_unit_name: " << "rad" << std::endl;
+                }
+            }
+        }
 
         return false;
     }

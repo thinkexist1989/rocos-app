@@ -341,7 +341,6 @@ TEST_CASE("URDF") {
                           <<     "    - upper: " << atof(limit->Attribute("upper"))<< std::endl
                           <<     "    - vel: " << atof(limit->Attribute("vel"))<< std::endl
                           <<     "    - acc: " << atof(limit->Attribute("acc"))<< std::endl
-                          <<     "    - max: " << limit->FloatAttribute("max", 1.0)<< std::endl
                           <<     "    - jerk: " << atof(limit->Attribute("jerk")) << std::endl;
                 auto trans = hw->FirstChildElement("transform");
                 std::cout <<     "  transform: \n"

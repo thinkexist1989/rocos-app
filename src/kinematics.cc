@@ -3,6 +3,7 @@
 //
 
 #include "kinematics.h"
+#include <kdl_parser/kdl_parser.hpp> // 用于将urdf文件解析为KDL::Tree
 
 
 namespace rocos {
@@ -10,27 +11,68 @@ namespace rocos {
     Kinematics::Kinematics() {
 
         //TODO: 初始化泰科6-DOF机械臂
-        getChainTechServo(chain_, q_min_, q_max_);
+//        getChainTechServo(chain_, q_min_, q_max_);
         //TODO: 初始化7-DOF机械臂
 //        getChain7Dofs(chain_, q_min_, q_max_);
 
-        Initialize();
+//        Initialize(); // 初始化
     }
 
     Kinematics::Kinematics(const std::string &urdf_file_path,
                            const std::string &base_link,
                            const std::string &tip) {
+        KDL::Tree tree;
+        if(!kdl_parser::treeFromFile(urdf_file_path, tree)) {
+            // 解析失败
+            std::cerr << "[ERROR][rocos::Kinematics] Could not extract urdf to kdl tree!" << std::endl;
+            return;
+        }
 
+        tree.getChain(base_link, tip, chain_); // 从KDL::Tree获取运动链
+
+        Initialize(); // 初始化
     }
 
-    Kinematics::Kinematics(KDL::Chain chain) {
-        chain_ = chain;
-
-        Initialize();
+    Kinematics::Kinematics(const KDL::Chain& chain) {
+        setChain(chain);
     }
 
     Kinematics::~Kinematics() {
 
+    }
+
+    bool Kinematics::setChain(const Chain &chain) {
+        chain_ = chain;
+        Initialize(); // 初始化
+
+        return true;
+    }
+
+    bool Kinematics::setChain(const std::string &base_link, const std::string &tip) {
+
+        if(!tree_.getChain(base_link, tip, chain_)) {
+            // 从KDL::Tree获取运动链失败
+            std::cerr << "[ERROR][rocos::Kinematics] Could not get chain from kdl tree!" << std::endl;
+            return false;
+        }
+
+        Initialize(); // 初始化
+
+        return true;
+    }
+
+    bool Kinematics::setChain(const Tree &tree, const std::string &base_link, const std::string &tip) {
+        tree_ = tree;
+
+        if(!tree_.getChain(base_link, tip, chain_)) {
+            // 从KDL::Tree获取运动链失败
+            std::cerr << "[ERROR][rocos::Kinematics] Could not get chain from kdl tree!" << std::endl;
+            return false;
+        }
+
+        Initialize(); // 初始化
+
+        return true;
     }
 
     void Kinematics::Initialize() {

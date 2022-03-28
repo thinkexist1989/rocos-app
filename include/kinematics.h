@@ -39,8 +39,14 @@ namespace rocos {
         Kinematics(const std::string& urdf_file_path,
                    const std::string& base_link,
                    const std::string& tip);
-        Kinematics(KDL::Chain chain);
+        Kinematics(const KDL::Chain& chain);
         ~Kinematics();
+
+        bool setChain(const KDL::Chain& chain); // 直接传入Chain
+        bool setChain(const std::string& base_link, const std::string& tip); //通过设置base_link和tip修改运动链
+        bool setChain(const KDL::Tree& tree, const std::string& base_link, const std::string& tip); //传入Tree
+
+        const KDL::Chain& getChain() { return chain_; } //返回运动链
 
         void Initialize();
 
@@ -52,6 +58,7 @@ namespace rocos {
         static void getChain7Dofs(KDL::Chain& chain, KDL::JntArray& q_min, KDL::JntArray& q_max);
 
     private:
+        KDL::Tree tree_;
         KDL::Chain chain_; // KDL运动链
         KDL::JntArray q_min_; // 关节最小位置
         KDL::JntArray q_max_; // 关节最大位置

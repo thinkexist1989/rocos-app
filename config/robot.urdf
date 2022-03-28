@@ -4,13 +4,6 @@
      For more information, please see http://wiki.ros.org/sw_urdf_exporter -->
 <robot name="taike_robot">
     <link name="base_link">
-        <inertial>
-            <origin xyz="-0.00016947 0.028075 0.023536" rpy="0 0 0"/>
-            <mass value="0.47116"/>
-            <inertia ixx="0.0038858" ixy="2.431E-05" ixz="-1.1864E-05"
-                     iyy="0.00075571" iyz="0.00093034"
-                     izz="0.003596"/>
-        </inertial>
         <visual>
             <origin xyz="0 0 0" rpy="0 0 0"/>
             <geometry>
@@ -49,7 +42,7 @@
         <parent link="base_link"/>
         <child link="link_1"/>
         <axis xyz="0 0 1"/>
-        <hardware>
+        <hardware id="0">
             <limit lower="-2.0" upper="2.0" vel="1.0" acc="10.0" jerk="10.0" effort="30.0"/>
             <transform ratio="1.0" offset_pos_cnt="0" cnt_per_unit="20860.757" torque_per_unit="1.0"
                        user_unit_name="rad"/>
@@ -84,7 +77,7 @@
         <parent link="link_1"/>
         <child link="link_2"/>
         <axis xyz="0 0 1"/>
-        <hardware>
+        <hardware id="1">
             <limit lower="-2.0" upper="2.0" vel="1.0" acc="10.0" jerk="10.0" effort="30.0" />
             <transform ratio="1.0" offset_pos_cnt="0" cnt_per_unit="20860.757" torque_per_unit="1.0" user_unit_name="rad"/>
         </hardware>
@@ -118,7 +111,7 @@
         <parent link="link_2"/>
         <child link="link_3"/>
         <axis xyz="0 0 -1"/>
-        <hardware>
+        <hardware id="2">
             <limit lower="-2.0" upper="2.0" vel="1.0" acc="10.0" jerk="10.0" effort="30.0" />
             <transform ratio="1.0" offset_pos_cnt="0" cnt_per_unit="20860.757" torque_per_unit="1.0" user_unit_name="rad"/>
         </hardware>
@@ -153,7 +146,7 @@
         <parent link="link_3"/>
         <child link="link_4"/>
         <axis xyz="0 0 -1"/>
-        <hardware>
+        <hardware id="3">
             <limit lower="-2.0" upper="2.0" vel="1.0" acc="10.0" jerk="10.0" effort="30.0" />
             <transform ratio="1.0" offset_pos_cnt="0" cnt_per_unit="20860.757" torque_per_unit="1.0" user_unit_name="rad"/>
         </hardware>
@@ -187,7 +180,7 @@
         <parent link="link_4"/>
         <child link="link_5"/>
         <axis xyz="0 0 -1"/>
-        <hardware>
+        <hardware id="4">
             <limit lower="-2.0" upper="2.0" vel="1.0" acc="10.0" jerk="10.0" effort="30.0" />
             <transform ratio="1.0" offset_pos_cnt="0" cnt_per_unit="20860.757" torque_per_unit="1.0" user_unit_name="rad"/>
         </hardware>
@@ -221,7 +214,7 @@
         <parent link="link_5"/>
         <child link="link_6"/>
         <axis xyz="0 0 -1"/>
-        <hardware>
+        <hardware id="5">
             <limit lower="-2.0" upper="2.0" vel="1.0" acc="10.0" jerk="10.0" effort="30.0" />
             <transform ratio="1.0" offset_pos_cnt="0" cnt_per_unit="20860.757" torque_per_unit="1.0" user_unit_name="rad"/>
         </hardware>
