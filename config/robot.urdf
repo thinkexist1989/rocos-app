@@ -38,7 +38,7 @@
         </collision>
     </link>
     <joint name="joint_1" type="continuous">
-        <origin xyz="-0.00017158 -0.00017422 0.12118" rpy="0 0 0"/>
+        <origin xyz="0.0 0.0 0.1215" rpy="0 0 0"/>
         <parent link="base_link"/>
         <child link="link_1"/>
         <axis xyz="0 0 1"/>
@@ -107,10 +107,10 @@
         </collision>
     </link>
     <joint name="joint_3" type="continuous">
-        <origin xyz="0.3 0 0" rpy="-3.1416 0 0"/>
+        <origin xyz="0.3 0 0" rpy="3.1416 0 0"/>
         <parent link="link_2"/>
         <child link="link_3"/>
-        <axis xyz="0 0 -1"/>
+        <axis xyz="0 0 1"/>
         <hardware id="2">
             <limit lower="-2.0" upper="2.0" vel="1.0" acc="10.0" jerk="10.0" effort="30.0" />
             <transform ratio="1.0" offset_pos_cnt="0" cnt_per_unit="20860.757" torque_per_unit="1.0" user_unit_name="rad"/>
@@ -145,7 +145,7 @@
         <origin xyz="0.276 0 0.012" rpy="3.1416 0 1.5708"/>
         <parent link="link_3"/>
         <child link="link_4"/>
-        <axis xyz="0 0 -1"/>
+        <axis xyz="0 0 1"/>
         <hardware id="3">
             <limit lower="-2.0" upper="2.0" vel="1.0" acc="10.0" jerk="10.0" effort="30.0" />
             <transform ratio="1.0" offset_pos_cnt="0" cnt_per_unit="20860.757" torque_per_unit="1.0" user_unit_name="rad"/>
@@ -179,7 +179,7 @@
         <origin xyz="0 0.09 0" rpy="-1.5708 0 0"/>
         <parent link="link_4"/>
         <child link="link_5"/>
-        <axis xyz="0 0 -1"/>
+        <axis xyz="0 0 1"/>
         <hardware id="4">
             <limit lower="-2.0" upper="2.0" vel="1.0" acc="10.0" jerk="10.0" effort="30.0" />
             <transform ratio="1.0" offset_pos_cnt="0" cnt_per_unit="20860.757" torque_per_unit="1.0" user_unit_name="rad"/>
@@ -213,7 +213,7 @@
         <origin xyz="0 -0.082 0" rpy="1.5708 0 0"/>
         <parent link="link_5"/>
         <child link="link_6"/>
-        <axis xyz="0 0 -1"/>
+        <axis xyz="0 0 1"/>
         <hardware id="5">
             <limit lower="-2.0" upper="2.0" vel="1.0" acc="10.0" jerk="10.0" effort="30.0" />
             <transform ratio="1.0" offset_pos_cnt="0" cnt_per_unit="20860.757" torque_per_unit="1.0" user_unit_name="rad"/>
