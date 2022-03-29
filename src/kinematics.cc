@@ -30,7 +30,7 @@ namespace rocos {
 
         tree.getChain(base_link, tip, chain_); // 从KDL::Tree获取运动链
 
-        Initialize(); // 初始化
+//        Initialize(); // 初始化
     }
 
     Kinematics::Kinematics(const KDL::Chain& chain) {
@@ -43,7 +43,10 @@ namespace rocos {
 
     bool Kinematics::setChain(const Chain &chain) {
         chain_ = chain;
-        Initialize(); // 初始化
+
+        q_min_.resize(chain_.getNrOfJoints());
+        q_max_.resize(chain_.getNrOfJoints());
+//        Initialize(); // 不要在这里初始化，要等q_min，q_max都初始化完毕再初始化
 
         return true;
     }
@@ -56,7 +59,9 @@ namespace rocos {
             return false;
         }
 
-        Initialize(); // 初始化
+        q_min_.resize(chain_.getNrOfJoints());
+        q_max_.resize(chain_.getNrOfJoints());
+//        Initialize(); // 不要在这里初始化，要等q_min，q_max都初始化完毕再初始化
 
         return true;
     }
@@ -70,7 +75,9 @@ namespace rocos {
             return false;
         }
 
-        Initialize(); // 初始化
+        q_min_.resize(chain_.getNrOfJoints());
+        q_max_.resize(chain_.getNrOfJoints());
+//        Initialize(); // 不要在这里初始化，要等q_min，q_max都初始化完毕再初始化
 
         return true;
     }
@@ -149,6 +156,13 @@ namespace rocos {
 
     int Kinematics::CartToJnt(const JntArray &q_init, const Frame &p_in, JntArray &q_out) {
         return ik_solver_->CartToJnt(q_init, p_in, q_out);
+    }
+
+    bool Kinematics::setPosLimits(const JntArray &q_min, const JntArray &q_max) {
+        q_min_ = q_min;
+        q_max_ = q_max;
+
+        return true;
     }
 
 }

@@ -46,6 +46,8 @@ namespace rocos {
         bool setChain(const std::string& base_link, const std::string& tip); //通过设置base_link和tip修改运动链
         bool setChain(const KDL::Tree& tree, const std::string& base_link, const std::string& tip); //传入Tree
 
+        bool setPosLimits(const KDL::JntArray& q_min, const KDL::JntArray& q_max);
+
         const KDL::Chain& getChain() { return chain_; } //返回运动链
 
         void Initialize();
@@ -56,6 +58,17 @@ namespace rocos {
         //TODO: for test;
         static void getChainTechServo(KDL::Chain& chain, KDL::JntArray& q_min, KDL::JntArray& q_max);
         static void getChain7Dofs(KDL::Chain& chain, KDL::JntArray& q_min, KDL::JntArray& q_max);
+
+        void initTechServo() {
+            //TODO: 初始化泰科6-DOF机械臂
+            getChainTechServo(chain_, q_min_, q_max_);
+            Initialize(); // 初始化
+        }
+        void initChain7Dofs() {
+            //TODO: 初始化7-DOF机械臂
+            getChain7Dofs(chain_, q_min_, q_max_);
+            Initialize(); // 初始化
+        }
 
     private:
         KDL::Tree tree_;

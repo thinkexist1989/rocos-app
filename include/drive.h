@@ -97,6 +97,14 @@ namespace rocos {
         inline int getId() const { return id_; }
 
         inline std::string getName() { return hw_interface_->getSlaveName(id_); }
+        inline void setName(const string& name) { name_ = name; } // 设置驱动器名称，在ecat_config.yaml的无所谓，
+                                                                  // 目前是以urdf中的joint name为准，通过hardware id对应
+
+        inline double getMinPosLimit() const { return min_pos_limit_; }
+        inline void setMinPosLimit(double min_pos) { min_pos_limit_ = min_pos; }
+
+        inline double getMaxPosLimit() const { return max_pos_limit_; }
+        inline void setMaxPosLimit(double max_pos) { max_pos_limit_ = max_pos; }
 
         inline ModeOfOperation getMode() const { return mode_; }
 
@@ -179,8 +187,6 @@ namespace rocos {
 
         inline std::string getUserUnitName() const { return user_unit_name_; } // 获取用户单位名称
 
-        inline  double getMaxPosLimit()const {  return  max_pos_limit_ ;}
-        inline  double getMinPosLimit()const {  return  min_pos_limit_ ;}
 
     protected:
 
@@ -193,7 +199,7 @@ namespace rocos {
         //TODO: 变换单位
         double max_vel_{1.0}; // [UserUnit]/s，比如 rad/s, mm/s
         double max_acc_{10.0}; // [UserUnit]/s^2，比如 rad/s^2
-        double max_jerk_{10.0}; // [UserUnit]/s^3，比如 rad/s^3
+        double max_jerk_{100.0}; // [UserUnit]/s^3，比如 rad/s^3
 
 
         bool is_enabled_{false};

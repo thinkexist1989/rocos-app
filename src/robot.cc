@@ -69,17 +69,6 @@ namespace rocos
         startMotionThread( );  //现在只计算JntToCart
     }
 
-    void Robot::addAllJoints( )
-    {
-        jnt_num_ = hw_interface_->getSlaveNumber( );
-        joints_.clear( );
-        for ( int i = 0; i < jnt_num_; i++ )
-        {
-            joints_.push_back( boost::make_shared< Drive >( hw_interface_, i ) );
-            joints_[ i ]->setMode( ModeOfOperation::CyclicSynchronousPositionMode );
-        }
-    }
-
     bool Robot::parseUrdf(const string &urdf_file_path,
                           const string &base_link,
                           const string &tip) {
@@ -101,10 +90,38 @@ namespace rocos
             return false;
         }
 
+        KDL::JntArray q_min(joints_.size());
+        KDL::JntArray q_max(joints_.size());
+
+        for(int i = 0; i < joints_.size(); ++i) {
+            q_min(i) = joints_[i]->getMinPosLimit();
+            q_max(i) = joints_[i]->getMaxPosLimit();
+        }
+
+        kinematics_.setPosLimits(q_min, q_max);
+        kinematics_.Initialize(); //初始化，构建IK solver;
+
         return true;
     }
 
+    //! \brief 从URDF中解析驱动器相关参数，这个函数只在parseUrdf()内部调用，在调用前，已经解析好KDL::Chain
+    //! \param urdf_file_path urdf文件路径
+    //! \return
     bool Robot::parseDriveParamsFromUrdf(const string &urdf_file_path) {
+        jnt_num_ = hw_interface_->getSlaveNumber();
+
+        if(kinematics_.getChain().getNrOfJoints() < jnt_num_) {
+            // if the number of joints in urdf is LESS than that in hardware, just warning but it's fine
+            std::cout << "[WARNING][rocos::robot] the hardware slave number is more than joint number." << std::endl;
+        }
+        else if(kinematics_.getChain().getNrOfJoints() < jnt_num_) {
+            // if the number of joints in urdf is GREATER than that in hardware, error occured and return
+            std::cerr << "[ERROR][rocos::robot] the hardware slave number is less than joint number." << std::endl;
+            return false;
+        }
+
+        joints_.clear(); // vector<Drive>清空
+
         tinyxml2::XMLDocument xml_doc;
         xml_doc.LoadFile(urdf_file_path.c_str()); // 解析urdf文件
 
@@ -114,30 +131,72 @@ namespace rocos
             for(int i = 0; i < jnt_num_; ++i) {
                 if(element->Attribute("name") == kinematics_.getChain().getSegment(i).getJoint().getName()) {
                     std::cout << "Joint" << std::endl
-                              <<     "\t name: " <<  element->Attribute("name") << "\n";
+                              <<     "- name: " <<  element->Attribute("name") << "\n";
+
                     auto hw = element->FirstChildElement("hardware");
+
+                    auto id = hw->IntAttribute("id", -1); // 对应的硬件ID，若没指定默认为-1
+                    std::cout <<     "- id: " << id << std::endl;
+
+                    auto jnt_ptr = boost::make_shared< Drive >( hw_interface_, id ); //获取相应硬件指针
+
+                    jnt_ptr->setName(element->Attribute("name")); //设置驱动器名称
+                    jnt_ptr->setMode( ModeOfOperation::CyclicSynchronousPositionMode ); //驱动器模式设置为CSP
+
                     auto limit = hw->FirstChildElement("limit");
-                    std::cout <<     "   limits: \n"
-                              <<     "    - lower: " << atof(limit->Attribute("lower"))<< std::endl
-                              <<     "    - upper: " << atof(limit->Attribute("upper"))<< std::endl
-                              <<     "    - vel: " << atof(limit->Attribute("vel"))<< std::endl
-                              <<     "    - acc: " << atof(limit->Attribute("acc"))<< std::endl
-                              <<     "    - jerk: " << atof(limit->Attribute("jerk")) << std::endl;
+
+                    jnt_ptr->setMinPosLimit(limit->FloatAttribute("lower", -M_PI));
+                    jnt_ptr->setMaxPosLimit(limit->FloatAttribute("upper", M_PI));
+                    jnt_ptr->setMaxVel(limit->FloatAttribute("vel", 1.0));
+                    jnt_ptr->setMaxAcc(limit->FloatAttribute("acc", 10.0));
+                    jnt_ptr->setMaxJerk(limit->FloatAttribute("jerk", 100.0));
+
+                    std::cout <<     "- limits: \n"
+                              <<     "----- lower: " << limit->FloatAttribute("lower", -M_PI) << std::endl
+                              <<     "----- upper: " << limit->FloatAttribute("upper", M_PI)  << std::endl
+                              <<     "----- vel: "   << limit->FloatAttribute("vel", 1.0)    << std::endl
+                              <<     "----- acc: "   << limit->FloatAttribute("acc", 10.0)    << std::endl
+                              <<     "----- jerk: "  << limit->FloatAttribute("jerk", 100.0)   << std::endl;
+
                     auto trans = hw->FirstChildElement("transform");
-                    std::cout <<     "  transform: \n"
-                              <<     "    - ratio: " << trans->FloatAttribute("ratio", 2.0) << std::endl
-                              <<     "    - offset_pos_cnt: " << trans->FloatAttribute("offset_pos_cnt", 1.0)<< std::endl
-                              <<     "    - cnt_per_unit: " << trans->FloatAttribute("cnt_per_unit", 22.0)<< std::endl
-                              <<     "    - torque_per_unit: " << trans->FloatAttribute("torque_per_unit", 33.0) << std::endl;
-                    if(trans->Attribute("user_unit_name"))
-                        std::cout << "    - user_unit_name: " << trans->Attribute("user_unit_name") << std::endl;
-                    else
-                        std::cout << "    - user_unit_name: " << "rad" << std::endl;
+
+                    jnt_ptr->setRatio(trans->FloatAttribute("ratio", 1.0));
+                    jnt_ptr->setPosZeroOffset(trans->IntAttribute("offset_pos_cnt", 0));
+                    jnt_ptr->setCntPerUnit(trans->FloatAttribute("cnt_per_unit", 1.0));
+                    jnt_ptr->setTorquePerUnit(trans->FloatAttribute("torque_per_unit", 1.0));
+
+                    std::cout <<     "- transform: \n"
+                              <<     "----- ratio: " << trans->FloatAttribute("ratio", 1.0) << std::endl
+                              <<     "----- offset_pos_cnt: " << trans->IntAttribute("offset_pos_cnt", 0)<< std::endl
+                              <<     "----- cnt_per_unit: " << trans->FloatAttribute("cnt_per_unit", 1.0)<< std::endl
+                              <<     "----- torque_per_unit: " << trans->FloatAttribute("torque_per_unit", 1.0) << std::endl;
+                    if(trans->Attribute("user_unit_name")) {
+                        jnt_ptr->setUserUnitName(trans->Attribute("user_unit_name"));
+                        std::cout << "----- user_unit_name: " << trans->Attribute("user_unit_name") << std::endl;
+                    }
+                    else {
+                        jnt_ptr->setUserUnitName(trans->Attribute("rad"));
+                        std::cout << "----- user_unit_name: " << "rad" << std::endl;
+                    }
+
+                    joints_.push_back( jnt_ptr ); // 将对应ID的hardware放入joints数组
                 }
             }
         }
 
-        return false;
+        return true;
+    }
+
+
+    void Robot::addAllJoints( )
+    {
+        jnt_num_ = hw_interface_->getSlaveNumber( );
+        joints_.clear( );
+        for ( int i = 0; i < jnt_num_; i++ )
+        {
+            joints_.push_back( boost::make_shared< Drive >( hw_interface_, i ) );
+            joints_[ i ]->setMode( ModeOfOperation::CyclicSynchronousPositionMode );
+        }
     }
 
     // TODO: 切换HW指针

@@ -75,6 +75,7 @@ int main( int argc, char* argv[] )
         Frame f_p3;
         Frame f_p4;
         Kinematics kinematics_;
+        kinematics_.initTechServo();
         KDL::JntArray q( 6 );
 
         q( 0 ) = 60 * M_PI / 180;

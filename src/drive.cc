@@ -24,6 +24,10 @@ namespace rocos {
 
     Drive::Drive(boost::shared_ptr<HardwareInterface> hw, int id) : hw_interface_(hw),
                                                                     id_(id) {
+        if(id_ < 0) {
+            std::cout << "[ERROR][rocos::Drive] Wrong hardware ID of joint" << std::endl;
+            return;
+        }
 
         drive_guard_ = DriveGuard::getInstance(); // 获取DriveGuard单例句柄
         drive_guard_->addDrive(this); // 将Drive实例添加到_driveGuard中来更新数据
