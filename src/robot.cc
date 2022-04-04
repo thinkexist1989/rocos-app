@@ -688,7 +688,14 @@ namespace rocos
         //** 变量初始化 **//
         KDL::Vector Pstart  = flange_.p;
         KDL::Vector Pend    = pose.p;
-        KDL::Vector Plenght = Pend - Pstart;
+        double Plength = (Pend - Pstart).Norm();
+        KDL::Rotation R_start_end = flange_.M.Inverse( ) * pose.M;
+        KDL::Vector ration_axis;
+        double angle = R_start_end.GetRotAngle( ration_axis );
+        const double equivalent_radius =0.1;
+        double Rlength = ( equivalent_radius * abs(angle) );
+        double Path_length = max( Plength,Rlength );
+
         traj_.clear( );
         KDL::JntArray q_init( jnt_num_ );
         KDL::JntArray q_target( jnt_num_ );
@@ -696,9 +703,8 @@ namespace rocos
         std::unique_ptr< R_INTERP_BASE > doubleS( new rocos::DoubleS );
         //**-------------------------------**//
 
-        doubleS->planProfile(
-            0, 0, 1, 0, 0, speed / Plenght.Norm( ), acceleration / Plenght.Norm( ),
-            ( *std::min_element( std::begin( max_jerk_ ), std::end( max_jerk_ ) ) ) / Plenght.Norm( ) );
+        doubleS->planProfile( 0, 0, 1, 0, 0, speed / Path_length, acceleration / Path_length,
+                              acceleration * 2 / Path_length );
 
         if ( !doubleS->isValidMovement( ) || !( doubleS->getDuration( ) > 0 ) )
         {
@@ -730,14 +736,12 @@ namespace rocos
         //** 轨迹计算 **//
         while ( dt <= duration )
         {
-            s             = doubleS->pos( dt );
-            KDL::Vector P = Pstart + Plenght * s;
-            Quaternion_interp =
-                JC_helper::UnitQuaternion_intep( Quaternion_start, Quaternion_end, s );
-            KDL::Frame interp_frame(
-                KDL::Rotation::Quaternion( Quaternion_interp[ 0 ], Quaternion_interp[ 1 ],
-                                           Quaternion_interp[ 2 ], Quaternion_interp[ 3 ] ),
-                P );
+            s                 = doubleS->pos( dt );
+            KDL::Vector P     = Pstart + ( Pend - Pstart ) * s;
+            Quaternion_interp = JC_helper::UnitQuaternion_intep( Quaternion_start, Quaternion_end, s );
+            KDL::Frame interp_frame( KDL::Rotation::Quaternion( Quaternion_interp[ 0 ], Quaternion_interp[ 1 ],
+                                                                Quaternion_interp[ 2 ], Quaternion_interp[ 3 ] ),
+                                     P );
             if ( kinematics_.CartToJnt( q_init, interp_frame, q_target ) < 0 )
             {
                 std::cerr << RED << "MoveL(): CartToJnt failed " << WHITE << std::endl;
@@ -823,7 +827,6 @@ namespace rocos
         KDL::JntArray q_init( jnt_num_ );
         KDL::JntArray q_target( jnt_num_ );
         KDL::Frame f_flange = flange_;
-        double dt           = 0;
         std::vector< double > max_step;
         bool orientation_fixed = mode == Robot::OrientationMode::FIXED ? true : false;
         std::vector< KDL::Frame > traj_target;
@@ -861,7 +864,6 @@ namespace rocos
 
             q_init = q_target;
             traj_.push_back( q_target );
-            dt += 0.001;
         }
         //**-------------------------------**//
 
@@ -887,93 +889,7 @@ namespace rocos
         return 0;
     }
 
-    int Robot::MoveR( Rotation rotation_to, double speed,
-                      double acceleration, double time, bool asynchronous, double equivalent_radius )
-    {
-        if ( time )
-        {
-            std::cerr << RED << " MoveR():time not supported yet" << WHITE << std::endl;
-            return -1;
-        }
-
-        if ( CheckBeforeMove( Frame{ rotation_to, flange_.p }, speed, acceleration, time, equivalent_radius ) < 0 )
-        {
-            std::cerr << RED << "MoveR():given parameters is invalid" << WHITE << std::endl;
-            return -1;
-        }
-        if ( equivalent_radius < epsilon )
-        {
-            std::cerr << RED << " MoveR():equivalent_radius too small" << WHITE << std::endl;
-            return -1;
-        }
-        //** 变量初始化 **//
-        traj_.clear( );
-        KDL::JntArray q_init( jnt_num_ );
-        KDL::JntArray q_target( jnt_num_ );
-        KDL::Frame f_flange = flange_;
-        double dt           = 0;
-        std::vector< double > max_step;
-        std::vector< KDL::Frame > traj_target;
-        //**-------------------------------**//
-
-        for ( int i = 0; i < jnt_num_; i++ )
-        {
-            q_init( i ) = pos_[ i ];
-            max_step.push_back( max_vel_[ i ] * 0.001 );
-        }
-
-        if ( JC_helper::rotation_trajectory( traj_target, f_flange.p, f_flange.M, rotation_to, speed, acceleration, equivalent_radius ) < 0 )
-        {
-            std::cerr << RED << "MoveR():  Rotation trajectory planning fail " << WHITE << std::endl;
-            return -1;
-        }
-
-        //** 轨迹计算 **//
-        for ( const auto& target : traj_target )
-        {
-            if ( kinematics_.CartToJnt( q_init, target, q_target ) < 0 )
-            {
-                std::cerr << RED << "MoveR(): CartToJnt failed " << WHITE << std::endl;
-                return -1;
-            }
-            //防止奇异位置速度激增
-            for ( int i = 0; i < jnt_num_; i++ )
-            {
-                if ( abs( q_target( i ) - q_init( i ) ) > max_step[ i ] )
-                {
-                    std::cout << RED << "MoveR():joint[" << i << "] speep is too  fast" << WHITE << std::endl;
-                    return -1;
-                }
-            }
-
-            q_init = q_target;
-            traj_.push_back( q_target );
-            dt += 0.001;
-        }
-        //**-------------------------------**//
-
-        if ( is_running_motion )  //不是OTG规划，异步/同步都不能打断
-        {
-            std::cerr << RED << " Motion is still running and waiting for it to finish"
-                      << WHITE << std::endl;
-            motion_thread_->join( );
-        }
-
-        if ( asynchronous )  //异步执行
-        {
-            motion_thread_.reset( new boost::thread{ &Robot::RunMoveL, this, traj_ } );
-            is_running_motion = true;
-        }
-        else  //同步执行
-        {
-            motion_thread_.reset( new boost::thread{ &Robot::RunMoveL, this, traj_ } );
-            motion_thread_->join( );
-            is_running_motion = false;
-        }
-
-        return 0;
-    }
-
+ 
     int Robot::MoveP( Frame pose, double speed, double acceleration, double time,
                       double radius, bool asynchronous )
     {
@@ -1007,14 +923,14 @@ namespace rocos
         }
         else
         {
-            KDL::Frame Frame_motion_1;
-            KDL::Frame Frame_motion_2;
+            KDL::Frame motion_frame_1;
+            KDL::Frame motion_frame_2;
             double motion_v_1;
             double motion_v_2;
             int success{ 0 };
 
             std::cout << GREEN << "***************第1次规划***************" << WHITE << std::endl;
-            success = JC_helper::multilink_trajectory( traj_target, Cart_point, point[ 0 ], point[ 1 ], Frame_motion_1, 0, motion_v_1, bound_dist[ 0 ], max_path_v[ 0 ], max_path_a[ 0 ], max_path_v[ 1 ] );
+            success = JC_helper::multilink_trajectory( traj_target, Cart_point, point[ 0 ], point[ 1 ], motion_frame_1, 0, motion_v_1, bound_dist[ 0 ], max_path_v[ 0 ], max_path_a[ 0 ], max_path_v[ 1 ] );
             if ( success < 0 )
             {
                 std::cerr << RED << "MultiMoveL(): given parameters is invalid in the 1th planning "
@@ -1026,20 +942,20 @@ namespace rocos
             for ( int i = 1; i < ( point.size( ) - 1 ); i++ )
             {
                 std::cout << GREEN << "***************第" << i + 1 << "次规划***************" << WHITE << std::endl;
-                success = JC_helper::multilink_trajectory( traj_target, Frame_motion_1, point[ i ], point[ i + 1 ], Frame_motion_2, motion_v_1, motion_v_2, bound_dist[ i ], max_path_v[ i ], max_path_a[ i ], max_path_v[ i + 1 ] );
+                success = JC_helper::multilink_trajectory( traj_target, motion_frame_1, point[ i ], point[ i + 1 ], motion_frame_2, motion_v_1, motion_v_2, bound_dist[ i ], max_path_v[ i ], max_path_a[ i ], max_path_v[ i + 1 ] );
                 if ( success < 0 )
                 {
                     std::cerr << RED << "MultiMoveL(): given parameters is invalid in the " << i + 1 << "th planning "
                               << WHITE << std::endl;
                     return -1;
                 }
-                Frame_motion_1 = Frame_motion_2;
+                motion_frame_1 = motion_frame_2;
                 motion_v_1     = motion_v_2;
                 traj_index.push_back( traj_target.size( ) );
             }
 
             std::cout << GREEN << "***************第" << point.size( ) << "次规划***************" << WHITE << std::endl;
-            success = JC_helper::link_trajectory( traj_target, Frame_motion_1, point.back( ), motion_v_1, 0, max_path_v.back( ), max_path_a.back( ) );
+            success = JC_helper::link_trajectory( traj_target, motion_frame_1, point.back( ), motion_v_1, 0, max_path_v.back( ), max_path_a.back( ) );
             if ( success < 0 )
             {
                 std::cerr << RED << "MultiMoveL(): given parameters is invalid in the last of planning "

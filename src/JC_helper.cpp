@@ -106,53 +106,55 @@ namespace JC_helper
 
     int link_trajectory( std::vector< KDL::Frame >& traj, const KDL::Frame& start, const KDL::Frame& end, double v_start, double v_end, double max_path_v, double max_path_a )
     {
-        if ( end == start )
-            return -1;
-
-        double T_link = 0;
-        rocos::DoubleS doubleS_P;
-        rocos::DoubleS doubleS_R;
-        double path_length = ( end.p - start.p ).Norm( );
-
-        doubleS_P.planDoubleSProfile( 0, 0, 1, v_start / path_length, v_end / path_length, max_path_v / path_length, max_path_a / path_length, max_path_a * 2 / path_length );
-        bool isplanned = doubleS_P.isValidMovement( );
-        if ( !isplanned || !( doubleS_P.getDuration( ) > 0 ) )
+        if ( end == start )//起始和终止位置一致，无需规划
+            return 0;
+        else
         {
-            std::cout << RED << "link_trajectory():Error_MotionPlanning_Not_Feasible" << WHITE << std::endl;
-            ;
-            return -1;
+            double T_link = 0;
+            rocos::DoubleS doubleS_P;
+            rocos::DoubleS doubleS_R;
+            double path_length = ( end.p - start.p ).Norm( );
+
+            doubleS_P.planDoubleSProfile( 0, 0, 1, v_start / path_length, v_end / path_length, max_path_v / path_length, max_path_a / path_length, max_path_a * 2 / path_length );
+            bool isplanned = doubleS_P.isValidMovement( );
+            if ( !isplanned || !( doubleS_P.getDuration( ) > 0 ) )
+            {
+                std::cout << RED << "link_trajectory():Error_MotionPlanning_Not_Feasible" << WHITE << std::endl;
+                ;
+                return -1;
+            }
+
+            doubleS_R.planDoubleSProfile( 0, 0, 1, 0, 0, max_path_v / path_length, max_path_a / path_length, max_path_a * 2 / path_length );
+            isplanned = doubleS_R.isValidMovement( );
+            if ( !isplanned || !( doubleS_R.getDuration( ) > 0 ) )
+            {
+                std::cout << RED << "link_trajectory():Error_MotionPlanning_Not_Feasible" << WHITE << std::endl;
+                ;
+                return -1;
+            }
+
+            if ( doubleS_R.getDuration( ) != doubleS_P.getDuration( ) )
+            {
+                doubleS_R.JC_scaleToDuration( doubleS_P.getDuration( ) );
+            }
+
+            T_link = doubleS_P.getDuration( );
+
+            double t_total = 0;
+            double s_p     = 0;
+            double s_r     = 0;
+
+            //** 轨迹计算 **//
+            while ( t_total >= 0 && t_total <= T_link )
+            {
+                s_p = doubleS_P.pos( t_total );
+                s_r = doubleS_R.pos( t_total );
+                traj.push_back( link_trajectory( start, end, s_p, s_r ) );
+                t_total = t_total + 0.001;
+            }
+            //**-------------------------------**//
+            return 0;
         }
-
-        doubleS_R.planDoubleSProfile( 0, 0, 1, 0, 0, max_path_v / path_length, max_path_a / path_length, max_path_a * 2 / path_length );
-        isplanned = doubleS_R.isValidMovement( );
-        if ( !isplanned || !( doubleS_R.getDuration( ) > 0 ) )
-        {
-            std::cout << RED << "link_trajectory():Error_MotionPlanning_Not_Feasible" << WHITE << std::endl;
-            ;
-            return -1;
-        }
-
-        if ( doubleS_R.getDuration( ) != doubleS_P.getDuration( ) )
-        {
-            doubleS_R.JC_scaleToDuration( doubleS_P.getDuration( ) );
-        }
-
-        T_link = doubleS_P.getDuration( );
-
-        double t_total = 0;
-        double s_p     = 0;
-        double s_r     = 0;
-
-        //** 轨迹计算 **//
-        while ( t_total >= 0 && t_total <= T_link )
-        {
-            s_p = doubleS_P.pos( t_total );
-            s_r = doubleS_R.pos( t_total );
-            traj.push_back( link_trajectory( start, end, s_p, s_r ) );
-            t_total = t_total + 0.001;
-        }
-        //**-------------------------------**//
-        return 0;
     }
 
     int multilink_trajectory( std::vector< KDL::Frame >& traj, const KDL::Frame& f_start, const KDL::Frame& f_mid, const KDL::Frame& f_end, KDL::Frame& next_f_start, double current_path_start_v, double& next_path_start_v, double bound_dist, double max_path_v, double max_path_a, double next_max_path_v )
@@ -467,7 +469,7 @@ namespace JC_helper
         return 0;
     }
 
-    int rotation_trajectory( std::vector< KDL::Frame >& traj, const KDL::Vector& f_p, const KDL::Rotation& f_r1, const KDL::Rotation& f_r2, double max_path_v , double max_path_a , double equivalent_radius  )
+    int rotation_trajectory( std::vector< KDL::Frame >& traj, const KDL::Vector& f_p, const KDL::Rotation& f_r1, const KDL::Rotation& f_r2, double max_path_v, double max_path_a, double equivalent_radius )
     {
         using namespace KDL;
 

@@ -466,20 +466,7 @@ namespace rocos
         //! \return 错误标志位,成功返回0
         int MovePath( const Path& path, bool asynchronous = false );
 
-        /**
-         * @brief 保持末端位置，只旋转姿态
-         * 
-         * @param rotation_to 目标姿态
-         * @param speed 速度
-         * @param acceleration 加速度
-         * @param time 总时间
-         * @param equivalent_radius 等效半径，乘以旋转角度得等效弧度
-         * @param asynchronous 异步与否
-         * @return int 
-         */
-        int MoveR( Rotation rotation_to, double speed,
-                   double acceleration, double time, bool asynchronous , double equivalent_radius=0.01
-                  );
+
 
         /**
          * @brief 多段直线的连续运动
