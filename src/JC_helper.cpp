@@ -106,7 +106,7 @@ namespace JC_helper
 
     int link_trajectory( std::vector< KDL::Frame >& traj, const KDL::Frame& start, const KDL::Frame& end, double v_start, double v_end, double max_path_v, double max_path_a )
     {
-        if ( end == start )//起始和终止位置一致，无需规划
+        if ( end == start )  //起始和终止位置一致，无需规划
             return 0;
         else
         {
@@ -161,7 +161,7 @@ namespace JC_helper
     {
         using namespace KDL;
         //** 变量初始化 **//
-        double eps = 1E-7;
+        const double eps = 1E-7;
         Vector p1{ f_start.p };
         Vector p_mid{ f_mid.p };
         Vector p2{ f_end.p };
@@ -188,13 +188,13 @@ namespace JC_helper
 
         if ( bound_dist >= abdist )
         {
-            std::cout << RED << "bound_dist is too  large，try to decrease it" << GREEN << std::endl;
+            std::cout << RED << "multi_link_trajectory():bound_dist is too  large，try to decrease it" << GREEN << std::endl;
             return -1;
         }
 
         if ( bound_dist >= bcdist )
         {
-            std::cout << RED << "multi_link_trajectory()：bound_dist is too  large，try to decrease it" << GREEN << std::endl;
+            std::cout << RED << "multi_link_trajectory():bound_dist is too  large，try to decrease it" << GREEN << std::endl;
         }
 
         if ( current_path_start_v > max_path_v )  //! 防止起始速度就超过最大可达线速度 ,理论上不可能发生
@@ -207,16 +207,26 @@ namespace JC_helper
 
         //**-------------------------------**//
 
+        //利用向量乘积公式，求得两向量的夹角 ,并且限定范围在0-180
+        double cos_alpha = std::max( -1., std::min( dot( ab, bc ) / abdist / bcdist, 1. ) );
+        //两段直线夹角接近0,则两段直线合并为一条处理
+        if ( ( 1 - cos_alpha ) <= eps )
+        {
+            next_f_start      = f_start;
+            next_path_start_v = current_path_start_v;
+            return 0;
+        }
+        //两段直线夹角接近180，则不允许圆弧过渡
+        else if ( ( cos_alpha - (-1) ) <= eps )
+            bound_dist = 0;
+
+        //求解两段直线的夹角和圆弧的半径
+        double alpha  = acos( cos_alpha );
+        double radius = bound_dist * tan( ( M_PI - alpha ) / 2 );
+
         //求解过渡半径占总长的百分比
         double s_bound_dist_1 = bound_dist / abdist;
         double s_bound_dist_2 = bound_dist / bcdist;
-
-        std::cout << "s_bound_dist_1 = " << s_bound_dist_1 << std::endl;
-        std::cout << "s_bound_dist_2= " << s_bound_dist_2 << std::endl;
-
-        //利用向量乘积公式，求得两向量的夹角 ,并且限定范围在0-180
-        double alpha  = acos( std::max( -1., std::min( dot( ab, bc ) / abdist / bcdist, 1. ) ) );
-        double radius = bound_dist * tan( ( M_PI - alpha ) / 2 );
 
         Frame F_base_circlestart = link_trajectory( f_start, f_mid, 1 - s_bound_dist_1, 1 - s_bound_dist_1 );
         Frame F_base_circleend   = link_trajectory( f_mid, f_end, s_bound_dist_2, s_bound_dist_2 );
@@ -237,10 +247,10 @@ namespace JC_helper
 
         double s_cirlular_v{ 0 };
 
-        if ( s_bound_dist_1 <= eps )
+        if ( s_bound_dist_1 <= eps )//不存在圆弧，圆弧速度为0
             s_cirlular_v = 0;
         else if ( ( 1 - s_bound_dist_1 ) <= eps )
-            s_cirlular_v = current_path_start_v / ( radius * alpha );
+            s_cirlular_v = current_path_start_v / ( radius * alpha );//不存在直线，圆弧速度为当前段运动速度
         else
             s_cirlular_v = s_bound_dist_1 * std::min( max_path_v, next_max_path_v ) / ( radius * alpha );  //考虑当前和下次的运动，选取最小值（代表当前运动和下一段运动的约束下，最大可行速度）
 

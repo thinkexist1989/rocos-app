@@ -65,7 +65,7 @@ namespace rocos
                 interp_[ i ] = new DoubleS;
             }
         }
-
+        kinematics_.initTechServo();
         startMotionThread( );  //现在只计算JntToCart
     }
 
@@ -360,8 +360,8 @@ namespace rocos
         }
         //**-------------------------------**//
 
-        std::vector< double > dt( jnt_num_, 0.0 );  // delta T
-        double max_time = 0.0;
+        // std::vector< double > dt( jnt_num_, 0.0 );  // delta T
+        // double max_time = 0.0;
 
         while ( is_running_ )
         {  // while start
@@ -694,7 +694,7 @@ namespace rocos
         double angle = R_start_end.GetRotAngle( ration_axis );
         const double equivalent_radius =0.1;
         double Rlength = ( equivalent_radius * abs(angle) );
-        double Path_length = max( Plength,Rlength );
+        double Path_length = std::max( Plength,Rlength );
 
         traj_.clear( );
         KDL::JntArray q_init( jnt_num_ );
