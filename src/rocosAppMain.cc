@@ -109,19 +109,19 @@ int main( int argc, char* argv[] )
     //        std::cout << "----------------test moveC end---------------" << std::endl;
     //    }
 
-       {  //测试moveL(只旋转，不移动)
+    //    {  //测试moveL(只旋转，不移动)
 
-           std::cout << "----------------test moveL start---------------" << std::endl;
-           f_p2 = f_p1 * Frame{ KDL::Rotation::RotX( 90 * M_PI / 180 ) };
+    //        std::cout << "----------------test moveL start---------------" << std::endl;
+    //        f_p2 = f_p1 * Frame{ KDL::Rotation::RotX( 90 * M_PI / 180 ) };
 
-           for ( int i = 0; i < 6; i++ )
-           {
-               robot.test_set_pos( i, q( i ) );                                //?pos_资源竞争
-               std::this_thread::sleep_for( std::chrono::milliseconds( 3 ) );  //?pos_资源竞争
-           }
-           robot.MoveL( f_p2, 0.01, 0.01, 0, 0, false );
-           std::cout << "----------------test moveL end---------------" << std::endl;
-       }
+    //        for ( int i = 0; i < 6; i++ )
+    //        {
+    //            robot.test_set_pos( i, q( i ) );                                //?pos_资源竞争
+    //            std::this_thread::sleep_for( std::chrono::milliseconds( 3 ) );  //?pos_资源竞争
+    //        }
+    //        robot.MoveL( f_p2, 0.01, 0.01, 0, 0, false );
+    //        std::cout << "----------------test moveL end---------------" << std::endl;
+    //    }
 
        {  //测试MultiMoveL，
            std::cout << "----------------test MultiMoveL start---------------" << std::endl;
@@ -134,6 +134,9 @@ int main( int argc, char* argv[] )
            Frame f_p5;
            Frame f_p6;
            Frame f_p7;
+           Frame f_p8;
+           Frame f_p9;
+           Frame f_p11;
 
            f_p1 = f_p1 * Frame{ KDL::Rotation::RotX( 90 * M_PI / 180 ), Vector{ 0.3, 0.0, 0 } };
            f_p2 = f_p1 * Frame{ KDL::Rotation::RotY( 90 * M_PI / 180 ), Vector{ 0.0, -0.3, -0.0 } };
@@ -142,11 +145,15 @@ int main( int argc, char* argv[] )
            f_p5 = f_p4 * Frame{ KDL::Rotation::RotZ( 45 * M_PI / 180 ), Vector{ 0.0, 0.0, -0.15 } };  //180度调头
            f_p6 = f_p5 * Frame{ KDL::Rotation::RotZ( 45 * M_PI / 180 ), Vector{ 0.0, 0.0, -0.15 } };  //0度平行
            f_p7 = f_p6 * Frame{ KDL::Rotation::RotZ( -90 * M_PI / 180 ), Vector{ 0.0, 0.0, 0.3 } };   //180度调头
+           f_p8 = f_p7 * Frame{ KDL::Rotation::RotZ( -90 * M_PI / 180 ) };   //只旋转
+           f_p9 = f_p8 * Frame{ KDL::Rotation::RotZ( 90 * M_PI / 180 ) };   //只旋转
+           f_p11 = f_p1 * Frame{ KDL::Rotation::RotY( 5 * M_PI / 180 ) };   //只旋转
+           
 
-           std::vector< KDL::Frame > points{ f_p1, f_p2, f_p3, f_p4, f_p5, f_p6, f_p7 };
-           std::vector< double > max_path_v{ 0.06, 0.04, 0.04, 0.06, 0.06, 0.06, 0.06 };
-           std::vector< double > max_path_a{ 0.06, 0.06, 0.06, 0.06, 0.06, 0.06, 0.06 };
-           std::vector< double > bound_dist{ 0.05, 0.0, 0.1, 0.1,0.1,0.1, 0.0 };
+           std::vector< KDL::Frame > points{ f_p1, f_p2, f_p3, f_p4, f_p5, f_p6, f_p7 ,f_p8,f_p9,f_p1 ,f_p11};
+           std::vector< double > max_path_v{ 0.06, 0.04, 0.04, 0.06, 0.06, 0.06, 0.06 ,0.06 ,0.06 ,0.06,0.01};
+           std::vector< double > max_path_a{ 0.06, 0.06, 0.06, 0.06, 0.06, 0.06, 0.06 ,0.06,0.06  ,0.06 ,0.01  };
+           std::vector< double > bound_dist{ 0.05, 0.0 , 0.1 ,  0.1, 0.1 , 0.1 , 0.0  ,0.0 ,0.0   ,0.0 ,0.0};
 
            robot.MultiMoveL( points, bound_dist, max_path_v, max_path_a, true );
            std::cout << "----------------test MultiMoveL end---------------" << std::endl;

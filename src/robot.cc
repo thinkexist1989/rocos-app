@@ -903,6 +903,16 @@ namespace rocos
         std::vector< KDL::Frame > traj_target;
         std::vector< int > traj_index;
         KDL::Frame Cart_point = flange_;
+        std::vector<size_t> vector_size{point.size(),bound_dist.size(),max_path_v.size(),max_path_a.size()};
+
+        for ( const auto& i : vector_size )
+        {
+            if ( i != point.size( ) )
+            {
+                std::cout << RED << "MultiMoveL(): All vectors must be the same size"<<WHITE << std::endl;
+                return -1;
+            }
+        }
 
         if ( point.size( ) == 0 )
         {
@@ -1000,9 +1010,9 @@ namespace rocos
                 {
                     for ( int j = 0; j < traj_index.size( ); j++ )
                         p = count < traj_index[ j ] ? ( j + 1 ) : p;  //找到当前是第几段轨迹
-                    std::cout << RED << "MultiMoveL():count =" << p << count << std::endl;
+                    std::cout << RED << "MultiMoveL():count =" << count << std::endl;
                     std::cout << RED << "MultiMoveL():joint[" << i << "] speep is too  fast on the " << p << "th trajectory" << std::endl;
-                    std::cout << RED << "MultiMoveL():target speed = " << abs( q_target( i ) - q_init( i ) ) << "and  max_step=" << max_step[ i ] << std::endl;
+                    std::cout << RED << "MultiMoveL():target speed = " << abs( q_target( i ) - q_init( i ) ) << " and  max_step=" << max_step[ i ] << std::endl;
                     std::cout << RED << "MultiMoveL():q_target( " << i << " )  = " << q_target( i ) << std::endl;
                     std::cout << RED << "MultiMoveL():q_init( " << i << " ) =" << q_init( i ) << WHITE << std::endl;
                     return -1;

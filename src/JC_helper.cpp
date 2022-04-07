@@ -114,13 +114,27 @@ namespace JC_helper
             rocos::DoubleS doubleS_P;
             rocos::DoubleS doubleS_R;
             double path_length = ( end.p - start.p ).Norm( );
+            //只旋转，不移地情况，要求v_start和v_end必需为0
+            if ( path_length == 0 )
+            {
+                if ( v_start != 0 || v_end != 0 )
+                {
+                    std::cout <<RED<< "link_trajectory(): v_start OR v_end must be zero"<<GREEN<<std::endl;
+                    return -1;
+                }
+                KDL::Rotation R_start_end = start.M.Inverse( ) * end.M;
+                KDL::Vector ration_axis;
+                double angle                   = R_start_end.GetRotAngle( ration_axis );
+                const double equivalent_radius = 0.1;
+                double Rlength                 = ( equivalent_radius * abs( angle ) );
+                path_length                    = Rlength;
+            }
 
             doubleS_P.planDoubleSProfile( 0, 0, 1, v_start / path_length, v_end / path_length, max_path_v / path_length, max_path_a / path_length, max_path_a * 2 / path_length );
             bool isplanned = doubleS_P.isValidMovement( );
             if ( !isplanned || !( doubleS_P.getDuration( ) > 0 ) )
             {
                 std::cout << RED << "link_trajectory():Error_MotionPlanning_Not_Feasible" << WHITE << std::endl;
-                ;
                 return -1;
             }
 
@@ -129,7 +143,6 @@ namespace JC_helper
             if ( !isplanned || !( doubleS_R.getDuration( ) > 0 ) )
             {
                 std::cout << RED << "link_trajectory():Error_MotionPlanning_Not_Feasible" << WHITE << std::endl;
-                ;
                 return -1;
             }
 
@@ -157,6 +170,7 @@ namespace JC_helper
         }
     }
 
+
     int multilink_trajectory( std::vector< KDL::Frame >& traj, const KDL::Frame& f_start, const KDL::Frame& f_mid, const KDL::Frame& f_end, KDL::Frame& next_f_start, double current_path_start_v, double& next_path_start_v, double bound_dist, double max_path_v, double max_path_a, double next_max_path_v )
     {
         using namespace KDL;
@@ -174,25 +188,42 @@ namespace JC_helper
         //**-------------------------------**//
 
         //** 数据有效性检查 **//
-        if ( abdist < eps )
+        //!注释，为了通过只旋转，不移动时的检查
+        // if ( abdist < eps )
+        // {
+        //     std::cout << RED << "multi_link_trajectory()：f_start and  f_mid are too close " << GREEN << std::endl;
+        //     return -1;
+        // }
+
+        // if ( bcdist < eps )
+        // {
+        //     std::cout << RED << "multi_link_trajectory():f_mid and  f_end are too close " << GREEN << std::endl;
+        //     return -1;
+        // }
+
+        if ( abdist < eps )//说明本段是只旋转，不移动，那么要求开始速度为0
+        {  
+            if ( current_path_start_v != 0 )//不为0，只有一种情况，上段bound_dist等于abdist等于bcdist
+            {  
+                std::cout << RED << "multi_link_trajectory():bound_dist of last motion  is too  large，try to decrease it" << GREEN << std::endl;
+                return -1;
+            }
+        }
+
+        if ( current_path_start_v < eps && abdist>eps &&( abdist - bound_dist ) < eps )//只存在圆弧段，且上段速度为0，在圆弧匀速约束这不允许
         {
-            std::cout << RED << "multi_link_trajectory()：f_start and  f_mid are too close " << GREEN << std::endl;
+            std::cout << RED << " multi_link_trajectory()：the Link length is not allowed to be equal to 0,When starting velocity of this motion is equal to 0" << GREEN << std::endl;
             return -1;
         }
 
-        if ( bcdist < eps )
-        {
-            std::cout << RED << "multi_link_trajectory():f_mid and  f_end are too close " << GREEN << std::endl;
-            return -1;
-        }
 
-        if ( bound_dist >= abdist )
+        if ( bound_dist > abdist )
         {
             std::cout << RED << "multi_link_trajectory():bound_dist is too  large，try to decrease it" << GREEN << std::endl;
             return -1;
         }
 
-        if ( bound_dist >= bcdist )
+        if ( bound_dist > bcdist )  //这个条件说明：【正常情况下】如果本段只旋转，不移地，则上段bound_dist必需=0，则本段开始速度一定为0
         {
             std::cout << RED << "multi_link_trajectory():bound_dist is too  large，try to decrease it" << GREEN << std::endl;
         }
@@ -225,8 +256,8 @@ namespace JC_helper
         double radius = bound_dist * tan( ( M_PI - alpha ) / 2 );
 
         //求解过渡半径占总长的百分比
-        double s_bound_dist_1 = bound_dist / abdist;
-        double s_bound_dist_2 = bound_dist / bcdist;
+        double s_bound_dist_1 = bound_dist == 0 ? 0 : bound_dist / abdist;
+        double s_bound_dist_2 = bound_dist == 0 ? 0 : bound_dist / bcdist;  //避免只旋转时出现0/0
 
         Frame F_base_circlestart = link_trajectory( f_start, f_mid, 1 - s_bound_dist_1, 1 - s_bound_dist_1 );
         Frame F_base_circleend   = link_trajectory( f_mid, f_end, s_bound_dist_2, s_bound_dist_2 );
@@ -234,11 +265,6 @@ namespace JC_helper
         Vector de     = F_base_circlestart.p - f_start.p;  //实际要走的直线段的距离
         double dedist = de.Norm( );                        //实际要走的直线段的距离
 
-        if ( current_path_start_v <= eps && ( 1 - s_bound_dist_1 ) <= eps )
-        {
-            std::cout << RED << " multi_link_trajectory()：the Link length is not allowed to be equal to 0,When Velocity of last motion is equal to 0" << GREEN << std::endl;
-            return -1;
-        }
 
         Vector V_base_t = ab * ( ab * bc );  //圆弧中垂直于第一段直线的半径向量
         V_base_t.Normalize( );
@@ -262,7 +288,19 @@ namespace JC_helper
         //存在直线，才需要规划
         if ( ( 1 - s_bound_dist_1 ) > eps )
         {
-            doubleS_1_P.planDoubleSProfile( 0, 0, 1, current_path_start_v / dedist, s_cirlular_v, max_path_v / dedist, max_path_a / dedist, max_path_a * 2 / dedist );
+            double Path_length{ dedist };
+            //dedist==0,代表只旋转，不移动的情况
+            if ( Path_length == 0 )
+            {
+                KDL::Rotation R_start_end = f_start.M.Inverse( ) * F_base_circlestart.M;
+                KDL::Vector ration_axis;
+                double angle                   = R_start_end.GetRotAngle( ration_axis );
+                const double equivalent_radius = 0.1;
+                double Rlength                 = ( equivalent_radius * abs( angle ) );
+                Path_length                    = Rlength;
+            }
+
+            doubleS_1_P.planDoubleSProfile( 0, 0, 1, current_path_start_v / Path_length, s_cirlular_v, max_path_v / Path_length, max_path_a / Path_length, max_path_a * 2 / Path_length );
             bool isplanned = doubleS_1_P.isValidMovement( );
             if ( !isplanned || !( doubleS_1_P.getDuration( ) > 0 ) )
             {
@@ -270,7 +308,7 @@ namespace JC_helper
                 return -1;
             }
 
-            doubleS_1_R.planDoubleSProfile( 0, 0, 1, 0, 0, max_path_v / dedist, max_path_a / dedist, max_path_a * 2 / dedist );
+            doubleS_1_R.planDoubleSProfile( 0, 0, 1, 0, 0, max_path_v / Path_length, max_path_a / Path_length, max_path_a * 2 / Path_length );
             isplanned = doubleS_1_R.isValidMovement( );
             if ( !isplanned || !( doubleS_1_R.getDuration( ) > 0 ) )
             {
@@ -330,8 +368,8 @@ namespace JC_helper
         double s_r     = 0;
 
         std::cout << "T  = " << ( T_link + T_cirlular ) << std::endl;
-        std::cout << "T_total_1 = " << ( T_link ) << std::endl;
         std::cout << "T_cirlular= " << ( T_cirlular ) << std::endl;
+        std::cout << "T_link= " << ( T_link ) << std::endl;
         //** 轨迹计算 **//
         while ( t_total >= 0 && t_total <= ( T_link + T_cirlular ) )
         {
