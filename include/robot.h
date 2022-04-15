@@ -496,21 +496,34 @@ namespace rocos
          */
         int MultiMoveL( const std::vector< KDL::Frame >& point, std::vector< double > bound_dist, std::vector< double > max_path_v, std::vector< double > max_path_a, bool asynchronous = false );
 
+
+
+        enum class  DRAGGING_FLAG
+        {
+        J0=0,J1,J2,J3,J4,J5,J6,
+        TOOL_X,TOOL_Y,TOOL_Z,
+        FLANG_X,FLANG_Y,FLANG_Z,
+        OBJECT_X,OBJECT_Y,OBJECT_Z,
+        };
+
+        enum class DIRCTION
+        {
+            POSITION =1,NEGATIVE =-1
+        };
+
         /**
          * @brief 拖动示教功能
-         * @note 第一次调用会启动线程，线程运行过程中需要至少100ms以内再次调用一次该函数（保持心跳）
-         * @param pose 目标位姿
-         * @param speed 速度
-         * @param acceleration 加速度 
-         * @param time 运行时间
-         * @param radius 过渡半径
-         * @return int <0表示发送错误
+         * @note 第一次调用会启动ruckig线程，线程运行过程中需要至少100ms以内再次调用一次该函数（保持心跳）
+         * @note 否则会触发紧急停止（进入速度无同步模式，速度快速降至0）
+         * @param flag 命令标志
+         * @param dir 正方向或反方向
+         * @param max_speed 最大运行速度,其10%的值+当前位置等于目标位置
+         * @param max_acceleration 最大关节速度
+         * @return int 
+         * @example 
+         * 
          */
-        int Dragging( Frame pose, double speed, double acceleration, double time,
-                      double radius );
-
-        //心跳保持，每次调用会使得心跳计数器自增+1
-        void HeartKeepAlive( );
+        int Dragging( DRAGGING_FLAG flag, DIRCTION dir, double max_speed, double max_acceleration );
 
     private:
         //运动前检查数据有效性
@@ -541,7 +554,8 @@ namespace rocos
     private:
         // TODO： 测试用MoveJ，阻塞运行，需要改为private
         void
-        moveJ( const std::vector< double >& pos, const std::vector< double >& max_vel,
+        moveJ( const std::vector< double >& pos, 
+               const std::vector< double >& max_vel,
                const std::vector< double >& max_acc,
                const std::vector< double >& max_jerk,
                Synchronization sync = SYNC_TIME,
@@ -581,8 +595,7 @@ namespace rocos
 
         std::vector< bool > need_plan_;  // 是否需要重新规划标志
 
-        boost::shared_ptr< boost::thread > otg_motion_thread_{
-            nullptr };                                                 // otg在线规划线程
+        boost::shared_ptr< boost::thread > otg_motion_thread_{nullptr };                                                 // otg在线规划线程
         boost::shared_ptr< boost::thread > motion_thread_{ nullptr };  // 执行motion线程
 
         Kinematics kinematics_;
@@ -592,8 +605,14 @@ namespace rocos
         Frame object_;  //!< 工件位置姿态
 
         std::vector< KDL::JntArray > traj_;
-        int tick_count{ 0 };
-        std::mutex tick_lock;
+        std::atomic<int> tick_count{ 0 };
+
+public:
+        friend void JC_helper::smart_servo::smart_servo_using_Joint( rocos::Robot* );
+        friend void JC_helper::smart_servo::smart_servo_IK( rocos::Robot* );
+        friend void JC_helper::smart_servo::smart_servo_motion( rocos::Robot* );
+
+
     };
 
 }  // namespace rocos

@@ -68,24 +68,25 @@ int main( int argc, char* argv[] )
 
     auto robotService = RobotServiceImpl::getInstance( &robot );
 
-   {  //测试
-       using namespace KDL;
-       Frame f_p1;
-       Frame f_p2;
-       Frame f_p3;
-       Frame f_p4;
-       Kinematics kinematics_;
-       kinematics_.initTechServo();
-       KDL::JntArray q( 6 );
+  #pragma region //* 测试
+   { 
+    //    using namespace KDL;
+    //    Frame f_p1;
+    //    Frame f_p2;
+    //    Frame f_p3;
+    //    Frame f_p4;
+    //    Kinematics kinematics_;
+    //    kinematics_.initTechServo();
+    //    KDL::JntArray q( 6 );
 
-       q( 0 ) = 60 * M_PI / 180;
-       q( 1 ) = -115 * M_PI / 180;
-       q( 2 ) = -110 * M_PI / 180;
-       q( 3 ) = -45 * M_PI / 180;
-       q( 4 ) = 90 * M_PI / 180;
-       q( 5 ) = 0 * M_PI / 180;
+    //    q( 0 ) = 60 * M_PI / 180;
+    //    q( 1 ) = -115 * M_PI / 180;
+    //    q( 2 ) = -110 * M_PI / 180;
+    //    q( 3 ) = -45 * M_PI / 180;
+    //    q( 4 ) = 90 * M_PI / 180;
+    //    q( 5 ) = 0 * M_PI / 180;
 
-       kinematics_.JntToCart( q, f_p1 );
+    //    kinematics_.JntToCart( q, f_p1 );
 
     //    { //测试moveC
           
@@ -123,42 +124,67 @@ int main( int argc, char* argv[] )
     //        std::cout << "----------------test moveL end---------------" << std::endl;
     //    }
 
-       {  //测试MultiMoveL，
-           std::cout << "----------------test MultiMoveL start---------------" << std::endl;
+    //    {  //测试MultiMoveL，
+    //        std::cout << "----------------test MultiMoveL start---------------" << std::endl;
 
-           for ( int i = 0; i < 6; i++ )
-           {
-               robot.test_set_pos( i, q( i ) );
-               std::this_thread::sleep_for( std::chrono::milliseconds( 3 ) );
-           }
-           Frame f_p5;
-           Frame f_p6;
-           Frame f_p7;
-           Frame f_p8;
-           Frame f_p9;
-           Frame f_p11;
+    //        for ( int i = 0; i < 6; i++ )
+    //        {
+    //            robot.test_set_pos( i, q( i ) );
+    //            std::this_thread::sleep_for( std::chrono::milliseconds( 3 ) );
+    //        }
+    //        Frame f_p5;
+    //        Frame f_p6;
+    //        Frame f_p7;
+    //        Frame f_p8;
+    //        Frame f_p9;
+    //        Frame f_p11;
 
-           f_p1 = f_p1 * Frame{ KDL::Rotation::RotX( 90 * M_PI / 180 ), Vector{ 0.3, 0.0, 0 } };
-           f_p2 = f_p1 * Frame{ KDL::Rotation::RotY( 90 * M_PI / 180 ), Vector{ 0.0, -0.3, -0.0 } };
-           f_p3 = f_p2 * Frame{ KDL::Rotation::RotX( -90 * M_PI / 180 ), Vector{ 0.0, 0.0, -0.3 } };
-           f_p4 = f_p3 * Frame{ KDL::Rotation::RotZ( -90 * M_PI / 180 ), Vector{ 0.0, 0.0, 0.3 } };
-           f_p5 = f_p4 * Frame{ KDL::Rotation::RotZ( 45 * M_PI / 180 ), Vector{ 0.0, 0.0, -0.15 } };  //180度调头
-           f_p6 = f_p5 * Frame{ KDL::Rotation::RotZ( 45 * M_PI / 180 ), Vector{ 0.0, 0.0, -0.15 } };  //0度平行
-           f_p7 = f_p6 * Frame{ KDL::Rotation::RotZ( -90 * M_PI / 180 ), Vector{ 0.0, 0.0, 0.3 } };   //180度调头
-           f_p8 = f_p7 * Frame{ KDL::Rotation::RotZ( -90 * M_PI / 180 ) };   //只旋转
-           f_p9 = f_p8 * Frame{ KDL::Rotation::RotZ( 90 * M_PI / 180 ) };   //只旋转
-           f_p11 = f_p1 * Frame{ KDL::Rotation::RotY( 5 * M_PI / 180 ) };   //只旋转
+    //        f_p1 = f_p1 * Frame{ KDL::Rotation::RotX( 90 * M_PI / 180 ), Vector{ 0.3, 0.0, 0 } };
+    //        f_p2 = f_p1 * Frame{ KDL::Rotation::RotY( 90 * M_PI / 180 ), Vector{ 0.0, -0.3, -0.0 } };
+    //        f_p3 = f_p2 * Frame{ KDL::Rotation::RotX( -90 * M_PI / 180 ), Vector{ 0.0, 0.0, -0.3 } };
+    //        f_p4 = f_p3 * Frame{ KDL::Rotation::RotZ( -90 * M_PI / 180 ), Vector{ 0.0, 0.0, 0.3 } };
+    //        f_p5 = f_p4 * Frame{ KDL::Rotation::RotZ( 45 * M_PI / 180 ), Vector{ 0.0, 0.0, -0.15 } };  //180度调头
+    //        f_p6 = f_p5 * Frame{ KDL::Rotation::RotZ( 45 * M_PI / 180 ), Vector{ 0.0, 0.0, -0.15 } };  //0度平行
+    //        f_p7 = f_p6 * Frame{ KDL::Rotation::RotZ( -90 * M_PI / 180 ), Vector{ 0.0, 0.0, 0.3 } };   //180度调头
+    //        f_p8 = f_p7 * Frame{ KDL::Rotation::RotZ( -90 * M_PI / 180 ) };   //只旋转
+    //        f_p9 = f_p8 * Frame{ KDL::Rotation::RotZ( 90 * M_PI / 180 ) };   //只旋转
+    //        f_p11 = f_p1 * Frame{ KDL::Rotation::RotY( 5 * M_PI / 180 ) };   //只旋转
            
 
-           std::vector< KDL::Frame > points{ f_p1, f_p2, f_p3, f_p4, f_p5, f_p6, f_p7 ,f_p8,f_p9,f_p1 ,f_p11};
-           std::vector< double > max_path_v{ 0.06, 0.04, 0.04, 0.06, 0.06, 0.06, 0.06 ,0.06 ,0.06 ,0.06,0.01};
-           std::vector< double > max_path_a{ 0.06, 0.06, 0.06, 0.06, 0.06, 0.06, 0.06 ,0.06,0.06  ,0.06 ,0.01  };
-           std::vector< double > bound_dist{ 0.05, 0.0 , 0.1 ,  0.1, 0.1 , 0.1 , 0.0  ,0.0 ,0.0   ,0.0 ,0.0};
+    //        std::vector< KDL::Frame > points{ f_p1, f_p2, f_p3, f_p4, f_p5, f_p6, f_p7 ,f_p8,f_p9,f_p1 ,f_p11};
+    //        std::vector< double > max_path_v{ 0.06, 0.04, 0.04, 0.06, 0.06, 0.06, 0.06 ,0.06 ,0.06 ,0.06,0.01};
+    //        std::vector< double > max_path_a{ 0.06, 0.06, 0.06, 0.06, 0.06, 0.06, 0.06 ,0.06,0.06  ,0.06 ,0.01  };
+    //        std::vector< double > bound_dist{ 0.05, 0.0 , 0.1 ,  0.1, 0.1 , 0.1 , 0.0  ,0.0 ,0.0   ,0.0 ,0.0};
 
-           robot.MultiMoveL( points, bound_dist, max_path_v, max_path_a, true );
-           std::cout << "----------------test MultiMoveL end---------------" << std::endl;
-       }
+    //        robot.MultiMoveL( points, bound_dist, max_path_v, max_path_a, true );
+    //        std::cout << "----------------test MultiMoveL end---------------" << std::endl;
+    //    }
+
+    {  //测试dragging
+        using namespace rocos;
+
+        PLOG_DEBUG << "连发测试";
+        //!要求每100ms以内至少调用一次，否则触发急停
+        for ( int i = 0; i < 100; i++ )
+        {
+            robot.Dragging( Robot::DRAGGING_FLAG::J0, Robot::DIRCTION::POSITION, 1, 1);
+            std::this_thread::sleep_for( std::chrono::milliseconds( 50 ) );
+        }
+        for ( int i = 0; i < 200; i++ )
+        {
+            robot.Dragging( Robot::DRAGGING_FLAG::J1, Robot::DIRCTION::POSITION, 1, 1);
+            std::this_thread::sleep_for( std::chrono::milliseconds( 50 ) );
+        }
+
+        sleep( 5);
+        PLOG_DEBUG << "急停测试";
+        sleep( 5);
+        robot.Dragging( Robot::DRAGGING_FLAG::J3, Robot::DIRCTION::POSITION, 1, 1 );
+
+
+    }
    }
+#pragma endregion
 
     //------------------------wait----------------------------------
     robotService->runServer( );

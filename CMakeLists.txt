@@ -53,6 +53,8 @@ add_subdirectory(3rdparty/kdl)
 add_subdirectory(3rdparty/nlopt)
 add_subdirectory(3rdparty/trac_ik)
 add_subdirectory(3rdparty/kdl_parser)
+add_subdirectory(3rdparty/ruckig)
+add_subdirectory(3rdparty/plog)
 
 
 ###########
@@ -130,6 +132,7 @@ target_link_libraries(kinematics
         nlopt
         orocos-kdl
         trac_ik
+        ruckig::ruckig
         )
 add_library(rocos::kinematics ALIAS kinematics)
 
@@ -144,6 +147,7 @@ target_link_libraries(robot
         rocos::hardware
         rocos::drive
         rocos::kinematics
+        plog::plog
         )
 add_library(rocos::robot ALIAS robot)
 

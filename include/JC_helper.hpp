@@ -2,9 +2,18 @@
 #define JC_HELPER_H
 
 #include "kdl/frames.hpp"
-#include "robot.h"
 #include <iostream>
+#include <ruckig/ruckig.hpp>
 #include <vector>
+#include <interpolate.h>
+#include <kdl/frames.hpp>
+#include <kdl/jntarray.hpp>
+#include <mutex>
+#include <atomic>
+#include <plog/Log.h>
+#include <plog/Appenders/ColorConsoleAppender.h>
+#include <plog/Initializers/RollingFileInitializer.h>
+
 
 #define RESET "\033[0m"
 
@@ -43,6 +52,11 @@
 //示例
 //std::cout << BLUE << " hello world " << std::endl;
 
+namespace rocos
+{
+    class Robot;
+}
+
 namespace JC_helper
 {
     /**
@@ -67,8 +81,7 @@ namespace JC_helper
       */
     KDL::Rotation RotAxisAngle( KDL::Rotation start, KDL::Rotation end, double s );
 
-
-     /**
+    /**
       * @brief 圆弧插值
       * 
       * @param F_base_circlestart 起点
@@ -91,7 +104,7 @@ namespace JC_helper
     KDL::Frame link_trajectory( const KDL::Frame& start, const KDL::Frame& end, double s_p, double s_r );
 
     int link_trajectory( std::vector< KDL::Frame >& traj, const KDL::Frame& start, const KDL::Frame& end, double v_start, double v_end, double max_path_v, double max_path_a );
- 
+
     /**
       * @brief 
       * 
@@ -110,7 +123,7 @@ namespace JC_helper
       */
     int multilink_trajectory( std::vector< KDL::Frame >& traj, const KDL::Frame& f_start, const KDL::Frame& f_mid, const KDL::Frame& f_end, KDL::Frame& next_f_start, double current_path_start_v, double& next_path_start_v, double bound_dist, double max_path_v, double max_path_a, double next_max_path_v = 1 );
 
-/**
+    /**
  * @brief 给定三点，计算出圆心
  * 
  * @param center 
@@ -121,7 +134,7 @@ namespace JC_helper
  */
     int circle_center( KDL::Frame& center, const KDL::Frame& f_p1, const KDL::Frame& f_p2, const KDL::Frame& f_p3 );
 
-/**
+    /**
  * @brief movec轨迹计算
  * 
  * @param traj 输出计算结果
@@ -135,7 +148,7 @@ namespace JC_helper
  */
     int circle_trajectory( std::vector< KDL::Frame >& traj, const KDL::Frame& f_p1, const KDL::Frame& f_p2, const KDL::Frame& f_p3, double max_path_v = 0.01, double max_path_a = 0.01, bool fixed_rotation = true );
 
-/**
+    /**
  * @brief 位置保持，只旋转姿态
  * 
  * @param traj 输出计算结果
@@ -149,6 +162,53 @@ namespace JC_helper
  */
     int rotation_trajectory( std::vector< KDL::Frame >& traj, const KDL::Vector& f_p, const KDL::Rotation& f_r1, const KDL::Rotation& f_r2, double max_path_v = 0.01, double max_path_a = 0.01, double equivalent_radius = 0.01 );
 
+
+    constexpr size_t _joint_num{ 6 };
+    
+    class smart_servo
+    {
+    public:
+        smart_servo( std::vector< KDL::JntArray >* traj_ptr, std::atomic< bool >* finished_flag_ptr );
+        void init( std::vector< double > q_init, std::vector< double > v_init, std::vector< double > a_init, double max_v, double max_a, double max_j );
+        void init( KDL::Frame p_init, double v_init, double a_init, double max_v, double max_a, double max_j );
+
+        void smart_servo_using_Joint(rocos::Robot* robot_ptr );
+        void smart_servo_using_Cartesian( );
+        void smart_servo_IK( rocos::Robot* );
+        void smart_servo_motion( rocos::Robot* );
+        void command( KDL::JntArray q_target );
+        void command( KDL::Frame p_target );
+
+    private:
+        std::vector< KDL::JntArray >* external_traj_ptr;
+        std::atomic< bool >* external_finished_flag_ptr;
+        std::mutex input_mutex;
+        std::mutex traj_mutex;
+
+        ruckig::Ruckig< _joint_num > otg{0.001};
+        ruckig::InputParameter< _joint_num > input;
+        ruckig::OutputParameter< _joint_num > output;
+
+        struct 
+        {
+            KDL::Frame _p_init;
+            double _v_init;
+            double _a_init;
+            double _max_v;
+            double _max_a;
+            double _max_j;
+
+        } _Cartesian_state;
+
+        struct
+        {
+            std::atomic< bool > _FinishPlanningCart{ true };
+            std::atomic< bool > _FinishCartIK{ true };
+        } _runnig_flag;
+
+      std::atomic<bool> on_stop_trajectory {false};
+
+    };
 
 }  // namespace JC_helper
 

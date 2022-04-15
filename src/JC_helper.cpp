@@ -1,4 +1,5 @@
 #include "JC_helper.hpp"
+#include "robot.h"
 
 namespace JC_helper
 {
@@ -111,15 +112,15 @@ namespace JC_helper
         else
         {
             double T_link = 0;
-            rocos::DoubleS doubleS_P;
-            rocos::DoubleS doubleS_R;
+            ::rocos::DoubleS doubleS_P;
+            ::rocos::DoubleS doubleS_R;
             double path_length = ( end.p - start.p ).Norm( );
             //只旋转，不移地情况，要求v_start和v_end必需为0
             if ( path_length == 0 )
             {
                 if ( v_start != 0 || v_end != 0 )
                 {
-                    std::cout <<RED<< "link_trajectory(): v_start OR v_end must be zero"<<GREEN<<std::endl;
+                    std::cout << RED << "link_trajectory(): v_start OR v_end must be zero" << GREEN << std::endl;
                     return -1;
                 }
                 KDL::Rotation R_start_end = start.M.Inverse( ) * end.M;
@@ -170,7 +171,6 @@ namespace JC_helper
         }
     }
 
-
     int multilink_trajectory( std::vector< KDL::Frame >& traj, const KDL::Frame& f_start, const KDL::Frame& f_mid, const KDL::Frame& f_end, KDL::Frame& next_f_start, double current_path_start_v, double& next_path_start_v, double bound_dist, double max_path_v, double max_path_a, double next_max_path_v )
     {
         using namespace KDL;
@@ -201,21 +201,20 @@ namespace JC_helper
         //     return -1;
         // }
 
-        if ( abdist < eps )//说明本段是只旋转，不移动，那么要求开始速度为0
-        {  
-            if ( current_path_start_v != 0 )//不为0，只有一种情况，上段bound_dist等于abdist等于bcdist
-            {  
+        if ( abdist < eps )  //说明本段是只旋转，不移动，那么要求开始速度为0
+        {
+            if ( current_path_start_v != 0 )  //不为0，只有一种情况，上段bound_dist等于abdist等于bcdist
+            {
                 std::cout << RED << "multi_link_trajectory():bound_dist of last motion  is too  large，try to decrease it" << GREEN << std::endl;
                 return -1;
             }
         }
 
-        if ( current_path_start_v < eps && abdist>eps &&( abdist - bound_dist ) < eps )//只存在圆弧段，且上段速度为0，在圆弧匀速约束这不允许
+        if ( current_path_start_v < eps && abdist > eps && ( abdist - bound_dist ) < eps )  //只存在圆弧段，且上段速度为0，在圆弧匀速约束这不允许
         {
             std::cout << RED << " multi_link_trajectory()：the Link length is not allowed to be equal to 0,When starting velocity of this motion is equal to 0" << GREEN << std::endl;
             return -1;
         }
-
 
         if ( bound_dist > abdist )
         {
@@ -248,7 +247,7 @@ namespace JC_helper
             return 0;
         }
         //两段直线夹角接近180，则不允许圆弧过渡
-        else if ( ( cos_alpha - (-1) ) <= eps )
+        else if ( ( cos_alpha - ( -1 ) ) <= eps )
             bound_dist = 0;
 
         //求解两段直线的夹角和圆弧的半径
@@ -265,7 +264,6 @@ namespace JC_helper
         Vector de     = F_base_circlestart.p - f_start.p;  //实际要走的直线段的距离
         double dedist = de.Norm( );                        //实际要走的直线段的距离
 
-
         Vector V_base_t = ab * ( ab * bc );  //圆弧中垂直于第一段直线的半径向量
         V_base_t.Normalize( );
 
@@ -273,18 +271,18 @@ namespace JC_helper
 
         double s_cirlular_v{ 0 };
 
-        if ( s_bound_dist_1 <= eps )//不存在圆弧，圆弧速度为0
+        if ( s_bound_dist_1 <= eps )  //不存在圆弧，圆弧速度为0
             s_cirlular_v = 0;
         else if ( ( 1 - s_bound_dist_1 ) <= eps )
-            s_cirlular_v = current_path_start_v / ( radius * alpha );//不存在直线，圆弧速度为当前段运动速度
+            s_cirlular_v = current_path_start_v / ( radius * alpha );  //不存在直线，圆弧速度为当前段运动速度
         else
             s_cirlular_v = s_bound_dist_1 * std::min( max_path_v, next_max_path_v ) / ( radius * alpha );  //考虑当前和下次的运动，选取最小值（代表当前运动和下一段运动的约束下，最大可行速度）
 
 #pragma region  // 第一段直线速度轨迹规划
 
         double T_link = 0;
-        rocos::DoubleS doubleS_1_P;
-        rocos::DoubleS doubleS_1_R;
+        ::rocos::DoubleS doubleS_1_P;
+        ::rocos::DoubleS doubleS_1_R;
         //存在直线，才需要规划
         if ( ( 1 - s_bound_dist_1 ) > eps )
         {
@@ -342,7 +340,7 @@ namespace JC_helper
 
 #pragma region  //圆弧段时间
         double T_cirlular = 0;
-        rocos::DoubleS doubleS_2_R;
+        ::rocos::DoubleS doubleS_2_R;
         if ( s_bound_dist_1 > eps )
         {
             T_cirlular = 1 / ( next_path_start_v / ( radius * alpha ) );
@@ -487,7 +485,7 @@ namespace JC_helper
         std::cout << BLUE << "theta13= " << theta13 * 180 / M_PI << GREEN << std::endl;
         //**-------------------------------**//
 
-        rocos::DoubleS doubleS;
+        ::rocos::DoubleS doubleS;
         double path_length = ( radius * theta13 );
         doubleS.planDoubleSProfile( 0, 0, 1, 0, 0, max_path_v / path_length, max_path_a / path_length, 2 * max_path_a / path_length );
         bool success = doubleS.isValidMovement( );
@@ -530,7 +528,7 @@ namespace JC_helper
             return -1;
         }
 
-        rocos::DoubleS doubleS;
+        ::rocos::DoubleS doubleS;
         double path_length = ( equivalent_radius * angle );
         doubleS.planDoubleSProfile( 0, 0, 1, 0, 0, max_path_v / path_length, max_path_a / path_length, 2 * max_path_a / path_length );
         bool success = doubleS.isValidMovement( );
@@ -552,6 +550,212 @@ namespace JC_helper
             dt += 0.001;
         }
         return 0;
+    }
+
+    smart_servo::smart_servo( std::vector< KDL::JntArray >* traj_ptr, std::atomic< bool >* finished_flag_ptr )
+    {
+        external_traj_ptr          = traj_ptr;
+        external_finished_flag_ptr = finished_flag_ptr;
+    }
+
+    void smart_servo::init( std::vector< double > q_init, std::vector< double > v_init, std::vector< double > a_init, double max_v, double max_a, double max_j )
+    {
+        for ( int i = 0; i < _joint_num; i++ )
+        {
+            input.current_position[ i ]     = q_init[ i ];
+            input.current_velocity[ i ]     = v_init[ i ];
+            input.current_acceleration[ i ] = a_init[ i ];
+
+            input.target_position[ i ]     = q_init[ i ];
+            input.target_velocity[ i ]     = v_init[ i ];
+            input.target_acceleration[ i ] = a_init[ i ];
+
+            input.max_velocity[ i ]     = max_v;
+            input.max_acceleration[ i ] = max_a;
+            input.max_jerk[ i ]         = max_j;
+        }
+        PLOG_INFO << "smart servo init succesed";
+    }
+
+    void smart_servo::init( KDL::Frame p_init, double v_init, double a_init, double max_v, double max_a, double max_j )
+    {
+        _Cartesian_state._p_init = p_init;
+        _Cartesian_state._v_init = v_init;
+        _Cartesian_state._a_init = a_init;
+        _Cartesian_state._max_v  = max_v;
+        _Cartesian_state._max_a  = max_a;
+        _Cartesian_state._max_j  = max_j;
+
+        PLOG_INFO << "smart servo init succesed";
+    }
+
+    void smart_servo::smart_servo_using_Joint( rocos::Robot* robot_ptr )
+    {
+        std::unique_lock< std::mutex > input_lock( input_mutex, std::defer_lock );
+        ruckig::Result res;
+        int count{ 0 };
+        int _tick_count{ robot_ptr->tick_count };
+
+        while ( *external_finished_flag_ptr ) PLOG_INFO << "----waiting for command----";
+
+        while ( 1 )
+        {
+            input_lock.lock( );
+            res = otg.update( input, output );
+            input_lock.unlock( );
+
+            if ( res == ruckig::Result::Finished )
+            {
+                ( *external_finished_flag_ptr ) = true;   //这次smart servo已结束，等待下一次smart servo
+                robot_ptr->is_running_motion    = false;  //机械臂运动已结束，可以执行其他离线类运动
+                PLOG_INFO << "smart servo has finished";
+                break;
+            }
+            else if ( res == ruckig::Result::Working )
+            {
+                const auto& p = output.new_position;
+
+                for ( int i = 0; i < _joint_num; ++i )
+                {
+                    robot_ptr->pos_[ i ] = p[ i ];
+                    robot_ptr->joints_[ i ]->setPosition( p[ i ] );
+                }
+                PLOG_DEBUG << "p[ 0 ]=" << p[ 0 ] << " p[ 1]=" << p[ 1 ] ;
+                input_lock.lock( );
+                output.pass_to_input( input );
+                input_lock.unlock( );
+
+                robot_ptr->hw_interface_->waitForSignal( 0 );
+            }
+
+            //** 100ms进行一次心跳检查,紧急停止时不需要检查 **//
+            if ( ( ( ++count ) == 100 ) && !on_stop_trajectory )
+            {
+                count = 0;
+
+                if ( _tick_count != robot_ptr->tick_count )
+                {
+                    _tick_count = robot_ptr->tick_count;
+                }
+                else
+                {
+                    PLOG_ERROR << "Some errors such as disconnecting from the controller";
+                    on_stop_trajectory = true;
+
+                    input_lock.lock( );
+                    input.control_interface = ruckig::ControlInterface::Velocity;
+                    input.synchronization   = ruckig::Synchronization::None;
+
+                    for ( int i = 0; i < _joint_num; i++ )
+                    {
+                        input.target_velocity[ i ]     = 0.0;
+                        input.target_acceleration[ i ] = 0.0;
+                    }
+                    input_lock.unlock( );
+                }
+            }
+            //**-------------------------------**//
+        }
+    }
+
+    //TODO 笛卡尔空间下smart servo
+    void smart_servo::smart_servo_using_Cartesian( )
+    {
+        PLOG_ERROR << " have not  completed yet" << std::endl;
+    }
+
+    //TODO 笛卡尔空间下smart servo,注意奇异位置速度激增问题
+    void smart_servo::smart_servo_IK( rocos::Robot* )
+    {
+        PLOG_ERROR << " have not  completed yet";
+    }
+   
+    //TODO 笛卡尔空间下smart servo
+    void smart_servo::smart_servo_motion( rocos::Robot* robot_ptr )
+    {
+        //** 变量初始化 **//
+        std::unique_lock< std::mutex > traj_lock( traj_mutex, std::defer_lock );
+        int count{ 0 };
+        int index{ 0 };
+        KDL::JntArray joint_command;
+        int _tick_count{ robot_ptr->tick_count };
+        //**-------------------------------**//
+        //** 等待command 开始 **//
+        while ( *external_finished_flag_ptr ) PLOG_INFO << "----waiting for command----";
+        //**-------------------------------**//
+
+        while ( 1 )
+        {
+            traj_lock.lock( );
+            //关节轨迹有余
+            if ( index < ( *external_traj_ptr ).size( ) )
+            {
+                joint_command = ( *external_traj_ptr )[ index ];
+                traj_lock.unlock( );
+
+                for ( int i = 0; i < _joint_num; ++i )
+                {
+                    robot_ptr->pos_[ i ] = joint_command( i );
+                    robot_ptr->joints_[ i ]->setPosition( joint_command( i ) );
+                }
+
+                robot_ptr->hw_interface_->waitForSignal( 0 );
+            }
+            else  //指向最后一个
+            {
+                traj_lock.unlock( );
+                if ( _runnig_flag._FinishCartIK )
+                    break;  //全部关节轨迹已经取出
+                else
+                    continue;  //还没规划完，本次跳过
+            }
+
+            index++;
+
+            //** 100ms进行一次心跳检查,紧急停止时不需要检查 **//
+            if ( ( ++count == 100 ) && !on_stop_trajectory )
+            {
+                count = 0;
+
+                if ( _tick_count != robot_ptr->tick_count )
+                    _tick_count = robot_ptr->tick_count;
+                else
+                {
+                    PLOG_ERROR << "RunDragging():Some errors such as disconnecting from the controller";
+                    on_stop_trajectory = true;
+                    {
+                        //TODO 笛卡尔下紧急停止
+                    }
+                }
+            }
+            //**-------------------------------**//
+        }
+
+        ( *external_finished_flag_ptr ) = true;   //这次smart servo已结束，等待下一次smart servo
+        robot_ptr->is_running_motion    = false;  //机械臂运动已结束，可以执行其他离线类运动
+    }
+
+    void smart_servo::command( KDL::JntArray q_target )
+    {
+        if ( !on_stop_trajectory )  //如果需要紧急停止，那么就不允许在更改指令了
+        {
+            std::unique_lock< std::mutex > input_lock( input_mutex );
+
+            for ( int i = 0; i < _joint_num; i++ )
+            {
+                input.target_position[ i ]     = q_target( i );
+                input.target_velocity[ i ]     = 0.0;
+                input.target_acceleration[ i ] = 0.0;
+            }
+
+            ( *external_finished_flag_ptr ) = false;  //如果第一次command，则会同时启动{规划}和{运动}线程
+        }
+    }
+
+    //TODO 笛卡尔空间下smart servo
+    void smart_servo::command( KDL::Frame p_target )
+    {
+        PLOG_ERROR << " have not  completed yet";
     }
 
 }  // namespace JC_helper

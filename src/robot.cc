@@ -66,7 +66,9 @@ namespace rocos
             }
         }
         kinematics_.initTechServo();
-        startMotionThread( );  //现在只计算JntToCart
+        static   plog::ColorConsoleAppender<plog::TxtFormatter> consoleAppender;
+        plog::init(plog::debug, &consoleAppender); // Initialize the logger.
+        startMotionThread( );
     }
 
     bool Robot::parseUrdf(const string &urdf_file_path,
@@ -592,12 +594,6 @@ namespace rocos
         if ( least_time != -1 ) least_motion_time_ = least_time;
     }
 
-    //TODO 心跳刷新
-    void Robot::HeartKeepAlive( )
-    {
-        std::lock_guard< std::mutex > lck( tick_lock );
-        tick_count++;
-    }
 
     /////// Motion Command /////////////
 
@@ -1045,113 +1041,151 @@ namespace rocos
         return 0;
     }
 
-    int Robot::Dragging( Frame pose, double speed, double acceleration, double time,
-                         double radius )
+    int Robot::Dragging( DRAGGING_FLAG flag, DIRCTION dir, double max_speed, double max_acceleration )
     {
-        if ( radius )
+        if ( CheckBeforeMove( JntArray{6}, max_speed, max_acceleration, 0, 0 ) < 0 )
         {
-            std::cerr << RED << " dragging(): radius not supported yet" << WHITE << std::endl;
+            PLOG_ERROR << "given parameters is invalid";
             return -1;
         }
-        if ( time )
-        {
-            std::cerr << RED << "dragging(): time not supported yet" << WHITE << std::endl;
-            return -1;
-        }
+      
+        static std::atomic< bool > _dragging_finished_flag{ true };
+        static JC_helper::smart_servo _smart_servo{ &traj_, &_dragging_finished_flag };
+        static std::shared_ptr< boost::thread > thread_planning{ nullptr };
+        static std::shared_ptr< boost::thread > thread_IK{ nullptr };
+        static std::shared_ptr< boost::thread > thread_motion{ nullptr };
+        KDL::JntArray target_joint{ 6 };
+        KDL::Frame target_frame;
+        KDL::Vector x;
+        int index{ static_cast< int >( flag ) };
 
-        if ( CheckBeforeMove( pose, speed, acceleration, time, radius ) < 0 )
+
+        //** is_running_motion的作用：不允许其他运动异步运行时,执行dragging;不允许执行dragging时，执行其他离线类运动**//
+        //** _dragging_finished_flag的作用：保证dragging 多次调用时，只吃初始化一次**//
+        if ( _dragging_finished_flag && is_running_motion )
         {
-            std::cerr << RED << "dragging():given parameters is invalid" << WHITE << std::endl;
-            return -1;
+            std::cerr << RED << "offline Motion is still running and waiting for it to finish"
+                      << WHITE << std::endl;
+            return 0;
         }
+        else if ( _dragging_finished_flag && !is_running_motion )
+        {
+            if(motion_thread_)
+            motion_thread_->join( );
+            is_running_motion = true;
+            traj_.clear( );
+        }
+        //**-------------------------------**//
 
         if ( is_running_motion )
         {
-            std::cerr << GREEN << "dragging(): Motion is still running and keep heard alive"
-                      << WHITE << std::endl;
-            HeartKeepAlive( );
-            return 0;
+            tick_count++;
         }
 
-        //** 变量初始化 **//
-        KDL::Vector Pstart  = flange_.p;
-        KDL::Vector Pend    = pose.p;
-        KDL::Vector Plenght = Pend - Pstart;
-        traj_.clear( );
-        KDL::JntArray q_init( jnt_num_ );
-        KDL::JntArray q_target( jnt_num_ );
-        double s = 0;
-        std::unique_ptr< R_INTERP_BASE > doubleS( new rocos::DoubleS );
-        //**-------------------------------**//
-
-        //** 规划速度设置 **//
-        //TODO 完善速度规划
-        doubleS->planProfile(
-            0, 0, 1, 0, 0, speed / Plenght.Norm( ), acceleration / Plenght.Norm( ),
-            ( *std::min_element( std::begin( max_jerk_ ), std::end( max_jerk_ ) ) ) / Plenght.Norm( ) );
-
-        if ( !doubleS->isValidMovement( ) || !( doubleS->getDuration( ) > 0 ) )
+        switch ( flag )
         {
-            std::cerr << RED << "dragging():dragging trajectory "
-                      << "is infeasible " << WHITE << std::endl;
-            return -1;
-        }
-        //**-------------------------------**//
+            case DRAGGING_FLAG::J0:
+            case DRAGGING_FLAG::J1:
+            case DRAGGING_FLAG::J2:
+            case DRAGGING_FLAG::J3:
+            case DRAGGING_FLAG::J4:
+            case DRAGGING_FLAG::J5:
+            case DRAGGING_FLAG::J6:
 
-        //** 变量初始化 **//
-        double dt       = 0;
-        double duration = doubleS->getDuration( );
-        std::vector< double > Quaternion_start{ 0, 0, 0, 0 };
-        std::vector< double > Quaternion_end{ 0, 0, 0, 0 };
-        std::vector< double > Quaternion_interp{ 0, 0, 0, 0 };
-        flange_.M.GetQuaternion( Quaternion_start.at( 0 ), Quaternion_start.at( 1 ),
-                                 Quaternion_start.at( 2 ), Quaternion_start.at( 3 ) );
-        pose.M.GetQuaternion( Quaternion_end.at( 0 ), Quaternion_end.at( 1 ),
-                              Quaternion_end.at( 2 ), Quaternion_end.at( 3 ) );
-        std::vector< double > max_step;
-        //**-------------------------------**//
-
-        for ( int i = 0; i < jnt_num_; i++ )
-        {
-            q_init( i ) = pos_[ i ];
-            max_step.push_back( max_vel_[ i ] * 0.001 );
-        }
-
-        //** 轨迹计算 **//
-        while ( dt <= duration )
-        {
-            s             = doubleS->pos( dt );
-            KDL::Vector P = Pstart + Plenght * s;
-            Quaternion_interp =
-                JC_helper::UnitQuaternion_intep( Quaternion_start, Quaternion_end, s );
-            KDL::Frame interp_frame(
-                KDL::Rotation::Quaternion( Quaternion_interp[ 0 ], Quaternion_interp[ 1 ],
-                                           Quaternion_interp[ 2 ], Quaternion_interp[ 3 ] ),
-                P );
-            if ( kinematics_.CartToJnt( q_init, interp_frame, q_target ) < 0 )
-            {
-                std::cerr << RED << " dragging():CartToJnt failed " << WHITE << std::endl;
-                return -1;
-            }
-            //防止奇异位置速度激增
-            for ( int i = 0; i < jnt_num_; i++ )
-            {
-                if ( abs( q_target( i ) - q_init( i ) ) > max_step[ i ] )
+                if ( _dragging_finished_flag )
                 {
-                    std::cout << RED << "dragging():joint[" << i << "] speep is too  fast" << WHITE << std::endl;
-                    return -1;
+                    if ( thread_planning )
+                        thread_planning->join( );
+                    _smart_servo.init( pos_, vel_, acc_, max_speed, max_acceleration, 2 * max_acceleration );
+                    thread_planning.reset( new boost::thread{ &JC_helper::smart_servo::smart_servo_using_Joint, &_smart_servo, this } );
                 }
-            }
 
-            q_init = q_target;
-            traj_.push_back( q_target );  //TODO: 未初始化
-            dt += 0.001;
+                for(int i =0;i<jnt_num_;i++)
+                target_joint(i) = pos_[i];
+                target_joint( index ) = std::min( target_joint( index ) + static_cast< double >( dir ) * max_speed * 0.1, joints_[ index ]->getMaxPosLimit( ) );  //取最大速度的10%
+                target_joint( index ) = std::max( target_joint( index ), joints_[ index ]->getMinPosLimit( ) );
+                _smart_servo.command( target_joint );
+
+                break;
+
+            case DRAGGING_FLAG::FLANG_X:
+            case DRAGGING_FLAG::FLANG_Y:
+            case DRAGGING_FLAG::FLANG_Z:
+
+                if ( _dragging_finished_flag )
+                {
+                    if ( thread_planning )
+                        thread_planning->join( );
+                    if ( thread_IK )
+                        thread_IK->join( );
+                    if ( thread_motion )
+                        thread_motion->join( );
+                    _smart_servo.init( flange_, 0, 0, max_speed, max_acceleration, 2 * max_acceleration );
+                    thread_planning.reset( new boost::thread{ &JC_helper::smart_servo::smart_servo_using_Cartesian, &_smart_servo } );
+                    thread_IK.reset( new boost::thread{ &JC_helper::smart_servo::smart_servo_IK, &_smart_servo, this } );
+                    thread_motion.reset( new boost::thread{ &JC_helper::smart_servo::smart_servo_motion, &_smart_servo, this } );
+                }
+
+                index        = index - static_cast< int >( DRAGGING_FLAG::FLANG_X );
+                x( index )   = static_cast< double >( dir ) * max_speed * 0.1;
+                target_frame = flange_ * KDL::Frame{ x };
+                _smart_servo.command( target_frame );
+
+                break;
+
+            case DRAGGING_FLAG::TOOL_X:
+            case DRAGGING_FLAG::TOOL_Y:
+            case DRAGGING_FLAG::TOOL_Z:
+
+                if ( _dragging_finished_flag )
+                {
+                    if ( thread_planning )
+                        thread_planning->join( );
+                    if ( thread_IK )
+                        thread_IK->join( );
+                    if ( thread_motion )
+                        thread_motion->join( );
+                    _smart_servo.init( flange_, 0, 0, max_speed, max_acceleration, 2 * max_acceleration );
+                    thread_planning.reset( new boost::thread{ &JC_helper::smart_servo::smart_servo_using_Cartesian, &_smart_servo } );
+                    thread_IK.reset( new boost::thread{ &JC_helper::smart_servo::smart_servo_IK, &_smart_servo, this } );
+                    thread_motion.reset( new boost::thread{ &JC_helper::smart_servo::smart_servo_motion, &_smart_servo, this } );
+                }
+
+                index        = index - static_cast< int >( DRAGGING_FLAG::TOOL_X );
+                x( index )   = static_cast< double >( dir ) * max_speed * 0.1;
+                target_frame = flange_ * KDL::Frame{ ( flange_.M.Inverse( ) * tool_.M ) * x };
+                _smart_servo.command( target_frame );
+
+                break;
+
+            case DRAGGING_FLAG::OBJECT_X:
+            case DRAGGING_FLAG::OBJECT_Y:
+            case DRAGGING_FLAG::OBJECT_Z:
+
+                if ( _dragging_finished_flag )
+                {
+                    if ( thread_planning )
+                        thread_planning->join( );
+                    if ( thread_IK )
+                        thread_IK->join( );
+                    if ( thread_motion )
+                        thread_motion->join( );
+                    _smart_servo.init( flange_, 0, 0, max_speed, max_acceleration, 2 * max_acceleration );
+                    thread_planning.reset( new boost::thread{ &JC_helper::smart_servo::smart_servo_using_Cartesian, &_smart_servo } );
+                    thread_IK.reset( new boost::thread{ &JC_helper::smart_servo::smart_servo_IK, &_smart_servo, this } );
+                    thread_motion.reset( new boost::thread{ &JC_helper::smart_servo::smart_servo_motion, &_smart_servo, this } );
+                }
+
+                index        = index - static_cast< int >( DRAGGING_FLAG::OBJECT_X );
+                x( index )   = static_cast< double >( dir ) * max_speed * 0.1;
+                target_frame = flange_ * KDL::Frame{ ( flange_.M.Inverse( ) * object_.M ) * x };
+                _smart_servo.command( target_frame );
+                break;
+
+            default:
+                PLOG_ERROR << " Undefined command flag";
+                break;
         }
-        //**-------------------------------**//
-
-        motion_thread_.reset( new boost::thread{ &Robot::RunDragging, this, traj_ } );
-        is_running_motion = true;
-
         return 0;
     }
 
@@ -1357,47 +1391,7 @@ namespace rocos
         is_running_motion = false;
     }
 
-    void Robot::RunDragging( const std::vector< KDL::JntArray >& traj )
-    {
-        int count{ 0 };
-        int tick_count_{ 0 };
-
-        {
-            std::lock_guard< std::mutex > lck( tick_lock );
-            tick_count_ = tick_count;
-        }
-
-        for ( const auto& waypoints : traj )
-        {
-            for ( int i = 0; i < jnt_num_; ++i )
-            {
-                pos_[ i ] = waypoints( i );
-                joints_[ i ]->setPosition( pos_[ i ] );
-            }
-
-            if ( ++count == 100 )
-            {
-                count = 0;
-                {
-                    std::unique_lock< std::mutex > lck( tick_lock );
-                    if ( tick_count_ != tick_count )
-                        tick_count_ = tick_count;
-                    else
-                    {
-                        std::cout << RED << "RunDragging():Some errors such as disconnecting from the controller" << WHITE << std::endl;
-                        lck.unlock( );
-                        StopMotion( );
-                        is_running_motion = false;
-                        return;
-                    }
-                }
-            }
-
-            hw_interface_->waitForSignal( 0 );
-        }
-
-        is_running_motion = false;  //TODO: added by Yangluo
-    }
+  
 
     //TODO 紧急停止
     void Robot::StopMotion( ) {}
