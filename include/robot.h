@@ -543,8 +543,7 @@ namespace rocos
         //实际multimovel执行线程
         void RunMultiMoveL( const std::vector< KDL::JntArray >& traj );
 
-        //实际dragging执行线程
-        void RunDragging( const std::vector< KDL::JntArray >& traj );
+
         //停止运动
         void StopMotion( );
 

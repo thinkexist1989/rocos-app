@@ -617,12 +617,13 @@ namespace rocos
             return -1;
         }
 
-        if ( is_running_motion )  //不是OTG规划，异步/同步都不能打断
+        if ( is_running_motion )  //最大异步执行一条任务
         {
-            std::cerr << RED << " Motion is still running and waiting for it to finish"
-                      << WHITE << std::endl;
-            motion_thread_->join( );
+            PLOG_ERROR << " Motion is still running and waiting for it to finish";
+            return -1;
         }
+
+        if ( motion_thread_ ) motion_thread_->join( );
 
         if ( asynchronous )  //异步执行
         {
@@ -680,6 +681,13 @@ namespace rocos
             std::cerr << RED << "MoveL():given parameters is invalid" << WHITE << std::endl;
             return -1;
         }
+
+        if ( is_running_motion )  //最大一条任务异步执行
+        {
+            PLOG_ERROR << RED << " Motion is still running and waiting for it to finish" << WHITE;
+            return -1;
+        }
+        if ( motion_thread_ ) motion_thread_->join( );
 
         //** 变量初始化 **//
         KDL::Vector Pstart  = flange_.p;
@@ -759,12 +767,7 @@ namespace rocos
         }
         //**-------------------------------**//
 
-        if ( is_running_motion )  //不是OTG规划，异步/同步都不能打断
-        {
-            std::cerr << RED << " Motion is still running and waiting for it to finish"
-                      << WHITE << std::endl;
-            motion_thread_->join( );
-        }
+     
 
         if ( asynchronous )  //异步执行
         {
@@ -818,6 +821,15 @@ namespace rocos
             return -1;
         }
 
+
+        if ( is_running_motion )  //最大一条任务异步执行
+        {
+            PLOG_ERROR << RED << " Motion is still running and waiting for it to finish" << WHITE;
+            return -1;
+        }
+        if ( motion_thread_ ) motion_thread_->join( );
+
+
         //** 变量初始化 **//
         traj_.clear( );
         KDL::JntArray q_init( jnt_num_ );
@@ -863,12 +875,6 @@ namespace rocos
         }
         //**-------------------------------**//
 
-        if ( is_running_motion )  //不是OTG规划，异步/同步都不能打断
-        {
-            std::cerr << RED << " Motion is still running and waiting for it to finish"
-                      << WHITE << std::endl;
-            motion_thread_->join( );
-        }
 
         if ( asynchronous )  //异步执行
         {
@@ -889,13 +895,23 @@ namespace rocos
     int Robot::MoveP( Frame pose, double speed, double acceleration, double time,
                       double radius, bool asynchronous )
     {
+        PLOG_ERROR<< "have not complicated yet";
         return 0;
     }
 
-    int Robot::MovePath( const Path& path, bool asynchronous ) { return 0; }
+    int Robot::MovePath( const Path& path, bool asynchronous ) { PLOG_ERROR<< "have not complicated yet"; return 0; }
 
     int Robot::MultiMoveL( const std::vector< KDL::Frame >& point, std::vector< double > bound_dist, std::vector< double > max_path_v, std::vector< double > max_path_a, bool asynchronous )
     {
+
+          if ( is_running_motion )  //最大一条任务异步执行
+        {
+            PLOG_ERROR << RED << " Motion is still running and waiting for it to finish" << WHITE;
+            return -1;
+        }
+        if ( motion_thread_ ) motion_thread_->join( );
+
+
         std::vector< KDL::Frame > traj_target;
         std::vector< int > traj_index;
         KDL::Frame Cart_point = flange_;
@@ -1019,12 +1035,7 @@ namespace rocos
         }
         //**-------------------------------**//
 
-        if ( is_running_motion )  //不是OTG规划，异步/同步都不能打断
-        {
-            std::cerr << RED << " Motion is still running and waiting for it to finish"
-                      << WHITE << std::endl;
-            motion_thread_->join( );
-        }
+    
 
         if ( asynchronous )  //异步执行
         {
@@ -1064,9 +1075,8 @@ namespace rocos
         //** _dragging_finished_flag的作用：保证dragging 多次调用时，只吃初始化一次**//
         if ( _dragging_finished_flag && is_running_motion )
         {
-            std::cerr << RED << "offline Motion is still running and waiting for it to finish"
-                      << WHITE << std::endl;
-            return 0;
+            PLOG_ERROR << RED << "offline Motion is still running and waiting for it to finish" << WHITE;
+            return -1;
         }
         else if ( _dragging_finished_flag && !is_running_motion )
         {
@@ -1390,8 +1400,6 @@ namespace rocos
 
         is_running_motion = false;
     }
-
-  
 
     //TODO 紧急停止
     void Robot::StopMotion( ) {}

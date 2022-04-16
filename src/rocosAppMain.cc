@@ -160,26 +160,30 @@ int main( int argc, char* argv[] )
     //        std::cout << "----------------test MultiMoveL end---------------" << std::endl;
     //    }
 
+
     {  //测试dragging
         using namespace rocos;
 
-        PLOG_DEBUG << "连发测试";
+        PLOG_DEBUG << "======连发测试开始===========";
         //!要求每100ms以内至少调用一次，否则触发急停
-        for ( int i = 0; i < 100; i++ )
+        for ( int i = 0; i < 400; i++ )
         {
             robot.Dragging( Robot::DRAGGING_FLAG::J0, Robot::DIRCTION::POSITION, 1, 1);
             std::this_thread::sleep_for( std::chrono::milliseconds( 50 ) );
         }
-        for ( int i = 0; i < 200; i++ )
+        
+        for ( int i = 0; i < 400; i++ )
         {
             robot.Dragging( Robot::DRAGGING_FLAG::J1, Robot::DIRCTION::POSITION, 1, 1);
             std::this_thread::sleep_for( std::chrono::milliseconds( 50 ) );
         }
-
+        PLOG_DEBUG << "======连发测试结束===========";
         sleep( 5);
-        PLOG_DEBUG << "急停测试";
-        sleep( 5);
-        robot.Dragging( Robot::DRAGGING_FLAG::J3, Robot::DIRCTION::POSITION, 1, 1 );
+        PLOG_DEBUG << "急停测试开始";
+        sleep( 7);
+        robot.Dragging( Robot::DRAGGING_FLAG::J0, Robot::DIRCTION::NEGATIVE, 1, 1 );
+        sleep( 7);
+        PLOG_DEBUG << "急停测试结束";
 
 
     }

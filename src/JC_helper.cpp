@@ -560,6 +560,9 @@ namespace JC_helper
 
     void smart_servo::init( std::vector< double > q_init, std::vector< double > v_init, std::vector< double > a_init, double max_v, double max_a, double max_j )
     {
+        input.control_interface = ruckig::ControlInterface::Position;
+        input.synchronization   = ruckig::Synchronization::Phase;
+
         for ( int i = 0; i < _joint_num; i++ )
         {
             input.current_position[ i ]     = q_init[ i ];
@@ -627,7 +630,6 @@ namespace JC_helper
 
                 robot_ptr->hw_interface_->waitForSignal( 0 );
             }
-
             //** 100ms进行一次心跳检查,紧急停止时不需要检查 **//
             if ( ( ( ++count ) == 100 ) && !on_stop_trajectory )
             {
@@ -641,7 +643,6 @@ namespace JC_helper
                 {
                     PLOG_ERROR << "Some errors such as disconnecting from the controller";
                     on_stop_trajectory = true;
-
                     input_lock.lock( );
                     input.control_interface = ruckig::ControlInterface::Velocity;
                     input.synchronization   = ruckig::Synchronization::None;
