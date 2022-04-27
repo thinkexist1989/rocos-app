@@ -611,6 +611,7 @@ namespace JC_helper
             {
                 ( *external_finished_flag_ptr ) = true;   //这次smart servo已结束，等待下一次smart servo
                 robot_ptr->is_running_motion    = false;  //机械臂运动已结束，可以执行其他离线类运动
+                on_stop_trajectory = false; //这个必须设为false,因为新线程仍然使用同一个对象数据成员
                 PLOG_INFO << "smart servo has finished";
                 break;
             }
@@ -623,7 +624,7 @@ namespace JC_helper
                     robot_ptr->pos_[ i ] = p[ i ];
                     robot_ptr->joints_[ i ]->setPosition( p[ i ] );
                 }
-                PLOG_DEBUG << "p[ 0 ]=" << p[ 0 ] << " p[ 1]=" << p[ 1 ] ;
+                // PLOG_DEBUG << "p[ 0 ]=" << p[ 0 ] << " p[ 1]=" << p[ 1 ] ;
                 input_lock.lock( );
                 output.pass_to_input( input );
                 input_lock.unlock( );
@@ -750,6 +751,10 @@ namespace JC_helper
             }
 
             ( *external_finished_flag_ptr ) = false;  //如果第一次command，则会同时启动{规划}和{运动}线程
+        }
+        else
+        {
+            PLOG_DEBUG<<"control is not allowed during emergency stop";
         }
     }
 

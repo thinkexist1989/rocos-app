@@ -623,7 +623,7 @@ namespace rocos
             return -1;
         }
 
-        if ( motion_thread_ ) motion_thread_->join( );
+        if ( motion_thread_ ){ motion_thread_->join( );motion_thread_=nullptr; }
 
         if ( asynchronous )  //异步执行
         {
@@ -638,6 +638,7 @@ namespace rocos
                                                      speed, acceleration, time,
                                                      radius } );
             motion_thread_->join( );
+            motion_thread_=nullptr;
             is_running_motion = false;
         }
 
@@ -687,7 +688,7 @@ namespace rocos
             PLOG_ERROR << RED << " Motion is still running and waiting for it to finish" << WHITE;
             return -1;
         }
-        if ( motion_thread_ ) motion_thread_->join( );
+        if ( motion_thread_ ) { motion_thread_->join( );motion_thread_=nullptr; }
 
         //** 变量初始化 **//
         KDL::Vector Pstart  = flange_.p;
@@ -778,6 +779,7 @@ namespace rocos
         {
             motion_thread_.reset( new boost::thread{ &Robot::RunMoveL, this, traj_ } );
             motion_thread_->join( );
+            motion_thread_=nullptr; 
             is_running_motion = false;
         }
 
@@ -827,7 +829,7 @@ namespace rocos
             PLOG_ERROR << RED << " Motion is still running and waiting for it to finish" << WHITE;
             return -1;
         }
-        if ( motion_thread_ ) motion_thread_->join( );
+        if ( motion_thread_ ) { motion_thread_->join( );motion_thread_=nullptr; }
 
 
         //** 变量初始化 **//
@@ -885,6 +887,7 @@ namespace rocos
         {
             motion_thread_.reset( new boost::thread{ &Robot::RunMoveL, this, traj_ } );
             motion_thread_->join( );
+            motion_thread_=nullptr; 
             is_running_motion = false;
         }
 
@@ -909,7 +912,7 @@ namespace rocos
             PLOG_ERROR << RED << " Motion is still running and waiting for it to finish" << WHITE;
             return -1;
         }
-        if ( motion_thread_ ) motion_thread_->join( );
+        if ( motion_thread_ ) { motion_thread_->join( );motion_thread_=nullptr; }
 
 
         std::vector< KDL::Frame > traj_target;
@@ -1046,6 +1049,7 @@ namespace rocos
         {
             motion_thread_.reset( new boost::thread{ &Robot::RunMultiMoveL, this, traj_ } );
             motion_thread_->join( );
+            motion_thread_=nullptr; 
             is_running_motion = false;
         }
 
@@ -1054,12 +1058,12 @@ namespace rocos
 
     int Robot::Dragging( DRAGGING_FLAG flag, DIRCTION dir, double max_speed, double max_acceleration )
     {
-        if ( CheckBeforeMove( JntArray{6}, max_speed, max_acceleration, 0, 0 ) < 0 )
+        if ( CheckBeforeMove( JntArray{ 6 }, max_speed, max_acceleration, 0, 0 ) < 0 )
         {
             PLOG_ERROR << "given parameters is invalid";
             return -1;
         }
-      
+
         static std::atomic< bool > _dragging_finished_flag{ true };
         static JC_helper::smart_servo _smart_servo{ &traj_, &_dragging_finished_flag };
         static std::shared_ptr< boost::thread > thread_planning{ nullptr };
@@ -1070,18 +1074,22 @@ namespace rocos
         KDL::Vector x;
         int index{ static_cast< int >( flag ) };
 
-
         //** is_running_motion的作用：不允许其他运动异步运行时,执行dragging;不允许执行dragging时，执行其他离线类运动**//
         //** _dragging_finished_flag的作用：保证dragging 多次调用时，只吃初始化一次**//
         if ( _dragging_finished_flag && is_running_motion )
         {
+            PLOG_ERROR << "_dragging_finished_flag=" << _dragging_finished_flag;
+            PLOG_ERROR << "is_running_motion=" << is_running_motion;
             PLOG_ERROR << RED << "offline Motion is still running and waiting for it to finish" << WHITE;
             return -1;
         }
         else if ( _dragging_finished_flag && !is_running_motion )
         {
-            if(motion_thread_)
-            motion_thread_->join( );
+            if ( motion_thread_ )
+            {
+                motion_thread_->join( );
+                motion_thread_ = nullptr;
+            }
             is_running_motion = true;
             traj_.clear( );
         }
@@ -1105,13 +1113,16 @@ namespace rocos
                 if ( _dragging_finished_flag )
                 {
                     if ( thread_planning )
+                    {
                         thread_planning->join( );
+                        thread_planning = nullptr;
+                    }
                     _smart_servo.init( pos_, vel_, acc_, max_speed, max_acceleration, 2 * max_acceleration );
                     thread_planning.reset( new boost::thread{ &JC_helper::smart_servo::smart_servo_using_Joint, &_smart_servo, this } );
                 }
 
-                for(int i =0;i<jnt_num_;i++)
-                target_joint(i) = pos_[i];
+                for ( int i = 0; i < jnt_num_; i++ )
+                    target_joint( i ) = pos_[ i ];
                 target_joint( index ) = std::min( target_joint( index ) + static_cast< double >( dir ) * max_speed * 0.1, joints_[ index ]->getMaxPosLimit( ) );  //取最大速度的10%
                 target_joint( index ) = std::max( target_joint( index ), joints_[ index ]->getMinPosLimit( ) );
                 _smart_servo.command( target_joint );
@@ -1125,11 +1136,20 @@ namespace rocos
                 if ( _dragging_finished_flag )
                 {
                     if ( thread_planning )
+                    {
                         thread_planning->join( );
+                        thread_planning = nullptr;
+                    }
                     if ( thread_IK )
+                    {
                         thread_IK->join( );
+                        thread_IK = nullptr;
+                    }
                     if ( thread_motion )
+                    {
                         thread_motion->join( );
+                        thread_motion = nullptr;
+                    }
                     _smart_servo.init( flange_, 0, 0, max_speed, max_acceleration, 2 * max_acceleration );
                     thread_planning.reset( new boost::thread{ &JC_helper::smart_servo::smart_servo_using_Cartesian, &_smart_servo } );
                     thread_IK.reset( new boost::thread{ &JC_helper::smart_servo::smart_servo_IK, &_smart_servo, this } );
@@ -1150,11 +1170,20 @@ namespace rocos
                 if ( _dragging_finished_flag )
                 {
                     if ( thread_planning )
+                    {
                         thread_planning->join( );
+                        thread_planning = nullptr;
+                    }
                     if ( thread_IK )
+                    {
                         thread_IK->join( );
+                        thread_IK = nullptr;
+                    }
                     if ( thread_motion )
+                    {
                         thread_motion->join( );
+                        thread_motion = nullptr;
+                    }
                     _smart_servo.init( flange_, 0, 0, max_speed, max_acceleration, 2 * max_acceleration );
                     thread_planning.reset( new boost::thread{ &JC_helper::smart_servo::smart_servo_using_Cartesian, &_smart_servo } );
                     thread_IK.reset( new boost::thread{ &JC_helper::smart_servo::smart_servo_IK, &_smart_servo, this } );
@@ -1175,11 +1204,20 @@ namespace rocos
                 if ( _dragging_finished_flag )
                 {
                     if ( thread_planning )
+                    {
                         thread_planning->join( );
+                        thread_planning = nullptr;
+                    }
                     if ( thread_IK )
+                    {
                         thread_IK->join( );
+                        thread_IK = nullptr;
+                    }
                     if ( thread_motion )
+                    {
                         thread_motion->join( );
+                        thread_motion = nullptr;
+                    }
                     _smart_servo.init( flange_, 0, 0, max_speed, max_acceleration, 2 * max_acceleration );
                     thread_planning.reset( new boost::thread{ &JC_helper::smart_servo::smart_servo_using_Cartesian, &_smart_servo } );
                     thread_IK.reset( new boost::thread{ &JC_helper::smart_servo::smart_servo_IK, &_smart_servo, this } );

@@ -590,7 +590,7 @@ namespace rocos
 
         bool is_running_{ false };
         bool is_exit_{ false };
-        bool is_running_motion{ false };
+        std::atomic< bool > is_running_motion{ false };
 
         std::vector< bool > need_plan_;  // 是否需要重新规划标志
 
