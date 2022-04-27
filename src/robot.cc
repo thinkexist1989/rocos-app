@@ -1053,9 +1053,9 @@ namespace rocos {
 
                 break;
 
-            case DRAGGING_FLAG::FLANG_X:
-            case DRAGGING_FLAG::FLANG_Y:
-            case DRAGGING_FLAG::FLANG_Z:
+            case DRAGGING_FLAG::FLANGE_X:
+            case DRAGGING_FLAG::FLANGE_Y:
+            case DRAGGING_FLAG::FLANGE_Z:
 
                 if ( _dragging_finished_flag )
                 {
@@ -1080,7 +1080,7 @@ namespace rocos {
                     thread_motion.reset( new boost::thread{ &JC_helper::smart_servo::smart_servo_motion, &_smart_servo, this } );
                 }
 
-                index = index - static_cast< int >( DRAGGING_FLAG::FLANG_X );
+                index = index - static_cast< int >( DRAGGING_FLAG::FLANGE_X );
                 x(index) = static_cast< double >( dir ) * max_speed * 0.1;
                 target_frame = flange_ * KDL::Frame{x};
                 _smart_servo.command(target_frame);

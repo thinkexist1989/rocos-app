@@ -41,9 +41,9 @@ enum Mode {
 
 enum DraggingFlag {
   J0 = 0; J1 = 1; J2 = 2; J3 = 3;J4 = 4;J5 = 5;J6 = 6;
-  TOOL_X = 7; TOOL_Y = 8; TOOL_Z = 9;
-  FLANG_X = 10; FLANG_Y = 11; FLANG_Z = 12;
-  OBJECT_X = 13; OBJECT_Y = 14; OBJECT_Z = 15;
+  TOOL_X = 100; TOOL_Y = 101; TOOL_Z = 102;
+  FLANGE_X = 200; FLANGE_Y = 201; FLANGE_Z = 202;
+  OBJECT_X = 300; OBJECT_Y = 301; OBJECT_Z = 302;
 };
 
 enum DraggingDirection {

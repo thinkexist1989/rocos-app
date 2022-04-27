@@ -460,10 +460,10 @@ namespace rocos {
 
 
         enum class DRAGGING_FLAG {
-            J0 = 0, J1, J2, J3, J4, J5, J6,
-            TOOL_X, TOOL_Y, TOOL_Z,
-            FLANG_X, FLANG_Y, FLANG_Z,
-            OBJECT_X, OBJECT_Y, OBJECT_Z,
+            J0 = 0, J1 = 1, J2 = 2, J3 = 3, J4 = 4, J5 = 5, J6 = 6,
+            TOOL_X = 100, TOOL_Y = 101, TOOL_Z = 102,
+            FLANGE_X = 200, FLANGE_Y = 201, FLANGE_Z = 202,
+            OBJECT_X = 300, OBJECT_Y = 301, OBJECT_Z = 302,
         };
 
         enum class DRAGGING_DIRRECTION {
