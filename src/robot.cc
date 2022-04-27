@@ -618,102 +618,118 @@ namespace rocos {
         return MoveJ(q_target, speed, acceleration, time, radius, asynchronous);
     }
 
-    int Robot::MoveL(Frame pose, double speed, double acceleration, double time,
-                     double radius, bool asynchronous) {
-        if (radius) {
-            std::cerr << RED << " radius not supported yet" << WHITE << std::endl;
-            return -1;
-        }
-        if (time) {
-            std::cerr << RED << " time not supported yet" << WHITE << std::endl;
-            return -1;
-        }
-
-        if (CheckBeforeMove(pose, speed, acceleration, time, radius) < 0) {
-            std::cerr << RED << "MoveL():given parameters is invalid" << WHITE << std::endl;
-            return -1;
-        }
-
-        if (is_running_motion)  //最大一条任务异步执行
+    int Robot::MoveL( Frame pose, double speed, double acceleration, double time,
+                      double radius, bool asynchronous )
+    {
+        if ( radius )
         {
-            PLOG_ERROR << RED << " Motion is still running and waiting for it to finish" << WHITE;
+            PLOG_ERROR << " radius not supported yet";
             return -1;
         }
-        if ( motion_thread_ ) { motion_thread_->join( );motion_thread_=nullptr; }
+        if ( time )
+        {
+            PLOG_ERROR << " time not supported yet";
+            return -1;
+        }
+
+        if ( CheckBeforeMove( pose, speed, acceleration, time, radius ) < 0 )
+        {
+            PLOG_ERROR << "given parameters is invalid";
+            return -1;
+        }
+
+        if ( is_running_motion )  //最大一条任务异步执行
+        {
+            PLOG_ERROR <<" Motion is still running and waiting for it to finish" ;
+            return -1;
+        }
+        if ( motion_thread_ )
+        {
+            motion_thread_->join( );
+            motion_thread_ = nullptr;
+        }
 
         //** 变量初始化 **//
-        KDL::Vector Pstart = flange_.p;
-        KDL::Vector Pend = pose.p;
-        double Plength = (Pend - Pstart).Norm();
-        KDL::Rotation R_start_end = flange_.M.Inverse() * pose.M;
+        KDL::Vector Pstart        = flange_.p;
+        KDL::Vector Pend          = pose.p;
+        double Plength            = ( Pend - Pstart ).Norm( );
+        KDL::Rotation R_start_end = flange_.M.Inverse( ) * pose.M;
         KDL::Vector ration_axis;
-        double angle = R_start_end.GetRotAngle(ration_axis);
+        double angle                   = R_start_end.GetRotAngle( ration_axis );
         const double equivalent_radius = 0.1;
-        double Rlength = (equivalent_radius * abs(angle));
-        double Path_length = std::max(Plength, Rlength);
+        double Rlength                 = ( equivalent_radius * abs( angle ) );
+        double Path_length             = std::max( Plength, Rlength );
 
-        traj_.clear();
-        KDL::JntArray q_init(jnt_num_);
-        KDL::JntArray q_target(jnt_num_);
+        traj_.clear( );
+        KDL::JntArray q_init( jnt_num_ );
+        KDL::JntArray q_target( jnt_num_ );
         double s = 0;
-        std::unique_ptr<R_INTERP_BASE> doubleS(new rocos::DoubleS);
+        std::unique_ptr< R_INTERP_BASE > doubleS( new rocos::DoubleS );
         //**-------------------------------**//
 
-        doubleS->planProfile(0, 0, 1, 0, 0, speed / Path_length, acceleration / Path_length,
-                             acceleration * 2 / Path_length);
+        doubleS->planProfile( 0, 0, 1, 0, 0, speed / Path_length, acceleration / Path_length,
+                              acceleration * 2 / Path_length );
 
-        if (!doubleS->isValidMovement() || !(doubleS->getDuration() > 0)) {
-            std::cerr << RED << "MoveL():moveL trajectory "
-                      << "is infeasible " << WHITE << std::endl;
+        if ( !doubleS->isValidMovement( ) || !( doubleS->getDuration( ) > 0 ) )
+        {
+            PLOG_ERROR << "moveL trajectory "
+                       << "is infeasible ";
             return -1;
         }
 
         //** 变量初始化 **//
-        double dt = 0;
-        double duration = doubleS->getDuration();
-        std::vector<double> Quaternion_start{0, 0, 0, 0};
-        std::vector<double> Quaternion_end{0, 0, 0, 0};
-        std::vector<double> Quaternion_interp{0, 0, 0, 0};
-        flange_.M.GetQuaternion(Quaternion_start.at(0), Quaternion_start.at(1),
-                                Quaternion_start.at(2), Quaternion_start.at(3));
-        pose.M.GetQuaternion(Quaternion_end.at(0), Quaternion_end.at(1),
-                             Quaternion_end.at(2), Quaternion_end.at(3));
-        std::vector<double> max_step;
-
+        double dt       = 0;
+        double duration = doubleS->getDuration( );
+        std::vector< double > Quaternion_start{ 0, 0, 0, 0 };
+        std::vector< double > Quaternion_end{ 0, 0, 0, 0 };
+        std::vector< double > Quaternion_interp{ 0, 0, 0, 0 };
+        flange_.M.GetQuaternion( Quaternion_start.at( 0 ), Quaternion_start.at( 1 ),
+                                 Quaternion_start.at( 2 ), Quaternion_start.at( 3 ) );
+        pose.M.GetQuaternion( Quaternion_end.at( 0 ), Quaternion_end.at( 1 ),
+                              Quaternion_end.at( 2 ), Quaternion_end.at( 3 ) );
+        std::vector< double > max_step;
+        KDL::Frame interp_frame{};
         //**-------------------------------**//
 
-        for (int i = 0; i < jnt_num_; i++) {
-            q_init(i) = pos_[i];
-            max_step.push_back(max_vel_[i] * 0.001);
+        for ( int i = 0; i < jnt_num_; i++ )
+        {
+            q_init( i ) = pos_[ i ];
+            max_step.push_back( max_vel_[ i ] * 0.001 );
         }
 
         //** 轨迹计算 **//
-        while (dt <= duration) {
-            s = doubleS->pos(dt);
-            KDL::Vector P = Pstart + (Pend - Pstart) * s;
-            Quaternion_interp = JC_helper::UnitQuaternion_intep(Quaternion_start, Quaternion_end, s);
-            KDL::Frame interp_frame(KDL::Rotation::Quaternion(Quaternion_interp[0], Quaternion_interp[1],
-                                                              Quaternion_interp[2], Quaternion_interp[3]),
-                                    P);
-            if (kinematics_.CartToJnt(q_init, interp_frame, q_target) < 0) {
-                std::cerr << RED << "MoveL(): CartToJnt failed " << WHITE << std::endl;
+        while ( dt <= duration )
+        {
+            s                 = doubleS->pos( dt );
+            KDL::Vector P     = Pstart + ( Pend - Pstart ) * s;
+            Quaternion_interp = JC_helper::UnitQuaternion_intep( Quaternion_start, Quaternion_end, s );
+            interp_frame.M    = KDL::Rotation::Quaternion( Quaternion_interp[ 0 ], Quaternion_interp[ 1 ],
+                                                           Quaternion_interp[ 2 ], Quaternion_interp[ 3 ] );
+            interp_frame.p    = P;
+
+
+            if ( kinematics_.CartToJnt( q_init, interp_frame, q_target ) < 0 )
+            {
+                PLOG_ERROR << " CartToJnt failed ";
                 return -1;
             }
             //防止奇异位置速度激增
-            for (int i = 0; i < jnt_num_; i++) {
-                if (abs(q_target(i) - q_init(i)) > max_step[i]) {
-                    std::cout << RED << "MoveL():joint[" << i << "] speep is too  fast" << WHITE << std::endl;
+            for ( int i = 0; i < jnt_num_; i++ )
+            {
+                if ( abs( q_target( i ) - q_init( i ) ) > max_step[ i ] )
+                {
+                    PLOG_ERROR << "joint[" << i << "] speep is too  fast";
+                    PLOG_ERROR.printf("q_init(%i)=%f",i,q_init(i)*180/3.1415926);
+                    PLOG_ERROR.printf("q_target(%i)=%f",i,q_target(i)*180/3.1415926);
                     return -1;
                 }
             }
 
             q_init = q_target;
-            traj_.push_back(q_target);  //TODO: 未初始化
+            traj_.push_back( q_target );  //TODO: 未初始化
             dt += 0.001;
         }
         //**-------------------------------**//
-
-
 
         if (asynchronous)  //异步执行
         {
@@ -1207,14 +1223,7 @@ namespace rocos {
     int Robot::CheckBeforeMove(const Frame &pos, double speed, double acceleration,
                                double time, double radius) {
         //** 数据有效性检查  **//
-        KDL::JntArray q_init(jnt_num_);
-        KDL::JntArray q_target(jnt_num_);
-        for (int i = 0; i < jnt_num_; i++) q_init(i) = pos_[i];
-        //位置检查
-        if (kinematics_.CartToJnt(q_init, pos, q_target) < 0) {
-            std::cerr << RED << " CheckBeforeMove(): Pos command is infeasible " << WHITE << std::endl;
-            return -1;
-        }
+        //TODO 使用解析公式去验证目标pose是否可达
 
         for (int i = 0; i < jnt_num_; i++) {  //TODO 这里的速度、加速度目前只针对关节空间进行检查
             //速度检查

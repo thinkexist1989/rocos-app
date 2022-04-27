@@ -76,15 +76,16 @@ int main( int argc, char* argv[] )
     //    Frame f_p3;
     //    Frame f_p4;
     //    Kinematics kinematics_;
-    //    kinematics_.initTechServo();
-    //    KDL::JntArray q( 6 );
+    //    kinematics_.initChain7Dofs();
+    //    KDL::JntArray q( 7 );
 
     //    q( 0 ) = 60 * M_PI / 180;
     //    q( 1 ) = -115 * M_PI / 180;
-    //    q( 2 ) = -110 * M_PI / 180;
-    //    q( 3 ) = -45 * M_PI / 180;
-    //    q( 4 ) = 90 * M_PI / 180;
-    //    q( 5 ) = 0 * M_PI / 180;
+    //    q( 2 ) = 0* M_PI / 180;
+    //    q( 3 ) = -110 * M_PI / 180;
+    //    q( 4 ) = -45 * M_PI / 180;
+    //    q( 5 ) = 90 * M_PI / 180;
+    //    q( 6 ) = 0 * M_PI / 180;
 
     //    kinematics_.JntToCart( q, f_p1 );
 
@@ -109,13 +110,26 @@ int main( int argc, char* argv[] )
     //     //    robot.MoveC( f_p2, f_p3, 0.01, 0.01, 0, 0, Robot::OrientationMode::UNCONSTRAINED, false );
     //        std::cout << "----------------test moveC end---------------" << std::endl;
     //    }
+    //  {  //测试moveL
+
+    //        std::cout << "----------------test moveL start---------------" << std::endl;
+    //        std::cout << "f_p1 = \n"<<f_p1<<std::endl;
+    //        f_p2 = f_p1 * Frame{ KDL::Rotation::RotX( 90 * M_PI / 180 ), Vector{ 0.1, 0.0, 0 } };       
+    //        for ( int i = 0; i < 7; i++ )
+    //        {
+    //            robot.test_set_pos( i, q( i ) );                                //?pos_资源竞争
+    //            std::this_thread::sleep_for( std::chrono::milliseconds( 3 ) );  //?pos_资源竞争
+    //        }
+    //        robot.MoveL( f_p1, 0.01, 0.01, 0, 0, false );
+    //        std::cout << "----------------test moveL end---------------" << std::endl;
+    //    }
 
     //    {  //测试moveL(只旋转，不移动)
 
     //        std::cout << "----------------test moveL start---------------" << std::endl;
     //        f_p2 = f_p1 * Frame{ KDL::Rotation::RotX( 90 * M_PI / 180 ) };
 
-    //        for ( int i = 0; i < 6; i++ )
+    //        for ( int i = 0; i < 7; i++ )
     //        {
     //            robot.test_set_pos( i, q( i ) );                                //?pos_资源竞争
     //            std::this_thread::sleep_for( std::chrono::milliseconds( 3 ) );  //?pos_资源竞争

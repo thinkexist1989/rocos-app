@@ -7,6 +7,9 @@ namespace JC_helper
                                                 const std::vector< double >& end,
                                                 double s )
     {
+        constexpr double eps = 1E-7;
+        
+
         if ( s > 1 || s < 0 )
         {
             std::cerr << RED << "values of S outside interval [0,1]" << GREEN << std::endl;
@@ -25,7 +28,7 @@ namespace JC_helper
         //**-------------------------------**//
 
         double theta = acos( cosTheta );
-        if ( theta == 0 || s == 0 )
+        if ( abs(theta)<eps   || s == 0 )
             return start_2;
         else
         {
@@ -175,7 +178,7 @@ namespace JC_helper
     {
         using namespace KDL;
         //** 变量初始化 **//
-        const double eps = 1E-7;
+        constexpr double eps = 1E-7;
         Vector p1{ f_start.p };
         Vector p_mid{ f_mid.p };
         Vector p2{ f_end.p };
