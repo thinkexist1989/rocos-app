@@ -28,53 +28,66 @@ import "geometry.proto";
 import "google/protobuf/wrappers.proto";
 
 enum Synchronization {
-    SYNC_NONE = 0;
-    SYNC_TIME = 1;
-    SYNC_PHASE = 2;
+  SYNC_NONE = 0;
+  SYNC_TIME = 1;
+  SYNC_PHASE = 2;
 }
 
 enum Mode {
-    MODE_CSP = 0;
-    MODE_CSV = 1;
-    MODE_CST = 2;
+  MODE_CSP = 0;
+  MODE_CSV = 1;
+  MODE_CST = 2;
 }
+
+enum DraggingFlag {
+  J0 = 0; J1 = 1; J2 = 2; J3 = 3;J4 = 4;J5 = 5;J6 = 6;
+  TOOL_X = 7; TOOL_Y = 8; TOOL_Z = 9;
+  FLANG_X = 10; FLANG_Y = 11; FLANG_Z = 12;
+  OBJECT_X = 13; OBJECT_Y = 14; OBJECT_Z = 15;
+};
+
+enum DraggingDirection {
+  NONE = 0;
+  POSITIVE = 1;
+  NEGATIVE = -1;
+};
 
 /////// SingleAxisCommand ////////////
 message SingleAxisEnabled {
-    int32 id = 1;
+  int32 id = 1;
 }
 
 message SingleAxisDisabled {
-    int32 id = 1;
+  int32 id = 1;
 }
 
 message SingleAxisMode {
-    int32 id = 1;
-    Mode value = 2;
+  int32 id = 1;
+  Mode value = 2;
 }
 
 message SingleAxisMove {
-    int32 id = 1;
-    double pos = 2;
-    optional double max_vel = 3;
-    optional double max_acc = 4;
-    optional double max_jerk = 5;
-    optional double least_time = 6;
-    optional bool   raw_data = 7;
+  int32 id = 1;
+  double pos = 2;
+  optional double max_vel = 3;
+  optional double max_acc = 4;
+  optional double max_jerk = 5;
+  optional double least_time = 6;
+  optional bool   raw_data = 7;
 }
 
 message SingleAxisStop {
-    int32 id = 1;
+  int32 id = 1;
 }
 
 message SingleAxisCommand {
-    oneof command {
-        SingleAxisEnabled enabled = 1;
-        SingleAxisDisabled disabled = 2;
-        SingleAxisMode mode = 3;
-        SingleAxisMove move = 4;
-        SingleAxisStop stop = 5; //增加停止命令，可以以允许的最大加速度立刻停止
-    }
+  oneof command {
+    SingleAxisEnabled enabled = 1;
+    SingleAxisDisabled disabled = 2;
+    SingleAxisMode mode = 3;
+    SingleAxisMove move = 4;
+    SingleAxisStop stop = 5; //增加停止命令，可以以允许的最大加速度立刻停止
+  }
 }
 
 /////// MultiAxisCommand ////////////
@@ -85,42 +98,42 @@ message MultiAxisDisabled {
 }
 
 message MultiAxisMode {
-    repeated Mode value = 1;
+  repeated Mode value = 1;
 }
 
 message MultiAxisSync {
-    Synchronization value = 1;
+  Synchronization value = 1;
 }
 
 message MultiAxisMove {
-    repeated double target_pos = 1;
-    repeated double max_vel = 3;
-    repeated double max_acc = 4;
-    repeated double max_jerk = 5;
-    optional double least_time = 6;
-    optional bool raw_data = 7;
-    optional Synchronization sync = 8;
+  repeated double target_pos = 1;
+  repeated double max_vel = 3;
+  repeated double max_acc = 4;
+  repeated double max_jerk = 5;
+  optional double least_time = 6;
+  optional bool raw_data = 7;
+  optional Synchronization sync = 8;
 }
 
 message MultiAxisStop {
 }
 
 message MultiAxisCommand {
-    oneof command {
-        MultiAxisEnabled enabled = 1;
-        MultiAxisDisabled disabled = 2;
-        MultiAxisMode mode = 3;
-        MultiAxisSync sync = 4;
-        MultiAxisMove move = 5;
-        MultiAxisStop stop = 6; //增加停止命令，每个轴都可以以允许的最大加速度立刻停止
-    }
+  oneof command {
+    MultiAxisEnabled enabled = 1;
+    MultiAxisDisabled disabled = 2;
+    MultiAxisMode mode = 3;
+    MultiAxisSync sync = 4;
+    MultiAxisMove move = 5;
+    MultiAxisStop stop = 6; //增加停止命令，每个轴都可以以允许的最大加速度立刻停止
+  }
 }
 
 
 /////// General Command /////////////
 message Enabled {
-    repeated double target_pos = 1;
-    repeated double target_vel = 2;
+  repeated double target_pos = 1;
+  repeated double target_vel = 2;
 }
 
 message Disabled {
@@ -128,133 +141,142 @@ message Disabled {
 
 // 查询或设置零位偏移
 message ZeroOffset {
-    repeated google.protobuf.Int32Value value = 1;
+  repeated google.protobuf.Int32Value value = 1;
 }
 
 // 查询或设置单位转换
 message CntPerUnit {
-    repeated google.protobuf.DoubleValue value = 1;
+  repeated google.protobuf.DoubleValue value = 1;
 }
 
 /////// Motion Command /////////////
 
 message MoveJ {
-    JointArray q = 1; //关节
-    double speed = 2;
-    double acceleration = 3;
-    double time = 4;
-    double radius = 5;
-    bool asynchronous = 6;
+  JointArray q = 1; //关节
+  double speed = 2;
+  double acceleration = 3;
+  double time = 4;
+  double radius = 5;
+  bool asynchronous = 6;
 }
 
 message MoveJ_IK {
-    SE3Pose pose = 1;
-    double speed = 2;
-    double acceleration = 3;
-    double time = 4;
-    double radius = 5;
-    bool asynchronous = 6;
+  SE3Pose pose = 1;
+  double speed = 2;
+  double acceleration = 3;
+  double time = 4;
+  double radius = 5;
+  bool asynchronous = 6;
 }
 
 message MoveL {
-    SE3Pose pose = 1;
-    double speed = 2;
-    double acceleration = 3;
-    double time = 4;
-    double radius = 5;
-    bool asynchronous = 6;
+  SE3Pose pose = 1;
+  double speed = 2;
+  double acceleration = 3;
+  double time = 4;
+  double radius = 5;
+  bool asynchronous = 6;
 }
 
 message MoveL_FK {
-    JointArray q = 1;
-    double speed = 2;
-    double acceleration = 3;
-    double time = 4;
-    double radius = 5;
-    bool asynchronous = 6;
+  JointArray q = 1;
+  double speed = 2;
+  double acceleration = 3;
+  double time = 4;
+  double radius = 5;
+  bool asynchronous = 6;
 }
 
 message MoveC {
-    SE3Pose pose_via = 1;
-    SE3Pose pose_to = 2;
-    double speed = 3;
-    double acceleration = 4;
-    double time = 5;
-    double radius = 6;
-    enum OrientationMode {
-        UNCONSTRAINED = 0;
-            FIXED = 1;
-    }
-    OrientationMode mode = 7;
-    bool asynchronous = 8;
+  SE3Pose pose_via = 1;
+  SE3Pose pose_to = 2;
+  double speed = 3;
+  double acceleration = 4;
+  double time = 5;
+  double radius = 6;
+  enum OrientationMode {
+    UNCONSTRAINED = 0;
+    FIXED = 1;
+  }
+  OrientationMode mode = 7;
+  bool asynchronous = 8;
 }
 
 message MoveP {
-    SE3Pose pose = 1;
-    double speed = 2;
-    double acceleration = 3;
-    double time = 4;
-    double radius = 5;
-    bool asynchronous = 6;
+  SE3Pose pose = 1;
+  double speed = 2;
+  double acceleration = 3;
+  double time = 4;
+  double radius = 5;
+  bool asynchronous = 6;
 }
 
 // Path
 message Path {
-    message PathEntry {
-        enum MoveType {
-            MOVE_J = 0;
-            MOVE_L = 1;
-            MOVE_P = 2;
-            MOVE_C = 3;
-        }
-        MoveType type = 1;
-
-        oneof param {
-            JointArray q = 2;
-            SE3Pose pose = 3;
-        }
-
+  message PathEntry {
+    enum MoveType {
+      MOVE_J = 0;
+      MOVE_L = 1;
+      MOVE_P = 2;
+      MOVE_C = 3;
     }
-    repeated PathEntry waypoints = 1;
+    MoveType type = 1;
+
+    oneof param {
+      JointArray q = 2;
+      SE3Pose pose = 3;
+    }
+
+  }
+  repeated PathEntry waypoints = 1;
 }
 //MovePath
 message MovePath {
-    Path path = 1;
-    bool asynchronous = 2;
+  Path path = 1;
+  bool asynchronous = 2;
 }
 
 message MotionCommand {
-    oneof command {
-        MoveJ move_j = 1;
-        MoveJ_IK move_j_ik = 2;
-        MoveL move_l = 3;
-        MoveL_FK move_l_fk = 4;
-        MoveC move_c = 5;
-        MoveP move_p = 6;
-        MovePath move_path = 7;
-    }
+  oneof command {
+    MoveJ move_j = 1;
+    MoveJ_IK move_j_ik = 2;
+    MoveL move_l = 3;
+    MoveL_FK move_l_fk = 4;
+    MoveC move_c = 5;
+    MoveP move_p = 6;
+    MovePath move_path = 7;
+  }
+}
+
+/////// Dragging Command /////////////
+message DraggingCommand {
+  DraggingFlag flag = 1;
+  DraggingDirection dir = 2;
+  double max_speed = 3;
+  double max_acceleration = 4;
 }
 
 ///////////////////////////////////////
 
 message RobotCommand {
-    oneof command {
-        Enabled enabled = 1;
-        Disabled disabled = 2;
-        MoveJ   move_j = 3;
-        SingleAxisCommand single_axis_command = 4;
-        MultiAxisCommand multi_axis_command = 5;
-        MotionCommand motion_command = 6;
-    }
+  oneof command {
+    Enabled enabled = 1;
+    Disabled disabled = 2;
+    MoveJ   move_j = 3;
+    SingleAxisCommand single_axis_command = 4;
+    MultiAxisCommand multi_axis_command = 5;
+    MotionCommand motion_command = 6;
+    DraggingCommand dragging_command = 7;
+  }
 }
 
 message RobotCommandRequest {
-    //Common request header.
-    RequestHeader header = 1;
-    RobotCommand command = 2;
+  //Common request header.
+  RequestHeader header = 1;
+  RobotCommand command = 2;
 }
 
 message RobotCommandResponse {
-    //Common request header.
-    ResponseHeader header = 1;
+  //Common request header.
+  ResponseHeader header = 1;
 }
