@@ -59,7 +59,7 @@ namespace rocos {
                 interp_[i] = new DoubleS;
             }
         }
-        kinematics_.initTechServo();
+//        kinematics_.initTechServo();
         static plog::ColorConsoleAppender<plog::TxtFormatter> consoleAppender;
         plog::init(plog::debug, &consoleAppender); // Initialize the logger.
         startMotionThread();
@@ -983,7 +983,7 @@ namespace rocos {
 
     int Robot::Dragging( DRAGGING_FLAG flag, DRAGGING_DIRRECTION dir, double max_speed, double max_acceleration )
     {
-        if ( CheckBeforeMove( JntArray{ 6 }, max_speed, max_acceleration, 0, 0 ) < 0 )
+        if ( CheckBeforeMove( JntArray{ static_cast<unsigned int>(jnt_num_) }, max_speed, max_acceleration, 0, 0 ) < 0 )
         {
             PLOG_ERROR << "given parameters is invalid";
             return -1;
@@ -994,7 +994,7 @@ namespace rocos {
         static std::shared_ptr< boost::thread > thread_planning{ nullptr };
         static std::shared_ptr< boost::thread > thread_IK{ nullptr };
         static std::shared_ptr< boost::thread > thread_motion{ nullptr };
-        KDL::JntArray target_joint{ 6 };
+        KDL::JntArray target_joint{ static_cast<unsigned int>(jnt_num_) };
         KDL::Frame target_frame;
         KDL::Vector x;
         int index{static_cast< int >( flag )};

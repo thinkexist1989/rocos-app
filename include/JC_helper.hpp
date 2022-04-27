@@ -163,7 +163,7 @@ namespace JC_helper
     int rotation_trajectory( std::vector< KDL::Frame >& traj, const KDL::Vector& f_p, const KDL::Rotation& f_r1, const KDL::Rotation& f_r2, double max_path_v = 0.01, double max_path_a = 0.01, double equivalent_radius = 0.01 );
 
 
-    constexpr size_t _joint_num{ 6 };
+    constexpr size_t _joint_num{ 7 };
     
     class smart_servo
     {
