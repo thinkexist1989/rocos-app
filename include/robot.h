@@ -461,9 +461,9 @@ namespace rocos {
 
         enum class DRAGGING_FLAG {
             J0 = 0, J1 = 1, J2 = 2, J3 = 3, J4 = 4, J5 = 5, J6 = 6,
-            TOOL_X = 100, TOOL_Y = 101, TOOL_Z = 102,
-            FLANGE_X = 200, FLANGE_Y = 201, FLANGE_Z = 202,
-            OBJECT_X = 300, OBJECT_Y = 301, OBJECT_Z = 302,
+            TOOL_X = 100, TOOL_Y = 101, TOOL_Z = 102, TOOL_ROLL = 103, TOOL_PITCH= 104, TOOL_YAW = 105,
+            FLANGE_X = 200, FLANGE_Y = 201, FLANGE_Z = 202,FLANGE_ROLL = 203, FLANGE_PITCH = 204, FLANGE_YAW = 205,
+            OBJECT_X = 300, OBJECT_Y = 301, OBJECT_Z = 302,OBJECT_ROLL= 303, OBJECT_PITCH = 304, OBJECT_YAW = 305,
         };
 
         enum class DRAGGING_DIRRECTION {
@@ -480,6 +480,11 @@ namespace rocos {
          * @param max_acceleration 最大关节速度
          * @return int 
          * @example 
+         *   for ( int i = 0; i < 100; i++ )
+         *  {
+         *   robot.Dragging( Robot::DraggingFlag::J1, Robot::DraggingDirection::POSITION, 1, 1);
+         *   std::this_thread::sleep_for( std::chrono::milliseconds( 50 ) );
+         *   }
          * 
          */
         int Dragging(DRAGGING_FLAG flag, DRAGGING_DIRRECTION dir, double max_speed, double max_acceleration);
@@ -549,7 +554,7 @@ namespace rocos {
 
         bool is_running_{false};
         bool is_exit_{false};
-        bool is_running_motion{false};
+        std::atomic<bool> is_running_motion{false};
 
         std::vector<bool> need_plan_;  // 是否需要重新规划标志
 

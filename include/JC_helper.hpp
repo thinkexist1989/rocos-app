@@ -2,18 +2,17 @@
 #define JC_HELPER_H
 
 #include "kdl/frames.hpp"
-#include <iostream>
-#include <ruckig/ruckig.hpp>
-#include <vector>
+#include <atomic>
 #include <interpolate.h>
+#include <iostream>
 #include <kdl/frames.hpp>
 #include <kdl/jntarray.hpp>
 #include <mutex>
-#include <atomic>
-#include <plog/Log.h>
 #include <plog/Appenders/ColorConsoleAppender.h>
 #include <plog/Initializers/RollingFileInitializer.h>
-
+#include <plog/Log.h>
+#include <ruckig/ruckig.hpp>
+#include <vector>
 
 #define RESET "\033[0m"
 
@@ -162,53 +161,81 @@ namespace JC_helper
  */
     int rotation_trajectory( std::vector< KDL::Frame >& traj, const KDL::Vector& f_p, const KDL::Rotation& f_r1, const KDL::Rotation& f_r2, double max_path_v = 0.01, double max_path_a = 0.01, double equivalent_radius = 0.01 );
 
-
     constexpr size_t _joint_num{ 7 };
-    
+
     class smart_servo
     {
-    public:
-        smart_servo( std::vector< KDL::JntArray >* traj_ptr, std::atomic< bool >* finished_flag_ptr );
-        void init( std::vector< double > q_init, std::vector< double > v_init, std::vector< double > a_init, double max_v, double max_a, double max_j );
-        void init( KDL::Frame p_init, double v_init, double a_init, double max_v, double max_a, double max_j );
-
-        void smart_servo_using_Joint(rocos::Robot* robot_ptr );
-        void smart_servo_using_Cartesian( );
-        void smart_servo_IK( rocos::Robot* );
-        void smart_servo_motion( rocos::Robot* );
-        void command( KDL::JntArray q_target );
-        void command( KDL::Frame p_target );
-
     private:
-        std::vector< KDL::JntArray >* external_traj_ptr;
-        std::atomic< bool >* external_finished_flag_ptr;
+        //** 这里都是关节smart servo 所需的全部变量 **//
         std::mutex input_mutex;
-        std::mutex traj_mutex;
-
-        ruckig::Ruckig< _joint_num > otg{0.001};
+        ruckig::Ruckig< _joint_num > otg{ 0.001 };
         ruckig::InputParameter< _joint_num > input;
         ruckig::OutputParameter< _joint_num > output;
+        //**-------------------------------**//
 
-        struct 
+        std::atomic< bool > on_stop_trajectory{ false };
+        std::atomic< bool >* external_finished_flag_ptr;
+
+        //** 这里都是笛卡尔smart servo 所需的全部变量 **//
+        struct
         {
             KDL::Frame _p_init;
+            KDL::JntArray _q_init;
             double _v_init;
             double _a_init;
             double _max_v;
             double _max_a;
             double _max_j;
 
+            KDL::Frame last_target;
+            KDL::Frame last_last_target;
+            KDL::Frame target;
+
+            std::vector< KDL::Frame > traj_frame;
+            std::vector< KDL::JntArray > traj_joint;
+
+            std::mutex mutex_traj_frame;
+            std::mutex mutex_traj_joint;
+            std::mutex mutex_command_flag;
+
         } _Cartesian_state;
 
         struct
         {
-            std::atomic< bool > _FinishPlanningCart{ true };
-            std::atomic< bool > _FinishCartIK{ true };
-        } _runnig_flag;
+            std::atomic< bool > _FinishedPlanningCart{ true };
+            std::atomic< bool > _FinishedCartIK{ true };
+        } _Cartesian_flag;
 
-      std::atomic<bool> on_stop_trajectory {false};
+        struct
+        {
+            std::mutex mutex_traj_frame;
+            std::mutex mutex_traj_joint;
+            std::mutex mutex_command_flag;
+        } _Cartesian_mutex;
 
+        //**-------------------------------**//
+
+
+    public:
+        smart_servo( std::atomic< bool >* finished_flag_ptr );
+        void init( std::vector< double > q_init, std::vector< double > v_init, std::vector< double > a_init, double max_v, double max_a, double max_j );
+        void init( KDL::JntArray q_init, KDL::Frame p_init, double v_init, double a_init, double max_v, double max_a, double max_j );
+
+        void smart_servo_using_Joint( rocos::Robot* robot_ptr );
+        void smart_servo_using_Cartesian( );
+        void smart_servo_IK( rocos::Robot* );
+        void smart_servo_motion( rocos::Robot* );
+        void command( KDL::JntArray q_target );
+        void command( KDL::Frame p_target );
     };
+
+  inline  KDL::JntArray vector_2_JntArray( std::vector< double > pos )
+    {
+        KDL::JntArray _pos( pos.size( ) );
+        for ( int i = 0; i < pos.size( ); i++ )
+            _pos( i ) = pos[ i ];
+        return _pos;
+    }
 
 }  // namespace JC_helper
 

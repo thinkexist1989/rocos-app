@@ -8,11 +8,11 @@ namespace JC_helper
                                                 double s )
     {
         constexpr double eps = 1E-7;
-        
 
         if ( s > 1 || s < 0 )
         {
-            std::cerr << RED << "values of S outside interval [0,1]" << GREEN << std::endl;
+            //TODO 处理assert
+            assert( 0 && "values of S outside interval [0,1]" );
         }
 
         double cosTheta = start[ 0 ] * end[ 0 ] + start[ 1 ] * end[ 1 ] + start[ 2 ] * end[ 2 ] +
@@ -28,18 +28,27 @@ namespace JC_helper
         //**-------------------------------**//
 
         double theta = acos( cosTheta );
-        if ( abs(theta)<eps   || s == 0 )
+
+        //!theta本应该计算为0，但是实际可能为0.000001，即使有(eps=1E-7)限定范围，仍然有误判可能,所以最好使用isnan()
+        if ( abs( theta ) < eps || s == 0 )
             return start_2;
         else
         {
             double coefficient_1 = sin( ( 1 - s ) * theta ) / sin( theta );
             double coefficient_2 = sin( ( s )*theta ) / sin( theta );
 
-            return std::vector< double >{
+            std::vector< double > res{
                 coefficient_1 * start_2[ 0 ] + coefficient_2 * end[ 0 ],
                 coefficient_1 * start_2[ 1 ] + coefficient_2 * end[ 1 ],
                 coefficient_1 * start_2[ 2 ] + coefficient_2 * end[ 2 ],
                 coefficient_1 * start_2[ 3 ] + coefficient_2 * end[ 3 ] };
+
+            //!防止误判
+            for ( const auto& var : res )
+                if ( isnan( var ) )
+                    return start_2;
+
+            return res;
         }
     }
 
@@ -555,12 +564,12 @@ namespace JC_helper
         return 0;
     }
 
-    smart_servo::smart_servo( std::vector< KDL::JntArray >* traj_ptr, std::atomic< bool >* finished_flag_ptr )
+    smart_servo::smart_servo( std::atomic< bool >* finished_flag_ptr )
     {
-        external_traj_ptr          = traj_ptr;
         external_finished_flag_ptr = finished_flag_ptr;
     }
 
+    //!init()只负责轨迹的信息重置，运行状态Flag由各运动线程结束后{手动重置}
     void smart_servo::init( std::vector< double > q_init, std::vector< double > v_init, std::vector< double > a_init, double max_v, double max_a, double max_j )
     {
         input.control_interface = ruckig::ControlInterface::Position;
@@ -582,15 +591,22 @@ namespace JC_helper
         }
         PLOG_INFO << "smart servo init succesed";
     }
-
-    void smart_servo::init( KDL::Frame p_init, double v_init, double a_init, double max_v, double max_a, double max_j )
+    //!init()只负责轨迹的信息重置，运行状态Flag由各运动线程结束后{手动重置}
+    void smart_servo::init( KDL::JntArray q_init, KDL::Frame p_init, double v_init, double a_init, double max_v, double max_a, double max_j )
     {
         _Cartesian_state._p_init = p_init;
+        _Cartesian_state._q_init = q_init;
         _Cartesian_state._v_init = v_init;
         _Cartesian_state._a_init = a_init;
         _Cartesian_state._max_v  = max_v;
         _Cartesian_state._max_a  = max_a;
         _Cartesian_state._max_j  = max_j;
+
+        _Cartesian_state.target           = p_init;
+        _Cartesian_state.last_target      = p_init;
+        _Cartesian_state.last_last_target = p_init;
+
+        _Cartesian_state.traj_joint.clear( );  //!防止smart_servo_motio()使用上次结果
 
         PLOG_INFO << "smart servo init succesed";
     }
@@ -602,7 +618,7 @@ namespace JC_helper
         int count{ 0 };
         int _tick_count{ robot_ptr->tick_count };
 
-        while ( *external_finished_flag_ptr ) PLOG_INFO << "----waiting for command----";
+        while ( *external_finished_flag_ptr ) PLOG_INFO << "waiting for command";
 
         while ( 1 )
         {
@@ -614,7 +630,7 @@ namespace JC_helper
             {
                 ( *external_finished_flag_ptr ) = true;   //这次smart servo已结束，等待下一次smart servo
                 robot_ptr->is_running_motion    = false;  //机械臂运动已结束，可以执行其他离线类运动
-                on_stop_trajectory = false; //这个必须设为false,因为新线程仍然使用同一个对象数据成员
+                on_stop_trajectory              = false;  //这个必须设为false,因为新线程仍然使用同一个对象数据成员
                 PLOG_INFO << "smart servo has finished";
                 break;
             }
@@ -655,6 +671,9 @@ namespace JC_helper
                     {
                         input.target_velocity[ i ]     = 0.0;
                         input.target_acceleration[ i ] = 0.0;
+                        input.max_velocity[ i ]        = robot_ptr->joints_[ i ]->getMaxVel( );
+                        input.max_acceleration[ i ]    = robot_ptr->joints_[ i ]->getMaxAcc( );
+                        input.max_jerk[ i ]            = robot_ptr->joints_[ i ]->getMaxJerk( );
                     }
                     input_lock.unlock( );
                 }
@@ -669,75 +688,185 @@ namespace JC_helper
         PLOG_ERROR << " have not  completed yet" << std::endl;
     }
 
-    //TODO 笛卡尔空间下smart servo,注意奇异位置速度激增问题
-    void smart_servo::smart_servo_IK( rocos::Robot* )
+    void smart_servo::smart_servo_IK( rocos::Robot* robot_ptr )
     {
-        PLOG_ERROR << " have not  completed yet";
+        //** 变量初始化 **//
+        _Cartesian_flag._FinishedCartIK = false;
+        std::unique_lock< std::mutex > lock_traj_frame( _Cartesian_state.mutex_traj_frame, std::defer_lock );  //不上锁
+        std::unique_lock< std::mutex > lock_traj_joint( _Cartesian_state.mutex_traj_joint, std::defer_lock );  //不上锁
+        KDL::Frame frame_target;
+        int traj_frame_count = 0;
+        KDL::JntArray _q_target( _joint_num );
+        std::vector< double > max_step;
+        //**-------------------------------**//
+
+        for ( int i = 0; i < _joint_num; i++ )
+        {
+            max_step.push_back( robot_ptr->max_vel_[ i ] * 0.001 );
+        }
+
+        //** 轨迹计算 **//
+        while ( 1 )
+        {
+            lock_traj_frame.lock( );
+            if ( traj_frame_count < _Cartesian_state.traj_frame.size( ) )
+            {
+                frame_target = _Cartesian_state.traj_frame[ traj_frame_count ];
+                lock_traj_frame.unlock( );
+            }
+            else
+            {
+                lock_traj_frame.unlock( );
+
+                if ( _Cartesian_flag._FinishedPlanningCart )
+                    break;  //全部frame已经取出。
+                else
+                    continue;  //未取出，但是当前已读取到最新数据。
+            }
+            traj_frame_count++;
+
+            if ( ( robot_ptr->kinematics_ ).CartToJnt( _Cartesian_state._q_init, frame_target, _q_target ) < 0 )
+            {
+                PLOG_ERROR << " CartToJnt failed , frame_target =\n"
+                           << frame_target;
+                on_stop_trajectory = true;
+                break;
+            }
+
+            for ( int i = 0; i < _joint_num; i++ )
+            {
+                if ( abs( _q_target( i ) - _Cartesian_state._q_init( i ) ) > max_step[ i ] )
+                {
+                    PLOG_ERROR << "joint[" << i << "] speep is too  fast on the ";
+                    on_stop_trajectory = true;
+                    break;
+                }
+            }
+
+            lock_traj_joint.lock( );
+            _Cartesian_state.traj_joint.push_back( _q_target );
+            lock_traj_joint.unlock( );
+            _Cartesian_state._q_init = _q_target;
+        }
+        _Cartesian_flag._FinishedCartIK = true;
     }
-   
-    //TODO 笛卡尔空间下smart servo
+
     void smart_servo::smart_servo_motion( rocos::Robot* robot_ptr )
     {
         //** 变量初始化 **//
-        std::unique_lock< std::mutex > traj_lock( traj_mutex, std::defer_lock );
+        std::unique_lock< std::mutex > lock_traj_joint( _Cartesian_state.mutex_traj_joint, std::defer_lock );  //不上锁
+        int traj_joint_count = 0;
         int count{ 0 };
-        int index{ 0 };
         KDL::JntArray joint_command;
         int _tick_count{ robot_ptr->tick_count };
         //**-------------------------------**//
-        //** 等待command 开始 **//
-        while ( *external_finished_flag_ptr ) PLOG_INFO << "----waiting for command----";
-        //**-------------------------------**//
 
-        while ( 1 )
+        //** 正常情况下，发送IK算的关节轨迹 **//
+        while ( !on_stop_trajectory )
         {
-            traj_lock.lock( );
-            //关节轨迹有余
-            if ( index < ( *external_traj_ptr ).size( ) )
+            //** 读取最新命令 **//
+            lock_traj_joint.lock( );
+            if ( traj_joint_count < _Cartesian_state.traj_joint.size( ) )
             {
-                joint_command = ( *external_traj_ptr )[ index ];
-                traj_lock.unlock( );
-
-                for ( int i = 0; i < _joint_num; ++i )
-                {
-                    robot_ptr->pos_[ i ] = joint_command( i );
-                    robot_ptr->joints_[ i ]->setPosition( joint_command( i ) );
-                }
-
-                robot_ptr->hw_interface_->waitForSignal( 0 );
+                joint_command = _Cartesian_state.traj_joint[ traj_joint_count ];
+                lock_traj_joint.unlock( );
             }
-            else  //指向最后一个
+            else
             {
-                traj_lock.unlock( );
-                if ( _runnig_flag._FinishCartIK )
-                    break;  //全部关节轨迹已经取出
+                lock_traj_joint.unlock( );
+                if ( _Cartesian_flag._FinishedCartIK )
+                    break;  //全部frame已经取出
                 else
-                    continue;  //还没规划完，本次跳过
+                    continue;
             }
 
-            index++;
+            traj_joint_count++;
+            //**-------------------------------**//
 
-            //** 100ms进行一次心跳检查,紧急停止时不需要检查 **//
-            if ( ( ++count == 100 ) && !on_stop_trajectory )
+            for ( int i = 0; i < _joint_num; ++i )
+            {
+                robot_ptr->pos_[ i ] = joint_command( i );
+                robot_ptr->joints_[ i ]->setPosition( joint_command( i ) );
+            }
+            robot_ptr->hw_interface_->waitForSignal( 0 );
+
+            //** 100ms进行一次心跳检查,超时触发紧急停止 **//
+            if ( ( ++count ) == 100 )
             {
                 count = 0;
-
                 if ( _tick_count != robot_ptr->tick_count )
+                {
                     _tick_count = robot_ptr->tick_count;
+                }
                 else
                 {
-                    PLOG_ERROR << "RunDragging():Some errors such as disconnecting from the controller";
+                    PLOG_ERROR << "Some errors such as disconnecting from the controller";
                     on_stop_trajectory = true;
-                    {
-                        //TODO 笛卡尔下紧急停止
-                    }
                 }
             }
             //**-------------------------------**//
         }
+        //**--------------------------------------------------------------**//
+
+        //**紧急停止 ，可能原因：1.轨迹规划失败、2.IK求解失败 3.心跳保持超时**//
+        if ( on_stop_trajectory )
+        {
+            ruckig::Ruckig< _joint_num > otg{ 0.001 };
+            ruckig::InputParameter< _joint_num > input;
+            ruckig::OutputParameter< _joint_num > output;
+            ruckig::Result res;
+
+            KDL::JntArray current_pos{ _Cartesian_state.traj_joint[ traj_joint_count - 1 ] };
+            KDL::JntArray last_pos{ _Cartesian_state.traj_joint[ traj_joint_count - 2 ] };
+            KDL::JntArray last_last_pos{ _Cartesian_state.traj_joint[ traj_joint_count - 3 ] };
+            KDL::JntArray current_vel( _joint_num );
+            KDL::JntArray last_vel( _joint_num );
+            KDL::JntArray current_acc( _joint_num );
+
+            KDL::Subtract( current_pos, last_pos, current_vel );
+            KDL::Divide( current_vel, 0.001, current_vel );
+
+            KDL::Subtract( last_pos, last_last_pos, last_vel );
+            KDL::Divide( last_vel, 0.001, last_vel );
+
+            KDL::Subtract( current_vel, last_vel, current_acc );
+            KDL::Divide( current_acc, 0.001, current_acc );
+
+            input.control_interface = ruckig::ControlInterface::Velocity;
+            input.synchronization   = ruckig::Synchronization::None;
+
+            for ( int i = 0; i < _joint_num; i++ )
+            {
+                input.current_position[ i ]     = current_pos( i );
+                input.current_velocity[ i ]     = current_vel( i );
+                input.current_acceleration[ i ] = current_acc( i );
+
+                input.target_position[ i ]     = current_pos( i );
+                input.target_velocity[ i ]     = 0;
+                input.target_acceleration[ i ] = 0;
+
+                input.max_velocity[ i ]     = robot_ptr->joints_[ i ]->getMaxVel( );
+                input.max_acceleration[ i ] = robot_ptr->joints_[ i ]->getMaxAcc( );
+                input.max_jerk[ i ]         = robot_ptr->joints_[ i ]->getMaxJerk( );
+            }
+
+            while ( ( res = otg.update( input, output ) ) != ruckig::Result::Finished )
+            {
+                const auto& p = output.new_position;
+
+                for ( int i = 0; i < _joint_num; ++i )
+                {
+                    robot_ptr->pos_[ i ] = p[ i ];
+                    robot_ptr->joints_[ i ]->setPosition( p[ i ] );
+                }
+                output.pass_to_input( input );
+                robot_ptr->hw_interface_->waitForSignal( 0 );
+            }
+        }
 
         ( *external_finished_flag_ptr ) = true;   //这次smart servo已结束，等待下一次smart servo
         robot_ptr->is_running_motion    = false;  //机械臂运动已结束，可以执行其他离线类运动
+        on_stop_trajectory              = false;
     }
 
     void smart_servo::command( KDL::JntArray q_target )
@@ -757,7 +886,7 @@ namespace JC_helper
         }
         else
         {
-            PLOG_DEBUG<<"control is not allowed during emergency stop";
+            PLOG_DEBUG << "control is not allowed during emergency stop";
         }
     }
 
