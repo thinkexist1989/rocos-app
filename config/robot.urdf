@@ -79,7 +79,7 @@
         <axis xyz="0 0 1"/>
         <hardware id="1">
             <limit lower="-2.312" upper="2.312" vel="1.0" acc="10.0" jerk="10.0" effort="30.0" />
-            <transform ratio="1.0" offset_pos_cnt="361813" cnt_per_unit="983040.0" torque_per_unit="1.0" user_unit_name="rad"/>
+            <transform ratio="1.0" offset_pos_cnt="361813" cnt_per_unit="156455.678" torque_per_unit="1.0" user_unit_name="rad"/>
         </hardware>
     </joint>
     <link name="link_3">
@@ -148,7 +148,7 @@
         <axis xyz="0 0 1"/>
         <hardware id="3">
             <limit lower="-2.312" upper="2.312" vel="1.0" acc="10.0" jerk="10.0" effort="30.0" />
-            <transform ratio="1.0" offset_pos_cnt="361811" cnt_per_unit="983040.0" torque_per_unit="1.0" user_unit_name="rad"/>
+            <transform ratio="1.0" offset_pos_cnt="361811" cnt_per_unit="156455.678" torque_per_unit="1.0" user_unit_name="rad"/>
         </hardware>
     </joint>
     <link name="link_5">
