@@ -720,6 +720,7 @@ namespace rocos {
                     PLOG_ERROR << "joint[" << i << "] speep is too  fast";
                     PLOG_ERROR.printf("q_init(%i)=%f",i,q_init(i)*180/3.1415926);
                     PLOG_ERROR.printf("q_target(%i)=%f",i,q_target(i)*180/3.1415926);
+                    PLOG_ERROR.printf("max_vel_(%i)=%f",i,max_vel_[i]*180/3.1415926);
                     return -1;
                 }
             }

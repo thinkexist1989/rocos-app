@@ -1,5 +1,10 @@
 #include "JC_helper.hpp"
 #include "robot.h"
+/** 待处理问题：
+ * 1. assert 换成异常
+ * 2. dragging 笛卡尔空间版 加入
+ * 3. drggging 关节空间改进，允许给笛卡尔位姿
+ */
 
 namespace JC_helper
 {
