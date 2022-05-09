@@ -78,7 +78,7 @@
         <child link="link_2"/>
         <axis xyz="0 0 1"/>
         <hardware id="1">
-          TODO  <limit lower="-2.312" upper="2.312" vel="1.0" acc="10.0" jerk="10.0" effort="30.0" />
+            <limit lower="-2.28" upper="2.28" vel="1.0" acc="10.0" jerk="10.0" effort="30.0" />
             <transform ratio="1.0" offset_pos_cnt="361813" cnt_per_unit="156455.678" torque_per_unit="1.0" user_unit_name="rad"/>
         </hardware>
     </joint>
@@ -147,7 +147,7 @@
         <child link="link_4"/>
         <axis xyz="0 0 1"/>
         <hardware id="3">
-       TODO     <limit lower="-2.312" upper="2.312" vel="1.0" acc="10.0" jerk="10.0" effort="30.0" />
+            <limit lower="-2.30" upper="2.30" vel="1.0" acc="10.0" jerk="10.0" effort="30.0" />
             <transform ratio="1.0" offset_pos_cnt="361811" cnt_per_unit="156455.678" torque_per_unit="1.0" user_unit_name="rad"/>
         </hardware>
     </joint>
@@ -181,7 +181,7 @@
         <child link="link_5"/>
         <axis xyz="0 0 1"/>
         <hardware id="4">
-         TODO   <limit lower="-3.09" upper="3.09" vel="1.0" acc="10.0" jerk="10.0" effort="30.0" />
+            <limit lower="-2.78" upper="2.78" vel="1.0" acc="10.0" jerk="10.0" effort="30.0" />
             <transform ratio="1.0" offset_pos_cnt="483328" cnt_per_unit="156455.678" torque_per_unit="1.0" user_unit_name="rad"/>
         </hardware>
     </joint>
@@ -249,7 +249,7 @@
         <child link="link_7"/>
         <axis xyz="0 0 1"/>
         <hardware id="6">
-         TODO   <limit lower="-2.95" upper="2.95" vel="1.0" acc="10.0" jerk="10.0" effort="30.0" />
+            <limit lower="-2.92" upper="2.92" vel="1.0" acc="10.0" jerk="10.0" effort="30.0" />
             <transform ratio="1.0" offset_pos_cnt="384569" cnt_per_unit="130379.73" torque_per_unit="1.0" user_unit_name="rad"/>
         </hardware>
     </joint>
