@@ -124,6 +124,7 @@ namespace JC_helper
 
     int link_trajectory( std::vector< KDL::Frame >& traj, const KDL::Frame& start, const KDL::Frame& end, double v_start, double v_end, double max_path_v, double max_path_a )
     {
+        constexpr double eps = 1E-7;
         if ( end == start )  //起始和终止位置一致，无需规划
             return 0;
         else
@@ -133,7 +134,7 @@ namespace JC_helper
             ::rocos::DoubleS doubleS_R;
             double path_length = ( end.p - start.p ).Norm( );
             //只旋转，不移地情况，要求v_start和v_end必需为0
-            if ( path_length == 0 )
+            if ( path_length <eps )
             {
                 if ( v_start != 0 || v_end != 0 )
                 {

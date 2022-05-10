@@ -984,11 +984,11 @@ namespace rocos {
 
         if (asynchronous)  //异步执行
         {
-            motion_thread_.reset(new boost::thread{&Robot::RunMultiMoveL, this, traj_});
+            motion_thread_.reset(new boost::thread{&Robot::RunMultiMoveL, this, std::ref(traj_)});
             is_running_motion = true;
         } else  //同步执行
         {
-            motion_thread_.reset( new boost::thread{ &Robot::RunMultiMoveL, this, traj_ } );
+            motion_thread_.reset( new boost::thread{ &Robot::RunMultiMoveL, this, std::ref(traj_) } );
             motion_thread_->join( );
             motion_thread_=nullptr; 
             is_running_motion = false;
@@ -1412,6 +1412,7 @@ namespace rocos {
     }
 
     //TODO 紧急停止
-    void Robot::StopMotion() {}
+    void Robot::StopMotion( ) {}
 
+ 
 }  // namespace rocos
