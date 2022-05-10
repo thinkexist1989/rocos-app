@@ -1231,7 +1231,43 @@ namespace rocos {
                 _smart_servo.command(target_frame);
                 break;
 
-            default:
+            case DRAGGING_FLAG::BASE_X:
+            case DRAGGING_FLAG::BASE_Y:
+            case DRAGGING_FLAG::BASE_Z:
+            case DRAGGING_FLAG::BASE_ROLL:
+            case DRAGGING_FLAG::BASE_PITCH:
+            case DRAGGING_FLAG::BASE_YAW:
+            
+                if ( _dragging_finished_flag )
+                {
+                    if ( _thread_planning )
+                    {
+                        _thread_planning->join( );
+                        _thread_planning = nullptr;
+                    }
+                    if ( _thread_IK )
+                    {
+                        _thread_IK->join( );
+                        _thread_IK = nullptr;
+                    }
+                    if ( _thread_motion )
+                    {
+                        _thread_motion->join( );
+                        _thread_motion = nullptr;
+                    }
+                    _smart_servo.init( JC_helper::vector_2_JntArray(pos_),flange_, 0, 0, max_speed, max_acceleration, 2 * max_acceleration );
+                    _thread_planning.reset( new boost::thread{ &JC_helper::smart_servo::smart_servo_using_Cartesian, &_smart_servo } );
+                    _thread_IK.reset( new boost::thread{ &JC_helper::smart_servo::smart_servo_IK, &_smart_servo, this } );
+                    _thread_motion.reset( new boost::thread{ &JC_helper::smart_servo::smart_servo_motion, &_smart_servo, this } );
+                }
+
+                index               = index - static_cast< int >( DRAGGING_FLAG::BASE_X );
+                tem_vector( index ) = static_cast< double >( dir ) * max_speed * 0.1;
+                target_frame        = flange_ * KDL::Frame{ flange_.M.Inverse( ) * tem_vector };
+                _smart_servo.command( target_frame );
+                break;
+
+            default:  // TODO 不接受指令处理-JC
                 PLOG_ERROR << " Undefined command flag";
                 break;
         }
