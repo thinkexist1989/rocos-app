@@ -667,7 +667,7 @@ namespace rocos {
         std::unique_ptr< R_INTERP_BASE > doubleS( new rocos::DoubleS );
         //**-------------------------------**//
 
-        doubleS->planProfile( 0, 0, 1, 0, 0, speed / Path_length, acceleration / Path_length,
+        doubleS->planProfile( 0, 0.0, 1.0, 0, 0, speed / Path_length, acceleration / Path_length,
                               acceleration * 2 / Path_length );
 
         if ( !doubleS->isValidMovement( ) || !( doubleS->getDuration( ) > 0 ) )

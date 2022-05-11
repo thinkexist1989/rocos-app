@@ -1,7 +1,6 @@
 #include "JC_helper.hpp"
 #include "robot.h"
 /** 待处理问题：
- * 1. assert 换成异常
  * 2. dragging 笛卡尔空间版 加入
  * 3. drggging 关节空间改进，允许给笛卡尔位姿
  */
@@ -14,14 +13,14 @@ namespace JC_helper
     {
         constexpr double eps = 1E-7;
 
-        if ( s > 1 || s < 0 )
+        if ( s < 0 || s > 1 )
         {
-            //TODO 处理assert
-            assert( 0 && "values of S outside interval [0,1]" );
+            PLOG_ERROR << "UnitQuaternion interpolation failure";
         }
 
         double cosTheta = start[ 0 ] * end[ 0 ] + start[ 1 ] * end[ 1 ] + start[ 2 ] * end[ 2 ] +
                           start[ 3 ] * end[ 3 ];
+
         std::vector< double > start_2 = start;
 
         //** 这里是为了取最短路径 **//
@@ -34,7 +33,7 @@ namespace JC_helper
 
         double theta = acos( cosTheta );
 
-        //!theta本应该计算为0，但是实际可能为0.000001，即使有(eps=1E-7)限定范围，仍然有误判可能,所以最好使用isnan()
+        //! theta本应该计算为0，但是实际可能为0.000001，即使有(eps=1E-7)限定范围，仍然有误判可能,所以最好使用isnan()
         if ( abs( theta ) < eps || s == 0 )
             return start_2;
         else
@@ -70,25 +69,36 @@ namespace JC_helper
         return start * KDL::Rotation::Rot2( axis, angle * s );
     }
 
-    KDL::Frame cirlular_trajectory( const KDL::Frame& F_base_circlestart, const KDL::Frame& F_base_circleend, const KDL::Frame& F_base_circleCenter, double s_p, double s_r, double alpha )
+    KDL::Frame cirlular_trajectory( const KDL::Frame& F_base_circlestart, const KDL::Frame& F_base_circleend, const KDL::Frame& F_base_circleCenter, double s_p, double s_r, double alpha, bool& success )
     {
         using namespace KDL;
 
-        assert( !( s_p > 1 || s_p < 0 ) && "values of s_p outside interval [0,1]" );  //*! 只要s超出范围就退出
-        assert( !( s_r > 1 || s_r < 0 ) && "values of s_r outside interval [0,1]" );  //*! 只要s超出范围就退出
+        if ( s_p > 1 || s_p < 0 )
+        {
+            PLOG_ERROR << "values of s_p outside interval [0,1]";
+            success = false;
+            return KDL::Frame{ };
+        }
+        if ( s_r > 1 || s_r < 0 )
+        {
+            PLOG_ERROR << "values of s_r outside interval [0,1]";
+            success = false;
+            return KDL::Frame{ };
+        }
 
         KDL::Vector x    = F_base_circlestart.p - F_base_circleCenter.p;
         double radius    = x.Normalize( );
         KDL::Vector tmpv = F_base_circleend.p - F_base_circleCenter.p;  //第二直线段上的半径段
         tmpv.Normalize( );
 
-        Vector z( x * tmpv );  //Z轴
+        Vector z( x * tmpv );  // Z轴
         double n = z.Normalize( );
 
         if ( n < epsilon )
         {
             std::cerr << RED << "cirlular_trajectory(): Z Axis Calculation error " << GREEN << std::endl;
-            assert( 0 );
+            success = false;
+            return KDL::Frame{ };
         }
 
         KDL::Frame F_base_circleCenter_( KDL::Rotation{ x, ( z * x ), z }, F_base_circleCenter.p );
@@ -99,13 +109,24 @@ namespace JC_helper
         F_base_circleend.M.GetQuaternion( Quaternion_end.at( 0 ), Quaternion_end.at( 1 ), Quaternion_end.at( 2 ), Quaternion_end.at( 3 ) );
         Quaternion_interp = UnitQuaternion_intep( Quaternion_start, Quaternion_end, s_r );
 
+        success = true;
         return KDL::Frame( KDL::Rotation::Quaternion( Quaternion_interp[ 0 ], Quaternion_interp[ 1 ], Quaternion_interp[ 2 ], Quaternion_interp[ 3 ] ), F_base_circleCenter_ * Vector{ radius * cos( s_p * alpha ), radius * sin( s_p * alpha ), 0 } );
     }
 
-    KDL::Frame link_trajectory( const KDL::Frame& start, const KDL::Frame& end, double s_p, double s_r )
+    KDL::Frame link_trajectory( const KDL::Frame& start, const KDL::Frame& end, double s_p, double s_r, bool& success )
     {
-        assert( !( s_p > 1 || s_p < 0 ) && "values of s_p outside interval [0,1]" );  //*! 只要s超出范围就退出
-        assert( !( s_r > 1 || s_r < 0 ) && "values of s_r outside interval [0,1]" );  //*! 只要s超出范围就退出
+        if ( s_p > 1 || s_p < 0 )
+        {
+            PLOG_ERROR << "values of s_p outside interval [0,1]";
+            success = false;
+            return KDL::Frame{ };
+        }
+        if ( s_r > 1 || s_r < 0 )
+        {
+            PLOG_ERROR << "values of s_r outside interval [0,1]";
+            success = false;
+            return KDL::Frame{ };
+        }
 
         //** 变量初始化 **//
         KDL::Vector Pstart = start.p;
@@ -118,7 +139,7 @@ namespace JC_helper
         start.M.GetQuaternion( Quaternion_start.at( 0 ), Quaternion_start.at( 1 ), Quaternion_start.at( 2 ), Quaternion_start.at( 3 ) );
         end.M.GetQuaternion( Quaternion_end.at( 0 ), Quaternion_end.at( 1 ), Quaternion_end.at( 2 ), Quaternion_end.at( 3 ) );
         Quaternion_interp = UnitQuaternion_intep( Quaternion_start, Quaternion_end, s_r );
-
+        success           = true;
         return KDL::Frame( KDL::Rotation::Quaternion( Quaternion_interp[ 0 ], Quaternion_interp[ 1 ], Quaternion_interp[ 2 ], Quaternion_interp[ 3 ] ), P );
     }
 
@@ -134,7 +155,7 @@ namespace JC_helper
             ::rocos::DoubleS doubleS_R;
             double path_length = ( end.p - start.p ).Norm( );
             //只旋转，不移地情况，要求v_start和v_end必需为0
-            if ( path_length <eps )
+            if ( path_length < eps )
             {
                 if ( v_start != 0 || v_end != 0 )
                 {
@@ -175,13 +196,21 @@ namespace JC_helper
             double t_total = 0;
             double s_p     = 0;
             double s_r     = 0;
+            bool link_success{ true };
+            KDL::Frame link_target{};
 
             //** 轨迹计算 **//
             while ( t_total >= 0 && t_total <= T_link )
             {
                 s_p = doubleS_P.pos( t_total );
-                s_r = doubleS_R.pos( t_total );
-                traj.push_back( link_trajectory( start, end, s_p, s_r ) );
+                s_r         = doubleS_R.pos( t_total );
+                link_target = link_trajectory( start, end, s_p, s_r, link_success );
+                if ( !link_success )
+                {
+                    PLOG_ERROR << " link calculating failure";
+                    return -1;
+                }
+                traj.push_back( link_target );
                 t_total = t_total + 0.001;
             }
             //**-------------------------------**//
@@ -250,7 +279,7 @@ namespace JC_helper
             std::cout << RED << " current_path_start_v  > max_path_v" << std::endl;
             std::cout << "current_path_start_v = " << current_path_start_v << std::endl;
             std::cout << " max_path_v = " << max_path_v << GREEN << std::endl;
-            assert( 0 );
+            return -1;
         }
 
         //**-------------------------------**//
@@ -275,9 +304,21 @@ namespace JC_helper
         //求解过渡半径占总长的百分比
         double s_bound_dist_1 = bound_dist == 0 ? 0 : bound_dist / abdist;
         double s_bound_dist_2 = bound_dist == 0 ? 0 : bound_dist / bcdist;  //避免只旋转时出现0/0
+        bool link_success{ true };
 
-        Frame F_base_circlestart = link_trajectory( f_start, f_mid, 1 - s_bound_dist_1, 1 - s_bound_dist_1 );
-        Frame F_base_circleend   = link_trajectory( f_mid, f_end, s_bound_dist_2, s_bound_dist_2 );
+        Frame F_base_circlestart = link_trajectory( f_start, f_mid, 1 - s_bound_dist_1, 1 - s_bound_dist_1, link_success );
+        if ( !link_success )
+        {
+            PLOG_ERROR << "link calculation failure";
+            return -1;
+        }
+
+        Frame F_base_circleend = link_trajectory( f_mid, f_end, s_bound_dist_2, s_bound_dist_2, link_success );
+        if ( !link_success )
+        {
+            PLOG_ERROR << "link calculation failure";
+            return -1;
+        }
 
         Vector de     = F_base_circlestart.p - f_start.p;  //实际要走的直线段的距离
         double dedist = de.Norm( );                        //实际要走的直线段的距离
@@ -305,7 +346,7 @@ namespace JC_helper
         if ( ( 1 - s_bound_dist_1 ) > eps )
         {
             double Path_length{ dedist };
-            //dedist==0,代表只旋转，不移动的情况
+            // dedist==0,代表只旋转，不移动的情况
             if ( Path_length == 0 )
             {
                 KDL::Rotation R_start_end = f_start.M.Inverse( ) * F_base_circlestart.M;
@@ -382,6 +423,9 @@ namespace JC_helper
         double t_total = 0;
         double s_p     = 0;
         double s_r     = 0;
+        KDL::Frame  link_target{};
+        KDL::Frame  circular_target{};
+        bool circule_success{true};
 
         std::cout << "T  = " << ( T_link + T_cirlular ) << std::endl;
         std::cout << "T_cirlular= " << ( T_cirlular ) << std::endl;
@@ -393,13 +437,27 @@ namespace JC_helper
             {
                 s_p = doubleS_1_P.pos( t_total );
                 s_r = doubleS_1_R.pos( t_total );
-                traj.push_back( link_trajectory( f_start, F_base_circlestart, s_p, s_r ) );
+
+                link_target =link_trajectory( f_start, F_base_circlestart, s_p, s_r,link_success ) ;
+                if(!link_success)
+                {
+                    PLOG_ERROR << "link calculation failure";
+                    return -1;
+                }
+                traj.push_back( link_target );
             }
             else
             {
                 s_p = ( t_total - T_link ) / T_cirlular;
                 s_r = doubleS_2_R.pos( t_total - T_link );
-                traj.push_back( cirlular_trajectory( F_base_circlestart, F_base_circleend, F_base_circleCenter, s_p, s_r, alpha ) );
+
+                circular_target = cirlular_trajectory( F_base_circlestart, F_base_circleend, F_base_circleCenter, s_p, s_r, alpha, circule_success );
+                if ( !circule_success )
+                {
+                    PLOG_ERROR << "circular calculation failure";
+                    return -1;
+                }
+                traj.push_back( circular_target );
             }
 
             t_total = t_total + 0.001;
@@ -442,8 +500,8 @@ namespace JC_helper
         v2 = f_p3.p - f_p1.p;
 
         //在新坐标系上
-        //f_p2 = [dot(v1,axis_x),0] = [bx,0]
-        //f_P3 = [dot(v2,axis_x),dot(v2,axis_y)=[cx,cy]
+        // f_p2 = [dot(v1,axis_x),0] = [bx,0]
+        // f_P3 = [dot(v2,axis_x),dot(v2,axis_y)=[cx,cy]
         //圆心一定位于[bx/2,0]的直线上，所以假设圆心为[bx/2,0]
         //在利用半径相等公式求解h
 
@@ -575,7 +633,7 @@ namespace JC_helper
         external_finished_flag_ptr = finished_flag_ptr;
     }
 
-    //!init()只负责轨迹的信息重置，运行状态Flag由各运动线程结束后{手动重置}
+    //! init()只负责轨迹的信息重置，运行状态Flag由各运动线程结束后{手动重置}
     void smart_servo::init( std::vector< double > q_init, std::vector< double > v_init, std::vector< double > a_init, double max_v, double max_a, double max_j )
     {
         input.control_interface = ruckig::ControlInterface::Position;
@@ -597,7 +655,7 @@ namespace JC_helper
         }
         PLOG_INFO << "smart servo init succesed";
     }
-    //!init()只负责轨迹的信息重置，运行状态Flag由各运动线程结束后{手动重置}
+    //! init()只负责轨迹的信息重置，运行状态Flag由各运动线程结束后{手动重置}
     void smart_servo::init( KDL::JntArray q_init, KDL::Frame p_init, double v_init, double a_init, double max_v, double max_a, double max_j )
     {
         _Cartesian_state._p_init = p_init;
@@ -688,7 +746,7 @@ namespace JC_helper
         }
     }
 
-    //TODO 笛卡尔空间下smart servo
+    // TODO 笛卡尔空间下smart servo
     void smart_servo::smart_servo_using_Cartesian( )
     {
         PLOG_ERROR << " have not  completed yet" << std::endl;
@@ -896,7 +954,7 @@ namespace JC_helper
         }
     }
 
-    //TODO 笛卡尔空间下smart servo
+    // TODO 笛卡尔空间下smart servo
     void smart_servo::command( KDL::Frame p_target )
     {
         PLOG_ERROR << " have not  completed yet";

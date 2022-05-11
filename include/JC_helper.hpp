@@ -91,7 +91,7 @@ namespace JC_helper
       * @param alpha 夹角
       * @return KDL::Frame 
       */
-    KDL::Frame cirlular_trajectory( const KDL::Frame& F_base_circlestart, const KDL::Frame& F_base_circleend, const KDL::Frame& F_base_circleCenter, double s_p, double s_r, double alpha );
+    KDL::Frame cirlular_trajectory( const KDL::Frame& F_base_circlestart, const KDL::Frame& F_base_circleend, const KDL::Frame& F_base_circleCenter, double s_p, double s_r, double alpha ,double & success);
 
     /**
       * @brief 直线规划（使用doubleS速度曲线）
@@ -100,7 +100,7 @@ namespace JC_helper
       * @param end 终止位姿
       * @return std::vector< KDL::Frame > 轨迹 
       */
-    KDL::Frame link_trajectory( const KDL::Frame& start, const KDL::Frame& end, double s_p, double s_r );
+    KDL::Frame link_trajectory( const KDL::Frame& start, const KDL::Frame& end, double s_p, double s_r, double & success );
 
     int link_trajectory( std::vector< KDL::Frame >& traj, const KDL::Frame& start, const KDL::Frame& end, double v_start, double v_end, double max_path_v, double max_path_a );
 
