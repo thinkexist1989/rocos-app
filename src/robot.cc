@@ -940,6 +940,7 @@ namespace rocos {
         KDL::JntArray q_target(jnt_num_);
         int count{0};
         int p = 0;  //表示当前正处理第几段轨迹
+        std::ofstream of{"./MultiMoveL.dat"};
 
         traj_.clear();
 
@@ -961,26 +962,30 @@ namespace rocos {
                 return -1;
             }
             //防止奇异位置速度激增
-            for (int i = 0; i < jnt_num_; i++) {
-                if (abs(q_target(i) - q_init(i)) > max_step[i]) {
-                    for (int j = 0; j < traj_index.size(); j++)
-                        p = count < traj_index[j] ? (j + 1) : p;  //找到当前是第几段轨迹
+            for ( int i = 0; i < jnt_num_; i++ )
+            {
+                if ( abs( q_target( i ) - q_init( i ) ) > max_step[ i ] )
+                {
+                    for ( int j = 0; j < traj_index.size( ); j++ )
+                        p = count < traj_index[ j ] ? ( j + 1 ) : p;  //找到当前是第几段轨迹
                     std::cout << RED << "MultiMoveL():count =" << count << std::endl;
                     std::cout << RED << "MultiMoveL():joint[" << i << "] speep is too  fast on the " << p
                               << "th trajectory" << std::endl;
-                    std::cout << RED << "MultiMoveL():target speed = " << abs(q_target(i) - q_init(i))
-                              << " and  max_step=" << max_step[i] << std::endl;
-                    std::cout << RED << "MultiMoveL():q_target( " << i << " )  = " << q_target(i) << std::endl;
-                    std::cout << RED << "MultiMoveL():q_init( " << i << " ) =" << q_init(i) << WHITE << std::endl;
+                    std::cout << RED << "MultiMoveL():target speed = " << abs( q_target( i ) - q_init( i ) )
+                              << " and  max_step=" << max_step[ i ] << std::endl;
+                    std::cout << RED << "MultiMoveL():q_target( " << i << " )  = " << q_target( i ) << std::endl;
+                    std::cout << RED << "MultiMoveL():q_init( " << i << " ) =" << q_init( i ) << WHITE << std::endl;
                     return -1;
                 }
             }
+            for ( int i = 0; i < jnt_num_; i++ )
+                of << q_target( i ) << "\t";
+                of<<"\n";
             traj_.push_back(q_target);
             count++;
         }
         //**-------------------------------**//
-
-
+        of.close( );
 
         if (asynchronous)  //异步执行
         {
@@ -1434,14 +1439,17 @@ namespace rocos {
         is_running_motion = false;  //TODO: added by Yangluo
     }
 
-    void Robot::RunMultiMoveL(const std::vector<KDL::JntArray> &traj) {
-        for (const auto &waypoints: traj) {
-            for (int i = 0; i < jnt_num_; ++i) {
-                pos_[i] = waypoints(i);
-                joints_[i]->setPosition(pos_[i]);
+    void Robot::RunMultiMoveL( const std::vector< KDL::JntArray >& traj )
+    {
+        for ( const auto& waypoints : traj )
+        {
+            for ( int i = 0; i < jnt_num_; ++i )
+            {
+                pos_[ i ] = waypoints( i );
+                joints_[ i ]->setPosition( waypoints(i));
             }
 
-            hw_interface_->waitForSignal(0);
+            hw_interface_->waitForSignal( 0 );
         }
 
         is_running_motion = false;

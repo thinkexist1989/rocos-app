@@ -194,6 +194,7 @@ namespace rocos {
     {
         std::string str;
         KDL::JntArray q_init( 7 );
+        KDL::JntArray q_target( 7 );
         KDL::Frame f_p1;
         KDL::Frame f_p2;
         KDL::Frame f_p3;
@@ -205,25 +206,35 @@ namespace rocos {
         KDL::Frame f_p9;
         KDL::Frame f_p11;
 
-        q_init( 0 ) = 0 * M_PI / 180;
-        q_init( 1 ) = -45 * M_PI / 180;
-        q_init( 2 ) = 0 * M_PI / 180;
-        q_init( 3 ) = -90 * M_PI / 180;
-        q_init( 4 ) = 0 * M_PI / 180;
-        q_init( 5 ) = 45 * M_PI / 180;
-        q_init( 6 ) = 0 * M_PI / 180;
+    
+        q_init( 0 ) = 44.477 * M_PI / 180;
+        q_init( 1 ) = -85.387 * M_PI / 180;
+        q_init( 2 ) = -85.851* M_PI / 180;
+        q_init( 3 ) = -90.00 * M_PI / 180;
+        q_init( 4 ) = -0.527 * M_PI / 180;
+        q_init( 5 ) = 45.337 * M_PI / 180;
+        q_init( 6 ) = 84.180* M_PI / 180;
+
+        q_target( 0 ) = 0 * M_PI / 180;
+        q_target( 1 ) = -45 * M_PI / 180;
+        q_target( 2 ) = 0 * M_PI / 180;
+        q_target( 3 ) = -90 * M_PI / 180;
+        q_target( 4 ) = 0 * M_PI / 180;
+        q_target( 5 ) = 45 * M_PI / 180;
+        q_target( 6 ) = 0 * M_PI / 180;
 
         setEnabled( );
 
         PLOG_DEBUG << "执行 moveJ,输入run执行";
         std::cin >> str;
+
         if ( str == std::string{ "run" } )
         {
-            MoveJ(q_init,0.4,0.2,0,0,false);
+            MoveJ(q_target,0.4,0.2,0,0,false);
         }
 
 
-        kinematics_.JntToCart( q_init, f_p1 );
+        kinematics_.JntToCart( q_target, f_p1 );
 
         PLOG_DEBUG << "f_p1 = \n"
                    << f_p1;
@@ -235,11 +246,11 @@ namespace rocos {
         {
             std::cout << "----------------test MultiMoveL start---------------" << std::endl;
 
-            f_p1  = f_p1 * KDL::Frame{ KDL::Vector{ 0.0, 0.3, 0 } };
-            f_p2  = f_p1 * KDL::Frame{ KDL::Vector{ -0.3, 0.0, -0.0 } };
+            f_p1  = f_p1 * KDL::Frame{ KDL::Vector{ -0.3, 0.0, 0.0 } };
+            f_p2  = f_p1 * KDL::Frame{ KDL::Vector{ 0.0, 0.3, 0.0 } };
             f_p3  = f_p2 * KDL::Frame{ KDL::Vector{ 0.3, 0.0, 0.0} };
             f_p4  = f_p3 * KDL::Frame{ KDL::Vector{ 0.0, -0.3, 0.0 } };
-            f_p5  = f_p4 * KDL::Frame{ KDL::Vector{ 0.0, 0.0, 0.15 } };                //180度调头
+            f_p5  = f_p4 * KDL::Frame{ KDL::Vector{ -0.3, 0.0, 0.0 } };                //180度调头
             f_p6  = f_p5 * KDL::Frame{ KDL::Vector{ 0.0, 0.0, 0.15 } };                //0度平行
             f_p7  = f_p6 * KDL::Frame{ KDL::Vector{ 0.0, 0.0, -0.3 } };                  //180度调头
             f_p8  = f_p7 * KDL::Frame{ KDL::Rotation::RotZ( -90 * M_PI / 180 ) };  //只旋转
@@ -251,18 +262,62 @@ namespace rocos {
             // std::vector< double > max_path_a{ 0.1, 0.1, 0.1};
             // std::vector< double > bound_dist{ 0.05, 0.05, 0.0};
 
-            std::vector< KDL::Frame > points{ f_p1, f_p2};
-            std::vector< double > max_path_v{ 0.06, 0.06};
-            std::vector< double > max_path_a{ 0.1, 0.1};
-            std::vector< double > bound_dist{ 0.00, 0.00};
+            // std::vector< KDL::Frame > points{ f_p1, f_p2,f_p3,f_p4};
+            // std::vector< double > max_path_v{ 0.06, 0.04,0.04, 0.06};
+            // std::vector< double > max_path_a{ 0.1, 0.1, 0.1, 0.1};
+            // std::vector< double > bound_dist{ 0.15, 0.0,0.1,0.1};
 
-            MultiMoveL( points, bound_dist, max_path_v, max_path_a, false );
+            std::vector< KDL::Frame > points{ f_p1, f_p2, f_p3, f_p4 };
+            std::vector< double > max_path_v{ 0.30, 0.30, 0.30, 0.30 };
+            std::vector< double > max_path_a{ 0.2, 0.2, 0.2, 0.2 };
+            std::vector< double > bound_dist{ 0.00, 0.0, 0.0, 0.0 };
+
+            // MultiMoveL( points, bound_dist, max_path_v, max_path_a, false );
+            MoveC( f_p1 , f_p2,0.10,0.2,0,0,Robot::OrientationMode::FIXED ,false);
+
+            MoveC( f_p3 , f_p4,0.10,0.2,0,0,Robot::OrientationMode::FIXED ,false);
+
+
+            // MoveJ( q_init, 0.4, 0.2, 0, 0, false );
+
+     
+            // MoveJ(q_init,0.4,0.2,0,0,false);
+
+            // MoveJ(q_target,0.4,0.2,0,0,false);
+
+  
+            // MoveJ(q_init,0.4,0.2,0,0,false);
+
+            // MoveJ(q_target,0.2,0.2,0,0,false);
+
+            // MoveJ(q_init,0.4,0.2,0,0,false);
+
+            // MoveJ(q_target,0.1,0.2,0,0,false);
+
             std::cout << "----------------test MultiMoveL end---------------" << std::endl;
         }
         else 
         {
             PLOG_DEBUG << "不执行，退出";
         }
+
+
+    //    if ( str == std::string{ "run" } )
+    //     {
+    //         std::cout << "----------------test MoveL start---------------" << std::endl;
+
+    //         f_p1  = f_p1 * KDL::Frame{ KDL::Vector{ 0.0, 0.075, 0.0 } };
+
+    //         std::vector< KDL::Frame > points{ f_p1, f_p2,f_p3,f_p4,f_p5};
+    //         std::vector< double > max_path_v{ 0.30, 0.30,0.30, 0.30,0.30};
+    //         std::vector< double > max_path_a{ 0.1, 0.1, 0.1, 0.1,0.1};
+    //         std::vector< double > bound_dist{ 0.1, 0.1,0.1,0.1,0.0};
+
+    //         MoveL( f_p1, 0.30, 0.1,0,0, false );
+    //         std::cout << "----------------test MoveL end---------------" << std::endl;
+    //     }
+
+
     }
 }
 
@@ -285,7 +340,8 @@ int main( int argc, char* argv[] )
 
     auto robotService = RobotServiceImpl::getInstance( &robot );
 
-    // std::thread thread_test{ &rocos::Robot::test, &robot };
+    std::thread thread_test{ &rocos::Robot::test, &robot };
+
     //------------------------wait----------------------------------
     robotService->runServer( );
     // thread_test.join( );
