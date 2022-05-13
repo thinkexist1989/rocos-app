@@ -7,6 +7,7 @@
 
 namespace JC_helper
 {
+    //TODO: 这个四元数插值是Slerp的实现吗？
     std::vector< double > UnitQuaternion_intep( const std::vector< double >& start,
                                                 const std::vector< double >& end,
                                                 double s )

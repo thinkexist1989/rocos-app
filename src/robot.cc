@@ -656,7 +656,7 @@ namespace rocos {
         KDL::Rotation R_start_end = flange_.M.Inverse( ) * pose.M;
         KDL::Vector ration_axis;
         double angle                   = R_start_end.GetRotAngle( ration_axis );
-        const double equivalent_radius = 0.1;
+        const double equivalent_radius = 0.1; // TODO: 等效半径，但是具体应该是什么值可以考虑
         double Rlength                 = ( equivalent_radius * abs( angle ) );
         double Path_length             = std::max( Plength, Rlength );
 
@@ -792,7 +792,7 @@ namespace rocos {
         KDL::JntArray q_target(jnt_num_);
         KDL::Frame f_flange = flange_;
         std::vector<double> max_step;
-        bool orientation_fixed = mode == Robot::OrientationMode::FIXED ? true : false;
+        bool orientation_fixed = mode == Robot::OrientationMode::FIXED;
         std::vector<KDL::Frame> traj_target;
         //**-------------------------------**//
 
