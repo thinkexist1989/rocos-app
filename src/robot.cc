@@ -619,7 +619,7 @@ namespace rocos {
     }
 
     int Robot::MoveL( Frame pose, double speed, double acceleration, double time,
-                      double radius, bool asynchronous )
+                      double radius, bool asynchronous ,int max_running_count)
     {
         if ( radius )
         {
@@ -631,7 +631,6 @@ namespace rocos {
             PLOG_ERROR << " time not supported yet";
             return -1;
         }
-
         if ( CheckBeforeMove( pose, speed, acceleration, time, radius ) < 0 )
         {
             PLOG_ERROR << "given parameters is invalid";
@@ -650,94 +649,105 @@ namespace rocos {
         }
 
         //** 变量初始化 **//
-        KDL::Vector Pstart        = flange_.p;
-        KDL::Vector Pend          = pose.p;
-        double Plength            = ( Pend - Pstart ).Norm( );
-        KDL::Rotation R_start_end = flange_.M.Inverse( ) * pose.M;
-        KDL::Vector ration_axis;
-        double angle                   = R_start_end.GetRotAngle( ration_axis );
-        const double equivalent_radius = 0.1; // TODO: 等效半径，但是具体应该是什么值可以考虑
-        double Rlength                 = ( equivalent_radius * abs( angle ) );
-        double Path_length             = std::max( Plength, Rlength );
-
         traj_.clear( );
         KDL::JntArray q_init( jnt_num_ );
         KDL::JntArray q_target( jnt_num_ );
-        double s = 0;
-        std::unique_ptr< R_INTERP_BASE > doubleS( new rocos::DoubleS );
+        std::vector<double> max_step;
+        std::vector<KDL::Frame> traj_target;
+        //!不要传入flange_ !不要传入flange_ !不要传入flange_
+        //!实测发现：因为后台有线程不断写入，因此读取可能失败，造成轨迹规划失败的假象！！！
+        //TODO 解决公共属性多线程互斥问题
+        KDL::Frame frame_init = flange_;
         //**-------------------------------**//
-
-        doubleS->planProfile( 0, 0.0, 1.0, 0, 0, speed / Path_length, acceleration / Path_length,
-                              acceleration * 2 / Path_length );
-
-        if ( !doubleS->isValidMovement( ) || !( doubleS->getDuration( ) > 0 ) )
-        {
-            PLOG_ERROR << "moveL trajectory "
-                       << "is infeasible ";
-            return -1;
-        }
-
-        //** 变量初始化 **//
-        double dt       = 0;
-        double duration = doubleS->getDuration( );
-        std::vector< double > Quaternion_start{ 0, 0, 0, 0 };
-        std::vector< double > Quaternion_end{ 0, 0, 0, 0 };
-        std::vector< double > Quaternion_interp{ 0, 0, 0, 0 };
-        flange_.M.GetQuaternion( Quaternion_start.at( 0 ), Quaternion_start.at( 1 ),
-                                 Quaternion_start.at( 2 ), Quaternion_start.at( 3 ) );
-        pose.M.GetQuaternion( Quaternion_end.at( 0 ), Quaternion_end.at( 1 ),
-                              Quaternion_end.at( 2 ), Quaternion_end.at( 3 ) );
-        std::vector< double > max_step;
-        KDL::Frame interp_frame{};
-        //**-------------------------------**//
-
+ 
         for ( int i = 0; i < jnt_num_; i++ )
         {
             q_init( i ) = pos_[ i ];
+            q_target( i ) = pos_[ i ];
             max_step.push_back( max_vel_[ i ] * 0.001 );
         }
 
-        //** 轨迹计算 **//
-        while ( dt <= duration )
+        if ( JC_helper::link_trajectory( traj_target, frame_init, pose,  speed, acceleration ) < 0 )
         {
-            s                 = doubleS->pos( dt );
-            KDL::Vector P     = Pstart + ( Pend - Pstart ) * s;
-            Quaternion_interp = JC_helper::UnitQuaternion_intep( Quaternion_start, Quaternion_end, s );
-            interp_frame.M    = KDL::Rotation::Quaternion( Quaternion_interp[ 0 ], Quaternion_interp[ 1 ],
-                                                           Quaternion_interp[ 2 ], Quaternion_interp[ 3 ] );
-            interp_frame.p    = P;
+            PLOG_ERROR << "link trajectory planning fail ";
+            return -1;
+        }
 
-            if ( kinematics_.CartToJnt( q_init, interp_frame, q_target ) < 0 )
+        //** 轨迹IK计算，计算失败，可以重新计算，有最大计算次数限制{max_running_count} **//
+        int ik_count{ 0 };
+        for (  ;ik_count < max_running_count; ik_count++ )
+        {
+            try
             {
-                PLOG_ERROR << " CartToJnt failed ";
-                return -1;
-            }
-            //防止奇异位置速度激增
-            for ( int i = 0; i < jnt_num_; i++ )
-            {
-                if ( abs( q_target( i ) - q_init( i ) ) > max_step[ i ] )
+                for ( int i = 0; i < jnt_num_; i++ )
                 {
-                    PLOG_ERROR << "joint[" << i << "] speep is too  fast";
-                    PLOG_ERROR.printf("q_init(%i)=%f",i,q_init(i)*180/3.1415926);
-                    PLOG_ERROR.printf("q_target(%i)=%f",i,q_target(i)*180/3.1415926);
-                    PLOG_ERROR.printf("max_vel_(%i)=%f",i,max_vel_[i]*180/3.1415926);
-                    return -1;
+                    q_init( i ) = pos_[ i ];
+                }
+                traj_.clear( );
+
+                PLOG_INFO << "---------------------------------------";
+
+                for ( const auto& target : traj_target )
+                {
+                    if ( kinematics_.CartToJnt( q_init, target, q_target ) < 0 )
+                    {
+                        // return -1;
+                        throw -1;
+                    }
+                    //防止奇异位置速度激增
+                    for ( int i = 0; i < jnt_num_; i++ )
+                    {
+                        if ( abs( q_target( i ) - q_init( i ) ) > max_step[ i ] )
+                        {
+                            PLOG_ERROR << "joint[" << i << "] speep is too  fast";
+                            PLOG_ERROR << "target speed = " << abs( q_target( i ) - q_init( i ) )
+                                       << " and  max_step=" << max_step[ i ];
+                            PLOG_ERROR << "q_target( " << i << " )  = " << q_target( i ) * 180 / M_PI;
+                            PLOG_ERROR << "q_init( " << i << " ) =" << q_init( i ) * 180 / M_PI;
+                            // return -1;
+                            throw -2;
+                        }
+                    }
+                    q_init = q_target;
+                    traj_.push_back( q_target );
+                }
+                //在此处时，代表规划成功
+                break;
+
+            }
+            catch ( int flag_error )
+            {
+                switch ( flag_error )
+                {
+                    case -1: PLOG_ERROR << " CartToJnt failed on the "<<ik_count<<" times"; break;
+                    case -2: PLOG_ERROR << " joint speep is too  fast "; break;
+                    default: PLOG_ERROR << "Undefined error!"; return -1;
                 }
             }
-
-            q_init = q_target;
-            traj_.push_back( q_target );  //TODO: 未初始化
-            dt += 0.001;
+            catch ( ... )
+            {
+                PLOG_ERROR << "Undefined error!";
+                return -1;
+            }
+       
         }
+
+        if ( ik_count == max_running_count )
+        {
+            PLOG_ERROR << "CartToJnt still failed even after " << max_running_count << " attempts";
+            return -1;
+        }
+
         //**-------------------------------**//
 
         if (asynchronous)  //异步执行
         {
-            motion_thread_.reset(new boost::thread{&Robot::RunMoveL, this, traj_});
+            motion_thread_.reset( new boost::thread{ &Robot::RunMoveL, this, std::ref( traj_ ) } );
             is_running_motion = true;
-        } else  //同步执行
+        }
+        else  //同步执行
         {
-            motion_thread_.reset( new boost::thread{ &Robot::RunMoveL, this, traj_ } );
+            motion_thread_.reset( new boost::thread{ &Robot::RunMoveL, this, std::ref( traj_ )  } );
             motion_thread_->join( );
             motion_thread_=nullptr; 
             is_running_motion = false;
@@ -755,93 +765,147 @@ namespace rocos {
         return MoveL(target, speed, acceleration, time, radius, asynchronous);
     }
 
-    int Robot::MoveC(Frame pose_via, Frame pose_to, double speed,
-                     double acceleration, double time, double radius,
-                     Robot::OrientationMode mode, bool asynchronous) {
-        if (radius) {
-            std::cerr << RED << " radius not supported yet" << WHITE << std::endl;
+    
+    int Robot::MoveC( Frame pose_via, Frame pose_to, double speed,
+                      double acceleration, double time, double radius,
+                      Robot::OrientationMode mode, bool asynchronous, int max_running_count )
+    {
+        if ( radius )
+        {
+            PLOG_ERROR << " radius not supported yet";
             return -1;
         }
-        if (time) {
-            std::cerr << RED << " time not supported yet" << WHITE << std::endl;
+        if ( time )
+        {
+            PLOG_ERROR << " time not supported yet";
             return -1;
         }
-
-        if (CheckBeforeMove(pose_via, speed, acceleration, time, radius) < 0) {
-            std::cerr << RED << "MoveC():given parameters is invalid" << WHITE << std::endl;
+        if ( CheckBeforeMove( pose_via, speed, acceleration, time, radius ) < 0 )
+        {
+            PLOG_ERROR << "given parameters is invalid";
             return -1;
         }
-
-        if (CheckBeforeMove(pose_to, speed, acceleration, time, radius) < 0) {
-            std::cerr << RED << "MoveC():given parameters is invalid" << WHITE << std::endl;
+        if ( CheckBeforeMove( pose_to, speed, acceleration, time, radius ) < 0 )
+        {
+            PLOG_ERROR << "given parameters is invalid";
             return -1;
         }
-
-
-        if (is_running_motion)  //最大一条任务异步执行
+        if ( is_running_motion )  //最大一条任务异步执行
         {
             PLOG_ERROR << RED << " Motion is still running and waiting for it to finish" << WHITE;
             return -1;
         }
-        if ( motion_thread_ ) { motion_thread_->join( );motion_thread_=nullptr; }
-
-
-        //** 变量初始化 **//
-        traj_.clear();
-        KDL::JntArray q_init(jnt_num_);
-        KDL::JntArray q_target(jnt_num_);
-        KDL::Frame f_flange = flange_;
-        std::vector<double> max_step;
-        bool orientation_fixed = mode == Robot::OrientationMode::FIXED;
-        std::vector<KDL::Frame> traj_target;
-        //**-------------------------------**//
-
-        for (int i = 0; i < jnt_num_; i++) {
-            q_init(i) = pos_[i];
-            max_step.push_back(max_vel_[i] * 0.001);
+        if ( motion_thread_ )
+        {
+            motion_thread_->join( );
+            motion_thread_ = nullptr;
         }
 
-        if (JC_helper::circle_trajectory(traj_target, f_flange, pose_via, pose_to, speed, acceleration,
-                                         orientation_fixed) < 0) {
-            std::cerr << RED << "MoveC(): circle trajectory planning fail " << WHITE << std::endl;
+        //** 变量初始化 **//
+        traj_.clear( );
+        KDL::JntArray q_init( jnt_num_ );
+        KDL::JntArray q_target( jnt_num_ );
+        KDL::Frame frame_init = flange_;
+        std::vector< double > max_step;
+        bool orientation_fixed = mode == Robot::OrientationMode::FIXED;
+        std::vector< KDL::Frame > traj_target;
+        //**-------------------------------**//
+
+        for ( int i = 0; i < jnt_num_; i++ )
+        {
+            q_init( i )   = pos_[ i ];
+            q_target( i ) = pos_[ i ];
+            max_step.push_back( max_vel_[ i ] * 0.001 );
+        }
+
+        if ( JC_helper::circle_trajectory( traj_target, frame_init, pose_via, pose_to, speed, acceleration,
+                                           orientation_fixed ) < 0 )
+        {
+            PLOG_ERROR << "circle trajectory planning fail ";
             return -1;
         }
 
-        //** 轨迹计算 **//
-        for (const auto &target: traj_target) {
-            if (kinematics_.CartToJnt(q_init, target, q_target) < 0) {
-                std::cerr << RED << "MoveC(): CartToJnt failed " << WHITE << std::endl;
-                return -1;
+        //** 轨迹IK计算，计算失败，可以重新计算，有最大计算次数限制{max_running_count} **//
+        int ik_count{ 0 };
+        for ( ; ik_count < max_running_count; ik_count++ )
+        {
+            try
+            {
+                for ( int i = 0; i < jnt_num_; i++ )
+                {
+                    q_init( i ) = pos_[ i ];
+                }
+                traj_.clear( );
+
+                PLOG_INFO << "---------------------------------------";
+
+                for ( const auto& target : traj_target )
+                {
+                    if ( kinematics_.CartToJnt( q_init, target, q_target ) < 0 )
+                    {
+                        // return -1;
+                        throw -1;
+                    }
+                    //防止奇异位置速度激增
+                    for ( int i = 0; i < jnt_num_; i++ )
+                    {
+                        if ( abs( q_target( i ) - q_init( i ) ) > max_step[ i ] )
+                        {
+                            PLOG_ERROR << "joint[" << i << "] speep is too  fast";
+                            PLOG_ERROR << "target speed = " << abs( q_target( i ) - q_init( i ) )
+                                       << " and  max_step=" << max_step[ i ];
+                            PLOG_ERROR << "q_target( " << i << " )  = " << q_target( i ) * 180 / M_PI;
+                            PLOG_ERROR << "q_init( " << i << " ) =" << q_init( i ) * 180 / M_PI;
+                            // return -1;
+                            throw -2;
+                        }
+                    }
+                    q_init = q_target;
+                    traj_.push_back( q_target );
+                }
+
+                //在此处时，代表规划成功
+                break;
             }
-            //防止奇异位置速度激增
-            for (int i = 0; i < jnt_num_; i++) {
-                if (abs(q_target(i) - q_init(i)) > max_step[i]) {
-                    std::cout << RED << "MoveC():joint[" << i << "] speep is too  fast" << WHITE << std::endl;
-                    return -1;
+            catch ( int flag_error )
+            {
+                switch ( flag_error )
+                {
+                    case -1: PLOG_ERROR << " CartToJnt failed on the " << ik_count << " times"; break;
+                    case -2: PLOG_ERROR << " joint speep is too  fast "; break;
+                    default: PLOG_ERROR << "Undefined error!"; return -1;
                 }
             }
-
-            q_init = q_target;
-            traj_.push_back(q_target);
+            catch ( ... )
+            {
+                PLOG_ERROR << "Undefined error!";
+                return -1;
+            }
         }
+
+        if ( ik_count == max_running_count )
+        {
+            PLOG_ERROR << "CartToJnt still failed even after " << max_running_count << " attempts";
+            return -1;
+        }
+
         //**-------------------------------**//
 
-
-        if (asynchronous)  //异步执行
+        if ( asynchronous )  //异步执行
         {
-            motion_thread_.reset(new boost::thread{&Robot::RunMoveL, this, traj_});
+            motion_thread_.reset( new boost::thread{ &Robot::RunMoveL, this, std::ref( traj_ ) } );
             is_running_motion = true;
-        } else  //同步执行
+        }
+        else  //同步执行
         {
-            motion_thread_.reset( new boost::thread{ &Robot::RunMoveL, this, traj_ } );
+            motion_thread_.reset( new boost::thread{ &Robot::RunMoveL, this, std::ref( traj_ ) } );
             motion_thread_->join( );
-            motion_thread_=nullptr; 
+            motion_thread_    = nullptr;
             is_running_motion = false;
         }
 
         return 0;
     }
-
 
     int Robot::MoveP(Frame pose, double speed, double acceleration, double time,
                      double radius, bool asynchronous) {
@@ -968,13 +1032,13 @@ namespace rocos {
                 {
                     for ( int j = 0; j < traj_index.size( ); j++ )
                         p = count < traj_index[ j ] ? ( j + 1 ) : p;  //找到当前是第几段轨迹
-                    std::cout << RED << "MultiMoveL():count =" << count << std::endl;
-                    std::cout << RED << "MultiMoveL():joint[" << i << "] speep is too  fast on the " << p
-                              << "th trajectory" << std::endl;
-                    std::cout << RED << "MultiMoveL():target speed = " << abs( q_target( i ) - q_init( i ) )
-                              << " and  max_step=" << max_step[ i ] << std::endl;
-                    std::cout << RED << "MultiMoveL():q_target( " << i << " )  = " << q_target( i ) << std::endl;
-                    std::cout << RED << "MultiMoveL():q_init( " << i << " ) =" << q_init( i ) << WHITE << std::endl;
+                    // PLOG_ERROR << "count =" << count;
+                    PLOG_ERROR << "joint[" << i << "] speep is too  fast on the " << p
+                               << "th trajectory";
+                    PLOG_ERROR << "target speed = " << abs( q_target( i ) - q_init( i ) )
+                               << " and  max_step=" << max_step[ i ];
+                    PLOG_ERROR << "q_target( " << i << " )  = " << q_target( i ) * 180 / M_PI;
+                    PLOG_ERROR << "q_init( " << i << " ) =" << q_init( i ) * 180 / M_PI << WHITE;
                     return -1;
                 }
             }

@@ -374,14 +374,15 @@ namespace rocos {
 
         //! \brief 直线运动到指定位姿
         //! \param pose 位姿
-        //! \param speed 关节速度限制（leading axis）
-        //! \param acceleration 关节加速度限制
+        //! \param speed 笛卡尔速度限制（leading axis）
+        //! \param acceleration 笛卡尔加速度限制
         //! \param time 最短运行时间
         //! \param radius 过渡半径
         //! \param asynchronous 是否异步运行
+        //! \param max_running_count MoveL规划失败重新尝试规划的最大次数
         //! \return 错误标志位,成功返回0
         int MoveL(Frame pose, double speed = 1.05, double acceleration = 1.4,
-                  double time = 0.0, double radius = 0.0, bool asynchronous = false);
+                  double time = 0.0, double radius = 0.0, bool asynchronous = false,int max_running_count = 10);
 
         //! \brief 直线运动到关节空间指定位置
         //! \param q 关节位置
@@ -404,10 +405,11 @@ namespace rocos {
         //! \param radius 过渡半径
         //! \param mode 姿态运行模式, UNCONSTRAINED姿态随动
         //! \param asynchronous 是否异步运行
+        //! \param max_running_count MoveL规划失败重新尝试规划的最大次数
         //! \return 错误标志位,成功返回0
         int MoveC(Frame pose_via, Frame pose_to, double speed = 0.25,
                   double acceleration = 1.2, double time = 0.0, double radius = 0.0,
-                  OrientationMode mode = UNCONSTRAINED, bool asynchronous = false);
+                  OrientationMode mode = UNCONSTRAINED, bool asynchronous = false,int max_running_count =10);
 
         //! \brief TODO: 什么是MoveP?
         //! \param pose 位姿

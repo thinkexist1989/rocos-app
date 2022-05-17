@@ -46,154 +46,158 @@ void signalHandler( int signo )
                   << "[!!SIGNAL!!]"
                   << "INTERRUPT by CTRL-C"
                   << "\033[0m" << std::endl;
+
         isRuning = false;
         exit( 0 );
     }
 }
 
-#pragma region //*测试
+#pragma region  //*测试 1
 // void test( )
 // {
-    // using namespace KDL;
-    // Frame f_p1;
-    // Frame f_p2;
-    // Frame f_p3;
-    // Frame f_p4;
-    // Kinematics kinematics_;
-    // kinematics_.initChain7Dofs( );
-    // KDL::JntArray q( 7 );
+// using namespace KDL;
+// Frame f_p1;
+// Frame f_p2;
+// Frame f_p3;
+// Frame f_p4;
+// Kinematics kinematics_;
+// kinematics_.initChain7Dofs( );
+// KDL::JntArray q( 7 );
 
-    // q( 0 ) = 60 * M_PI / 180;
-    // q( 1 ) = -115 * M_PI / 180;
-    // q( 2 ) = 0 * M_PI / 180;
-    // q( 3 ) = -110 * M_PI / 180;
-    // q( 4 ) = -45 * M_PI / 180;
-    // q( 5 ) = 90 * M_PI / 180;
-    // q( 6 ) = 0 * M_PI / 180;
+// q( 0 ) = 60 * M_PI / 180;
+// q( 1 ) = -115 * M_PI / 180;
+// q( 2 ) = 0 * M_PI / 180;
+// q( 3 ) = -110 * M_PI / 180;
+// q( 4 ) = -45 * M_PI / 180;
+// q( 5 ) = 90 * M_PI / 180;
+// q( 6 ) = 0 * M_PI / 180;
 
-    // kinematics_.JntToCart( q, f_p1 );
+// kinematics_.JntToCart( q, f_p1 );
 
-    // {  //测试moveC
+// {  //测试moveC
 
-    //     std::cout << "----------------test moveC start---------------" << std::endl;
-    //     f_p2 = f_p1 * Frame{ KDL::Rotation::RotX( 90 * M_PI / 180 ), Vector{ 0.0, -0.1, -0.1 } };
-    //     f_p3 = f_p1 * Frame{ KDL::Rotation::RotY( 90 * M_PI / 180 ), Vector{ 0.0, 0.0, -0.2 } };
+//     std::cout << "----------------test moveC start---------------" << std::endl;
+//     f_p2 = f_p1 * Frame{ KDL::Rotation::RotX( 90 * M_PI / 180 ), Vector{ 0.0, -0.1, -0.1 } };
+//     f_p3 = f_p1 * Frame{ KDL::Rotation::RotY( 90 * M_PI / 180 ), Vector{ 0.0, 0.0, -0.2 } };
 
-    //     for ( int i = 0; i < 6; i++ )
-    //     {
-    //         robot.test_set_pos( i, q( i ) );                                //?pos_资源竞争
-    //         std::this_thread::sleep_for( std::chrono::milliseconds( 3 ) );  //?pos_资源竞争
-    //     }
-    //     robot.MoveC( f_p2, f_p3, 0.05, 0.05, 0, 0, Robot::OrientationMode::FIXED, false );
+//     for ( int i = 0; i < 6; i++ )
+//     {
+//         robot.test_set_pos( i, q( i ) );                                //?pos_资源竞争
+//         std::this_thread::sleep_for( std::chrono::milliseconds( 3 ) );  //?pos_资源竞争
+//     }
+//     robot.MoveC( f_p2, f_p3, 0.05, 0.05, 0, 0, Robot::OrientationMode::FIXED, false );
 
-    //     //    for ( int i = 0; i < 6; i++ )
-    //     //    {
-    //     //        robot.test_set_pos( i, q( i ) );
-    //     //        std::this_thread::sleep_for( std::chrono::milliseconds( 3 ) );
-    //     //    }
-    //     //    robot.MoveC( f_p2, f_p3, 0.01, 0.01, 0, 0, Robot::OrientationMode::UNCONSTRAINED, false );
-    //     std::cout << "----------------test moveC end---------------" << std::endl;
-    // }
-    // {  //测试moveL
+//     //    for ( int i = 0; i < 6; i++ )
+//     //    {
+//     //        robot.test_set_pos( i, q( i ) );
+//     //        std::this_thread::sleep_for( std::chrono::milliseconds( 3 ) );
+//     //    }
+//     //    robot.MoveC( f_p2, f_p3, 0.01, 0.01, 0, 0, Robot::OrientationMode::UNCONSTRAINED, false );
+//     std::cout << "----------------test moveC end---------------" << std::endl;
+// }
+// {  //测试moveL
 
-    //     std::cout << "----------------test moveL start---------------" << std::endl;
-    //     std::cout << "f_p1 = \n"
-    //               << f_p1 << std::endl;
-    //     f_p2 = f_p1 * Frame{ KDL::Rotation::RotX( 90 * M_PI / 180 ), Vector{ 0.1, 0.0, 0 } };
-    //     for ( int i = 0; i < 7; i++ )
-    //     {
-    //         robot.test_set_pos( i, q( i ) );                                //?pos_资源竞争
-    //         std::this_thread::sleep_for( std::chrono::milliseconds( 3 ) );  //?pos_资源竞争
-    //     }
-    //     robot.MoveL( f_p1, 0.01, 0.01, 0, 0, false );
-    //     std::cout << "----------------test moveL end---------------" << std::endl;
-    // }
+//     std::cout << "----------------test moveL start---------------" << std::endl;
+//     std::cout << "f_p1 = \n"
+//               << f_p1 << std::endl;
+//     f_p2 = f_p1 * Frame{ KDL::Rotation::RotX( 90 * M_PI / 180 ), Vector{ 0.1, 0.0, 0 } };
+//     for ( int i = 0; i < 7; i++ )
+//     {
+//         robot.test_set_pos( i, q( i ) );                                //?pos_资源竞争
+//         std::this_thread::sleep_for( std::chrono::milliseconds( 3 ) );  //?pos_资源竞争
+//     }
+//     robot.MoveL( f_p1, 0.01, 0.01, 0, 0, false );
+//     std::cout << "----------------test moveL end---------------" << std::endl;
+// }
 
-    // {  //测试moveL(只旋转，不移动)
+// {  //测试moveL(只旋转，不移动)
 
-    //     std::cout << "----------------test moveL start---------------" << std::endl;
-    //     f_p2 = f_p1 * Frame{ KDL::Rotation::RotX( 90 * M_PI / 180 ) };
+//     std::cout << "----------------test moveL start---------------" << std::endl;
+//     f_p2 = f_p1 * Frame{ KDL::Rotation::RotX( 90 * M_PI / 180 ) };
 
-    //     for ( int i = 0; i < 7; i++ )
-    //     {
-    //         robot.test_set_pos( i, q( i ) );                                //?pos_资源竞争
-    //         std::this_thread::sleep_for( std::chrono::milliseconds( 3 ) );  //?pos_资源竞争
-    //     }
-    //     robot.MoveL( f_p2, 0.01, 0.01, 0, 0, false );
-    //     std::cout << "----------------test moveL end---------------" << std::endl;
-    // }
+//     for ( int i = 0; i < 7; i++ )
+//     {
+//         robot.test_set_pos( i, q( i ) );                                //?pos_资源竞争
+//         std::this_thread::sleep_for( std::chrono::milliseconds( 3 ) );  //?pos_资源竞争
+//     }
+//     robot.MoveL( f_p2, 0.01, 0.01, 0, 0, false );
+//     std::cout << "----------------test moveL end---------------" << std::endl;
+// }
 
-    // {  //测试MultiMoveL，
-    //     std::cout << "----------------test MultiMoveL start---------------" << std::endl;
+// {  //测试MultiMoveL，
+//     std::cout << "----------------test MultiMoveL start---------------" << std::endl;
 
-    //     for ( int i = 0; i < 6; i++ )
-    //     {
-    //         robot.test_set_pos( i, q( i ) );
-    //         std::this_thread::sleep_for( std::chrono::milliseconds( 3 ) );
-    //     }
-    //     Frame f_p5;
-    //     Frame f_p6;
-    //     Frame f_p7;
-    //     Frame f_p8;
-    //     Frame f_p9;
-    //     Frame f_p11;
+//     for ( int i = 0; i < 6; i++ )
+//     {
+//         robot.test_set_pos( i, q( i ) );
+//         std::this_thread::sleep_for( std::chrono::milliseconds( 3 ) );
+//     }
+//     Frame f_p5;
+//     Frame f_p6;
+//     Frame f_p7;
+//     Frame f_p8;
+//     Frame f_p9;
+//     Frame f_p11;
 
-    //     f_p1  = f_p1 * Frame{ KDL::Rotation::RotX( 90 * M_PI / 180 ), Vector{ 0.3, 0.0, 0 } };
-    //     f_p2  = f_p1 * Frame{ KDL::Rotation::RotY( 90 * M_PI / 180 ), Vector{ 0.0, -0.3, -0.0 } };
-    //     f_p3  = f_p2 * Frame{ KDL::Rotation::RotX( -90 * M_PI / 180 ), Vector{ 0.0, 0.0, -0.3 } };
-    //     f_p4  = f_p3 * Frame{ KDL::Rotation::RotZ( -90 * M_PI / 180 ), Vector{ 0.0, 0.0, 0.3 } };
-    //     f_p5  = f_p4 * Frame{ KDL::Rotation::RotZ( 45 * M_PI / 180 ), Vector{ 0.0, 0.0, -0.15 } };  //180度调头
-    //     f_p6  = f_p5 * Frame{ KDL::Rotation::RotZ( 45 * M_PI / 180 ), Vector{ 0.0, 0.0, -0.15 } };  //0度平行
-    //     f_p7  = f_p6 * Frame{ KDL::Rotation::RotZ( -90 * M_PI / 180 ), Vector{ 0.0, 0.0, 0.3 } };   //180度调头
-    //     f_p8  = f_p7 * Frame{ KDL::Rotation::RotZ( -90 * M_PI / 180 ) };                            //只旋转
-    //     f_p9  = f_p8 * Frame{ KDL::Rotation::RotZ( 90 * M_PI / 180 ) };                             //只旋转
-    //     f_p11 = f_p1 * Frame{ KDL::Rotation::RotY( 5 * M_PI / 180 ) };                              //只旋转
+//     f_p1  = f_p1 * Frame{ KDL::Rotation::RotX( 90 * M_PI / 180 ), Vector{ 0.3, 0.0, 0 } };
+//     f_p2  = f_p1 * Frame{ KDL::Rotation::RotY( 90 * M_PI / 180 ), Vector{ 0.0, -0.3, -0.0 } };
+//     f_p3  = f_p2 * Frame{ KDL::Rotation::RotX( -90 * M_PI / 180 ), Vector{ 0.0, 0.0, -0.3 } };
+//     f_p4  = f_p3 * Frame{ KDL::Rotation::RotZ( -90 * M_PI / 180 ), Vector{ 0.0, 0.0, 0.3 } };
+//     f_p5  = f_p4 * Frame{ KDL::Rotation::RotZ( 45 * M_PI / 180 ), Vector{ 0.0, 0.0, -0.15 } };  //180度调头
+//     f_p6  = f_p5 * Frame{ KDL::Rotation::RotZ( 45 * M_PI / 180 ), Vector{ 0.0, 0.0, -0.15 } };  //0度平行
+//     f_p7  = f_p6 * Frame{ KDL::Rotation::RotZ( -90 * M_PI / 180 ), Vector{ 0.0, 0.0, 0.3 } };   //180度调头
+//     f_p8  = f_p7 * Frame{ KDL::Rotation::RotZ( -90 * M_PI / 180 ) };                            //只旋转
+//     f_p9  = f_p8 * Frame{ KDL::Rotation::RotZ( 90 * M_PI / 180 ) };                             //只旋转
+//     f_p11 = f_p1 * Frame{ KDL::Rotation::RotY( 5 * M_PI / 180 ) };                              //只旋转
 
-    //     std::vector< KDL::Frame > points{ f_p1, f_p2, f_p3, f_p4, f_p5, f_p6, f_p7, f_p8, f_p9, f_p1, f_p11 };
-    //     std::vector< double > max_path_v{ 0.06, 0.04, 0.04, 0.06, 0.06, 0.06, 0.06, 0.06, 0.06, 0.06, 0.01 };
-    //     std::vector< double > max_path_a{ 0.06, 0.06, 0.06, 0.06, 0.06, 0.06, 0.06, 0.06, 0.06, 0.06, 0.01 };
-    //     std::vector< double > bound_dist{ 0.05, 0.0, 0.1, 0.1, 0.1, 0.1, 0.0, 0.0, 0.0, 0.0, 0.0 };
+//     std::vector< KDL::Frame > points{ f_p1, f_p2, f_p3, f_p4, f_p5, f_p6, f_p7, f_p8, f_p9, f_p1, f_p11 };
+//     std::vector< double > max_path_v{ 0.06, 0.04, 0.04, 0.06, 0.06, 0.06, 0.06, 0.06, 0.06, 0.06, 0.01 };
+//     std::vector< double > max_path_a{ 0.06, 0.06, 0.06, 0.06, 0.06, 0.06, 0.06, 0.06, 0.06, 0.06, 0.01 };
+//     std::vector< double > bound_dist{ 0.05, 0.0, 0.1, 0.1, 0.1, 0.1, 0.0, 0.0, 0.0, 0.0, 0.0 };
 
-    //     robot.MultiMoveL( points, bound_dist, max_path_v, max_path_a, true );
-    //     std::cout << "----------------test MultiMoveL end---------------" << std::endl;
-    // }
+//     robot.MultiMoveL( points, bound_dist, max_path_v, max_path_a, true );
+//     std::cout << "----------------test MultiMoveL end---------------" << std::endl;
+// }
 
-    // {  //测试dragging
-    //     using namespace rocos;
+// {  //测试dragging
+//     using namespace rocos;
 
-    //     PLOG_DEBUG << "======连发测试开始===========";
-    //     //!要求每100ms以内至少调用一次，否则触发急停
-    //     for ( int i = 0; i < 100; i++ )
-    //     {
-    //         robot.Dragging( Robot::DraggingFlag::J0, Robot::DraggingDirection::POSITION, 1, 1 );
-    //         std::this_thread::sleep_for( std::chrono::milliseconds( 50 ) );
-    //     }
+//     PLOG_DEBUG << "======连发测试开始===========";
+//     //!要求每100ms以内至少调用一次，否则触发急停
+//     for ( int i = 0; i < 100; i++ )
+//     {
+//         robot.Dragging( Robot::DraggingFlag::J0, Robot::DraggingDirection::POSITION, 1, 1 );
+//         std::this_thread::sleep_for( std::chrono::milliseconds( 50 ) );
+//     }
 
-    //     PLOG_DEBUG << "======连发测试切换===========";  //调用紧急停止
-    //     sleep( 2 );
+//     PLOG_DEBUG << "======连发测试切换===========";  //调用紧急停止
+//     sleep( 2 );
 
-    //     for ( int i = 0; i < 100; i++ )  //第二套动作
-    //     {
-    //         robot.Dragging( Robot::DraggingFlag::J1, Robot::DraggingDirection::POSITION, 1, 1 );
-    //         std::this_thread::sleep_for( std::chrono::milliseconds( 50 ) );
-    //     }
+//     for ( int i = 0; i < 100; i++ )  //第二套动作
+//     {
+//         robot.Dragging( Robot::DraggingFlag::J1, Robot::DraggingDirection::POSITION, 1, 1 );
+//         std::this_thread::sleep_for( std::chrono::milliseconds( 50 ) );
+//     }
 
-    //     PLOG_DEBUG << "======连发测试结束===========";
-    //     sleep( 5 );
-    //     PLOG_DEBUG << "急停测试开始";
-    //     sleep( 7 );
-    //     robot.Dragging( Robot::DraggingFlag::J0, Robot::DraggingDirection::NEGATIVE, 1, 1 );  //第三套动作
-    //     sleep( 7 );
-    //     PLOG_DEBUG << "急停测试结束";
-    // }
-
+//     PLOG_DEBUG << "======连发测试结束===========";
+//     sleep( 5 );
+//     PLOG_DEBUG << "急停测试开始";
+//     sleep( 7 );
+//     robot.Dragging( Robot::DraggingFlag::J0, Robot::DraggingDirection::NEGATIVE, 1, 1 );  //第三套动作
+//     sleep( 7 );
+//     PLOG_DEBUG << "急停测试结束";
+// }
 
 // }
-namespace rocos {
-   void Robot::test( )
+
+#pragma endregion
+
+#pragma region  //*测试2
+namespace rocos
+{
+    void Robot::test( )
     {
-        std::string str;
-        KDL::JntArray q_init( 7 );
+        // KDL::JntArray q_init( 7 );
         KDL::JntArray q_target( 7 );
         KDL::Frame f_p1;
         KDL::Frame f_p2;
@@ -201,125 +205,161 @@ namespace rocos {
         KDL::Frame f_p4;
         KDL::Frame f_p5;
         KDL::Frame f_p6;
-        KDL::Frame f_p7;
-        KDL::Frame f_p8;
-        KDL::Frame f_p9;
-        KDL::Frame f_p11;
 
-    
-        q_init( 0 ) = 44.477 * M_PI / 180;
-        q_init( 1 ) = -85.387 * M_PI / 180;
-        q_init( 2 ) = -85.851* M_PI / 180;
-        q_init( 3 ) = -90.00 * M_PI / 180;
-        q_init( 4 ) = -0.527 * M_PI / 180;
-        q_init( 5 ) = 45.337 * M_PI / 180;
-        q_init( 6 ) = 84.180* M_PI / 180;
+        KDL::Frame f_c_p1;
+        KDL::Frame f_c_p2;
+        KDL::Frame f_c_p3;
+        KDL::Frame f_c_p0;
+        std::string str{ "disable" };
 
-        q_target( 0 ) = 0 * M_PI / 180;
-        q_target( 1 ) = -45 * M_PI / 180;
-        q_target( 2 ) = 0 * M_PI / 180;
-        q_target( 3 ) = -90 * M_PI / 180;
-        q_target( 4 ) = 0 * M_PI / 180;
-        q_target( 5 ) = 45 * M_PI / 180;
-        q_target( 6 ) = 0 * M_PI / 180;
+        //** 电机使能检查 **//
+        PLOG_INFO << "电机使能检查";
+
+        for ( int i{ 0 }; i < jnt_num_; i++ )
+        {
+            if ( joints_[ i ]->getDriveState( ) != DriveState::OperationEnabled )
+            {
+                for ( int j{ 0 }; j < 3; j++ )
+                {
+                    PLOG_ERROR << "电机[" << i << "] 未使能，确定主站已初始化完成了？,输入yes确认";
+                    std::cin >> str;
+                    if ( str != std::string_view{ "yes" } )
+                    {
+                        PLOG_ERROR << "未输入yes, 判断主站 {未} 初始化完成,程序关闭";
+                        exit( 0 );
+                    }
+                }
+            }
+        }
 
         setEnabled( );
+        //**-------------------------------**//
 
-        PLOG_DEBUG << "执行 moveJ,输入run执行";
+
+        PLOG_INFO << "当前环境是否安全，如果是，输入run开始执行程序";
         std::cin >> str;
 
-        if ( str == std::string{ "run" } )
+        if ( str == std::string_view{ "run" } )
         {
-            MoveJ(q_target,0.4,0.2,0,0,false);
-        }
+            q_target( 0 ) = 0 * M_PI / 180;
+            q_target( 1 ) = -45 * M_PI / 180;
+            q_target( 2 ) = 0 * M_PI / 180;
+            q_target( 3 ) = -90 * M_PI / 180;
+            q_target( 4 ) = 0 * M_PI / 180;
+            q_target( 5 ) = 45 * M_PI / 180;
+            q_target( 6 ) = 0 * M_PI / 180;
 
+            MoveJ( q_target, 0.4, 0.2, 0, 0, false );
 
-        kinematics_.JntToCart( q_target, f_p1 );
+            kinematics_.JntToCart( q_target, f_p1 );
+            f_p1 = f_p1 * KDL::Frame{ KDL::Vector{ 0.0, -0.15, 0.0 } };
+            f_p2 = f_p1 * KDL::Frame{ KDL::Vector{ -0.3, 0.0, 0.0 } };
+            f_p3 = f_p2 * KDL::Frame{ KDL::Vector{ 0.0, 0.3, 0.0 } };
+            f_p4 = f_p3 * KDL::Frame{ KDL::Vector{ 0.3, 0.0, 0.0 } };
+            f_p5 = f_p4 * KDL::Frame{ KDL::Vector{ 0.0, -0.15, 0.0 } };
 
-        PLOG_DEBUG << "f_p1 = \n"
-                   << f_p1;
-
-        PLOG_DEBUG << "确认f_p1 是否正确,如果正确输入run启动程序";
-        std::cin >> str;
-
-        if ( str == std::string{ "run" } )
-        {
-            std::cout << "----------------test MultiMoveL start---------------" << std::endl;
-
-            f_p1  = f_p1 * KDL::Frame{ KDL::Vector{ -0.3, 0.0, 0.0 } };
-            f_p2  = f_p1 * KDL::Frame{ KDL::Vector{ 0.0, 0.3, 0.0 } };
-            f_p3  = f_p2 * KDL::Frame{ KDL::Vector{ 0.3, 0.0, 0.0} };
-            f_p4  = f_p3 * KDL::Frame{ KDL::Vector{ 0.0, -0.3, 0.0 } };
-            f_p5  = f_p4 * KDL::Frame{ KDL::Vector{ -0.3, 0.0, 0.0 } };                //180度调头
-            f_p6  = f_p5 * KDL::Frame{ KDL::Vector{ 0.0, 0.0, 0.15 } };                //0度平行
-            f_p7  = f_p6 * KDL::Frame{ KDL::Vector{ 0.0, 0.0, -0.3 } };                  //180度调头
-            f_p8  = f_p7 * KDL::Frame{ KDL::Rotation::RotZ( -90 * M_PI / 180 ) };  //只旋转
-            f_p9  = f_p8 * KDL::Frame{ KDL::Rotation::RotZ( 90 * M_PI / 180 ) };   //只旋转
-            f_p11 = f_p1 * KDL::Frame{ KDL::Rotation::RotY( 5 * M_PI / 180 ) };    //只旋转
-
-            // std::vector< KDL::Frame > points{ f_p1, f_p2, f_p3};
-            // std::vector< double > max_path_v{ 0.06, 0.06, 0.06};
-            // std::vector< double > max_path_a{ 0.1, 0.1, 0.1};
-            // std::vector< double > bound_dist{ 0.05, 0.05, 0.0};
-
-            // std::vector< KDL::Frame > points{ f_p1, f_p2,f_p3,f_p4};
-            // std::vector< double > max_path_v{ 0.06, 0.04,0.04, 0.06};
-            // std::vector< double > max_path_a{ 0.1, 0.1, 0.1, 0.1};
-            // std::vector< double > bound_dist{ 0.15, 0.0,0.1,0.1};
-
-            std::vector< KDL::Frame > points{ f_p1, f_p2, f_p3, f_p4 };
-            std::vector< double > max_path_v{ 0.30, 0.30, 0.30, 0.30 };
-            std::vector< double > max_path_a{ 0.2, 0.2, 0.2, 0.2 };
-            std::vector< double > bound_dist{ 0.00, 0.0, 0.0, 0.0 };
+            std::vector< KDL::Frame > points{ f_p1, f_p2, f_p3, f_p4, f_p5 };
+            std::vector< double > max_path_v{ 0.30, 0.30, 0.30, 0.30, 0.30 };
+            std::vector< double > max_path_a{ 0.2, 0.2, 0.2, 0.2, 0.2 };
+            std::vector< double > bound_dist{ 0.05, 0.05, 0.05, 0.05, 0.0 };
 
             // MultiMoveL( points, bound_dist, max_path_v, max_path_a, false );
-            MoveC( f_p1 , f_p2,0.10,0.2,0,0,Robot::OrientationMode::FIXED ,false);
 
-            MoveC( f_p3 , f_p4,0.10,0.2,0,0,Robot::OrientationMode::FIXED ,false);
+            f_p6 = f_p5 * KDL::Frame{ KDL::Vector{ -0.3, 0.3,0.0 } };
+            MoveL( f_p6, 0.2, 0.2, 0, 0, false );
 
 
-            // MoveJ( q_init, 0.4, 0.2, 0, 0, false );
+            for ( int i = 0; i < jnt_num_; i++ )
+                q_target( i ) = 0;
+            MoveJ( q_target, 0.2, 0.2, 0, 0, false );
 
-     
-            // MoveJ(q_init,0.4,0.2,0,0,false);
+            q_target( 0 ) = 0 * M_PI / 180;
+            q_target( 1 ) = 45 * M_PI / 180;
+            q_target( 2 ) = 0 * M_PI / 180;
+            q_target( 3 ) = 90 * M_PI / 180;
+            q_target( 4 ) = 0 * M_PI / 180;
+            q_target( 5 ) = 45 * M_PI / 180;
+            q_target( 6 ) = 0 * M_PI / 180;
 
-            // MoveJ(q_target,0.4,0.2,0,0,false);
+            MoveJ( q_target, 0.2, 0.2, 0, 0, false );
 
-  
-            // MoveJ(q_init,0.4,0.2,0,0,false);
+            kinematics_.JntToCart( q_target, f_c_p0 );
 
-            // MoveJ(q_target,0.2,0.2,0,0,false);
+            f_c_p1 = f_c_p0 * KDL::Frame{ KDL::Vector{ -0.1, -0.1, 0 } };
+            f_c_p2 = f_c_p0 * KDL::Frame{ KDL::Vector{ -0.2, 0.0, 0 } };
+            f_c_p3 = f_c_p0 * KDL::Frame{ KDL::Vector{ -0.1, 0.1, 0 } };
 
-            // MoveJ(q_init,0.4,0.2,0,0,false);
+            MoveC( f_c_p1, f_c_p2, 0.2, 0.2, 0, 0, Robot::OrientationMode::FIXED, false );
+            MoveC( f_c_p3, f_c_p0, 0.2, 0.2, 0, 0, Robot::OrientationMode::FIXED, false );
 
-            // MoveJ(q_target,0.1,0.2,0,0,false);
-
-            std::cout << "----------------test MultiMoveL end---------------" << std::endl;
+            for ( int i = 0; i < jnt_num_; i++ )
+                q_target( i ) = 0;
+            MoveJ( q_target, 0.2, 0.2, 0, 0, false );
         }
-        else 
-        {
-            PLOG_DEBUG << "不执行，退出";
-        }
 
-
-    //    if ( str == std::string{ "run" } )
-    //     {
-    //         std::cout << "----------------test MoveL start---------------" << std::endl;
-
-    //         f_p1  = f_p1 * KDL::Frame{ KDL::Vector{ 0.0, 0.075, 0.0 } };
-
-    //         std::vector< KDL::Frame > points{ f_p1, f_p2,f_p3,f_p4,f_p5};
-    //         std::vector< double > max_path_v{ 0.30, 0.30,0.30, 0.30,0.30};
-    //         std::vector< double > max_path_a{ 0.1, 0.1, 0.1, 0.1,0.1};
-    //         std::vector< double > bound_dist{ 0.1, 0.1,0.1,0.1,0.0};
-
-    //         MoveL( f_p1, 0.30, 0.1,0,0, false );
-    //         std::cout << "----------------test MoveL end---------------" << std::endl;
-    //     }
-
-
+        PLOG_INFO << "全部测试结束，goodbye！";
     }
-}
+}  // namespace rocos
+
+#pragma endregion
+
+#pragma region  //*测试3
+// namespace rocos
+// {
+//     void Robot::test( )
+//     {
+//         KDL::JntArray q_target( 7 );
+
+//         setEnabled( );
+
+//         PLOG_DEBUG << "执行 moveJ,输入run执行";
+
+//         std::cin >> str;
+
+//         while ( str != std::string{ "exit" } )
+//         {
+
+//             std::cout << "----------------test MultiMoveL start---------------" << std::endl;
+
+//             if ( str == std::string{ "1" } )
+//             {
+//                 q_target( 0 ) = 32.139 * M_PI / 180;
+//                 q_target( 1 ) = -56.752 * M_PI / 180;
+//                 q_target( 2 ) = -49.227 * M_PI / 180;
+//                 q_target( 3 ) = -90 * M_PI / 180;
+//                 q_target( 4 ) = -0.336 * M_PI / 180;
+//                 q_target( 5 ) = 45.085 * M_PI / 180;
+//                 q_target( 6 ) = 39.535 * M_PI / 180;
+
+//                 MoveJ( q_target, 0.4, 0.2, 0, 0, false );
+//             }
+
+//             else if ( str == std::string{ "2" } )
+//             {
+//                 q_target( 0 ) = 0 * M_PI / 180;
+//                 q_target( 1 ) = -45 * M_PI / 180;
+//                 q_target( 2 ) = 0 * M_PI / 180;
+//                 q_target( 3 ) = -90 * M_PI / 180;
+//                 q_target( 4 ) = 0 * M_PI / 180;
+//                 q_target( 5 ) = -45 * M_PI / 180;
+//                 q_target( 6 ) = 0 * M_PI / 180;
+
+//                 MoveJ( q_target, 0.4, 0.2, 0, 0, false );
+//             }
+
+//             else if ( str == std::string{ "home" } )
+//             {
+//                 for ( int i = 0; i < 7; i++ )
+//                     q_target( i ) = 0;
+//                 MoveJ( q_target, 0.4, 0.2, 0, 0, false );
+//             }
+
+//             std::cout << "----------------test MultiMoveL end---------------" << std::endl;
+//             std::cin >> str;
+//         }
+
+//     }
+// }  // namespace rocos
 
 #pragma endregion
 
@@ -344,6 +384,6 @@ int main( int argc, char* argv[] )
 
     //------------------------wait----------------------------------
     robotService->runServer( );
-    // thread_test.join( );
+    thread_test.join( );
     return 0;
 }

@@ -58,17 +58,8 @@ namespace rocos
 
 namespace JC_helper
 {
-    /**
-      * @brief 姿态插值（四元素球面线性插值）
-      *
-      * @param start 开始姿态
-      * @param end 结束姿态
-      * @param s 百分比
-      * @return std::vector< double > 四元素x,y,z,w
-      */
-    std::vector< double > UnitQuaternion_intep( const std::vector< double >& start,
-                                                const std::vector< double >& end,
-                                                double s );
+   
+
 
     /**
       * @brief 姿态插值（轴角法角度线性插值）
@@ -89,20 +80,25 @@ namespace JC_helper
       * @param s_p 位置百分比
       * @param s_r 位态百分比
       * @param alpha 夹角
+      * @param success 计算是否成功标识位 (false 为不成功)
       * @return KDL::Frame 
       */
-    KDL::Frame cirlular_trajectory( const KDL::Frame& F_base_circlestart, const KDL::Frame& F_base_circleend, const KDL::Frame& F_base_circleCenter, double s_p, double s_r, double alpha ,double & success);
+    KDL::Frame circle( const KDL::Frame& F_base_circlestart, const KDL::Frame& F_base_circleend, const KDL::Frame& F_base_circleCenter, double s_p, double s_r, double alpha ,double & success);
 
     /**
       * @brief 直线规划（使用doubleS速度曲线）
       * 
       * @param start 起始位姿
       * @param end 终止位姿
-      * @return std::vector< KDL::Frame > 轨迹 
+      * @param success 计算是否成功标识位 (false 为不成功)
+      * @return 指定s对应的位姿
       */
-    KDL::Frame link_trajectory( const KDL::Frame& start, const KDL::Frame& end, double s_p, double s_r, double & success );
+    KDL::Frame link( const KDL::Frame& start, const KDL::Frame& end, double s_p, double s_r, double & success );
 
     int link_trajectory( std::vector< KDL::Frame >& traj, const KDL::Frame& start, const KDL::Frame& end, double v_start, double v_end, double max_path_v, double max_path_a );
+
+    int link_trajectory( std::vector< KDL::Frame >& traj, const KDL::Frame& start, const KDL::Frame& end, double max_path_v, double max_path_a );
+
 
     /**
       * @brief 
