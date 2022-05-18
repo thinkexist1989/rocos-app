@@ -61,7 +61,7 @@ namespace rocos {
         }
 //        kinematics_.initTechServo();
         static plog::ColorConsoleAppender<plog::TxtFormatter> consoleAppender;
-        plog::init(plog::debug, &consoleAppender); // Initialize the logger.
+        plog::init(plog::info, &consoleAppender); // Initialize the logger.
         startMotionThread();
     }
 
@@ -631,6 +631,13 @@ namespace rocos {
             PLOG_ERROR << " time not supported yet";
             return -1;
         }
+
+        if ( max_running_count < 1 )
+        {
+            PLOG_ERROR << "max_running_count parameters must be greater than 0";
+            return -1;
+        }
+
         if ( CheckBeforeMove( pose, speed, acceleration, time, radius ) < 0 )
         {
             PLOG_ERROR << "given parameters is invalid";
@@ -642,6 +649,8 @@ namespace rocos {
             PLOG_ERROR <<" Motion is still running and waiting for it to finish" ;
             return -1;
         }
+        else is_running_motion =true;
+
         if ( motion_thread_ )
         {
             motion_thread_->join( );
@@ -670,6 +679,7 @@ namespace rocos {
         if ( JC_helper::link_trajectory( traj_target, frame_init, pose,  speed, acceleration ) < 0 )
         {
             PLOG_ERROR << "link trajectory planning fail ";
+             is_running_motion =false;
             return -1;
         }
 
@@ -691,7 +701,6 @@ namespace rocos {
                 {
                     if ( kinematics_.CartToJnt( q_init, target, q_target ) < 0 )
                     {
-                        // return -1;
                         throw -1;
                     }
                     //防止奇异位置速度激增
@@ -704,7 +713,6 @@ namespace rocos {
                                        << " and  max_step=" << max_step[ i ];
                             PLOG_ERROR << "q_target( " << i << " )  = " << q_target( i ) * 180 / M_PI;
                             PLOG_ERROR << "q_init( " << i << " ) =" << q_init( i ) * 180 / M_PI;
-                            // return -1;
                             throw -2;
                         }
                     }
@@ -721,12 +729,13 @@ namespace rocos {
                 {
                     case -1: PLOG_ERROR << " CartToJnt failed on the "<<ik_count<<" times"; break;
                     case -2: PLOG_ERROR << " joint speep is too  fast "; break;
-                    default: PLOG_ERROR << "Undefined error!"; return -1;
+                    default: PLOG_ERROR << "Undefined error!";  is_running_motion =false; return -1;
                 }
             }
             catch ( ... )
             {
                 PLOG_ERROR << "Undefined error!";
+                 is_running_motion =false;
                 return -1;
             }
        
@@ -735,6 +744,7 @@ namespace rocos {
         if ( ik_count == max_running_count )
         {
             PLOG_ERROR << "CartToJnt still failed even after " << max_running_count << " attempts";
+             is_running_motion =false;
             return -1;
         }
 
@@ -780,6 +790,11 @@ namespace rocos {
             PLOG_ERROR << " time not supported yet";
             return -1;
         }
+        if ( max_running_count < 1 )
+        {
+            PLOG_ERROR << "max_running_count parameters must be greater than 0";
+            return -1;
+        }
         if ( CheckBeforeMove( pose_via, speed, acceleration, time, radius ) < 0 )
         {
             PLOG_ERROR << "given parameters is invalid";
@@ -795,6 +810,9 @@ namespace rocos {
             PLOG_ERROR << RED << " Motion is still running and waiting for it to finish" << WHITE;
             return -1;
         }
+        else
+            is_running_motion = true;
+
         if ( motion_thread_ )
         {
             motion_thread_->join( );
@@ -822,6 +840,7 @@ namespace rocos {
                                            orientation_fixed ) < 0 )
         {
             PLOG_ERROR << "circle trajectory planning fail ";
+             is_running_motion =false;
             return -1;
         }
 
@@ -843,7 +862,7 @@ namespace rocos {
                 {
                     if ( kinematics_.CartToJnt( q_init, target, q_target ) < 0 )
                     {
-                        // return -1;
+                
                         throw -1;
                     }
                     //防止奇异位置速度激增
@@ -856,7 +875,7 @@ namespace rocos {
                                        << " and  max_step=" << max_step[ i ];
                             PLOG_ERROR << "q_target( " << i << " )  = " << q_target( i ) * 180 / M_PI;
                             PLOG_ERROR << "q_init( " << i << " ) =" << q_init( i ) * 180 / M_PI;
-                            // return -1;
+                    
                             throw -2;
                         }
                     }
@@ -873,12 +892,13 @@ namespace rocos {
                 {
                     case -1: PLOG_ERROR << " CartToJnt failed on the " << ik_count << " times"; break;
                     case -2: PLOG_ERROR << " joint speep is too  fast "; break;
-                    default: PLOG_ERROR << "Undefined error!"; return -1;
+                    default: PLOG_ERROR << "Undefined error!";  is_running_motion =false;return -1;
                 }
             }
             catch ( ... )
             {
                 PLOG_ERROR << "Undefined error!";
+                 is_running_motion =false;
                 return -1;
             }
         }
@@ -886,6 +906,7 @@ namespace rocos {
         if ( ik_count == max_running_count )
         {
             PLOG_ERROR << "CartToJnt still failed even after " << max_running_count << " attempts";
+             is_running_motion =false;
             return -1;
         }
 
@@ -1072,7 +1093,8 @@ namespace rocos {
 
         //** 变量初始化 **//
         static std::atomic< bool > _dragging_finished_flag{ true };
-        static JC_helper::smart_servo _smart_servo{ &_dragging_finished_flag };
+        static JC_helper::SmartServo_Joint _SmartServo_Joint{ &_dragging_finished_flag };
+        static JC_helper::SmartServo_Cartesian _SmartServo_Cartesian{ &_dragging_finished_flag };
         static std::shared_ptr< boost::thread > _thread_planning{ nullptr };
         static std::shared_ptr< boost::thread > _thread_IK{ nullptr };
         static std::shared_ptr< boost::thread > _thread_motion{ nullptr };
@@ -1177,15 +1199,15 @@ namespace rocos {
                         _thread_planning->join( );
                         _thread_planning = nullptr;
                     }
-                    _smart_servo.init( pos_, vel_, acc_, max_speed, max_acceleration, 2 * max_acceleration );
-                    _thread_planning.reset( new boost::thread{ &JC_helper::smart_servo::smart_servo_using_Joint, &_smart_servo, this } );
+                    _SmartServo_Joint.init( pos_, vel_, acc_, max_speed, max_acceleration, 2 * max_acceleration );
+                    _thread_planning.reset( new boost::thread{ &JC_helper::SmartServo_Joint::RunSmartServo, &_SmartServo_Joint, this } );
                 }
 
                 for ( int i = 0; i < jnt_num_; i++ )
                     target_joint( i ) = pos_[ i ];
                 target_joint( index ) = std::min( target_joint( index ) + static_cast< double >( dir ) * max_speed * 0.1, joints_[ index ]->getMaxPosLimit( ) );  //取最大速度的10%
                 target_joint( index ) = std::max( target_joint( index ), joints_[ index ]->getMinPosLimit( ) );
-                _smart_servo.command( target_joint );
+                _SmartServo_Joint.command( target_joint );
 
                 break;
 
@@ -1195,7 +1217,6 @@ namespace rocos {
             case DRAGGING_FLAG::FLANGE_ROLL:
             case DRAGGING_FLAG::FLANGE_PITCH:
             case DRAGGING_FLAG::FLANGE_YAW:
-
 
                 if ( _dragging_finished_flag )//新动作初始化一次
                 {
@@ -1214,16 +1235,17 @@ namespace rocos {
                         _thread_motion->join( );
                         _thread_motion = nullptr;
                     }
-                    _smart_servo.init( JC_helper::vector_2_JntArray(pos_) ,flange_, 0, 0, max_speed, max_acceleration, 2 * max_acceleration );
-                    _thread_planning.reset( new boost::thread{ &JC_helper::smart_servo::smart_servo_using_Cartesian, &_smart_servo } );
-                    _thread_IK.reset( new boost::thread{ &JC_helper::smart_servo::smart_servo_IK, &_smart_servo, this } );
-                    _thread_motion.reset( new boost::thread{ &JC_helper::smart_servo::smart_servo_motion, &_smart_servo, this } );
+                    _SmartServo_Cartesian.init( JC_helper::vector_2_JntArray(pos_) ,flange_, 0, 0, max_speed, max_acceleration, 2 * max_acceleration );
+                    _thread_planning.reset( new boost::thread{ &JC_helper::SmartServo_Cartesian::RunSmartServo_Plannig, &_SmartServo_Cartesian } );
+                    _thread_IK.reset( new boost::thread{ &JC_helper::SmartServo_Cartesian::RunSmartServo_Ik, &_SmartServo_Cartesian, this } );
+                    _thread_motion.reset( new boost::thread{ &JC_helper::SmartServo_Cartesian::RunSmartServo_Motion, &_SmartServo_Cartesian, this } );
                 }
 
                 index = index - static_cast< int >( DRAGGING_FLAG::FLANGE_X );
                 tem_vector(index) = static_cast< double >( dir ) * max_speed * 0.1;
                 target_frame = flange_ * KDL::Frame{tem_vector};
-                _smart_servo.command(target_frame);
+                _SmartServo_Cartesian.command(target_frame);
+                PLOG_DEBUG<<"target_frame = \n"<<target_frame; 
 
                 break;
 
@@ -1251,16 +1273,17 @@ namespace rocos {
                         _thread_motion->join( );
                         _thread_motion = nullptr;
                     }
-                    _smart_servo.init( JC_helper::vector_2_JntArray(pos_),flange_, 0, 0, max_speed, max_acceleration, 2 * max_acceleration );
-                    _thread_planning.reset( new boost::thread{ &JC_helper::smart_servo::smart_servo_using_Cartesian, &_smart_servo } );
-                    _thread_IK.reset( new boost::thread{ &JC_helper::smart_servo::smart_servo_IK, &_smart_servo, this } );
-                    _thread_motion.reset( new boost::thread{ &JC_helper::smart_servo::smart_servo_motion, &_smart_servo, this } );
+                    _SmartServo_Cartesian.init( JC_helper::vector_2_JntArray(pos_),flange_, 0, 0, max_speed, max_acceleration, 2 * max_acceleration );
+                    _thread_planning.reset( new boost::thread{ &JC_helper::SmartServo_Cartesian::RunSmartServo_Plannig, &_SmartServo_Cartesian } );
+                    _thread_IK.reset( new boost::thread{ &JC_helper::SmartServo_Cartesian::RunSmartServo_Ik, &_SmartServo_Cartesian, this } );
+                    _thread_motion.reset( new boost::thread{ &JC_helper::SmartServo_Cartesian::RunSmartServo_Motion, &_SmartServo_Cartesian, this } );
                 }
 
                 index = index - static_cast< int >( DRAGGING_FLAG::TOOL_X );
                 tem_vector(index) = static_cast< double >( dir ) * max_speed * 0.1;
                 target_frame = flange_ * KDL::Frame{(flange_.M.Inverse() * tool_.M) * tem_vector};
-                _smart_servo.command(target_frame);
+                _SmartServo_Cartesian.command(target_frame);
+                PLOG_DEBUG<<"target_frame = \n"<<target_frame; 
 
                 break;
 
@@ -1288,16 +1311,16 @@ namespace rocos {
                         _thread_motion->join( );
                         _thread_motion = nullptr;
                     }
-                    _smart_servo.init( JC_helper::vector_2_JntArray(pos_),flange_, 0, 0, max_speed, max_acceleration, 2 * max_acceleration );
-                    _thread_planning.reset( new boost::thread{ &JC_helper::smart_servo::smart_servo_using_Cartesian, &_smart_servo } );
-                    _thread_IK.reset( new boost::thread{ &JC_helper::smart_servo::smart_servo_IK, &_smart_servo, this } );
-                    _thread_motion.reset( new boost::thread{ &JC_helper::smart_servo::smart_servo_motion, &_smart_servo, this } );
+                    _SmartServo_Cartesian.init( JC_helper::vector_2_JntArray(pos_),flange_, 0, 0, max_speed, max_acceleration, 2 * max_acceleration );
+                    _thread_planning.reset( new boost::thread{ &JC_helper::SmartServo_Cartesian::RunSmartServo_Plannig, &_SmartServo_Cartesian } );
+                    _thread_IK.reset( new boost::thread{ &JC_helper::SmartServo_Cartesian::RunSmartServo_Ik, &_SmartServo_Cartesian, this } );
+                    _thread_motion.reset( new boost::thread{ &JC_helper::SmartServo_Cartesian::RunSmartServo_Motion, &_SmartServo_Cartesian, this } );
                 }
 
                 index = index - static_cast< int >( DRAGGING_FLAG::OBJECT_X );
                 tem_vector(index) = static_cast< double >( dir ) * max_speed * 0.1;
                 target_frame = flange_ * KDL::Frame{(flange_.M.Inverse() * object_.M) * tem_vector};
-                _smart_servo.command(target_frame);
+                _SmartServo_Cartesian.command(target_frame);
                 break;
 
             case DRAGGING_FLAG::BASE_X:
@@ -1324,16 +1347,25 @@ namespace rocos {
                         _thread_motion->join( );
                         _thread_motion = nullptr;
                     }
-                    _smart_servo.init( JC_helper::vector_2_JntArray(pos_),flange_, 0, 0, max_speed, max_acceleration, 2 * max_acceleration );
-                    _thread_planning.reset( new boost::thread{ &JC_helper::smart_servo::smart_servo_using_Cartesian, &_smart_servo } );
-                    _thread_IK.reset( new boost::thread{ &JC_helper::smart_servo::smart_servo_IK, &_smart_servo, this } );
-                    _thread_motion.reset( new boost::thread{ &JC_helper::smart_servo::smart_servo_motion, &_smart_servo, this } );
+                    _SmartServo_Cartesian.init( JC_helper::vector_2_JntArray(pos_),flange_, 0, 0, max_speed, max_acceleration, 2 * max_acceleration );
+                    _thread_planning.reset( new boost::thread{ &JC_helper::SmartServo_Cartesian::RunSmartServo_Plannig, &_SmartServo_Cartesian } );
+                    _thread_IK.reset( new boost::thread{ &JC_helper::SmartServo_Cartesian::RunSmartServo_Ik, &_SmartServo_Cartesian, this } );
+                    _thread_motion.reset( new boost::thread{ &JC_helper::SmartServo_Cartesian::RunSmartServo_Motion, &_SmartServo_Cartesian, this } );
                 }
 
                 index               = index - static_cast< int >( DRAGGING_FLAG::BASE_X );
-                tem_vector( index ) = static_cast< double >( dir ) * max_speed * 0.1;
+                tem_vector( index ) = static_cast< double >( 1 ) * max_speed * 0.1;
+                // tem_vector( index ) = static_cast< double >( dir ) * max_speed * 0.1;
                 target_frame        = flange_ * KDL::Frame{ flange_.M.Inverse( ) * tem_vector };
-                _smart_servo.command( target_frame );
+                _SmartServo_Cartesian.command( target_frame );
+
+                if(dir == DRAGGING_DIRRECTION::POSITION)
+                PLOG_ERROR<< "正方向";
+                else if (dir == DRAGGING_DIRRECTION::NEGATIVE)
+                PLOG_ERROR<< "负方向";
+                else if (dir == DRAGGING_DIRRECTION::NONE)
+                PLOG_ERROR<< "无方向";
+
                 break;
 
             default:  // TODO 不接受指令处理-JC

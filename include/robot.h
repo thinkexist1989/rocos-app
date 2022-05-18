@@ -567,6 +567,7 @@ namespace rocos {
 
         Kinematics kinematics_;
 
+
         Frame flange_;  //!< 法兰位置姿态
         Frame tool_;    //!< 工具位置姿态
         Frame object_;  //!< 工件位置姿态
@@ -575,11 +576,11 @@ namespace rocos {
         std::atomic<int> tick_count{0};
 
     public:
-        friend void JC_helper::smart_servo::smart_servo_using_Joint(rocos::Robot *);
+        friend void JC_helper::SmartServo_Joint::RunSmartServo(rocos::Robot *);
 
-        friend void JC_helper::smart_servo::smart_servo_IK(rocos::Robot *);
+        friend void JC_helper::SmartServo_Cartesian::RunSmartServo_Ik(rocos::Robot *);
 
-        friend void JC_helper::smart_servo::smart_servo_motion(rocos::Robot *);
+        friend void JC_helper::SmartServo_Cartesian::RunSmartServo_Motion(rocos::Robot *);
 
 
     };
