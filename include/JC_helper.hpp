@@ -54,7 +54,13 @@
 namespace rocos
 {
     class Robot;
-}
+
+}  // namespace rocos
+
+    // enum class rocos::Robot::DRAGGING_DIRRECTION;
+
+
+
 
 namespace JC_helper
 {
@@ -264,9 +270,9 @@ namespace JC_helper
         const double big_eps{ 1E-3 };
 
         KDL::JntArray _q_init;
-
-
         std::mutex target_mutex;
+
+        long  time_count{ 300 };
 
     public:
         SmartServo_Cartesian( std::atomic< bool >* finished_flag_ptr );
@@ -276,9 +282,11 @@ namespace JC_helper
         void RunSmartServo_Plannig( );
         void RunSmartServo_Ik( rocos::Robot* );
         void RunSmartServo_Motion( rocos::Robot* );
-        int command( KDL::Frame p_target );
+        int command( const KDL::Vector& tem_v, const char* str = "BASE" );
+        int command( const KDL::Rotation& tem_r, const char* str = "BASE" );
 
     private:
+        int command( KDL::Frame p_target );
         KDL::Frame link_trajectory( const KDL::Frame& start, const KDL::Frame& end, double s_p );
         KDL::Frame link_trajectory( const KDL::Frame& start, const KDL::Frame& end, double s_p, double s_r );
         std::vector< double > UnitQuaternion_intep( const std::vector< double >& start, const std::vector< double >& end, double s, bool flag_big_angle = false );
@@ -295,6 +303,17 @@ namespace JC_helper
             _pos( i ) = pos[ i ];
         return _pos;
     }
+
+    inline void  print_JntArray( const char* str ,KDL::JntArray joints )
+    {
+        PLOG_DEBUG << str << ":";
+        for ( int i = 0; i < _joint_num; i++ )
+            PLOG_DEBUG.printf( "[%d] = %f", i, joints( i )*180/M_PI );
+        PLOG_DEBUG ;
+
+    }
+
+
 
 }  // namespace JC_helper
 

@@ -740,7 +740,11 @@ namespace JC_helper
         //**-------------------------------**//
 
         //第一次启动需要等待command()
-        while ( *external_finished_flag_ptr ) PLOG_INFO << "waiting for command";
+        while ( *external_finished_flag_ptr )
+        {
+            std::this_thread::sleep_for( std::chrono::duration< double >{ 0.003 } );
+            PLOG_INFO << "waiting for command";
+        }
 
         while ( 1 )
         {
@@ -857,11 +861,11 @@ namespace JC_helper
         //     thread_RunPlanningIK.reset( new boost::thread{ &SmartServo_Cartesian::RunSmartServo_Ik, this } );
         // if ( !thread_RunMotion )
         //     thread_RunMotion.reset( new boost::thread{ &SmartServo_Cartesian::RunSmartServo_Motion, this } );
+        time_count = 300;
 
         PLOG_INFO << "smart servo init succesed";
     }
 
-    // TODO 笛卡尔空间下smart servo
     void SmartServo_Cartesian::RunSmartServo_Plannig( )
     {
         //** 变量初始化 **//
@@ -873,15 +877,17 @@ namespace JC_helper
         double path_a{ 0 };
         int OnlineDoubleS_count{ 1 };
         bool flag_from_last_rotation{ false };
-        double t_last_rotation{ 0.002 };  //上段姿态运行时刻
+        double t_last_rotation{ 0.001 };  //上段姿态运行时刻
         double dt_link{ 0 };              //当前段段姿态运行时刻
-        const double sleep_time{ 0.002 };
+        constexpr double sleep_time{ 0.001*0.8 };//最长睡眠时间为1ms,最高于这个值会导致运动不连续
 
         //**-------------------------------**//
+        PLOG_DEBUG;
 
         //第一次启动需要等待command()
         while ( *external_finished_flag_ptr )
             ;
+        PLOG_DEBUG;
 
         try
         {
@@ -933,8 +939,12 @@ namespace JC_helper
                         //** 直线段轨迹计算 **//
                         while ( 1 )
                         {
-                            if ( on_stop_trajectory ) {PLOG_DEBUG; throw "on_stop_trajectory";}
-                            
+                            if ( on_stop_trajectory )
+                            {
+                                PLOG_DEBUG;
+                                throw "on_stop_trajectory";
+                            }
+
                             _rotaion_OnlineDoubleS.get_pos_vel_acc( OnlineDoubleS_count, s, sd, sdd );
                             if ( ( 1.0 - s ) > eps && _command_flag == command_flag )
                             {
@@ -952,12 +962,12 @@ namespace JC_helper
                                 // PLOG_DEBUG << "dt_link =\n"
                                 //            << dt_link;
                                 // PLOG_DEBUG << "OnlineDoubleS_count =\n"
-                                //            << 0.002 * OnlineDoubleS_count;
+                                //            << 0.001 * OnlineDoubleS_count;
 
                                 lock_traj_frame.lock( );
                                 traj_frame.push_back( path_p );
                                 lock_traj_frame.unlock( );
-                                dt_link = dt_link + 0.002;
+                                dt_link = dt_link + 0.001;
 
                                 OnlineDoubleS_count++;
 
@@ -1080,11 +1090,11 @@ namespace JC_helper
 
                             if ( flag_from_last_rotation )
                             {
-                                _last_rotaion_OnlineDoubleS.get_pos_vel_acc( t_last_rotation - 0.002, s_r, sd_r, sdd_r );
+                                _last_rotaion_OnlineDoubleS.get_pos_vel_acc( t_last_rotation - 0.001, s_r, sd_r, sdd_r );
                             }
                             else
                             {
-                                _rotaion_OnlineDoubleS.get_pos_vel_acc( dt_link - 0.002, s_r, sd_r, sdd_r );
+                                _rotaion_OnlineDoubleS.get_pos_vel_acc( dt_link - 0.001, s_r, sd_r, sdd_r );
                             }
 
                             if ( length_circle_link <= eps )  //!只旋转目标且不存在直线段了，不需要时间缩放
@@ -1173,10 +1183,9 @@ namespace JC_helper
                             Frame _last_target      = last_target;
                             Frame _last_last_target = last_last_target;
                             Frame _path_p           = path_p;
-                            t_last_rotation         = 0.002;
-                            dt_link                 = 0.002;
+                            t_last_rotation         = 0.001;
+                            dt_link                 = 0.001;
                             double next_remain_length{ 0 };
-
 
                             // PLOG_DEBUG << "target =\n"
                             //            << target;
@@ -1217,7 +1226,7 @@ namespace JC_helper
                                             }
 
                                             path_p.M = ratation_trajectory( _last_last_target.M, _last_target.M, s_r );
-                                            t_last_rotation += 0.002;
+                                            t_last_rotation += 0.001;
                                             flag_from_last_rotation = true;
                                         }
                                         else if ( dt_link <= ratation_duration )
@@ -1243,7 +1252,7 @@ namespace JC_helper
                                             else
                                                 path_p.M = ratation_trajectory( _last_target.M, _target.M, s_r );
 
-                                            dt_link += 0.002;
+                                            dt_link += 0.001;
                                             flag_from_last_rotation = false;
                                         }
                                         // PLOG_DEBUG << "dt_link =" << dt_link;
@@ -1347,7 +1356,6 @@ namespace JC_helper
                             {
                                 while ( 1 )  //第一段和第二段直线轨迹
                                 {
-
                                     if ( on_stop_trajectory ) throw "on_stop_trajectory";
 
                                     _OnlineDoubleS.get_pos_vel_acc( OnlineDoubleS_count, s_p, sd_p, sdd_p );
@@ -1362,14 +1370,14 @@ namespace JC_helper
                                         {
                                             _last_rotaion_OnlineDoubleS.get_pos_vel_acc( t_last_rotation, s_r, sd_r, sdd_r );
                                             path_p.M = ratation_trajectory( _last_last_target.M, _last_target.M, s_r );
-                                            t_last_rotation += 0.002;
+                                            t_last_rotation += 0.001;
                                             flag_from_last_rotation = true;
                                         }
                                         else if ( dt_link <= ratation_duration )
                                         {
                                             _rotaion_OnlineDoubleS.get_pos_vel_acc( dt_link, s_r, sd_r, sdd_r );
                                             path_p.M = ratation_trajectory( _last_target.M, _target.M, s_r );
-                                            dt_link += 0.002;
+                                            dt_link += 0.001;
                                             flag_from_last_rotation = false;
                                         }
                                         // PLOG_DEBUG << "dt_link =" << dt_link;
@@ -1494,9 +1502,9 @@ namespace JC_helper
                             double sdd_r{ 0 };
 
                             if ( flag_from_last_rotation )
-                                _last_rotaion_OnlineDoubleS.get_pos_vel_acc( t_last_rotation - 0.002, s_r, sd_r, sdd_r );
+                                _last_rotaion_OnlineDoubleS.get_pos_vel_acc( t_last_rotation - 0.001, s_r, sd_r, sdd_r );
                             else
-                                _rotaion_OnlineDoubleS.get_pos_vel_acc( dt_link - 0.002, s_r, sd_r, sdd_r );
+                                _rotaion_OnlineDoubleS.get_pos_vel_acc( dt_link - 0.001, s_r, sd_r, sdd_r );
 
                             _last_rotaion_OnlineDoubleS.calculate( s_r, 1, sd_r, 0, sdd_r, 0, 1e7, 1e7, 1e7, _OnlineDoubleS.get_duration( ) );
                             double last_ratation_duration{ _last_rotaion_OnlineDoubleS.get_duration( ) };
@@ -1510,13 +1518,11 @@ namespace JC_helper
                             Frame _last_last_target = last_last_target;
                             Frame _path_p           = path_p;
                             OnlineDoubleS_count     = 1;
-                            t_last_rotation         = 0.002;
+                            t_last_rotation         = 0.001;
                             double next_remain_length{ 0 };
 
                             while ( 1 )
                             {
-                                  
-
                                 if ( on_stop_trajectory ) throw "on_stop_trajectory";
 
                                 _OnlineDoubleS.get_pos_vel_acc( OnlineDoubleS_count, s_p, sd_p, sdd_p );
@@ -1531,7 +1537,7 @@ namespace JC_helper
                                     {
                                         _last_rotaion_OnlineDoubleS.get_pos_vel_acc( t_last_rotation, s_r, sd_r, sdd_r );
                                         path_p.M = ratation_trajectory( _last_last_target.M, _last_target.M, s_r );
-                                        t_last_rotation += 0.002;
+                                        t_last_rotation += 0.001;
                                         flag_from_last_rotation = true;
                                     }
 
@@ -1677,9 +1683,9 @@ namespace JC_helper
                             if ( !( radio_angle >= 0 ) ) radio_angle = 0.5;                        // 0/0无效，这里为了规划成功，设置为0.5
 
                             if ( flag_from_last_rotation )
-                                _last_rotaion_OnlineDoubleS.get_pos_vel_acc( t_last_rotation - 0.002, s_r, sd_r, sdd_r );
+                                _last_rotaion_OnlineDoubleS.get_pos_vel_acc( t_last_rotation - 0.001, s_r, sd_r, sdd_r );
                             else
-                                _rotaion_OnlineDoubleS.get_pos_vel_acc( dt_link - 0.002, s_r, sd_r, sdd_r );
+                                _rotaion_OnlineDoubleS.get_pos_vel_acc( dt_link - 0.001, s_r, sd_r, sdd_r );
 
                             _last_rotaion_OnlineDoubleS.calculate( s_r, 1, sd_r, 0, sdd_r, 0, 1e7, 1e7, 1e7, _OnlineDoubleS.get_duration( ) * radio_angle );
                             double last_ratation_duration{ abs( remain_angle ) < eps ? 0 : _last_rotaion_OnlineDoubleS.get_duration( ) };
@@ -1697,8 +1703,8 @@ namespace JC_helper
                             double sd_p{ 0 };
                             double sdd_p{ 0 };
                             OnlineDoubleS_count = 1;
-                            t_last_rotation     = 0.002;
-                            dt_link             = 0.002;
+                            t_last_rotation     = 0.001;
+                            dt_link             = 0.001;
 
                             Frame _target           = target;
                             Frame _last_target      = last_target;
@@ -1707,8 +1713,6 @@ namespace JC_helper
 
                             while ( 1 )  //圆弧段计算
                             {
-                               
-
                                 if ( on_stop_trajectory ) throw "on_stop_trajectory";
 
                                 _OnlineDoubleS.get_pos_vel_acc( OnlineDoubleS_count, s_p, sd_p, sdd_p );
@@ -1723,14 +1727,14 @@ namespace JC_helper
                                     {
                                         _last_rotaion_OnlineDoubleS.get_pos_vel_acc( t_last_rotation, s_r, sd_r, sdd_r );
                                         path_p.M = ratation_trajectory( _last_last_target.M, _last_target.M, s_r );
-                                        t_last_rotation += 0.002;
+                                        t_last_rotation += 0.001;
                                         flag_from_last_rotation = true;
                                     }
                                     else if ( dt_link <= ratation_duration )
                                     {
                                         _rotaion_OnlineDoubleS.get_pos_vel_acc( dt_link, s_r, sd_r, sdd_r );
                                         path_p.M = ratation_trajectory( _last_target.M, _target.M, s_r );
-                                        dt_link += 0.002;
+                                        dt_link += 0.001;
                                         flag_from_last_rotation = false;
                                     }
 
@@ -1871,8 +1875,6 @@ namespace JC_helper
 
                             while ( 1 )  //直线段段计算
                             {
-                                   
-
                                 if ( on_stop_trajectory ) throw "on_stop_trajectory";
 
                                 _OnlineDoubleS.get_pos_vel_acc( OnlineDoubleS_count, s_p, sd_p, sdd_p );
@@ -1888,7 +1890,7 @@ namespace JC_helper
                                     {
                                         _last_rotaion_OnlineDoubleS.get_pos_vel_acc( t_last_rotation, s_r, sd_r, sdd_r );
                                         path_p.M = ratation_trajectory( F_base_circlestart.M, F_base_circleend.M, s_r );
-                                        t_last_rotation += 0.002;
+                                        t_last_rotation += 0.001;
                                         flag_from_last_rotation = true;
                                     }
                                     else if ( dt_link <= ratation_duration )
@@ -1896,7 +1898,7 @@ namespace JC_helper
                                         // link_flag = true;  //必需在直线段且上段姿态实现完，才能切换目标
                                         _rotaion_OnlineDoubleS.get_pos_vel_acc( dt_link, s_r, sd_r, sdd_r );
                                         path_p.M = ratation_trajectory( F_base_circleend.M, _target.M, s_r );
-                                        dt_link += 0.002;
+                                        dt_link += 0.001;
                                         flag_from_last_rotation = false;
                                     }
 
@@ -2005,7 +2007,7 @@ namespace JC_helper
             PLOG_ERROR << "planning 触发急停";
             PLOG_ERROR << str;
             FinishPlanningFrame = true;
-            command_flag =0;
+            command_flag        = 0;
         }
         catch ( const std::exception& e )
         {
@@ -2016,8 +2018,7 @@ namespace JC_helper
 
             PLOG_ERROR << e.what( );
             FinishPlanningFrame = true;
-            command_flag =0;
-
+            command_flag        = 0;
         }
         catch ( ... )
         {
@@ -2027,7 +2028,7 @@ namespace JC_helper
                 PLOG_INFO << "planning  结束,未知异常";
 
             FinishPlanningFrame = true;
-            command_flag =0;
+            command_flag        = 0;
         }
     }
 
@@ -2090,7 +2091,11 @@ namespace JC_helper
             {
                 if ( abs( _q_target( i ) - _q_init( i ) ) > max_step[ i ] )
                 {
-                    PLOG_ERROR << "joint[" << i << "] speep is too  fast ";
+                    PLOG_ERROR << "joint[" << i << "] speep is too  fast";
+                    PLOG_ERROR << "target speed = " << abs( _q_target( i ) - _q_init( i ) )
+                               << " and  max_step=" << max_step[ i ];
+                    PLOG_ERROR << "_q_target( " << i << " )  = " << _q_target( i ) * 180 / M_PI;
+                    PLOG_ERROR << "_q_init( " << i << " ) =" << _q_init( i ) * 180 / M_PI;
                     on_stop_trajectory = true;
                     break;
                 }
@@ -2147,12 +2152,16 @@ namespace JC_helper
             traj_joint_count++;
             //**-------------------------------**//
 
+            //** 位置伺服 **//
             for ( int i = 0; i < _joint_num; ++i )
             {
                 robot_ptr->pos_[ i ] = joint_command( i );
                 robot_ptr->joints_[ i ]->setPosition( joint_command( i ) );
             }
             robot_ptr->hw_interface_->waitForSignal( 0 );
+            //**-------------------------------**//
+
+            time_count++;  // 1ms计时，类内部使用
 
             //** 100ms进行一次心跳检查,超时触发紧急停止 **//
             if ( ( ++count ) == 100 )
@@ -2176,82 +2185,125 @@ namespace JC_helper
         if ( on_stop_trajectory )
         {
             PLOG_ERROR << "motion触发紧急停止";
-            // ruckig::Ruckig< _joint_num > otg{ 0.001 };
-            // ruckig::InputParameter< _joint_num > input;
-            // ruckig::OutputParameter< _joint_num > output;
-            // ruckig::Result res;
+            ruckig::Ruckig< _joint_num > otg{ 0.001 };
+            ruckig::InputParameter< _joint_num > input;
+            ruckig::OutputParameter< _joint_num > output;
+            ruckig::Result res;
+            int joint_index{ 0 };
 
-            // KDL::JntArray current_pos{ traj_joint[ traj_joint_count - 1 ] };
-            // KDL::JntArray last_pos{ traj_joint[ traj_joint_count - 2 ] };
-            // KDL::JntArray last_last_pos{ traj_joint[ traj_joint_count - 3 ] };
-            // KDL::JntArray current_vel( _joint_num );
-            // KDL::JntArray last_vel( _joint_num );
-            // KDL::JntArray current_acc( _joint_num );
+            if ( traj_joint_count > 200 )
+                joint_index = 200;
+            else if ( traj_joint_count > 100 )
+                joint_index = 100;
+            else if ( traj_joint_count > 10 )
+                joint_index = 10;
+            else if ( traj_joint_count > 5 )
+                joint_index = 5;
+            else
+                joint_index = 0;
+            if ( joint_index )
+            {
+                try
+                {
+                    PLOG_DEBUG << "traj_joint.size( )  = " << traj_joint.size( );
+                    PLOG_DEBUG << "joint_index = " << joint_index;
+                    PLOG_DEBUG << "traj_joint_count = " << traj_joint_count;
+                    KDL::JntArray current_pos{ traj_joint[ traj_joint_count - 1 ] };
+                    KDL::JntArray last_pos{ traj_joint[ traj_joint_count - ( joint_index / 2 ) - 1 ] };
+                    KDL::JntArray last_last_pos{ traj_joint[ traj_joint_count - joint_index - 1 ] };
 
-            // KDL::Subtract( current_pos, last_pos, current_vel );
-            // KDL::Divide( current_vel, 0.001, current_vel );
+                    KDL::JntArray current_vel( _joint_num );
+                    KDL::JntArray last_vel( _joint_num );
+                    KDL::JntArray current_acc( _joint_num );
 
-            // KDL::Subtract( last_pos, last_last_pos, last_vel );
-            // KDL::Divide( last_vel, 0.001, last_vel );
+                    KDL::Subtract( current_pos, last_pos, current_vel );
+                    // print_JntArray( "last_last_pos", last_last_pos );
+                    // print_JntArray( "last_pos", last_pos );
+                    // print_JntArray( "current_pos", current_pos );
+                    KDL::Divide( current_vel, joint_index * 0.001 / 2, current_vel );
 
-            // KDL::Subtract( current_vel, last_vel, current_acc );
-            // KDL::Divide( current_acc, 0.001, current_acc );
+                    KDL::Subtract( last_pos, last_last_pos, last_vel );
+                    KDL::Divide( last_vel, joint_index * 0.001 / 2, last_vel );
 
-            // input.control_interface = ruckig::ControlInterface::Velocity;
-            // input.synchronization   = ruckig::Synchronization::None;
+                    KDL::Subtract( current_vel, last_vel, current_acc );
+                    KDL::Divide( current_acc, joint_index * 0.001 / 2, current_acc );
 
-            // for ( int i = 0; i < _joint_num; i++ )
-            // {
-            //     input.current_position[ i ]     = current_pos( i );
-            //     input.current_velocity[ i ]     = current_vel( i );
-            //     input.current_acceleration[ i ] = current_acc( i );
+                    input.control_interface = ruckig::ControlInterface::Velocity;
+                    input.synchronization   = ruckig::Synchronization::None;
 
-            //     input.target_position[ i ]     = current_pos( i );
-            //     input.target_velocity[ i ]     = 0;
-            //     input.target_acceleration[ i ] = 0;
+                    for ( int i = 0; i < _joint_num; i++ )
+                    {
+                        input.current_position[ i ]     = current_pos( i )   ;
+                        //防止速度和加速度估计不准
+                        input.current_velocity[ i ]     = KDL::sign( current_vel( i ) ) * std::min( abs( current_vel( i ) ), robot_ptr->joints_[ i ]->getMaxVel( ) );
+                        input.current_acceleration[ i ] = KDL::sign( current_acc( i ) ) * std::min( abs( current_acc( i ) ), robot_ptr->joints_[ i ]->getMaxAcc( )*0.80 );
 
-            //     input.max_velocity[ i ]     = robot_ptr->joints_[ i ]->getMaxVel( );
-            //     input.max_acceleration[ i ] = robot_ptr->joints_[ i ]->getMaxAcc( );
-            //     input.max_jerk[ i ]         = robot_ptr->joints_[ i ]->getMaxJerk( );
-            // }
+                        printf( "pos(%d)=  %f, vel(%d)= %f , last vel(%d)= %f , acc(%d)= %f \n", i, input.current_position[ i ] * 180 / M_PI, i, input.current_velocity[ i ] * 180 / M_PI, i, last_vel( i ) * 180 / M_PI, i, input.current_acceleration[ i ] * 180 / M_PI );
 
-            // while ( ( res = otg.update( input, output ) ) != ruckig::Result::Finished )
-            // {
-            //     const auto& p = output.new_position;
+                        input.target_position[ i ]     = current_pos( i );
+                        input.target_velocity[ i ]     = 0;
+                        input.target_acceleration[ i ] = 0;
 
-            //     for ( int i = 0; i < _joint_num; ++i )
-            //     {
-            //         robot_ptr->pos_[ i ] = p[ i ];
-            //         robot_ptr->joints_[ i ]->setPosition( p[ i ] );
-            //     }
-            //     output.pass_to_input( input );
-            //     robot_ptr->hw_interface_->waitForSignal( 0 );
-            // }
+                        input.max_velocity[ i ]     = robot_ptr->joints_[ i ]->getMaxVel( );
+                        input.max_acceleration[ i ] = robot_ptr->joints_[ i ]->getMaxAcc( );
+                        input.max_jerk[ i ]         = robot_ptr->joints_[ i ]->getMaxJerk( );
+                    }
+
+                    while ( ( res = otg.update( input, output ) ) != ruckig::Result::Finished )
+                    {
+                        const auto& p = output.new_position;
+
+                        for ( int i = 0; i < _joint_num; ++i )
+                        {
+                            robot_ptr->pos_[ i ] = p[ i ];
+                            robot_ptr->joints_[ i ]->setPosition( p[ i ] );
+                        }
+                        output.pass_to_input( input );
+                        robot_ptr->hw_interface_->waitForSignal( 0 );
+                    }
+                }
+                catch ( const std::exception& e )
+                {
+                    PLOG_ERROR <<e.what( );
+                }
+                catch ( ... )
+                {
+                    PLOG_ERROR << "未知错误";
+                }
+            }
+            else
+                PLOG_DEBUG << "traj_joint 路径点太少，直接停止";
         }
         else
             PLOG_INFO << "motion 结束";
 
-        //!等待规划线程完事以后，再统一把所有标志位归位
+        //!等待plannig规划线程完事以后，再统一把所有标志位归位
         while ( !FinishPlanningFrame ) std::this_thread::sleep_for( std::chrono::duration< double >{ 0.001 } );
 
         ( *external_finished_flag_ptr ) = true;   //这次smart servo已结束，等待下一次smart servo
         robot_ptr->is_running_motion    = false;  //机械臂运动已结束，可以执行其他离线类运动
         on_stop_trajectory              = false;
         PLOG_INFO << "SmartServo_Cartesian 全部结束";
-
     }
 
-    // TODO 笛卡尔空间下smart servo
     int SmartServo_Cartesian::command( KDL::Frame new_target )
     {
         if ( !on_stop_trajectory )  //如果需要紧急停止，那么就不允许在更改指令了
         {
             if ( new_target == target )
+            {
+                PLOG_DEBUG << "目标一致，无效";
                 return -1;
+            }
+            else if ( time_count < 100 )
+            {
+                PLOG_DEBUG << "100ms时间未到";
+                return -1;
+            }
             else
             {
                 std::unique_lock< std::mutex > lock_target( target_mutex, std::defer_lock );  //不上锁
-
+                time_count = 0;
                 lock_target.lock( );
                 last_last_target = last_target;
                 last_target      = target;
@@ -2268,6 +2320,20 @@ namespace JC_helper
             PLOG_DEBUG << "control is not allowed during emergency stop";
             return -1;
         }
+    }
+    int SmartServo_Cartesian::command( const KDL::Vector& tem_v, const char* str )
+    {
+        if ( strcmp( str, "FLANGE" ) == 0 )
+            return command( target * KDL::Frame{ tem_v } );
+        else if ( strcmp( str, "BASE" ) == 0 )
+            return command( target * KDL::Frame{ target.M.Inverse( ) * tem_v } );
+    }
+    int SmartServo_Cartesian::command( const KDL::Rotation& tem_r, const char* str )
+    {
+        if ( strcmp( str, "FLANGE" ) == 0 )
+            return command( target * KDL::Frame{ tem_r } );
+        else if ( strcmp( str, "BASE" ) == 0 )
+            return command( KDL::Frame{ tem_r * target.M, target.p } );
     }
 
     KDL::Frame SmartServo_Cartesian::link_trajectory( const KDL::Frame& start, const KDL::Frame& end, double s_p )
