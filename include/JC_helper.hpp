@@ -49,117 +49,120 @@
 #define BOLDWHITE "\033[1m\033[37m" /* Bold White */
 
 //示例
-//std::cout << BLUE << " hello world " << std::endl;
+// std::cout << BLUE << " hello world " << std::endl;
 
 namespace rocos
 {
     class Robot;
-}
+
+}  // namespace rocos
+
+    // enum class rocos::Robot::DRAGGING_DIRRECTION;
+
+
+
 
 namespace JC_helper
 {
-   
-
 
     /**
-      * @brief 姿态插值（轴角法角度线性插值）
-      *
-      * @param start 开始姿态
-      * @param end 结束姿态
-      * @param s 百分比
-      * @return KDL::Rotation
-      */
+     * @brief 姿态插值（轴角法角度线性插值）
+     *
+     * @param start 开始姿态
+     * @param end 结束姿态
+     * @param s 百分比
+     * @return KDL::Rotation
+     */
     KDL::Rotation RotAxisAngle( KDL::Rotation start, KDL::Rotation end, double s );
 
     /**
-      * @brief 圆弧插值
-      * 
-      * @param F_base_circlestart 起点
-      * @param F_base_circleend 终点
-      * @param F_base_circleCenter 圆心
-      * @param s_p 位置百分比
-      * @param s_r 位态百分比
-      * @param alpha 夹角
-      * @param success 计算是否成功标识位 (false 为不成功)
-      * @return KDL::Frame 
-      */
-    KDL::Frame circle( const KDL::Frame& F_base_circlestart, const KDL::Frame& F_base_circleend, const KDL::Frame& F_base_circleCenter, double s_p, double s_r, double alpha ,double & success);
+     * @brief 圆弧插值
+     *
+     * @param F_base_circlestart 起点
+     * @param F_base_circleend 终点
+     * @param F_base_circleCenter 圆心
+     * @param s_p 位置百分比
+     * @param s_r 位态百分比
+     * @param alpha 夹角
+     * @param success 计算是否成功标识位 (false 为不成功)
+     * @return KDL::Frame
+     */
+    KDL::Frame circle( const KDL::Frame& F_base_circlestart, const KDL::Frame& F_base_circleend, const KDL::Frame& F_base_circleCenter, double s_p, double s_r, double alpha, double& success );
 
     /**
-      * @brief 直线规划（使用doubleS速度曲线）
-      * 
-      * @param start 起始位姿
-      * @param end 终止位姿
-      * @param success 计算是否成功标识位 (false 为不成功)
-      * @return 指定s对应的位姿
-      */
-    KDL::Frame link( const KDL::Frame& start, const KDL::Frame& end, double s_p, double s_r, double & success );
+     * @brief 直线规划（使用doubleS速度曲线）
+     *
+     * @param start 起始位姿
+     * @param end 终止位姿
+     * @param success 计算是否成功标识位 (false 为不成功)
+     * @return 指定s对应的位姿
+     */
+    KDL::Frame link( const KDL::Frame& start, const KDL::Frame& end, double s_p, double s_r, double& success );
 
     int link_trajectory( std::vector< KDL::Frame >& traj, const KDL::Frame& start, const KDL::Frame& end, double v_start, double v_end, double max_path_v, double max_path_a );
 
     int link_trajectory( std::vector< KDL::Frame >& traj, const KDL::Frame& start, const KDL::Frame& end, double max_path_v, double max_path_a );
 
-
     /**
-      * @brief 
-      * 
-      * @param traj 存储的轨迹
-      * @param f_start 应该开始运动的位姿
-      * @param f_mid 中间的插值点
-      * @param f_end 结束的插值点
-      * @param next_f_start 下一段运动应该开始的位姿
-      * @param current_path_start_v 应该开始运动的线速度
-      * @param next_path_start_v 下一段运动应该开始的线速度
-      * @param bound_dist 过渡半径
-      * @param max_path_v 最大线速度
-      * @param max_path_a 最大线加速度
-      * @param next_max_path_v 下一段的最大线速度（如果无下一段了，此参数无意义）
-      * @return int 
-      */
+     * @brief
+     *
+     * @param traj 存储的轨迹
+     * @param f_start 应该开始运动的位姿
+     * @param f_mid 中间的插值点
+     * @param f_end 结束的插值点
+     * @param next_f_start 下一段运动应该开始的位姿
+     * @param current_path_start_v 应该开始运动的线速度
+     * @param next_path_start_v 下一段运动应该开始的线速度
+     * @param bound_dist 过渡半径
+     * @param max_path_v 最大线速度
+     * @param max_path_a 最大线加速度
+     * @param next_max_path_v 下一段的最大线速度（如果无下一段了，此参数无意义）
+     * @return int
+     */
     int multilink_trajectory( std::vector< KDL::Frame >& traj, const KDL::Frame& f_start, const KDL::Frame& f_mid, const KDL::Frame& f_end, KDL::Frame& next_f_start, double current_path_start_v, double& next_path_start_v, double bound_dist, double max_path_v, double max_path_a, double next_max_path_v = 1 );
 
     /**
- * @brief 给定三点，计算出圆心
- * 
- * @param center 
- * @param f_p1 
- * @param f_p2 
- * @param f_p3 
- * @return int 
- */
+     * @brief 给定三点，计算出圆心
+     *
+     * @param center
+     * @param f_p1
+     * @param f_p2
+     * @param f_p3
+     * @return int
+     */
     int circle_center( KDL::Frame& center, const KDL::Frame& f_p1, const KDL::Frame& f_p2, const KDL::Frame& f_p3 );
 
     /**
- * @brief movec轨迹计算
- * 
- * @param traj 输出计算结果
- * @param f_p1 第一点
- * @param f_p2 第二点
- * @param f_p3 第三点
- * @param max_path_v 最大速度
- * @param max_path_a 最大加速度
- * @param fixed_rotation 是否保持姿态：是->姿态不变；否->姿态指向圆心方向变换
- * @return int 
- */
+     * @brief movec轨迹计算
+     *
+     * @param traj 输出计算结果
+     * @param f_p1 第一点
+     * @param f_p2 第二点
+     * @param f_p3 第三点
+     * @param max_path_v 最大速度
+     * @param max_path_a 最大加速度
+     * @param fixed_rotation 是否保持姿态：是->姿态不变；否->姿态指向圆心方向变换
+     * @return int
+     */
     int circle_trajectory( std::vector< KDL::Frame >& traj, const KDL::Frame& f_p1, const KDL::Frame& f_p2, const KDL::Frame& f_p3, double max_path_v = 0.01, double max_path_a = 0.01, bool fixed_rotation = true );
 
     /**
- * @brief 位置保持，只旋转姿态
- * 
- * @param traj 输出计算结果
- * @param f_p 位置保持
- * @param f_r1 起始姿态
- * @param f_r2 终止姿态
- * @param max_path_v 最大速度
- * @param max_path_a 最大加速度
- * @param equivalent_radius 等效半径，用于乘以角度得到等效弧度
- * @return int 
- */
+     * @brief 位置保持，只旋转姿态
+     *
+     * @param traj 输出计算结果
+     * @param f_p 位置保持
+     * @param f_r1 起始姿态
+     * @param f_r2 终止姿态
+     * @param max_path_v 最大速度
+     * @param max_path_a 最大加速度
+     * @param equivalent_radius 等效半径，用于乘以角度得到等效弧度
+     * @return int
+     */
     int rotation_trajectory( std::vector< KDL::Frame >& traj, const KDL::Vector& f_p, const KDL::Rotation& f_r1, const KDL::Rotation& f_r2, double max_path_v = 0.01, double max_path_a = 0.01, double equivalent_radius = 0.01 );
 
     constexpr size_t _joint_num{ 7 };
 
-    class smart_servo
+    class SmartServo_Joint
     {
     private:
         //** 这里都是关节smart servo 所需的全部变量 **//
@@ -172,66 +175,145 @@ namespace JC_helper
         std::atomic< bool > on_stop_trajectory{ false };
         std::atomic< bool >* external_finished_flag_ptr;
 
-        //** 这里都是笛卡尔smart servo 所需的全部变量 **//
-        struct
-        {
-            KDL::Frame _p_init;
-            KDL::JntArray _q_init;
-            double _v_init;
-            double _a_init;
-            double _max_v;
-            double _max_a;
-            double _max_j;
-
-            KDL::Frame last_target;
-            KDL::Frame last_last_target;
-            KDL::Frame target;
-
-            std::vector< KDL::Frame > traj_frame;
-            std::vector< KDL::JntArray > traj_joint;
-
-            std::mutex mutex_traj_frame;
-            std::mutex mutex_traj_joint;
-            std::mutex mutex_command_flag;
-
-        } _Cartesian_state;
-
-        struct
-        {
-            std::atomic< bool > _FinishedPlanningCart{ true };
-            std::atomic< bool > _FinishedCartIK{ true };
-        } _Cartesian_flag;
-
-        struct
-        {
-            std::mutex mutex_traj_frame;
-            std::mutex mutex_traj_joint;
-            std::mutex mutex_command_flag;
-        } _Cartesian_mutex;
-
-        //**-------------------------------**//
-
-
     public:
-        smart_servo( std::atomic< bool >* finished_flag_ptr );
+        SmartServo_Joint( std::atomic< bool >* finished_flag_ptr );
         void init( std::vector< double > q_init, std::vector< double > v_init, std::vector< double > a_init, double max_v, double max_a, double max_j );
-        void init( KDL::JntArray q_init, KDL::Frame p_init, double v_init, double a_init, double max_v, double max_a, double max_j );
-
-        void smart_servo_using_Joint( rocos::Robot* robot_ptr );
-        void smart_servo_using_Cartesian( );
-        void smart_servo_IK( rocos::Robot* );
-        void smart_servo_motion( rocos::Robot* );
+        void RunSmartServo( rocos::Robot* robot_ptr );
         void command( KDL::JntArray q_target );
-        void command( KDL::Frame p_target );
     };
 
-  inline  KDL::JntArray vector_2_JntArray( std::vector< double > pos )
+   class OnlineDoubleS
+    {
+    private:
+        const double T_S{ 0.001 };
+
+        ruckig::Ruckig< 1 > otg;
+        ruckig::InputParameter< 1 > input;
+        ruckig::OutputParameter< 1 > output;
+        ruckig::Trajectory< 1 > _trajectory;
+        std::array< double, 1 > position, velocity, acceleration;
+        const double middle_eps{ 1E-4 };
+        double s{ 0 };
+        double sd{ 0 };
+        double sdd{ 0 };
+        int count{ 0 };
+
+    public:
+        void calculate(
+            double q0,
+            double q1,
+            double v_s,
+            double v_e,
+            double a_s,
+            double a_e,
+
+            double v_max,
+            double a_max,
+            double j_max
+
+        );
+        void calculate(
+            double q0,
+            double q1,
+            double v_s,
+            double v_e,
+            double a_s,
+            double a_e,
+
+            double v_max,
+            double a_max,
+            double j_max,
+            double t );
+
+        double get_duration( );
+        void get_pos_vel_acc( int i, double& p, double& v, double& a );
+        void get_pos_vel_acc( double t, double& p, double& v, double& a );
+    };
+
+
+    class SmartServo_Cartesian
+    {
+    private:
+        std::atomic< bool > on_stop_trajectory{ false };
+        std::atomic< bool >* external_finished_flag_ptr;
+
+    private:
+        double max_path_v{ 0.1 };
+        double max_path_a{ 0.1 };
+        double equivalent_radius{ 0.1 };
+        KDL::Frame last_target;
+        KDL::Frame last_last_target;
+        KDL::Frame target;
+        std::vector< KDL::Frame > traj_frame;
+        std::vector< KDL::JntArray > traj_joint;
+        std::mutex mutex_traj_frame;
+        std::mutex mutex_traj_joint;
+
+        atomic< int > command_flag{ 0 };
+
+        OnlineDoubleS _OnlineDoubleS;
+        OnlineDoubleS _rotaion_OnlineDoubleS;
+        OnlineDoubleS _last_rotaion_OnlineDoubleS;
+
+        bool FinishRunPlanningIK{ true };
+        bool FinishPlanningFrame{ true };
+        bool FinishRunMotion{ true };
+
+        atomic< int > count_down{ 200 };
+        KDL::Frame _new_target{ };
+
+        const int rvie_max_count = 100;
+
+        const double eps{ 1E-7 };
+        const double small_eps{ 1E-6 };
+        const double middle_eps{ 1E-4 };
+        const double big_eps{ 1E-3 };
+
+        KDL::JntArray _q_init;
+        std::mutex target_mutex;
+
+        long  time_count{ 300 };
+
+    public:
+        SmartServo_Cartesian( std::atomic< bool >* finished_flag_ptr );
+        ~SmartServo_Cartesian( );
+        void init( KDL::JntArray q_init, KDL::Frame p_init, double v_init, double a_init, double max_v, double max_a, double max_j );
+
+        void RunSmartServo_Plannig( );
+        void RunSmartServo_Ik( rocos::Robot* );
+        void RunSmartServo_Motion( rocos::Robot* );
+        int command( const KDL::Vector& tem_v, const char* str = "BASE" );
+        int command( const KDL::Rotation& tem_r, const char* str = "BASE" );
+
+    private:
+        int command( KDL::Frame p_target );
+        KDL::Frame link_trajectory( const KDL::Frame& start, const KDL::Frame& end, double s_p );
+        KDL::Frame link_trajectory( const KDL::Frame& start, const KDL::Frame& end, double s_p, double s_r );
+        std::vector< double > UnitQuaternion_intep( const std::vector< double >& start, const std::vector< double >& end, double s, bool flag_big_angle = false );
+        KDL::Frame cirlular_trajectory( const KDL::Frame& F_base_circlestart, const KDL::Frame& F_base_circleend, const KDL::Frame& F_base_circleCenter, double s_p, double alpha );
+        KDL::Frame cirlular_trajectory( const KDL::Frame& F_base_circlestart, const KDL::Frame& F_base_circleend, const KDL::Frame& F_base_circleCenter, double s_p, double s_r, double alpha );
+        KDL::Rotation ratation_trajectory( const KDL::Rotation& start, const KDL::Rotation& end, double s_r, bool flag_big_angle = false );
+    };
+
+ 
+    inline KDL::JntArray vector_2_JntArray( std::vector< double > pos )
     {
         KDL::JntArray _pos( pos.size( ) );
         for ( int i = 0; i < pos.size( ); i++ )
             _pos( i ) = pos[ i ];
         return _pos;
     }
+
+    inline void  print_JntArray( const char* str ,KDL::JntArray joints )
+    {
+        PLOG_DEBUG << str << ":";
+        for ( int i = 0; i < _joint_num; i++ )
+            PLOG_DEBUG.printf( "[%d] = %f", i, joints( i )*180/M_PI );
+        PLOG_DEBUG ;
+
+    }
+
+
 
 }  // namespace JC_helper
 

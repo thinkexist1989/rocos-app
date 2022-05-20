@@ -461,7 +461,7 @@ namespace rocos {
                    std::vector<double> max_path_a, bool asynchronous = false);
 
 
-        enum class DRAGGING_FLAG {
+        enum class DRAGGING_FLAG :int {
             J0 = 0, J1 = 1, J2 = 2, J3 = 3, J4 = 4, J5 = 5, J6 = 6,
             TOOL_X = 100, TOOL_Y = 101, TOOL_Z = 102, TOOL_ROLL = 103, TOOL_PITCH= 104, TOOL_YAW = 105,
             FLANGE_X = 200, FLANGE_Y = 201, FLANGE_Z = 202,FLANGE_ROLL = 203, FLANGE_PITCH = 204, FLANGE_YAW = 205,
@@ -469,7 +469,7 @@ namespace rocos {
             BASE_X = 400, BASE_Y = 401, BASE_Z = 402, BASE_ROLL= 403, BASE_PITCH = 404, BASE_YAW = 405
         };
 
-        enum class DRAGGING_DIRRECTION {
+        enum class DRAGGING_DIRRECTION :int{
             NONE = 0, POSITION = 1, NEGATIVE = -1
         };
 
@@ -567,6 +567,7 @@ namespace rocos {
 
         Kinematics kinematics_;
 
+
         Frame flange_;  //!< 法兰位置姿态
         Frame tool_;    //!< 工具位置姿态
         Frame object_;  //!< 工件位置姿态
@@ -575,14 +576,23 @@ namespace rocos {
         std::atomic<int> tick_count{0};
 
     public:
-        friend void JC_helper::smart_servo::smart_servo_using_Joint(rocos::Robot *);
+        friend void JC_helper::SmartServo_Joint::RunSmartServo(rocos::Robot *);
 
-        friend void JC_helper::smart_servo::smart_servo_IK(rocos::Robot *);
+        friend void JC_helper::SmartServo_Cartesian::RunSmartServo_Ik(rocos::Robot *);
 
-        friend void JC_helper::smart_servo::smart_servo_motion(rocos::Robot *);
+        friend void JC_helper::SmartServo_Cartesian::RunSmartServo_Motion(rocos::Robot *);
 
 
     };
+
+
+    enum class DRAGGING_FLAG_2 :int {
+            J0 = 0, J1 = 1, J2 = 2, J3 = 3, J4 = 4, J5 = 5, J6 = 6,
+            TOOL_X = 100, TOOL_Y = 101, TOOL_Z = 102, TOOL_ROLL = 103, TOOL_PITCH= 104, TOOL_YAW = 105,
+            FLANGE_X = 200, FLANGE_Y = 201, FLANGE_Z = 202,FLANGE_ROLL = 203, FLANGE_PITCH = 204, FLANGE_YAW = 205,
+            OBJECT_X = 300, OBJECT_Y = 301, OBJECT_Z = 302,OBJECT_ROLL= 303, OBJECT_PITCH = 304, OBJECT_YAW = 305,
+            BASE_X = 400, BASE_Y = 401, BASE_Z = 402, BASE_ROLL= 403, BASE_PITCH = 404, BASE_YAW = 405
+        };
 
 }  // namespace rocos
 
