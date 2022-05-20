@@ -2162,7 +2162,7 @@ namespace JC_helper
             time_count++;  // 1ms计时，类内部使用
 
             //** 100ms进行一次心跳检查,超时触发紧急停止 **//
-            if ( ( ++count ) == 100  && !tick_time_out)
+            if ( ( ++count ) == 100  )
             {
                 count = 0;
                 if ( _tick_count != robot_ptr->tick_count )
@@ -2172,7 +2172,7 @@ namespace JC_helper
                 else
                 {
                     PLOG_ERROR << "Some errors such as disconnecting from the controller";
-                    tick_time_out = true;
+                    on_stop_trajectory = true;
                 }
             }
             //**-------------------------------**//
@@ -2200,9 +2200,9 @@ namespace JC_helper
             {
                 try
                 {
-                    PLOG_DEBUG << "traj_joint.size( )  = " << traj_joint.size( );
-                    PLOG_DEBUG << "joint_index = " << joint_index;
-                    PLOG_DEBUG << "traj_joint_count = " << traj_joint_count;
+                    PLOG_ERROR << "traj_joint.size( )  = " << traj_joint.size( );
+                    PLOG_ERROR << "joint_index = " << joint_index;
+                    PLOG_ERROR << "traj_joint_count = " << traj_joint_count;
                     KDL::JntArray current_pos{ traj_joint[ traj_joint_count - 1 ] };
                     KDL::JntArray last_pos{ traj_joint[ traj_joint_count - ( joint_index / 2 ) - 1 ] };
                     KDL::JntArray last_last_pos{ traj_joint[ traj_joint_count - joint_index - 1 ] };
@@ -2278,22 +2278,21 @@ namespace JC_helper
         ( *external_finished_flag_ptr ) = true;   //这次smart servo已结束，等待下一次smart servo
         robot_ptr->is_running_motion    = false;  //机械臂运动已结束，可以执行其他离线类运动
         on_stop_trajectory              = false;
-        tick_time_out                   = false;
         PLOG_INFO << "SmartServo_Cartesian 全部结束";
     }
 
     int SmartServo_Cartesian::command( KDL::Frame new_target )
     {
-        if ( !on_stop_trajectory&&!tick_time_out )  //如果需要紧急停止，那么就不允许在更改指令了
+        if ( !on_stop_trajectory )  //如果需要紧急停止，那么就不允许在更改指令了
         {
             if ( new_target == target )
             {
                 PLOG_DEBUG << "目标一致，无效";
                 return -1;
             }
-            else if ( time_count < 200 )
+            else if ( time_count < 240 )
             {
-                PLOG_DEBUG << "200ms时间未到";
+                // PLOG_INFO << "240ms时间未到";
                 return -1;
             }
             else

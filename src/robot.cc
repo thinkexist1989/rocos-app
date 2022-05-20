@@ -1101,7 +1101,7 @@ namespace rocos {
         int index{ static_cast< int >( flag ) };
         static int last_index{ index };
         int res{ -1 };
-        constexpr double vector_speed_scale{0.06};
+        constexpr double vector_speed_scale{0.1};
         constexpr double rotation_speed_scale{0.2};
         //**-------------------------------**//
 
