@@ -235,6 +235,7 @@ namespace JC_helper
     {
     private:
         std::atomic< bool > on_stop_trajectory{ false };
+        std::atomic< bool > tick_time_out{ false };
         std::atomic< bool >* external_finished_flag_ptr;
 
     private:

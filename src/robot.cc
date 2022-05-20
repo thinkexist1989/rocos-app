@@ -61,7 +61,7 @@ namespace rocos {
         }
 //        kinematics_.initTechServo();
         static plog::ColorConsoleAppender<plog::TxtFormatter> consoleAppender;
-        plog::init(plog::debug, &consoleAppender); // Initialize the logger.
+        plog::init(plog::info, &consoleAppender); // Initialize the logger.
         startMotionThread();
     }
 
@@ -1101,8 +1101,8 @@ namespace rocos {
         int index{ static_cast< int >( flag ) };
         static int last_index{ index };
         int res{ -1 };
-        constexpr double vector_speed_scale{0.3};
-        constexpr double rotation_speed_scale{0.35};
+        constexpr double vector_speed_scale{0.06};
+        constexpr double rotation_speed_scale{0.2};
         //**-------------------------------**//
 
         //** 命令有效性检查 **//
@@ -1235,7 +1235,7 @@ namespace rocos {
 
                 for ( int i = 0; i < jnt_num_; i++ )
                     target_joint( i ) = pos_[ i ];
-                target_joint( index ) = std::min( target_joint( index ) + static_cast< double >( dir ) * max_speed * vector_speed_scale, joints_[ index ]->getMaxPosLimit( ) );  //取最大速度的10%
+                target_joint( index ) = std::min( target_joint( index ) + static_cast< double >( dir ) * max_speed * 0.1, joints_[ index ]->getMaxPosLimit( ) );  //取最大速度的10%
                 target_joint( index ) = std::max( target_joint( index ), joints_[ index ]->getMinPosLimit( ) );
                 _SmartServo_Joint.command( target_joint );
 

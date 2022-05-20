@@ -882,12 +882,10 @@ namespace JC_helper
         constexpr double sleep_time{ 0.001*0.8 };//最长睡眠时间为1ms,最高于这个值会导致运动不连续
 
         //**-------------------------------**//
-        PLOG_DEBUG;
 
         //第一次启动需要等待command()
         while ( *external_finished_flag_ptr )
             ;
-        PLOG_DEBUG;
 
         try
         {
@@ -908,7 +906,7 @@ namespace JC_helper
                         FinishPlanningFrame = true;
                         // TODO 注意这个锁
                         lock_target.unlock( );
-                        PLOG_DEBUG << "----全部结束----";
+                        PLOG_INFO << "Plannig 结束";
                         break;
                     }
                     //**-------------------------------**//
@@ -2164,7 +2162,7 @@ namespace JC_helper
             time_count++;  // 1ms计时，类内部使用
 
             //** 100ms进行一次心跳检查,超时触发紧急停止 **//
-            if ( ( ++count ) == 100 )
+            if ( ( ++count ) == 100  && !tick_time_out)
             {
                 count = 0;
                 if ( _tick_count != robot_ptr->tick_count )
@@ -2174,7 +2172,7 @@ namespace JC_helper
                 else
                 {
                     PLOG_ERROR << "Some errors such as disconnecting from the controller";
-                    on_stop_trajectory = true;
+                    tick_time_out = true;
                 }
             }
             //**-------------------------------**//
@@ -2191,16 +2189,13 @@ namespace JC_helper
             ruckig::Result res;
             int joint_index{ 0 };
 
-            if ( traj_joint_count > 200 )
-                joint_index = 200;
-            else if ( traj_joint_count > 100 )
+            if ( traj_joint_count > 100 )
                 joint_index = 100;
-            else if ( traj_joint_count > 10 )
-                joint_index = 10;
             else if ( traj_joint_count > 5 )
-                joint_index = 5;
+                joint_index = traj_joint_count - 1;
             else
                 joint_index = 0;
+
             if ( joint_index )
             {
                 try
@@ -2283,21 +2278,22 @@ namespace JC_helper
         ( *external_finished_flag_ptr ) = true;   //这次smart servo已结束，等待下一次smart servo
         robot_ptr->is_running_motion    = false;  //机械臂运动已结束，可以执行其他离线类运动
         on_stop_trajectory              = false;
+        tick_time_out                   = false;
         PLOG_INFO << "SmartServo_Cartesian 全部结束";
     }
 
     int SmartServo_Cartesian::command( KDL::Frame new_target )
     {
-        if ( !on_stop_trajectory )  //如果需要紧急停止，那么就不允许在更改指令了
+        if ( !on_stop_trajectory&&!tick_time_out )  //如果需要紧急停止，那么就不允许在更改指令了
         {
             if ( new_target == target )
             {
                 PLOG_DEBUG << "目标一致，无效";
                 return -1;
             }
-            else if ( time_count < 100 )
+            else if ( time_count < 200 )
             {
-                PLOG_DEBUG << "100ms时间未到";
+                PLOG_DEBUG << "200ms时间未到";
                 return -1;
             }
             else

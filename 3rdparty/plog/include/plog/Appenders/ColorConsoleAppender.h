@@ -69,6 +69,10 @@ namespace plog
                     this->m_outputStream << "\x1B[97m\x1B[41m"; // white on red background
                     break;
 
+                case info:
+                    this->m_outputStream << "\033[32m";
+                    break;
+
                 case error:
                     this->m_outputStream << "\x1B[91m"; // red
                     break;
