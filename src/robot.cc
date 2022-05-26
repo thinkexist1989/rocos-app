@@ -23,7 +23,7 @@
 
 namespace rocos {
     Robot::Robot(boost::shared_ptr<HardwareInterface> hw) : hw_interface_(hw) {
-        parseUrdf("robot.urdf", "base_link", "link_7");
+        parseUrdf("robot.urdf", "base_link", "link_6");
 
 //        addAllJoints( ); // TODO: 这个应该直接加到参数解析里面，解析之后加入关节，顺序和主站顺序可能不一样
 
