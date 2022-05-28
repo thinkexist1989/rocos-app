@@ -1025,7 +1025,6 @@ namespace rocos {
         KDL::JntArray q_target(jnt_num_);
         int count{0};
         int p = 0;  //表示当前正处理第几段轨迹
-        std::ofstream of{"./MultiMoveL.dat"};
 
         traj_.clear();
 
@@ -1063,14 +1062,11 @@ namespace rocos {
                     return -1;
                 }
             }
-            for ( int i = 0; i < jnt_num_; i++ )
-                of << q_target( i ) << "\t";
-                of<<"\n";
+
             traj_.push_back(q_target);
             count++;
         }
         //**-------------------------------**//
-        of.close( );
 
         if (asynchronous)  //异步执行
         {
