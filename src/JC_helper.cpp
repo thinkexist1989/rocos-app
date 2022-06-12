@@ -2123,8 +2123,6 @@ namespace JC_helper
         int count{ 0 };
         KDL::JntArray joint_command;
         int _tick_count{ robot_ptr->tick_count };
-        std::array< double, _joint_num > joints_vel{ 0 };
-        std::array< double, _joint_num > joints_last_vel{ 0 };
         //**-------------------------------**//
 
         //第一次启动需要等待command()
@@ -2156,8 +2154,6 @@ namespace JC_helper
             //** 位置伺服 **//
             for ( int i = 0; i < _joint_num; ++i )
             {
-                joints_last_vel[ i ] = joints_vel[ i ];
-                joints_vel[ i ]      = robot_ptr->joints_[ i ]->getVelocity( );
                 robot_ptr->pos_[ i ] = joint_command( i );
                 robot_ptr->joints_[ i ]->setPosition( joint_command( i ) );
             }
@@ -2188,10 +2184,10 @@ namespace JC_helper
         if ( on_stop_trajectory )
         {
             PLOG_ERROR << "motion触发紧急停止";
-            //!紧急停止措施，对于仿真是立刻停止，实物才能看到效果
-            motion_stop( robot_ptr, joints_last_vel, joints_vel, 0.002 );
-            //! 触发急停后就冷静3秒，防止手一直按着触发急停
-            std::this_thread::sleep_for( std::chrono::duration< double >{ 3 } );
+            // //!紧急停止措施，对于仿真是立刻停止，实物才能看到效果
+            motion_stop( robot_ptr, std::ref(traj_joint), traj_joint_count);
+            // //! 触发急停后就冷静3秒，防止手一直按着触发急停
+            std::this_thread::sleep_for( std::chrono::duration< double >{ 2.3 } );
         }
         else
             PLOG_INFO << "motion 结束";
@@ -2561,41 +2557,107 @@ namespace JC_helper
         a = acceleration[ 0 ];
     }
 
-    void motion_stop( rocos::Robot* robot_ptr, std::array< double, _joint_num > joints_last_vel, std::array< double, _joint_num > joints_vel, double dt )
+    void motion_stop( rocos::Robot* robot_ptr, const std::vector< KDL::JntArray > &traj_joint ,int traj_joint_count)
     {
-        ruckig::Ruckig< _joint_num > otg{ 0.001 };
-        ruckig::InputParameter< _joint_num > input;
-        ruckig::OutputParameter< _joint_num > output;
-        ruckig::Result res;
-        input.control_interface = ruckig::ControlInterface::Velocity;
-        input.synchronization   = ruckig::Synchronization::None;
+              ruckig::Ruckig< _joint_num > otg{ 0.001 };
+            ruckig::InputParameter< _joint_num > input;
+            ruckig::OutputParameter< _joint_num > output;
+            ruckig::Result res;
+            int joint_index{ 0 };
 
-        for ( int i = 0; i < _joint_num; i++ )
-        {
-            input.current_position[ i ]     = robot_ptr->pos_[ i ];
-            input.current_velocity[ i ]     = KDL::sign( joints_vel[ i ] ) * std::min( abs( joints_vel[ i ] ), robot_ptr->joints_[ i ]->getMaxVel( ) );
-            input.current_acceleration[ i ] = KDL::sign( joints_vel[ i ] - joints_last_vel[ i ] ) * std::min( abs( ( joints_vel[ i ] - joints_last_vel[ i ] ) / dt ), robot_ptr->joints_[ i ]->getMaxAcc( ) );
-            input.target_position[ i ]      = input.current_position[ i ];
-            input.target_velocity[ i ]      = 0;
-            input.target_acceleration[ i ]  = 0;
+            if ( traj_joint_count > 100 )
+                joint_index = 100;
+            else if ( traj_joint_count > 15 )
+                joint_index = traj_joint_count - 1;
+            else
+                joint_index = 0;
 
-            input.max_velocity[ i ]     = robot_ptr->joints_[ i ]->getMaxVel( );
-            input.max_acceleration[ i ] = robot_ptr->joints_[ i ]->getMaxAcc( );
-            input.max_jerk[ i ]         = robot_ptr->joints_[ i ]->getMaxJerk( );
-        }
-
-        while ( ( res = otg.update( input, output ) ) != ruckig::Result::Finished )
-        {
-            const auto& p = output.new_position;
-
-            for ( int i = 0; i < _joint_num; ++i )
+            if ( joint_index )
             {
-                robot_ptr->pos_[ i ] = p[ i ];
-                robot_ptr->joints_[ i ]->setPosition( p[ i ] );
+                try
+                {
+                    PLOG_ERROR << "traj_joint.size( )  = " << traj_joint.size( );
+                    PLOG_ERROR << "joint_index = " << joint_index;
+                    PLOG_ERROR << "traj_joint_count = " << traj_joint_count;
+                    KDL::JntArray current_pos{ traj_joint[ traj_joint_count - 1 ] };
+                    KDL::JntArray last_pos{ traj_joint[ traj_joint_count - ( joint_index / 2 ) - 1 ] };
+                    KDL::JntArray last_last_pos{ traj_joint[ traj_joint_count - joint_index - 1 ] };
+
+                    KDL::JntArray current_vel( _joint_num );
+                    KDL::JntArray last_vel( _joint_num );
+                    KDL::JntArray current_acc( _joint_num );
+
+                    KDL::Subtract( current_pos, last_pos, current_vel );
+                    // print_JntArray( "last_last_pos", last_last_pos );
+                    // print_JntArray( "last_pos", last_pos );
+                    // print_JntArray( "current_pos", current_pos );
+                    KDL::Divide( current_vel, joint_index * 0.001 / 2, current_vel );
+
+                    KDL::Subtract( last_pos, last_last_pos, last_vel );
+                    KDL::Divide( last_vel, joint_index * 0.001 / 2, last_vel );
+
+                    KDL::Subtract( current_vel, last_vel, current_acc );
+                    KDL::Divide( current_acc, joint_index * 0.001 / 2, current_acc );
+
+                    input.control_interface = ruckig::ControlInterface::Velocity;
+                    input.synchronization   = ruckig::Synchronization::None;
+
+                    for ( int i = 0; i < _joint_num; i++ )
+                    {
+                        input.current_position[ i ]     = current_pos( i )   ;
+                        //防止速度和加速度估计不准
+                        input.current_velocity[ i ]     = KDL::sign( current_vel( i ) ) * std::min( abs( current_vel( i ) ), robot_ptr->joints_[ i ]->getMaxVel( ) );
+                        input.current_acceleration[ i ] = KDL::sign( current_acc( i ) ) * std::min( abs( current_acc( i ) ), robot_ptr->joints_[ i ]->getMaxAcc( )*0.80 );
+
+                        printf( "pos(%d)=  %f, vel(%d)= %f , last vel(%d)= %f , acc(%d)= %f \n", i, input.current_position[ i ] * 180 / M_PI, i, input.current_velocity[ i ] * 180 / M_PI, i, last_vel( i ) * 180 / M_PI, i, input.current_acceleration[ i ] * 180 / M_PI );
+
+                        input.target_position[ i ]     = current_pos( i );
+                        input.target_velocity[ i ]     = 0;
+                        input.target_acceleration[ i ] = 0;
+
+                        input.max_velocity[ i ]     = robot_ptr->joints_[ i ]->getMaxVel( );
+                        input.max_acceleration[ i ] = robot_ptr->joints_[ i ]->getMaxAcc( );
+                        input.max_jerk[ i ]         = robot_ptr->joints_[ i ]->getMaxJerk( );
+                    }
+
+                    while ( ( res = otg.update( input, output ) ) == ruckig::Result::Working )
+                    {
+                        const auto& p = output.new_position;
+
+                        for ( int i = 0; i < _joint_num; ++i )
+                        {
+                            robot_ptr->pos_[ i ] = p[ i ];
+                            robot_ptr->joints_[ i ]->setPosition( p[ i ] );
+                        }
+                        output.pass_to_input( input );
+                        robot_ptr->hw_interface_->waitForSignal( 0 );
+                    }
+                }
+                catch ( const std::exception& e )
+                {
+                    PLOG_ERROR << e.what( );
+                    for ( int i = 0; i < _joint_num; ++i )
+                    {
+                        robot_ptr->joints_[ i ]->setPosition( robot_ptr->pos_[ i ] );
+                    }
+                }
+                catch ( ... )
+                {
+                    PLOG_ERROR << "未知错误";
+                    for ( int i = 0; i < _joint_num; ++i )
+                    {
+                        robot_ptr->joints_[ i ]->setPosition( robot_ptr->pos_[ i ] );
+                    }
+                }
             }
-            output.pass_to_input( input );
-            robot_ptr->hw_interface_->waitForSignal( 0 );
-        }
+            else
+            {
+                PLOG_DEBUG << "traj_joint 路径点太少，直接停止";
+                for ( int i = 0; i < _joint_num; ++i )
+                {
+                    robot_ptr->joints_[ i ]->setPosition( robot_ptr->pos_[ i ] );
+                }
+            }
     }
 #pragma endregion
 
@@ -2638,6 +2700,7 @@ namespace JC_helper
         // TODO处理力矩
         init_force_torque.force = ( flange_pos * KDL::Frame{ KDL::Rotation::RPY( 0, 0, M_PI ), KDL::Vector( 0, 0, 0.035 ) } ) * init_force_torque.force;
 
+        PLOG_INFO << "F/T sensor init success";
         return 0;
     }
 
@@ -2680,6 +2743,8 @@ namespace JC_helper
             PLOG_DEBUG.printf( "torque[ %d ] = %f ", i, force_torque.torque[ i ] );
 
         std::this_thread::sleep_for( std::chrono::duration< double >( 0.001 ) );
+        
+        return 0;
     }
 
 #pragma endregion
@@ -2780,11 +2845,11 @@ namespace JC_helper
     int admittance::init( KDL::Frame flange_pos )
     {
         //** 6维力初始化 **//
-        // if ( my_ft_sensor.init( flange_pos) < 0 )
-        // {
-        //     PLOG_ERROR << " force-torque sensor init failed ";
-        //     return -1;
-        // }
+        if ( my_ft_sensor.init( flange_pos) < 0 )
+        {
+            PLOG_ERROR << " force-torque sensor init failed ";
+            return -1;
+        }
         //**-------------------------------**//
 
         PLOG_INFO << " init success";
@@ -2844,6 +2909,7 @@ namespace JC_helper
         }
 
         //** 轨迹计算 **//
+
         if ( traj_target.size( ) == 1 )  //示教模式
             max_count = numeric_limits< int_least64_t >::max( );
         else
@@ -2895,17 +2961,22 @@ namespace JC_helper
             lock_traj_joint.unlock( );
             _q_init = _q_target;
 
-            auto t_stop     = std::chrono::steady_clock::now( );
-            auto t_duration = std::chrono::duration< double >( t_stop - t_start );
-            if ( t_duration.count( ) < 0.0008 )
-            {
-                std::this_thread::sleep_for( std::chrono::duration< double >( 0.0007 - t_duration.count( ) ) );
-            }
+            // 6维力信息刷新
+            my_ft_sensor.getting_data( robot_ptr->flange_ );
 
             // TODO 导纳计算
-            smd.calculate( frame_offset ,0.0008);
-            smd.set_force( sin(0.001*traj_count)*5, 0, 0 );
+            smd.set_force( my_ft_sensor.force_torque.force[0], my_ft_sensor.force_torque.force[1],my_ft_sensor.force_torque.force[2]);
             smd.set_torque( 0, 0, 0 );
+            smd.calculate( frame_offset ,0.0008);
+     
+
+            auto t_stop     = std::chrono::steady_clock::now( );
+            auto t_duration = std::chrono::duration< double >( t_stop - t_start );
+            
+            if ( t_duration.count( ) < 0.0008 )
+            {
+                std::this_thread::sleep_for( std::chrono::duration< double >( 0.0008 - t_duration.count( ) ) );
+            }
 
         }
 
@@ -2923,9 +2994,6 @@ namespace JC_helper
         int traj_joint_count = 0;
         int count{ 0 };
         KDL::JntArray joint_command;
-        int _tick_count{ robot_ptr->tick_count };
-        std::array< double, _joint_num > joints_vel{ 0 };
-        std::array< double, _joint_num > joints_last_vel{ 0 };
         //**-------------------------------**//
 
         //** 正常情况下，接收IK解算后的关节轨迹 **//
@@ -2953,8 +3021,6 @@ namespace JC_helper
             //** 位置伺服 **//
             for ( int i = 0; i < _joint_num; ++i )
             {
-                joints_last_vel[ i ] = joints_vel[ i ];
-                joints_vel[ i ]      = robot_ptr->joints_[ i ]->getVelocity( );
                 robot_ptr->pos_[ i ] = joint_command( i );
                 robot_ptr->joints_[ i ]->setPosition( joint_command( i ) );
             }
@@ -2967,8 +3033,14 @@ namespace JC_helper
         if ( on_stop_trajectory )
         {
             PLOG_ERROR << "motion触发紧急停止";
+            // for ( int i = 0; i < _joint_num; ++i )
+            // {
+            //     PLOG_DEBUG << "joints_vel[ " << i << " ] = " << joints_vel[ i ];
+            //     PLOG_DEBUG << "joints_acc[ " << i << " ] = " << ( joints_vel[ i ] - joints_last_vel[ i ] ) / 0.001;
+            //     PLOG_DEBUG;
+            // }
             //!紧急停止措施，对于仿真是立刻停止，实物才能看到效果
-            motion_stop( robot_ptr, joints_last_vel, joints_vel, 0.002 );
+            motion_stop( robot_ptr, std::ref(traj_joint), traj_joint_count);
         }
         else
             PLOG_INFO << "motion 结束";
@@ -2976,6 +3048,9 @@ namespace JC_helper
         // robot_ptr->is_running_motion    = false;  //机械臂运动已结束，可以执行其他离线类运动
         // on_stop_trajectory              = false;
     }
+
+
+
 
 #pragma endregion
 

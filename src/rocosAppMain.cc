@@ -492,8 +492,7 @@ namespace rocos
         if ( str == std::string_view{ "run" } )
         {
             KDL::JntArray q_target( 7 );
-            for ( int i{ 0 }; i < 1; i++ )
-            {
+    
                 q_target( 0 ) = 0 * M_PI / 180;
                 q_target( 1 ) = -45 * M_PI / 180;
                 q_target( 2 ) = 0* M_PI / 180;
@@ -505,19 +504,38 @@ namespace rocos
                 MoveJ( q_target, 0.4, 1.5, 0, 0, false );
 
                 //** 导纳调试 **//
-                // admittance_teaching();
+                admittance_teaching();
                 //**-------------------------------**//
 
                 //** 6维力调试 **//
-                JC_helper::ft_sensor my_sensor{ };
-                my_sensor.init( flange_ );
+                // JC_helper::ft_sensor my_sensor{ };
+                // my_sensor.init( flange_ );
 
-                for ( int i{ 0 }; i < 5 * 60 * 100; i++ )
-                    my_sensor.debug( flange_ );
+                // for ( int i{ 0 }; i < 5*60*1000; i++ )
+                // {
+                //     my_sensor.debug( flange_ );
+                // }
 
                 //**-------------------------------**//
-                
-            }
+
+                //** 速度调试**//
+                // std::vector< double >
+                //     joints_last_vel( 7, 0 );
+                // std::vector< double >
+                //     joints_vel( 7, 0 );
+                // for ( int count{ 0 }; count < 5 * 60 ; count++ )
+                // {
+                //     for ( int i = 0; i < 7; ++i )
+                //     {
+                //         joints_last_vel[ i ] = joints_vel[ i ];
+                //         joints_vel[ i ]      = joints_[ i ]->getVelocity( );
+                //         PLOG_DEBUG << "joints_vel[ " << i << " ] = " << joints_vel[ i ];
+                //         PLOG_DEBUG << "joints_acc[ " << i << " ] = " << ( joints_vel[ i ] - joints_last_vel[ i ] ) / 1;
+                //         PLOG_DEBUG;
+                //     }
+                //     std::this_thread::sleep_for( std::chrono::milliseconds( 1000 ) );
+                // }
+                //**-------------------------------**//
         }
         PLOG_INFO << "全部测试结束,goodbye!";
     }
@@ -535,8 +553,8 @@ int main( int argc, char* argv[] )
     }
 
     using namespace rocos;
-    boost::shared_ptr< HardwareInterface > hw = boost::make_shared< HardwareSim >( 7 );  // 仿真
-    // boost::shared_ptr< HardwareInterface > hw = boost::make_shared< Hardware >( );  //真实机械臂
+    // boost::shared_ptr< HardwareInterface > hw = boost::make_shared< HardwareSim >( 7 );  // 仿真
+    boost::shared_ptr< HardwareInterface > hw = boost::make_shared< Hardware >( );  //真实机械臂
 
     Robot robot( hw );
 

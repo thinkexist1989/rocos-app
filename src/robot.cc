@@ -1529,14 +1529,14 @@ namespace rocos {
 
         for (const auto &waypoints: traj) {
             for (int i = 0; i < jnt_num_; ++i) {
-                pos_[i] = waypoints(i);
-                joints_[i]->setPosition(pos_[i]);
+                pos_[ i ] = waypoints( i );
+                joints_[ i ]->setPosition( pos_[ i ] );
             }
 
-            hw_interface_->waitForSignal(0);
+            hw_interface_->waitForSignal( 0 );
         }
 
-        is_running_motion = false;  //TODO: added by Yangluo
+        is_running_motion = false;  // TODO: added by Yangluo
     }
 
     void Robot::RunMultiMoveL( const std::vector< KDL::JntArray >& traj )
@@ -1546,7 +1546,7 @@ namespace rocos {
             for ( int i = 0; i < jnt_num_; ++i )
             {
                 pos_[ i ] = waypoints( i );
-                joints_[ i ]->setPosition( waypoints(i));
+                joints_[ i ]->setPosition( waypoints( i ) );
             }
 
             hw_interface_->waitForSignal( 0 );
@@ -1555,27 +1555,29 @@ namespace rocos {
         is_running_motion = false;
     }
 
-
-    int Robot::admittance_teaching ()
+    int Robot::admittance_teaching( )
     {
-     if ( is_running_motion )  //最大一条任务异步执行
+        if ( is_running_motion )  //最大一条任务异步执行
         {
-            PLOG_ERROR <<" Motion is still running and waiting for it to finish" ;
+            PLOG_ERROR << " Motion is still running and waiting for it to finish";
             return -1;
         }
-        else is_running_motion =true;
+        else
+            is_running_motion = true;
 
-        JC_helper::admittance admittance_control{};
+        JC_helper::admittance admittance_control{ };
 
-       if( admittance_control.init(flange_)<0)
-       return -1;
+        if ( admittance_control.init( flange_ ) < 0 )
+        {
+            is_running_motion = false;
+            return -1;
+        }
 
-       std::vector< KDL::Frame > traj_target{ flange_ };
-       admittance_control.start( this,std::ref(traj_target) );
+        std::vector< KDL::Frame > traj_target{ flange_ };
+        admittance_control.start( this, std::ref( traj_target ) );
 
-       is_running_motion = false;
-       return 0;
+        is_running_motion = false;
+        return 0;
     }
 
- 
 }  // namespace rocos

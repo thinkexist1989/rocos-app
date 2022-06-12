@@ -211,6 +211,6 @@ static void ShowResponse( Response r )
 //             ShowResponse( r );
 //         }
 //     }
-//     // Close(&socketHandle);
+//     UdpClose(&socketHandle);
 //     return 0;
 // }

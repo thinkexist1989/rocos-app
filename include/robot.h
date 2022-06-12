@@ -583,7 +583,8 @@ namespace rocos {
 
         friend void JC_helper::SmartServo_Cartesian::RunSmartServo_Motion(rocos::Robot *);
 
-        friend void JC_helper::motion_stop(rocos::Robot* robot_ptr,std::array<double,JC_helper::_joint_num> joints_last_vel,std::array<double,JC_helper::_joint_num> joints_vel,double dt );
+        friend void JC_helper::motion_stop( rocos::Robot* robot_ptr, const std::vector< KDL::JntArray > &traj_joint ,int traj_joint_count);
+
 
         friend class JC_helper::admittance ;
     };

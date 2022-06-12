@@ -316,7 +316,9 @@ namespace JC_helper
      * @param joints_vel 当前时间的速度
      * @param dt 速度微分时间间隔
      */
-    void motion_stop( rocos::Robot* robot_ptr, std::array< double, _joint_num > joints_last_vel, std::array< double, _joint_num > joints_vel, double dt );
+    void motion_stop( rocos::Robot* robot_ptr, const std::vector< KDL::JntArray > &traj_joint  ,int traj_joint_count);
+
+
 
 
     class ft_sensor
@@ -326,6 +328,7 @@ namespace JC_helper
         Response res{ };
         SOCKET_HANDLE socketHandle{ };
         KDL::Wrench init_force_torque{ };
+    public:
         KDL::Wrench force_torque{ };
 
     public:
@@ -358,7 +361,7 @@ namespace JC_helper
         std::atomic< bool > on_stop_trajectory{ false };
         std::vector< KDL::JntArray > traj_joint;
         bool FinishRunPlanningIK{ false };
-        // ft_sensor my_ft_sensor{ };
+        ft_sensor my_ft_sensor{ };
 
     public:
         int init( KDL::Frame flange_pos );
