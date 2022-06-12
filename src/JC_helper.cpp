@@ -2764,11 +2764,13 @@ namespace JC_helper
         for ( int i{ 0 }; i < 3; i++ )
         {
             force_acc_offset[ i ] = ( TCP_force[ i ] - B[ i ] * force_vel_offset[ i ] - K[ i ] * force_pos_offset[ i ] ) / M[ i ];
-            force_vel_offset[ i ] = admittance_dt * ( force_acc_offset[ i ] + force_last_acc_offset[ i ] ) / 2 + force_vel_offset[ i ];
-            force_pos_offset[ i ] = admittance_dt * ( force_vel_offset[ i ] + force_last_vel_offset[ i ] ) / 2 + force_pos_offset[ i ];
+            force_vel_offset[ i ] = _dt * ( force_acc_offset[ i ] + force_last_acc_offset[ i ] ) / 2 + force_vel_offset[ i ];
+            force_pos_offset[ i ] = _dt * ( force_vel_offset[ i ] + force_last_vel_offset[ i ] ) / 2 + force_pos_offset[ i ];
 
             force_last_acc_offset[ i ] = force_acc_offset[ i ];
             force_last_vel_offset[ i ] = force_vel_offset[ i ];
+
+            _Cartesian_vel.vel[ i ] = force_vel_offset[ i ];
         }
     }
 
@@ -2781,13 +2783,15 @@ namespace JC_helper
         for ( int i{ 0 }; i < 3; i++ )
         {
             torque_acc_offset[ i ] = ( TCP_torque[ i ] - B[ i ] * torque_vel_offset[ i ] - K[ i ] * torque_pos_offset[ i ] ) / M[ i ];
-            torque_vel_offset[ i ] = admittance_dt * ( torque_acc_offset[ i ] + torque_last_acc_offset[ i ] ) / 2 + torque_vel_offset[ i ];
+            torque_vel_offset[ i ] = _dt * ( torque_acc_offset[ i ] + torque_last_acc_offset[ i ] ) / 2 + torque_vel_offset[ i ];
 
-            delta_rot( i )   = admittance_dt * ( torque_vel_offset[ i ] + torque_last_vel_offset[ i ] ) / 2;
+            delta_rot( i )   = _dt * ( torque_vel_offset[ i ] + torque_last_vel_offset[ i ] ) / 2;
             current_rot( i ) = torque_pos_offset[ i ];
 
             torque_last_acc_offset[ i ] = torque_acc_offset[ i ];
             torque_last_vel_offset[ i ] = torque_vel_offset[ i ];
+
+            _Cartesian_vel.rot[ i ] = torque_vel_offset[ i ];
         }
 
         template_rot = KDL::Rotation::Rot( delta_rot, delta_rot.Norm( ) ) * KDL::Rotation::Rot( current_rot, current_rot.Norm( ) );
@@ -2800,9 +2804,9 @@ namespace JC_helper
         return template_rot;
     }
 
-    int AS::calculate( KDL::Frame& pos_offset  , double dt )
+    int AS::calculate( KDL::Frame& pos_offset  , double dt , KDL::Twist& Cartesian_vel )
     {
-        admittance_dt = dt;
+        _dt = dt;
         calculate_translate( );
 
         for ( int i{ 0 }; i < 3; i++ )
@@ -2811,6 +2815,10 @@ namespace JC_helper
         }
 
         pos_offset.M = calculate_rotation( );
+
+
+        //_Cartesian_vel代表仅仅由力引起的速度矢量
+        Cartesian_vel = _Cartesian_vel;
 
         return 0;
     }
@@ -2840,6 +2848,12 @@ namespace JC_helper
             B[ i ] = 2 * damp * sqrt( M[ i ] * K[ i ] );
 
         PLOG_DEBUG << "damp  = " << damp;
+    }
+
+
+    admittance::admittance( rocos::Robot* robot_ptr ) : _ik_vel{ robot_ptr->kinematics_.getChain()}
+    {
+        
     }
 
     int admittance::init( KDL::Frame flange_pos )
@@ -2899,6 +2913,9 @@ namespace JC_helper
         KDL::JntArray _q_init( _joint_num );
         std::vector< double > max_step;
         int_least64_t max_count{ 0 };
+        KDL::Twist admittance_vel;
+        KDL::JntArray joints_vel( _joint_num );
+
         //**-------------------------------**//
 
         for ( int i = 0; i < _joint_num; i++ )
@@ -2919,6 +2936,7 @@ namespace JC_helper
         {
             auto t_start = std::chrono::steady_clock::now( );
 
+     
             //** 读取最新Frame **//
             if ( traj_target.size( ) == 1 )  //示教模式
                 frame_target = frame_offset * traj_target[ 0 ];
@@ -2936,6 +2954,12 @@ namespace JC_helper
                 on_stop_trajectory = true;
                 break;
             }
+            //**-------------------------------**//
+
+            //** 笛卡尔速度求解 **//
+            // _ik_vel.CartToJnt( _q_init, admittance_vel, joints_vel );
+            // KDL::Multiply( joints_vel, 0.001, joints_vel );
+            // KDL::Add( _q_init, joints_vel, _q_target );
             //**-------------------------------**//
 
             //** 速度保护 **//
@@ -2961,14 +2985,15 @@ namespace JC_helper
             lock_traj_joint.unlock( );
             _q_init = _q_target;
 
+
             // 6维力信息刷新
-            my_ft_sensor.getting_data( robot_ptr->flange_ );
+            // my_ft_sensor.getting_data( robot_ptr->flange_ );
 
             // TODO 导纳计算
-            smd.set_force( my_ft_sensor.force_torque.force[0], my_ft_sensor.force_torque.force[1],my_ft_sensor.force_torque.force[2]);
+            smd.set_force( 0, sin(traj_count*0.001)*12,0);
             smd.set_torque( 0, 0, 0 );
-            smd.calculate( frame_offset ,0.0008);
-     
+            smd.calculate( frame_offset ,0.0008,admittance_vel);
+
 
             auto t_stop     = std::chrono::steady_clock::now( );
             auto t_duration = std::chrono::duration< double >( t_stop - t_start );

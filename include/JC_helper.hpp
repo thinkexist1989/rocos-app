@@ -14,6 +14,8 @@
 #include <plog/Log.h>
 #include <ruckig/ruckig.hpp>
 #include <vector>
+#include <kdl/chainiksolvervel_pinv.hpp>
+
 
 #define RESET "\033[0m"
 
@@ -362,8 +364,10 @@ namespace JC_helper
         std::vector< KDL::JntArray > traj_joint;
         bool FinishRunPlanningIK{ false };
         ft_sensor my_ft_sensor{ };
+        KDL::ChainIkSolverVel_pinv _ik_vel;
 
     public:
+        admittance(rocos::Robot* robot_ptr);
         int init( KDL::Frame flange_pos );
         void start( rocos::Robot* robot_ptr, const std::vector< KDL::Frame >& traj_target );
         void IK( rocos::Robot* robot_ptr, const std::vector< KDL::Frame >& traj_target );
@@ -391,7 +395,8 @@ namespace JC_helper
             std::vector<double> K{ 150., 150., 150., 100., 100., 100. };
             std::vector<double> B{ 30., 30., 30., 30., 30., 30. };
           
-            double admittance_dt{ 0.001 };
+            double _dt{ 0.001 };
+            KDL::Twist _Cartesian_vel;
 
         public:
             spring_mass_dump( );
@@ -400,7 +405,8 @@ namespace JC_helper
 
             KDL::Rotation calculate_rotation( );
 
-            int calculate( KDL::Frame& pos_offset, double dt );
+             int calculate( KDL::Frame& pos_offset  , double dt , KDL::Twist& Cartesian_vel );
+
 
             void set_force( double force_x, double force_y, double force_z );
 

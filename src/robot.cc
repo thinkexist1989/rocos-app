@@ -1565,7 +1565,7 @@ namespace rocos {
         else
             is_running_motion = true;
 
-        JC_helper::admittance admittance_control{ };
+        JC_helper::admittance admittance_control{ this};
 
         if ( admittance_control.init( flange_ ) < 0 )
         {
