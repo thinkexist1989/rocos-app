@@ -61,7 +61,7 @@ namespace rocos {
         }
 //        kinematics_.initTechServo();
         static plog::ColorConsoleAppender<plog::TxtFormatter> consoleAppender;
-        plog::init(plog::info, &consoleAppender); // Initialize the logger.
+        plog::init(plog::debug, &consoleAppender); // Initialize the logger.
         startMotionThread();
     }
 
@@ -1555,8 +1555,27 @@ namespace rocos {
         is_running_motion = false;
     }
 
-    //TODO 紧急停止
-    void Robot::StopMotion( ) {}
+
+    int Robot::admittance_teaching ()
+    {
+     if ( is_running_motion )  //最大一条任务异步执行
+        {
+            PLOG_ERROR <<" Motion is still running and waiting for it to finish" ;
+            return -1;
+        }
+        else is_running_motion =true;
+
+        JC_helper::admittance admittance_control{};
+
+       if( admittance_control.init(flange_)<0)
+       return -1;
+
+       std::vector< KDL::Frame > traj_target{ flange_ };
+       admittance_control.start( this,std::ref(traj_target) );
+
+       is_running_motion = false;
+       return 0;
+    }
 
  
 }  // namespace rocos

@@ -369,103 +369,36 @@ void signalHandler( int signo )
  * @brief 测试4：机械臂标定的50个路点
  *
  */
-namespace rocos
-{
-    void Robot::test( )
-    {
-        // KDL::JntArray q_init( 7 );
-        KDL::JntArray q_target( 7 );
-        std::ifstream dat{ "/home/think/rocos-app/file_measpoint0.dat" };
-        std::ofstream invalid_Pos{ "/home/think/rocos-app/invalid_pos.dat" };
-
-        std::vector< KDL::JntArray > q_vector;
-        std::string str{ "" };
-        int count = 0;
-
-        while ( dat >> str )
-        {
-            q_target( count ) = stod( str ) * M_PI / 180;
-            count++;
-            if ( count == 7 )
-            {
-                count = 0;
-                q_vector.push_back( q_target );
-            }
-        }
-        for ( int i = 0; i < q_vector.size( ); i++ )
-        {
-            for ( int j = 0; j < 7; j++ )
-                std::cout << " " << q_vector[ i ]( j );
-
-            std::cout << std::endl;
-        }
-
-        //** 电机使能检查 **//
-        PLOG_INFO << "电机使能检查";
-
-        for ( int i{ 0 }; i < jnt_num_; i++ )
-        {
-            if ( joints_[ i ]->getDriveState( ) != DriveState::OperationEnabled )
-            {
-                for ( int j{ 0 }; j < 1; j++ )
-                {
-                    PLOG_ERROR << "电机[" << i << "] 未使能，确定主站已初始化完成了？,输入y确认";
-                    std::cin >> str;
-                    if ( str != std::string_view{ "y" } )
-                    {
-                        PLOG_ERROR << "未输入yes, 判断主站 {未} 初始化完成,程序关闭";
-                        exit( 0 );
-                    }
-                }
-            }
-        }
-
-        setEnabled( );
-        //**-------------------------------**//
-
-        PLOG_INFO << "当前环境是否安全,如果是,输入run开始执行程序";
-        std::cin >> str;
-
-        if ( str == std::string_view{ "run" } )
-        {
-            for ( int i = 0; i < q_vector.size( ); i++ )
-            {
-                for ( int j = 0; j < 7; j++ )
-                {
-                    q_target( j ) = q_vector[ i ]( j );
-                }
-
-                if ( MoveJ( q_target, 0.6, 0.3, 0, 0, false ) < 0 )
-                {
-                    for ( int k = 0; k < 7; k++ )
-                        invalid_Pos << q_target( k ) << "\t";
-                }
-                invalid_Pos  << "\n";
-                std::cin>>str;
-            }
-            invalid_Pos.close( );
-        }
-        PLOG_INFO << "全部测试结束，goodbye！";
-    }
-}  // namespace rocos
-
-#pragma endregion
-
-
-
-#pragma region  //* 测试5 
-/**
- * @brief 测试5：机械臂标定 走正方体
- *
- */
 // namespace rocos
 // {
 //     void Robot::test( )
 //     {
 //         // KDL::JntArray q_init( 7 );
 //         KDL::JntArray q_target( 7 );
+//         std::ifstream dat{ "/home/think/rocos-app/file_measpoint0.dat" };
+//         std::ofstream invalid_Pos{ "/home/think/rocos-app/invalid_pos.dat" };
 
+//         std::vector< KDL::JntArray > q_vector;
 //         std::string str{ "" };
+//         int count = 0;
+
+//         while ( dat >> str )
+//         {
+//             q_target( count ) = stod( str ) * M_PI / 180;
+//             count++;
+//             if ( count == 7 )
+//             {
+//                 count = 0;
+//                 q_vector.push_back( q_target );
+//             }
+//         }
+//         for ( int i = 0; i < q_vector.size( ); i++ )
+//         {
+//             for ( int j = 0; j < 7; j++ )
+//                 std::cout << " " << q_vector[ i ]( j );
+
+//             std::cout << std::endl;
+//         }
 
 //         //** 电机使能检查 **//
 //         PLOG_INFO << "电机使能检查";
@@ -495,44 +428,100 @@ namespace rocos
 
 //         if ( str == std::string_view{ "run" } )
 //         {
-//             for ( int i{ 0 }; i < 1; i++ )
+//             for ( int i = 0; i < q_vector.size( ); i++ )
 //             {
-//                 KDL::Frame f_target{ };
+//                 for ( int j = 0; j < 7; j++ )
+//                 {
+//                     q_target( j ) = q_vector[ i ]( j );
+//                 }
 
-//                 f_target = KDL::Frame{ KDL::Rotation::RPY( -180 * M_PI / 180, 52.86 * M_PI / 180, -180 * M_PI / 180 ), KDL::Vector{ 0.4, 0, 0.72 } };
-
-//                 q_target( 0 ) = 0.044 * M_PI / 180;
-//                 q_target( 1 ) = 20.401 * M_PI / 180;
-//                 q_target( 2 ) = -0.025 * M_PI / 180;
-//                 q_target( 3 ) = -89.902 * M_PI / 180;
-//                 q_target( 4 ) = -0.026 * M_PI / 180;
-//                 q_target( 5 ) = -57.639 * M_PI / 180;
-//                 q_target( 6 ) = 0.019 * M_PI / 180;
-
-//                 MoveJ( q_target, 0.4,0.2, 0, 0, false );
-
-//                 std::this_thread::sleep_for( std::chrono::duration< double >{ 7 } );
-
-//                 f_target.p = KDL::Vector{ 0.28, 0.12, 0.6 };
-//                 MoveL( f_target, 0.4,0.2, 0, 0, false );
-//                 std::this_thread::sleep_for( std::chrono::duration< double >{ 7 } );
-
-//                 f_target.p = KDL::Vector{ 0.28, -0.12, 0.6 };
-//                 MoveL( f_target, 0.4,0.2, 0, 0, false );
-//                 std::this_thread::sleep_for( std::chrono::duration< double >{ 7 } );
-
-//                 f_target.p = KDL::Vector{ 0.52, -0.12, 0.84 };
-//                 MoveL( f_target, 0.4,0.2, 0, 0, false );
-//                 std::this_thread::sleep_for( std::chrono::duration< double >{ 7 } );
-
-//                 f_target.p = KDL::Vector{ 0.52, 0.12, 0.84 };
-//                 MoveL( f_target, 0.4,0.2, 0, 0, false );
-//                 std::this_thread::sleep_for( std::chrono::duration< double >{ 7 } );
+//                 if ( MoveJ( q_target, 0.6, 0.3, 0, 0, false ) < 0 )
+//                 {
+//                     for ( int k = 0; k < 7; k++ )
+//                         invalid_Pos << q_target( k ) << "\t";
+//                 }
+//                 invalid_Pos  << "\n";
+//                 std::cin>>str;
 //             }
+//             invalid_Pos.close( );
 //         }
 //         PLOG_INFO << "全部测试结束，goodbye！";
 //     }
 // }  // namespace rocos
+
+#pragma endregion
+
+#pragma region  //* 测试5 
+/**
+ * @brief 测试5：机械臂标定 走正方体
+ *
+ */
+namespace rocos
+{
+    void Robot::test( )
+    {
+
+        std::string str{ "" };
+
+        //** 电机使能检查 **//
+        PLOG_INFO << "电机使能检查";
+
+        for ( int i{ 0 }; i < jnt_num_; i++ )
+        {
+            if ( joints_[ i ]->getDriveState( ) != DriveState::OperationEnabled )
+            {
+                for ( int j{ 0 }; j < 1; j++ )
+                {
+                    PLOG_ERROR << "电机[" << i << "] 未使能，确定主站已初始化完成了？,输入y确认";
+                    std::cin >> str;
+                    if ( str != std::string_view{ "y" } )
+                    {
+                        PLOG_ERROR << "未输入yes, 判断主站 {未} 初始化完成,程序关闭";
+                        exit( 0 );
+                    }
+                }
+            }
+        }
+
+        setEnabled( );
+        //**-------------------------------**//
+
+        PLOG_INFO << "当前环境是否安全,如果是,输入run开始执行程序";
+        std::cin >> str;
+
+        if ( str == std::string_view{ "run" } )
+        {
+            KDL::JntArray q_target( 7 );
+            for ( int i{ 0 }; i < 1; i++ )
+            {
+                q_target( 0 ) = 0 * M_PI / 180;
+                q_target( 1 ) = -45 * M_PI / 180;
+                q_target( 2 ) = 0* M_PI / 180;
+                q_target( 3 ) = -90* M_PI / 180;
+                q_target( 4 ) = -0 * M_PI / 180;
+                q_target( 5 ) = 45 * M_PI / 180;
+                q_target( 6 ) = 0 * M_PI / 180;
+
+                MoveJ( q_target, 0.4, 1.5, 0, 0, false );
+
+                //** 导纳调试 **//
+                // admittance_teaching();
+                //**-------------------------------**//
+
+                //** 6维力调试 **//
+                JC_helper::ft_sensor my_sensor{ };
+                my_sensor.init( flange_ );
+
+                for ( int i{ 0 }; i < 5 * 60 * 100; i++ )
+                    my_sensor.debug( flange_ );
+
+                //**-------------------------------**//
+                
+            }
+        }
+        PLOG_INFO << "全部测试结束,goodbye!";
+    }
+}  // namespace rocos
 
 #pragma endregion
 
@@ -546,8 +535,8 @@ int main( int argc, char* argv[] )
     }
 
     using namespace rocos;
-    // boost::shared_ptr< HardwareInterface > hw = boost::make_shared< HardwareSim >( 7 );  // 仿真
-    boost::shared_ptr< HardwareInterface > hw = boost::make_shared< Hardware >( );  //真实机械臂
+    boost::shared_ptr< HardwareInterface > hw = boost::make_shared< HardwareSim >( 7 );  // 仿真
+    // boost::shared_ptr< HardwareInterface > hw = boost::make_shared< Hardware >( );  //真实机械臂
 
     Robot robot( hw );
 
@@ -557,6 +546,6 @@ int main( int argc, char* argv[] )
 
     //------------------------wait----------------------------------
     robotService->runServer( );
-    // thread_test.join( );
+    thread_test.join( );
     return 0;
 }

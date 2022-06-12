@@ -1,6 +1,7 @@
 #ifndef JC_HELPER_H
 #define JC_HELPER_H
 
+#include "highspeed_udp.hpp"
 #include "kdl/frames.hpp"
 #include <atomic>
 #include <interpolate.h>
@@ -57,10 +58,7 @@ namespace rocos
 
 }  // namespace rocos
 
-    // enum class rocos::Robot::DRAGGING_DIRRECTION;
-
-
-
+// enum class rocos::Robot::DRAGGING_DIRRECTION;
 
 namespace JC_helper
 {
@@ -182,7 +180,7 @@ namespace JC_helper
         void command( KDL::JntArray q_target );
     };
 
-   class OnlineDoubleS
+    class OnlineDoubleS
     {
     private:
         const double T_S{ 0.001 };
@@ -230,7 +228,6 @@ namespace JC_helper
         void get_pos_vel_acc( double t, double& p, double& v, double& a );
     };
 
-
     class SmartServo_Cartesian
     {
     private:
@@ -272,7 +269,7 @@ namespace JC_helper
         KDL::JntArray _q_init;
         std::mutex target_mutex;
 
-        long  time_count{ 300 };
+        long time_count{ 300 };
 
     public:
         SmartServo_Cartesian( std::atomic< bool >* finished_flag_ptr );
@@ -295,7 +292,6 @@ namespace JC_helper
         KDL::Rotation ratation_trajectory( const KDL::Rotation& start, const KDL::Rotation& end, double s_r, bool flag_big_angle = false );
     };
 
- 
     inline KDL::JntArray vector_2_JntArray( std::vector< double > pos )
     {
         KDL::JntArray _pos( pos.size( ) );
@@ -304,16 +300,113 @@ namespace JC_helper
         return _pos;
     }
 
-    inline void  print_JntArray( const char* str ,KDL::JntArray joints )
+    inline void print_JntArray( const char* str, KDL::JntArray joints )
     {
         PLOG_DEBUG << str << ":";
         for ( int i = 0; i < _joint_num; i++ )
-            PLOG_DEBUG.printf( "[%d] = %f", i, joints( i )*180/M_PI );
-        PLOG_DEBUG ;
-
+            PLOG_DEBUG.printf( "[%d] = %f", i, joints( i ) * 180 / M_PI );
+        PLOG_DEBUG;
     }
 
+    /**
+     * @brief 紧急停止，注意此函数不关心任何标志位，因此调用着需要保证函数执行期间，没有其他运动并行执行
+     * @note joints_acc = (joints_vel - joints_last_vel) /dt
+     * @param robot_ptr
+     * @param joints_last_vel 当前时间-dt后的关节速度
+     * @param joints_vel 当前时间的速度
+     * @param dt 速度微分时间间隔
+     */
+    void motion_stop( rocos::Robot* robot_ptr, std::array< double, _joint_num > joints_last_vel, std::array< double, _joint_num > joints_vel, double dt );
 
+
+    class ft_sensor
+    {
+    private:
+        std::string _ip_dress{ };
+        Response res{ };
+        SOCKET_HANDLE socketHandle{ };
+        KDL::Wrench init_force_torque{ };
+        KDL::Wrench force_torque{ };
+
+    public:
+        ft_sensor( const char* ip_dress = "192.168.1.105" );
+        ~ft_sensor( );
+
+        /**
+         * @brief 初始化设置，获取初始位置下力信息并转换到base系下
+         *
+         * @param flange_pos 法兰盘的位姿
+         * @return int
+         */
+        int init( KDL::Frame flange_pos );
+
+        /**
+         * @brief 刷新传感器数据,内置重力补偿
+         *
+         * @param flange_pos flange的位姿
+         */
+        void getting_data( KDL::Frame flange_pos );
+
+        int debug( KDL::Frame flange_pos );
+    };
+
+    class admittance
+    {
+    private:
+        KDL::Frame frame_offset{ };
+        std::mutex mutex_traj_joint;
+        std::atomic< bool > on_stop_trajectory{ false };
+        std::vector< KDL::JntArray > traj_joint;
+        bool FinishRunPlanningIK{ false };
+        // ft_sensor my_ft_sensor{ };
+
+    public:
+        int init( KDL::Frame flange_pos );
+        void start( rocos::Robot* robot_ptr, const std::vector< KDL::Frame >& traj_target );
+        void IK( rocos::Robot* robot_ptr, const std::vector< KDL::Frame >& traj_target );
+        void motion( rocos::Robot* robot_ptr );
+
+        class spring_mass_dump
+        {
+        private:
+            //!不要用array,实测发现会吞掉后面的数据
+            std::vector<double> TCP_force{ 0, 0, 0 };
+            std::vector<double> force_pos_offset{ 0, 0, 0 };
+            std::vector<double> force_vel_offset{ 0, 0, 0 };
+            std::vector<double> force_last_vel_offset{ 0, 0, 0 };
+            std::vector<double> force_acc_offset{ 0, 0, 0 };
+            std::vector<double> force_last_acc_offset{ 0, 0, 0 };
+
+            std::vector<double> TCP_torque{ 0, 0, 0 };
+            std::vector<double> torque_pos_offset{ 0, 0, 0 };
+            std::vector<double> torque_vel_offset{ 0, 0, 0 };
+            std::vector<double> torque_last_vel_offset{ 0, 0, 0 };
+            std::vector<double> torque_acc_offset{ 0, 0, 0 };
+            std::vector<double> torque_last_acc_offset{ 0, 0, 0 };
+
+            std::vector<double> M{ 30.0, 30., 30., 30., 30., 30. };
+            std::vector<double> K{ 150., 150., 150., 100., 100., 100. };
+            std::vector<double> B{ 30., 30., 30., 30., 30., 30. };
+          
+            double admittance_dt{ 0.001 };
+
+        public:
+            spring_mass_dump( );
+
+            void calculate_translate( );
+
+            KDL::Rotation calculate_rotation( );
+
+            int calculate( KDL::Frame& pos_offset, double dt );
+
+            void set_force( double force_x, double force_y, double force_z );
+
+            void set_torque( double tor_que_x, double tor_que_y, double tor_que_z );
+
+            void set_damp( double value );
+        } smd;
+
+    };
 
 }  // namespace JC_helper
 
