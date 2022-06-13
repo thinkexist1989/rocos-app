@@ -2567,7 +2567,7 @@ namespace JC_helper
 
             if ( traj_joint_count > 100 )
                 joint_index = 100;
-            else if ( traj_joint_count > 15 )
+            else if ( traj_joint_count > 40 )
                 joint_index = traj_joint_count - 1;
             else
                 joint_index = 0;
@@ -2686,15 +2686,16 @@ namespace JC_helper
 
         std::this_thread::sleep_for( std::chrono::duration< double >{ 1 } );
 
-        SendCommand( &socketHandle, COMMAND_START, 1 );
+        SendCommand( &socketHandle, COMMAND_START, 3 );
+        for(int i =0;i<3;i++)
         res = Receive( &socketHandle );
 
-        init_force_torque.force[ 0 ]  = res.fx / FORCE_DIV;
-        init_force_torque.force[ 1 ]  = res.fy / FORCE_DIV;
-        init_force_torque.force[ 2 ]  = res.fz / FORCE_DIV;
-        init_force_torque.torque[ 0 ] = res.tx / TORQUE_DIV;
-        init_force_torque.torque[ 1 ] = res.ty / TORQUE_DIV;
-        init_force_torque.torque[ 2 ] = res.tz / TORQUE_DIV;
+        init_force_torque.force[ 0 ]  = res.fx / FORCE_DIV + 0.2;
+        init_force_torque.force[ 1 ]  = res.fy / FORCE_DIV - 2.3;
+        init_force_torque.force[ 2 ]  = res.fz / FORCE_DIV + 5.1;
+        init_force_torque.torque[ 0 ] = res.tx / TORQUE_DIV + 0.05;
+        init_force_torque.torque[ 1 ] = res.ty / TORQUE_DIV - 0.04;
+        init_force_torque.torque[ 2 ] = res.tz / TORQUE_DIV - 0.09;
 
         //将起始收到的力信息转变到base坐标系下
         // TODO处理力矩
@@ -2709,12 +2710,12 @@ namespace JC_helper
         SendCommand( &socketHandle, COMMAND_START, 1 );
         res = Receive( &socketHandle );
 
-        force_torque.force[ 0 ]  = res.fx / FORCE_DIV;
-        force_torque.force[ 1 ]  = res.fy / FORCE_DIV;
-        force_torque.force[ 2 ]  = res.fz / FORCE_DIV;
-        force_torque.torque[ 0 ] = res.tx / TORQUE_DIV;
-        force_torque.torque[ 1 ] = res.ty / TORQUE_DIV;
-        force_torque.torque[ 2 ] = res.tz / TORQUE_DIV;
+        force_torque.force[ 0 ]  = res.fx / FORCE_DIV+ 0.2;
+        force_torque.force[ 1 ]  = res.fy / FORCE_DIV- 2.3;
+        force_torque.force[ 2 ]  = res.fz / FORCE_DIV+ 5.1;
+        force_torque.torque[ 0 ] = res.tx / TORQUE_DIV+ 0.05;
+        force_torque.torque[ 1 ] = res.ty / TORQUE_DIV- 0.04;
+        force_torque.torque[ 2 ] = res.tz / TORQUE_DIV- 0.09;
 
         //收到的力信息转换到base系
         force_torque.force = ( flange_pos * KDL::Frame{ KDL::Rotation::RPY( 0, 0, M_PI ), KDL::Vector( 0, 0, 0.035 ) } ) * force_torque.force;
@@ -2726,9 +2727,9 @@ namespace JC_helper
         for ( int i{ 0 }; i < 3; i++ )
             force_torque.torque[ i ] = 0;
 
-        //去除毛刺，限制3N
+        //去除毛刺，限制2N
         for ( int i{ 0 }; i < 3; i++ )
-            if ( abs( force_torque.force[ i ] ) < 3 )
+            if ( abs( force_torque.force[ i ] ) < 2 )
                 force_torque.force[ i ] = 0;
     }
 
@@ -2751,15 +2752,20 @@ namespace JC_helper
 
 #pragma region  //*导纳控制
 
-    using AS = admittance::spring_mass_dump;
 
-    AS::spring_mass_dump( )
+    spring_mass_dump::spring_mass_dump( )
     {   
-        for ( int i{ 0 }; i < _joint_num; i++ )
-            B[ i ] = 2 * 1 * sqrt( M[ i ] * K[ i ] );
+        // for ( int i{ 0 }; i < _joint_num; i++ )
+        //     B[ i ] = 2 * 1 * sqrt( M[ i ] * K[ i ] );
+
+            out_dat.open( "/home/think/rocos-app/debug/admittance.csv" );
     }
 
-    void AS::calculate_translate( )
+    spring_mass_dump::~spring_mass_dump( )
+    {
+        out_dat.close();
+    }
+    void spring_mass_dump::calculate_translate( )
     {
         for ( int i{ 0 }; i < 3; i++ )
         {
@@ -2774,7 +2780,7 @@ namespace JC_helper
         }
     }
 
-    KDL::Rotation AS::calculate_rotation( )
+    KDL::Rotation spring_mass_dump::calculate_rotation( )
     {
         KDL::Vector delta_rot;
         KDL::Vector current_rot;
@@ -2804,26 +2810,31 @@ namespace JC_helper
         return template_rot;
     }
 
-    int AS::calculate( KDL::Frame& pos_offset  , double dt , KDL::Twist& Cartesian_vel )
+    int spring_mass_dump::calculate( KDL::Frame& pos_offset  , KDL::Twist& Cartesian_vel   , double dt )
     {
+        // static int dt_count{0};
         _dt = dt;
+
         calculate_translate( );
 
         for ( int i{ 0 }; i < 3; i++ )
         {
             pos_offset.p[ i ] = force_pos_offset[ i ];
         }
+            // out_dat << std::to_string( dt_count++*0.001) << "\t,";
+            // out_dat << std::to_string( pos_offset.p[ 0 ]) ;
+            // out_dat << "\n,";
+ 
 
-        pos_offset.M = calculate_rotation( );
+            // pos_offset.M = calculate_rotation( );
 
+            //_Cartesian_vel代表仅仅由力引起的速度矢量
+            Cartesian_vel = _Cartesian_vel;
 
-        //_Cartesian_vel代表仅仅由力引起的速度矢量
-        Cartesian_vel = _Cartesian_vel;
-
-        return 0;
+            return 0;
     }
 
-    void AS::set_force( double force_x, double force_y, double force_z )
+    void spring_mass_dump::set_force( double force_x, double force_y, double force_z )
     {
         TCP_force[ 0 ] = force_x;
         TCP_force[ 1 ] = force_y;
@@ -2831,7 +2842,7 @@ namespace JC_helper
         // PLOG_DEBUG.printf( "TCP_force  = %f %f %f", TCP_force[ 0 ], TCP_force[ 1 ], TCP_force[ 2 ] );
     }
 
-    void AS::set_torque( double tor_que_x, double tor_que_y, double tor_que_z )
+    void spring_mass_dump::set_torque( double tor_que_x, double tor_que_y, double tor_que_z )
     {
         TCP_torque[ 0 ] = tor_que_x;
         TCP_torque[ 1 ] = tor_que_y;
@@ -2839,7 +2850,7 @@ namespace JC_helper
         // PLOG_DEBUG.printf( "TCP_torque  = %f %f %f", TCP_torque[ 0 ], TCP_torque[ 1 ], TCP_torque[ 2 ] );
     }
 
-    void AS::set_damp( double value )
+    void spring_mass_dump::set_damp( double value )
     {
         static double damp = 1;
         damp += value;
@@ -2853,7 +2864,12 @@ namespace JC_helper
 
     admittance::admittance( rocos::Robot* robot_ptr ) : _ik_vel{ robot_ptr->kinematics_.getChain()}
     {
-        
+        out_joint_csv.open("/home/think/rocos-app/debug/joints.csv");
+    }
+    
+    admittance::~admittance( )
+    {
+        out_joint_csv.close();
     }
 
     int admittance::init( KDL::Frame flange_pos )
@@ -2866,6 +2882,7 @@ namespace JC_helper
         }
         //**-------------------------------**//
 
+
         PLOG_INFO << " init success";
 
         return 0;
@@ -2875,9 +2892,12 @@ namespace JC_helper
     {
         std::shared_ptr< std::thread > _thread_IK{ nullptr };
         std::shared_ptr< std::thread > _thread_motion{ nullptr };
+        std::shared_ptr< std::thread > _thread_ft_sensor{ nullptr };
 
+        _thread_ft_sensor.reset( new std::thread{ &JC_helper::admittance::sensor_update, this, robot_ptr });
         _thread_IK.reset( new std::thread{ &JC_helper::admittance::IK, this, robot_ptr, std::ref( traj_target ) } );
         _thread_motion.reset( new std::thread{ &JC_helper::admittance::motion, this, robot_ptr } );
+
 
         if ( traj_target.size( ) == 1 )  //示教模式
         {
@@ -2890,15 +2910,15 @@ namespace JC_helper
                 std::cin >> str;
             }
             on_stop_trajectory = true;
-            _thread_motion->join( );
-            _thread_IK->join( );
         }
         else  //运动导纳模式
         {
             PLOG_INFO << " starting  admittance motion";
-            _thread_motion->join( );
-            _thread_IK->join( );
         }
+
+        _thread_motion->join( );
+        _thread_IK->join( );
+        _thread_ft_sensor->join( );
 
         PLOG_INFO << "admittance  全部结束";
     }
@@ -2936,36 +2956,41 @@ namespace JC_helper
         {
             auto t_start = std::chrono::steady_clock::now( );
 
-     
+            // TODO 导纳计算
+            smd.set_force(my_ft_sensor.force_torque.force[0],my_ft_sensor.force_torque.force[1],my_ft_sensor.force_torque.force[2]);
+            // smd.set_force( 0, -20, 0 );
+            // smd.set_torque( 0, 0, 0 );
+            smd.calculate( frame_offset, admittance_vel );
+
             //** 读取最新Frame **//
             if ( traj_target.size( ) == 1 )  //示教模式
                 frame_target = frame_offset * traj_target[ 0 ];
             else
                 frame_target = frame_offset * traj_target[ traj_count ];
 
-            traj_count++;
             //**-------------------------------**//
 
             //** IK求解 **//
-            if ( ( robot_ptr->kinematics_ ).CartToJnt( _q_init, frame_target, _q_target ) < 0 )
-            {
-                PLOG_ERROR << " CartToJnt failed  frame_target =\n"
-                           << frame_target;
-                on_stop_trajectory = true;
-                break;
-            }
+            // if ( ( robot_ptr->kinematics_ ).CartToJnt( _q_init, frame_target, _q_target ) < 0 )
+            // {
+            //     PLOG_ERROR << " CartToJnt failed  frame_target =\n"
+            //                << frame_target;
+            //     on_stop_trajectory = true;
+            //     break;
+            // }
             //**-------------------------------**//
 
             //** 笛卡尔速度求解 **//
-            // _ik_vel.CartToJnt( _q_init, admittance_vel, joints_vel );
-            // KDL::Multiply( joints_vel, 0.001, joints_vel );
-            // KDL::Add( _q_init, joints_vel, _q_target );
+            _ik_vel.CartToJnt( _q_init, admittance_vel, joints_vel );
+            KDL::Multiply( joints_vel, 0.001, joints_vel );
+            KDL::Add( _q_init, joints_vel, _q_target );
             //**-------------------------------**//
 
-            //** 速度保护 **//
+            //** 速度保护**//
             for ( int i = 0; i < _joint_num; i++ )
             {
-                if ( abs( _q_target( i ) - _q_init( i ) ) > max_step[ i ] )
+
+                if ( abs( _q_target( i ) - _q_init( i ) ) > 5*max_step[ i ] )
                 {
                     PLOG_ERROR << "joint[" << i << "] speep is too  fast";
                     PLOG_ERROR << "target speed = " << abs( _q_target( i ) - _q_init( i ) )
@@ -2975,9 +3000,20 @@ namespace JC_helper
                     on_stop_trajectory = true;
                     break;
                 }
+
             }
 
             if ( on_stop_trajectory ) break;
+            //**-------------------------------**//
+
+            //** 打印 **//
+            //  out_joint_csv << std::to_string( traj_count*0.001) << "\t,";
+            // for ( int i = 0; i < _joint_num - 1; i++ )
+            // {
+            //     out_joint_csv << std::to_string( _q_target( i ) ) << "\t,";
+            // }
+            // out_joint_csv << std::to_string( _q_target( 6 ) );
+            // out_joint_csv << "\n";
             //**-------------------------------**//
 
             lock_traj_joint.lock( );
@@ -2985,19 +3021,9 @@ namespace JC_helper
             lock_traj_joint.unlock( );
             _q_init = _q_target;
 
-
-            // 6维力信息刷新
-            // my_ft_sensor.getting_data( robot_ptr->flange_ );
-
-            // TODO 导纳计算
-            smd.set_force( 0, sin(traj_count*0.001)*12,0);
-            smd.set_torque( 0, 0, 0 );
-            smd.calculate( frame_offset ,0.0008,admittance_vel);
-
-
             auto t_stop     = std::chrono::steady_clock::now( );
             auto t_duration = std::chrono::duration< double >( t_stop - t_start );
-            
+
             if ( t_duration.count( ) < 0.0008 )
             {
                 std::this_thread::sleep_for( std::chrono::duration< double >( 0.0008 - t_duration.count( ) ) );
@@ -3017,7 +3043,6 @@ namespace JC_helper
         //** 变量初始化 **//
         std::unique_lock< std::mutex > lock_traj_joint( mutex_traj_joint, std::defer_lock );  //不上锁
         int traj_joint_count = 0;
-        int count{ 0 };
         KDL::JntArray joint_command;
         //**-------------------------------**//
 
@@ -3034,6 +3059,9 @@ namespace JC_helper
             else
             {
                 lock_traj_joint.unlock( );
+                PLOG_DEBUG<< "已超过最新命令";
+                PLOG_DEBUG<< traj_joint_count ;
+                PLOG_DEBUG<< traj_joint.size( ) ;
                 if ( FinishRunPlanningIK )
                     break;  //全部frame已经取出
                 else
@@ -3074,8 +3102,12 @@ namespace JC_helper
         // on_stop_trajectory              = false;
     }
 
-
-
+    void admittance::sensor_update( rocos::Robot* robot_ptr )
+    {
+        // 6维力信息刷新
+        while(!FinishRunPlanningIK)
+        my_ft_sensor.getting_data( robot_ptr->flange_ );
+    }
 
 #pragma endregion
 

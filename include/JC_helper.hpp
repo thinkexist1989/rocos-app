@@ -6,6 +6,7 @@
 #include <atomic>
 #include <interpolate.h>
 #include <iostream>
+#include <kdl/chainiksolvervel_pinv.hpp>
 #include <kdl/frames.hpp>
 #include <kdl/jntarray.hpp>
 #include <mutex>
@@ -14,8 +15,7 @@
 #include <plog/Log.h>
 #include <ruckig/ruckig.hpp>
 #include <vector>
-#include <kdl/chainiksolvervel_pinv.hpp>
-
+#include <fstream>
 
 #define RESET "\033[0m"
 
@@ -318,10 +318,7 @@ namespace JC_helper
      * @param joints_vel 当前时间的速度
      * @param dt 速度微分时间间隔
      */
-    void motion_stop( rocos::Robot* robot_ptr, const std::vector< KDL::JntArray > &traj_joint  ,int traj_joint_count);
-
-
-
+    void motion_stop( rocos::Robot* robot_ptr, const std::vector< KDL::JntArray >& traj_joint, int traj_joint_count );
 
     class ft_sensor
     {
@@ -330,6 +327,7 @@ namespace JC_helper
         Response res{ };
         SOCKET_HANDLE socketHandle{ };
         KDL::Wrench init_force_torque{ };
+
     public:
         KDL::Wrench force_torque{ };
 
@@ -355,6 +353,52 @@ namespace JC_helper
         int debug( KDL::Frame flange_pos );
     };
 
+    class spring_mass_dump
+    {
+    private:
+        //!不要用array,实测发现会吞掉后面的数据
+        std::vector< double > TCP_force{ 0, 0, 0 };
+        std::vector< double > force_pos_offset{ 0, 0, 0 };
+        std::vector< double > force_vel_offset{ 0, 0, 0 };
+        std::vector< double > force_last_vel_offset{ 0, 0, 0 };
+        std::vector< double > force_acc_offset{ 0, 0, 0 };
+        std::vector< double > force_last_acc_offset{ 0, 0, 0 };
+
+        std::vector< double > TCP_torque{ 0, 0, 0 };
+        std::vector< double > torque_pos_offset{ 0, 0, 0 };
+        std::vector< double > torque_vel_offset{ 0, 0, 0 };
+        std::vector< double > torque_last_vel_offset{ 0, 0, 0 };
+        std::vector< double > torque_acc_offset{ 0, 0, 0 };
+        std::vector< double > torque_last_acc_offset{ 0, 0, 0 };
+
+        std::vector< double > M{ 120.0, 120., 240., 120., 120., 120. };
+        // std::vector< double > K{ 50., 50., 50., 30., 30., 30. };
+        std::vector< double > K{ 0., 0., 0., 100., 100., 100. };
+        std::vector< double > B{ 120., 120., 240., 120., 120., 120. };
+
+        double _dt{ 0.001 };
+        KDL::Twist _Cartesian_vel;
+
+        std::ofstream out_dat{};
+
+
+    public:
+        spring_mass_dump( );
+        ~spring_mass_dump( );
+
+        void calculate_translate( );
+
+        KDL::Rotation calculate_rotation( );
+
+        int calculate( KDL::Frame& pos_offset, KDL::Twist& Cartesian_vel , double dt= 0.001);
+
+        void set_force( double force_x, double force_y, double force_z );
+
+        void set_torque( double tor_que_x, double tor_que_y, double tor_que_z );
+
+        void set_damp( double value );
+    };
+
     class admittance
     {
     private:
@@ -365,56 +409,21 @@ namespace JC_helper
         bool FinishRunPlanningIK{ false };
         ft_sensor my_ft_sensor{ };
         KDL::ChainIkSolverVel_pinv _ik_vel;
+        spring_mass_dump smd{ };
+
+        std::ofstream out_joint_csv{};
+
+
+
 
     public:
-        admittance(rocos::Robot* robot_ptr);
+        admittance( rocos::Robot* robot_ptr );
+        ~admittance( );
         int init( KDL::Frame flange_pos );
         void start( rocos::Robot* robot_ptr, const std::vector< KDL::Frame >& traj_target );
         void IK( rocos::Robot* robot_ptr, const std::vector< KDL::Frame >& traj_target );
         void motion( rocos::Robot* robot_ptr );
-
-        class spring_mass_dump
-        {
-        private:
-            //!不要用array,实测发现会吞掉后面的数据
-            std::vector<double> TCP_force{ 0, 0, 0 };
-            std::vector<double> force_pos_offset{ 0, 0, 0 };
-            std::vector<double> force_vel_offset{ 0, 0, 0 };
-            std::vector<double> force_last_vel_offset{ 0, 0, 0 };
-            std::vector<double> force_acc_offset{ 0, 0, 0 };
-            std::vector<double> force_last_acc_offset{ 0, 0, 0 };
-
-            std::vector<double> TCP_torque{ 0, 0, 0 };
-            std::vector<double> torque_pos_offset{ 0, 0, 0 };
-            std::vector<double> torque_vel_offset{ 0, 0, 0 };
-            std::vector<double> torque_last_vel_offset{ 0, 0, 0 };
-            std::vector<double> torque_acc_offset{ 0, 0, 0 };
-            std::vector<double> torque_last_acc_offset{ 0, 0, 0 };
-
-            std::vector<double> M{ 30.0, 30., 30., 30., 30., 30. };
-            std::vector<double> K{ 150., 150., 150., 100., 100., 100. };
-            std::vector<double> B{ 30., 30., 30., 30., 30., 30. };
-          
-            double _dt{ 0.001 };
-            KDL::Twist _Cartesian_vel;
-
-        public:
-            spring_mass_dump( );
-
-            void calculate_translate( );
-
-            KDL::Rotation calculate_rotation( );
-
-             int calculate( KDL::Frame& pos_offset  , double dt , KDL::Twist& Cartesian_vel );
-
-
-            void set_force( double force_x, double force_y, double force_z );
-
-            void set_torque( double tor_que_x, double tor_que_y, double tor_que_z );
-
-            void set_damp( double value );
-        } smd;
-
+        void sensor_update(rocos::Robot* robot_ptr);
     };
 
 }  // namespace JC_helper

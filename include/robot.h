@@ -512,6 +512,8 @@ namespace rocos {
 
         int admittance_teaching( );
 
+        int admittance_control(Frame pose, double speed, double acceleration );
+
         //停止运动
         void StopMotion();
 

@@ -1580,4 +1580,44 @@ namespace rocos {
         return 0;
     }
 
+  int Robot::admittance_control(Frame pose, double speed, double acceleration )
+    {
+        if ( is_running_motion )  //最大一条任务异步执行
+        {
+            PLOG_ERROR << " Motion is still running and waiting for it to finish";
+            return -1;
+        }
+        else
+            is_running_motion = true;
+
+        JC_helper::admittance admittance_control{ this};
+
+        if ( admittance_control.init( flange_ ) < 0 )
+        {
+            is_running_motion = false;
+            return -1;
+        }
+
+       //** 变量初始化 **//
+        std::vector<KDL::Frame> traj_target;
+        //!不要传入flange_ !不要传入flange_ !不要传入flange_
+        //!实测发现：因为后台有线程不断写入，因此读取可能失败，造成轨迹规划失败的假象！！！
+        //TODO 解决公共属性多线程互斥问题
+        KDL::Frame frame_init = flange_;
+        //**-------------------------------**//
+ 
+        if ( JC_helper::link_trajectory( traj_target, frame_init, pose,  speed, acceleration ) < 0 )
+        {
+            PLOG_ERROR << "link trajectory planning fail ";
+             is_running_motion =false;
+            return -1;
+        }
+        
+        admittance_control.start( this, std::ref( traj_target ) );
+        is_running_motion = false;
+        return 0;
+    }
+
+
+
 }  // namespace rocos
