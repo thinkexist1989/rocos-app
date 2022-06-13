@@ -23,7 +23,7 @@ typedef int SOCKET_HANDLE;
 #    define FT_PORT  49152       /* FT_PORT the Ethernet DAQ always uses */
 #    define FT_SAMPLE_COUNT 10  /* 10 incoming samples */
 #    define FT_SPEED 1         /* 1000 / FT_SPEED = FT_SPEED in Hz */
-#    define FT_FILTER 3         /* 0 = No FT_FILTER; 1 = 500 Hz; 2 = 150 Hz; 3 = 50 Hz; 4 = 15 Hz; 5 = 5 Hz; 6 = 1.5 Hz */
+#    define FT_FILTER 4         /* 0 = No FT_FILTER; 1 = 500 Hz; 2 = 150 Hz; 3 = 50 Hz; 4 = 15 Hz; 5 = 5 Hz; 6 = 1.5 Hz */
 #    define FT_BIASING_ON 0xFF  /* Biasing on */
 #    define FT_BIASING_OFF 0x00 /* Biasing off */
 

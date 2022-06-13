@@ -47,6 +47,23 @@ namespace JC_helper
         // TODO处理力矩
         init_force_torque.force = ( flange_pos * KDL::Frame{ KDL::Rotation::RPY( 0, 0, M_PI ), KDL::Vector( 0, 0, 0.035 ) } ) * init_force_torque.force;
 
+        ft_input.control_interface = ruckig::ControlInterface::Position;
+        ft_input.synchronization   = ruckig::Synchronization::None;
+        for ( int i{ 0 }; i < 3; i++ )
+        {
+            ft_input.current_position[ i ]     = 0;
+            ft_input.current_velocity[ i ]     = 0;
+            ft_input.current_acceleration[ i ] = 0;
+
+            ft_input.target_position[ i ]     = 0;
+            ft_input.target_velocity[ i ]     = 0;
+            ft_input.target_acceleration[ i ] = 0;
+
+            ft_input.max_velocity[ i ]     = 200;
+            ft_input.max_acceleration[ i ] = 400;
+            ft_input.max_jerk[ i ]         = 700;
+        }
+
         PLOG_INFO << "F/T sensor init success";
         return 0;
     }
@@ -210,11 +227,13 @@ namespace JC_helper
     admittance::admittance( rocos::Robot* robot_ptr ) : _ik_vel{ robot_ptr->kinematics_.getChain( ) }
     {
         out_joint_csv.open( "/home/think/rocos-app/debug/joints.csv" );
+        ft_otg_csv.open( "/home/think/rocos-app/debug/ft_otg.csv" );
     }
 
     admittance::~admittance( )
     {
         out_joint_csv.close( );
+        ft_otg_csv.close( );
     }
 
     int admittance::init( KDL::Frame flange_pos )
@@ -237,10 +256,12 @@ namespace JC_helper
         std::shared_ptr< std::thread > _thread_IK{ nullptr };
         // std::shared_ptr< std::thread > _thread_motion{ nullptr };
         std::shared_ptr< std::thread > _thread_ft_sensor{ nullptr };
+        std::shared_ptr< std::thread > _thread_ft_otg{ nullptr };
 
         _thread_ft_sensor.reset( new std::thread{ &JC_helper::admittance::sensor_update, this, robot_ptr } );
         _thread_IK.reset( new std::thread{ &JC_helper::admittance::IK, this, robot_ptr, std::ref( traj_target ) } );
         // _thread_motion.reset( new std::thread{ &JC_helper::admittance::motion, this, robot_ptr } );
+        _thread_ft_otg.reset( new std::thread{ &JC_helper::admittance::force_torque_otg, this});
 
         if ( traj_target.size( ) == 1 )  //示教模式
         {
@@ -262,7 +283,7 @@ namespace JC_helper
         // _thread_motion->join( );
         _thread_IK->join( );
         _thread_ft_sensor->join( );
-
+        _thread_ft_otg->join( );
         PLOG_INFO << "admittance  全部结束";
     }
 
@@ -300,7 +321,7 @@ namespace JC_helper
             // auto t_start = std::chrono::steady_clock::now( );
 
             // TODO 导纳计算
-            smd.set_force( my_ft_sensor.force_torque.force[ 0 ], my_ft_sensor.force_torque.force[ 1 ], my_ft_sensor.force_torque.force[ 2 ] );
+            smd.set_force( my_ft_sensor.ft_output.new_position[0], my_ft_sensor.ft_output.new_position[ 1 ], my_ft_sensor.ft_output.new_position[ 2 ] );
             // smd.set_force( 0, -20, 0 );
             // smd.set_torque( 0, 0, 0 );
             smd.calculate( frame_offset, admittance_vel );
@@ -460,6 +481,21 @@ namespace JC_helper
         // 6维力信息刷新
         while ( !FinishRunPlanningIK )
             my_ft_sensor.getting_data( robot_ptr->flange_ );
+    }
+
+    void admittance::force_torque_otg( )
+    {
+        while ( !FinishRunPlanningIK )
+        {
+            for ( int i{ 0 }; i < 3; i++ )
+            {
+                my_ft_sensor.ft_input.target_position[ i ] = my_ft_sensor.force_torque.force[ i ];
+            }
+            my_ft_sensor.ft_res = my_ft_sensor.ft_otg.update( my_ft_sensor.ft_input, my_ft_sensor.ft_output );
+            my_ft_sensor.ft_output.pass_to_input( my_ft_sensor.ft_input );
+            ft_otg_csv<< std::to_string( my_ft_sensor.ft_output.new_position[0] )  << "," <<std::to_string( my_ft_sensor.ft_output.new_position[1] )  << "," <<std::to_string( my_ft_sensor.ft_output.new_position[2] )  << "\n";
+            std::this_thread::sleep_for( std::chrono::duration< double >( 0.001 ) );
+        }
     }
 
 #pragma endregion
