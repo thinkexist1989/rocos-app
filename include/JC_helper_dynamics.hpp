@@ -16,7 +16,6 @@
 #include <plog/Log.h>
 #include <ruckig/ruckig.hpp>
 #include <vector>
-#include "JC_helper_kinematics.hpp"
 
 namespace rocos
 {
@@ -38,12 +37,7 @@ private:
     KDL::Wrench init_force_torque{ };
 
 public:
-    ruckig::OutputParameter< 3 > ft_output;
-    ruckig::Ruckig< 3 > ft_otg{ 0.001 };
-    ruckig::InputParameter< 3 > ft_input;
-    ruckig::Result ft_res;
     KDL::Wrench force_torque{ };
-
 
 public:
     ft_sensor( const char* ip_dress = "192.168.1.105" );
@@ -125,7 +119,6 @@ private:
     spring_mass_dump smd{ };
 
     std::ofstream out_joint_csv{ };
-    std::ofstream ft_otg_csv{ };
 
 public:
     admittance( rocos::Robot* robot_ptr );
@@ -135,8 +128,6 @@ public:
     void IK( rocos::Robot* robot_ptr, const std::vector< KDL::Frame >& traj_target );
     void motion( rocos::Robot* robot_ptr );
     void sensor_update( rocos::Robot* robot_ptr );
-    void force_torque_otg( );
-
 };
 
 }  // namespace JC_helper
