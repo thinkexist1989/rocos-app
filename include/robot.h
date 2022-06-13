@@ -24,8 +24,8 @@
 #include <hardware_interface.h>
 #include <interpolate.h>
 #include <kinematics.h>
-
-#include "JC_helper.hpp"
+#include "JC_helper_kinematics.hpp"
+#include "JC_helper_dynamics.hpp"
 #include <Eigen/StdVector>  //!< Eigen官网说明 https://eigen.tuxfamily.org/dox/group__TopicStlContainers.html
 #include <boost/smart_ptr.hpp>
 #include <vector>
