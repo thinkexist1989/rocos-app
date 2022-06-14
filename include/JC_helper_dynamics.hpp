@@ -80,8 +80,8 @@ private:
     std::vector< double > torque_last_acc_offset{ 0, 0, 0 };
 
     std::vector< double > M{ 50.0, 50., 50., 50., 50., 50. };
-    // std::vector< double > K{ 50., 50., 50., 30., 30., 30. };
-    std::vector< double > K{ 0., 0., 0., 100., 100., 100. };
+    std::vector< double > K{ 50., 50., 50., 30., 30., 30. };
+    // std::vector< double > K{ 0., 0., 0., 100., 100., 100. };
     std::vector< double > B{ 50., 50., 50., 50., 50., 50. };
 
     double _dt{ 0.001 };

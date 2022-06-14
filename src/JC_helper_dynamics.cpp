@@ -30,7 +30,7 @@ namespace JC_helper
         // ! 爪子装上后，零漂消除不应该打开了，只有空载情况下才可以打开零漂消除
         SendCommand( &socketHandle, COMMAND_BIAS, FT_BIASING_OFF );
 
-        std::this_thread::sleep_for( std::chrono::duration< double >{ 1 } );
+        std::this_thread::sleep_for( std::chrono::duration< double >{ 2.0 } );
 
         SendCommand( &socketHandle, COMMAND_START, 3 );
         for ( int i = 0; i < 3; i++ )
@@ -53,30 +53,33 @@ namespace JC_helper
 
     void ft_sensor::getting_data( KDL::Frame flange_pos )
     {
-        SendCommand( &socketHandle, COMMAND_START, 1 );
-        res = Receive( &socketHandle );
+        SendCommand( &socketHandle, COMMAND_START, 100 );
+        for ( int i = 0; i < 100; i++ )
+        {
+            res = Receive( &socketHandle );
 
-        force_torque.force[ 0 ]  = res.fx / FORCE_DIV + 0.2;
-        force_torque.force[ 1 ]  = res.fy / FORCE_DIV - 2.3;
-        force_torque.force[ 2 ]  = res.fz / FORCE_DIV + 5.1;
-        force_torque.torque[ 0 ] = res.tx / TORQUE_DIV + 0.05;
-        force_torque.torque[ 1 ] = res.ty / TORQUE_DIV - 0.04;
-        force_torque.torque[ 2 ] = res.tz / TORQUE_DIV - 0.09;
+            force_torque.force[ 0 ]  = res.fx / FORCE_DIV + 0.2;
+            force_torque.force[ 1 ]  = res.fy / FORCE_DIV - 2.3;
+            force_torque.force[ 2 ]  = res.fz / FORCE_DIV + 5.1;
+            force_torque.torque[ 0 ] = res.tx / TORQUE_DIV + 0.05;
+            force_torque.torque[ 1 ] = res.ty / TORQUE_DIV - 0.04;
+            force_torque.torque[ 2 ] = res.tz / TORQUE_DIV - 0.09;
 
-        //收到的力信息转换到base系
-        force_torque.force = ( flange_pos * KDL::Frame{ KDL::Rotation::RPY( 0, 0, M_PI ), KDL::Vector( 0, 0, 0.035 ) } ) * force_torque.force;
+            //收到的力信息转换到base系
+            force_torque.force = ( flange_pos * KDL::Frame{ KDL::Rotation::RPY( 0, 0, M_PI ), KDL::Vector( 0, 0, 0.035 ) } ) * force_torque.force;
 
-        // 重力补偿
-        force_torque.force = force_torque.force - init_force_torque.force;
+            // 重力补偿
+            force_torque.force = force_torque.force - init_force_torque.force;
 
-        // TODO 处理力矩
-        for ( int i{ 0 }; i < 3; i++ )
-            force_torque.torque[ i ] = 0;
+            // TODO 处理力矩
+            for ( int i{ 0 }; i < 3; i++ )
+                force_torque.torque[ i ] = 0;
 
-        //去除毛刺，限制2N
-        for ( int i{ 0 }; i < 3; i++ )
-            if ( abs( force_torque.force[ i ] ) < 2 )
-                force_torque.force[ i ] = 0;
+            //去除毛刺，限制2N
+            for ( int i{ 0 }; i < 3; i++ )
+                if ( abs( force_torque.force[ i ] ) < 2 )
+                    force_torque.force[ i ] = 0;
+        }
     }
 
     int ft_sensor::debug( KDL::Frame flange_pos )
@@ -99,8 +102,8 @@ namespace JC_helper
 #pragma region  //*弹簧阻尼质量系统
     spring_mass_dump::spring_mass_dump( )
     {
-        // for ( int i{ 0 }; i < _joint_num; i++ )
-        //     B[ i ] = 2 * 1 * sqrt( M[ i ] * K[ i ] );
+        for ( int i{ 0 }; i < _joint_num; i++ )
+            B[ i ] = 2 * 1 * sqrt( M[ i ] * K[ i ] );
 
         out_dat.open( "/home/think/rocos-app/debug/admittance.csv" );
     }
@@ -228,7 +231,6 @@ namespace JC_helper
         //**-------------------------------**//
 
         PLOG_INFO << " init success";
-
         return 0;
     }
 
@@ -332,7 +334,7 @@ namespace JC_helper
             //** 速度保护**//
             for ( int i = 0; i < _joint_num; i++ )
             {
-                if ( abs( _q_target( i ) - _q_init( i ) ) >  3*max_step[ i ] )
+                if ( abs( _q_target( i ) - _q_init( i ) ) > 0.3 )
                 {
                     PLOG_ERROR << "joint[" << i << "] speep is too  fast";
                     PLOG_ERROR << "target speed = " << abs( _q_target( i ) - _q_init( i ) )
@@ -360,8 +362,9 @@ namespace JC_helper
             //** 位置伺服 **//
             for ( int i = 0; i < _joint_num; ++i )
             {
-                robot_ptr->pos_[ i ] = _q_target( i );
-                robot_ptr->joints_[ i ]->setPosition( _q_target( i ) );
+                    robot_ptr->pos_[ i ] = _q_target( i );
+                    robot_ptr->joints_[ i ]->setPosition( _q_target( i ) );
+                
             }
             robot_ptr->hw_interface_->waitForSignal( 0 );
             //**-------------------------------**//

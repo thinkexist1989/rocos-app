@@ -512,7 +512,7 @@ namespace rocos {
 
         int admittance_teaching( );
 
-        int admittance_control(Frame pose, double speed, double acceleration );
+        int admittance_control(KDL::Frame frame_init,KDL::Frame frame_target, double speed, double acceleration );
 
         //停止运动
         void StopMotion();

@@ -504,19 +504,28 @@ namespace rocos
                 MoveJ( q_target, 0.4, 1.5, 0, 0, false );
 
                 //** 导纳调试 **//
-                admittance_teaching();
-                // admittance_control( flange_ * KDL::Frame{ KDL::Vector{ 0., 0, 0.05 } }, 0.01, 0.01 );
-                // MoveL(flange_ * KDL::Frame{ KDL::Vector{ 0., 0, 0.05 } }, 0.01, 0.01,0, 0, false);
+                // admittance_teaching();
 
-                // q_target( 0 ) = -10 * M_PI / 180;
-                // q_target( 1 ) = -35 * M_PI / 180;
-                // q_target( 2 ) = 0 * M_PI / 180;
-                // q_target( 3 ) = -80 * M_PI / 180;
-                // q_target( 4 ) = -0 * M_PI / 180;
-                // q_target( 5 ) = 55 * M_PI / 180;
-                // q_target( 6 ) = 0 * M_PI / 180;
+                KDL::Frame frame_init = flange_;
 
-                // MoveJ( q_target, 0.005, 0.02, 0, 0, false );
+
+                admittance_control( frame_init, frame_init * KDL::Frame{ KDL::Vector{ -0.1, 0, 0 } }, 0.1, 1 );
+
+                // for(int i{0};i<3;i++)
+                // {
+                //     MoveL( frame_init * KDL::Frame{ KDL::Vector{ 0., 0, 0.05 } }, 0.2, 2, 0, 0, false );
+                //     MoveL( frame_init, 0.2, 2, 0, 0, false );
+                // }
+
+                // q_target( 0 ) = 5 * M_PI / 180;
+                // q_target( 1 ) = -40 * M_PI / 180;
+                // q_target( 2 ) = 5* M_PI / 180;
+                // q_target( 3 ) = -95* M_PI / 180;
+                // q_target( 4 ) = -5 * M_PI / 180;
+                // q_target( 5 ) = 50 * M_PI / 180;
+                // q_target( 6 ) = -5 * M_PI / 180;
+
+                // MoveJ( q_target, 0.001, 0.001, 0, 0, false );
 
                 //**-------------------------------**//
 

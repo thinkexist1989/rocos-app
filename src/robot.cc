@@ -1068,6 +1068,7 @@ namespace rocos {
         }
         //**-------------------------------**//
 
+
         if (asynchronous)  //异步执行
         {
             motion_thread_.reset(new boost::thread{&Robot::RunMultiMoveL, this, std::ref(traj_)});
@@ -1527,10 +1528,12 @@ namespace rocos {
     void Robot::RunMoveL(const std::vector<KDL::JntArray> &traj) {
         std::cout << "No. of waypoints: " << traj.size() << std::endl;
 
-        for (const auto &waypoints: traj) {
-            for (int i = 0; i < jnt_num_; ++i) {
+        for ( const auto& waypoints : traj )
+        {
+            for ( int i = 0; i < jnt_num_; ++i )
+            {
                 pos_[ i ] = waypoints( i );
-                joints_[ i ]->setPosition( pos_[ i ] );
+                joints_[ i ]->setPosition( waypoints( i ) );
             }
 
             hw_interface_->waitForSignal( 0 );
@@ -1548,7 +1551,6 @@ namespace rocos {
                 pos_[ i ] = waypoints( i );
                 joints_[ i ]->setPosition( waypoints( i ) );
             }
-
             hw_interface_->waitForSignal( 0 );
         }
 
@@ -1580,7 +1582,7 @@ namespace rocos {
         return 0;
     }
 
-  int Robot::admittance_control(Frame pose, double speed, double acceleration )
+    int Robot::admittance_control(KDL::Frame frame_init,KDL::Frame frame_target, double speed, double acceleration )
     {
         if ( is_running_motion )  //最大一条任务异步执行
         {
@@ -1603,16 +1605,25 @@ namespace rocos {
         //!不要传入flange_ !不要传入flange_ !不要传入flange_
         //!实测发现：因为后台有线程不断写入，因此读取可能失败，造成轨迹规划失败的假象！！！
         //TODO 解决公共属性多线程互斥问题
-        KDL::Frame frame_init = flange_;
         //**-------------------------------**//
- 
-        if ( JC_helper::link_trajectory( traj_target, frame_init, pose,  speed, acceleration ) < 0 )
+
+        for ( int i{ 0 }; i < 20; i++ )
         {
-            PLOG_ERROR << "link trajectory planning fail ";
-             is_running_motion =false;
-            return -1;
+            if ( JC_helper::link_trajectory( traj_target, frame_init, frame_target, speed, acceleration ) < 0 )
+            {
+                PLOG_ERROR << "link trajectory planning fail ";
+                is_running_motion = false;
+                return -1;
+            }
+
+            if ( JC_helper::link_trajectory( traj_target, frame_target, frame_init, speed, acceleration ) < 0 )
+            {
+                PLOG_ERROR << "link trajectory planning fail ";
+                is_running_motion = false;
+                return -1;
+            }
         }
-        
+
         admittance_control.start( this, std::ref( traj_target ) );
         is_running_motion = false;
         return 0;
