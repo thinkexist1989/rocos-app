@@ -2606,8 +2606,10 @@ namespace JC_helper
                     {
                         input.current_position[ i ]     = current_pos( i )   ;
                         //防止速度和加速度估计不准
-                        input.current_velocity[ i ]     = KDL::sign( current_vel( i ) ) * std::min( abs( current_vel( i ) ), robot_ptr->joints_[ i ]->getMaxVel( ) );
-                        input.current_acceleration[ i ] = KDL::sign( current_acc( i ) ) * std::min( abs( current_acc( i ) ), robot_ptr->joints_[ i ]->getMaxAcc( )*0.80 );
+                        //速度不可能超过50度
+                        //加速度不可能超过80度
+                        input.current_velocity[ i ]     = KDL::sign( current_vel( i ) ) * std::min( abs( current_vel( i ) ), 0.87);
+                        input.current_acceleration[ i ] = KDL::sign( current_acc( i ) ) * std::min( abs( current_acc( i ) ), 1.4);
 
                         printf( "pos(%d)=  %f, vel(%d)= %f , last vel(%d)= %f , acc(%d)= %f \n", i, input.current_position[ i ] * 180 / M_PI, i, input.current_velocity[ i ] * 180 / M_PI, i, last_vel( i ) * 180 / M_PI, i, input.current_acceleration[ i ] * 180 / M_PI );
 

@@ -610,9 +610,10 @@ namespace rocos {
         JntArray q_target(jnt_num_);
         for (int i = 0; i < jnt_num_; i++) {
             q_init.data[i] = pos_[i];
+            q_target.data[i]  = pos_[i];
         }
         if (kinematics_.CartToJnt(q_init, pose, q_target) < 0) {
-            std::cerr << RED << " MoveJ_IK():CartToJnt failed" << WHITE << std::endl;
+            PLOG_ERROR<< " CartToJnt failed" ;
             return -1;
         }
         return MoveJ(q_target, speed, acceleration, time, radius, asynchronous);
@@ -667,6 +668,7 @@ namespace rocos {
         //!实测发现：因为后台有线程不断写入，因此读取可能失败，造成轨迹规划失败的假象！！！
         //TODO 解决公共属性多线程互斥问题
         KDL::Frame frame_init = flange_;
+        int traj_count{ 0 };
         //**-------------------------------**//
  
         for ( int i = 0; i < jnt_num_; i++ )
@@ -718,6 +720,7 @@ namespace rocos {
                     }
                     q_init = q_target;
                     traj_.push_back( q_target );
+
                 }
                 //在此处时，代表规划成功
                 break;
@@ -1575,14 +1578,34 @@ namespace rocos {
             return -1;
         }
 
-        std::vector< KDL::Frame > traj_target{ flange_ };
-        admittance_control.start( this, std::ref( traj_target ) );
+        std::shared_ptr< std::thread > _thread_ft_sensor{ nullptr };
+        _thread_ft_sensor.reset( new std::thread{ &JC_helper::admittance::sensor_update, &admittance_control, this } );
 
-        is_running_motion = false;
-        return 0;
+        bool flag_turnoff{false};
+
+        std::shared_ptr< std::thread > _thread_admittance_teaching{ nullptr };
+        _thread_admittance_teaching.reset( new std::thread{ &JC_helper::admittance::Runteaching, &admittance_control,this, flange_,&flag_turnoff} );
+
+            PLOG_INFO << " starting  teaching";
+
+            std::string str;
+            while ( str.compare( "break" ) != 0 )
+            {
+                PLOG_INFO << " enter 'break' to turnoff teaching function:";
+                std::cin >> str;
+            }
+            flag_turnoff = true;
+
+            _thread_admittance_teaching->join( );
+            _thread_ft_sensor->join( );
+
+            PLOG_INFO << "admittance  全部结束";
+
+            is_running_motion = false;
+            return 0;
     }
 
-    int Robot::admittance_control(KDL::Frame frame_init,KDL::Frame frame_target, double speed, double acceleration )
+    int Robot::admittance_link(KDL::Frame frame_target, double speed, double acceleration )
     {
         if ( is_running_motion )  //最大一条任务异步执行
         {
@@ -1594,37 +1617,27 @@ namespace rocos {
 
         JC_helper::admittance admittance_control{ this};
 
+        // admittance类里自带传感器类，需要初始化才能用
         if ( admittance_control.init( flange_ ) < 0 )
         {
             is_running_motion = false;
             return -1;
         }
 
-       //** 变量初始化 **//
-        std::vector<KDL::Frame> traj_target;
-        //!不要传入flange_ !不要传入flange_ !不要传入flange_
-        //!实测发现：因为后台有线程不断写入，因此读取可能失败，造成轨迹规划失败的假象！！！
-        //TODO 解决公共属性多线程互斥问题
-        //**-------------------------------**//
+        std::shared_ptr< std::thread > _thread_ft_sensor{ nullptr };
+        _thread_ft_sensor.reset( new std::thread{ &JC_helper::admittance::sensor_update, &admittance_control, this } );
 
-        for ( int i{ 0 }; i < 20; i++ )
-        {
-            if ( JC_helper::link_trajectory( traj_target, frame_init, frame_target, speed, acceleration ) < 0 )
-            {
-                PLOG_ERROR << "link trajectory planning fail ";
-                is_running_motion = false;
-                return -1;
-            }
 
-            if ( JC_helper::link_trajectory( traj_target, frame_target, frame_init, speed, acceleration ) < 0 )
-            {
-                PLOG_ERROR << "link trajectory planning fail ";
-                is_running_motion = false;
-                return -1;
-            }
-        }
+        std::shared_ptr< std::thread > _thread_admittance_link{ nullptr };
+        _thread_admittance_link.reset( new std::thread{ &JC_helper::admittance::RunLink, &admittance_control, this, frame_target,speed,acceleration} );
 
-        admittance_control.start( this, std::ref( traj_target ) );
+        PLOG_INFO << " starting  admittance motion";
+
+        _thread_admittance_link->join( );
+        _thread_ft_sensor->join( );
+
+        PLOG_INFO << "admittance  全部结束";
+
         is_running_motion = false;
         return 0;
     }

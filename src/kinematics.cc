@@ -86,7 +86,7 @@ namespace rocos {
         // 初始化正运动学求解器
         fk_solver_.reset(new KDL::ChainFkSolverPos_recursive(chain_));
         //初始化逆运动学求解器
-        ik_solver_.reset(new TRAC_IK::TRAC_IK(chain_, q_min_, q_max_));
+        ik_solver_.reset(new TRAC_IK::TRAC_IK(chain_, q_min_, q_max_ ,0.005,8e-8));
     }
 
     void Kinematics::getChainTechServo(KDL::Chain &chain, KDL::JntArray &q_min, KDL::JntArray &q_max) {

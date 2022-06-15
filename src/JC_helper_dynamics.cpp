@@ -77,7 +77,7 @@ namespace JC_helper
 
             //去除毛刺，限制2N
             for ( int i{ 0 }; i < 3; i++ )
-                if ( abs( force_torque.force[ i ] ) < 2 )
+                if ( abs( force_torque.force[ i ] ) < 4.5 )
                     force_torque.force[ i ] = 0;
         }
     }
@@ -212,7 +212,7 @@ namespace JC_helper
 
     admittance::admittance( rocos::Robot* robot_ptr ) : _ik_vel{ robot_ptr->kinematics_.getChain( ) }
     {
-        out_joint_csv.open( "/home/think/rocos-app/debug/joints.csv" );
+        out_joint_csv.open( "/home/think/rocos-app/debug/admittance_joints.csv" );
     }
 
     admittance::~admittance( )
@@ -234,41 +234,42 @@ namespace JC_helper
         return 0;
     }
 
-    void admittance::start( rocos::Robot* robot_ptr, const std::vector< KDL::Frame >& traj_target )
-    {
-        std::shared_ptr< std::thread > _thread_IK{ nullptr };
-        // std::shared_ptr< std::thread > _thread_motion{ nullptr };
-        std::shared_ptr< std::thread > _thread_ft_sensor{ nullptr };
+    // void admittance::start( rocos::Robot* robot_ptr, const std::vector< KDL::Frame >& traj_target )
+    // {
+    //     std::shared_ptr< std::thread > _thread_IK{ nullptr };
+    //     // std::shared_ptr< std::thread > _thread_motion{ nullptr };
+    //     std::shared_ptr< std::thread > _thread_ft_sensor{ nullptr };
 
-        _thread_ft_sensor.reset( new std::thread{ &JC_helper::admittance::sensor_update, this, robot_ptr } );
-        _thread_IK.reset( new std::thread{ &JC_helper::admittance::IK, this, robot_ptr, std::ref( traj_target ) } );
-        // _thread_motion.reset( new std::thread{ &JC_helper::admittance::motion, this, robot_ptr } );
+    //     _thread_ft_sensor.reset( new std::thread{ &JC_helper::admittance::sensor_update, this, robot_ptr } );
+    //     _thread_IK.reset( new std::thread{ &JC_helper::admittance::IK, this, robot_ptr, std::ref( traj_target ) } );
+    //     // _thread_motion.reset( new std::thread{ &JC_helper::admittance::motion, this, robot_ptr } );
 
-        if ( traj_target.size( ) == 1 )  //示教模式
-        {
-            PLOG_INFO << " starting  teaching";
+    //     if ( traj_target.size( ) == 1 )  //示教模式
+    //     {
+    //         PLOG_INFO << " starting  teaching";
 
-            std::string str;
-            while ( str.compare( "break" ) != 0 )
-            {
-                PLOG_INFO << " enter 'break' to turnoff teaching function:";
-                std::cin >> str;
-            }
-            on_stop_trajectory = true;
-        }
-        else  //运动导纳模式
-        {
-            PLOG_INFO << " starting  admittance motion";
-        }
+    //         std::string str;
+    //         while ( str.compare( "break" ) != 0 )
+    //         {
+    //             PLOG_INFO << " enter 'break' to turnoff teaching function:";
+    //             std::cin >> str;
+    //         }
+    //         on_stop_trajectory = true;
+    //     }
+    //     else  //运动导纳模式
+    //     {
+    //         PLOG_INFO << " starting  admittance motion";
+    //     }
 
-        // _thread_motion->join( );
-        _thread_IK->join( );
-        _thread_ft_sensor->join( );
+    //     // _thread_motion->join( );
+    //     _thread_IK->join( );
+    //     _thread_ft_sensor->join( );
 
-        PLOG_INFO << "admittance  全部结束";
-    }
+    //     PLOG_INFO << "admittance  全部结束";
+    // }
 
-    void admittance::IK( rocos::Robot* robot_ptr, const std::vector< KDL::Frame >& traj_target )
+
+    void admittance::Runteaching( rocos::Robot* robot_ptr, const KDL::Frame traj_target ,bool * flag_turnoff )
     {
         //** 变量初始化 **//
         // std::unique_lock< std::mutex > lock_traj_joint( mutex_traj_joint, std::defer_lock );  //不上锁
@@ -282,25 +283,24 @@ namespace JC_helper
 
         //**-------------------------------**//
 
+        //** 程序初始化 **//
+
         for ( int i = 0; i < _joint_num; i++ )
         {
             max_step.push_back( robot_ptr->max_vel_[ i ] * 0.001 );
             _q_init( i )   = robot_ptr->pos_[ i ];
             _q_target( i ) = _q_init( i );
         }
+        //**-------------------------------**//
 
         //** 轨迹计算 **//
 
-        if ( traj_target.size( ) == 1 )  //示教模式
             max_count = numeric_limits< int_least64_t >::max( );
-        else
-            max_count = traj_target.size( );
+
 
         int traj_count{ 0 };
         for ( ; traj_count < max_count; traj_count++ )
         {
-            // auto t_start = std::chrono::steady_clock::now( );
-
             // TODO 导纳计算
             smd.set_force( my_ft_sensor.force_torque.force[ 0 ], my_ft_sensor.force_torque.force[ 1 ], my_ft_sensor.force_torque.force[ 2 ] );
             // smd.set_force( 0, -20, 0 );
@@ -308,33 +308,30 @@ namespace JC_helper
             smd.calculate( frame_offset, admittance_vel );
 
             //** 读取最新Frame **//
-            if ( traj_target.size( ) == 1 )  //示教模式
-                frame_target = frame_offset * traj_target[ 0 ];
-            else
-                frame_target = frame_offset * traj_target[ traj_count ];
-
+            frame_target = frame_offset * traj_target;  //示教模式
             //**-------------------------------**//
 
             //** IK求解 **//
-            if ( ( robot_ptr->kinematics_ ).CartToJnt( _q_init, frame_target, _q_target ) < 0 )
-            {
-                PLOG_ERROR << " CartToJnt failed  frame_target =\n"
-                           << frame_target;
-                on_stop_trajectory = true;
-                break;
-            }
+            // if ( ( robot_ptr->kinematics_ ).CartToJnt( _q_init, frame_target, _q_target ) < 0 )
+            // {
+            //     PLOG_ERROR << " CartToJnt failed  frame_target =\n"
+            //                << frame_target;
+            //     //! on_stop_trajectory = true;
+            //     //! break;
+
             //**-------------------------------**//
 
             //** 笛卡尔速度求解 **//
-            // _ik_vel.CartToJnt( _q_init, admittance_vel, joints_vel );
-            // KDL::Multiply( joints_vel, 0.001, joints_vel );
-            // KDL::Add( _q_init, joints_vel, _q_target );
+
+            _ik_vel.CartToJnt( _q_init, admittance_vel, joints_vel );
+            KDL::Multiply( joints_vel, 0.001, joints_vel );
+            KDL::Add( _q_init, joints_vel, _q_target );
             //**-------------------------------**//
 
             //** 速度保护**//
             for ( int i = 0; i < _joint_num; i++ )
             {
-                if ( abs( _q_target( i ) - _q_init( i ) ) > 0.3 )
+                if ( abs( _q_target( i ) - _q_init( i ) ) > 0.1 )
                 {
                     PLOG_ERROR << "joint[" << i << "] speep is too  fast";
                     PLOG_ERROR << "target speed = " << abs( _q_target( i ) - _q_init( i ) )
@@ -349,8 +346,8 @@ namespace JC_helper
             if ( on_stop_trajectory ) break;
             //**-------------------------------**//
 
-            //** 打印 **//
-            //  out_joint_csv << std::to_string( traj_count*0.001) << "\t,";
+            //** csv打印 **//
+            // out_joint_csv << std::to_string( traj_count * 0.001 ) << "\t,";
             // for ( int i = 0; i < _joint_num - 1; i++ )
             // {
             //     out_joint_csv << std::to_string( _q_target( i ) ) << "\t,";
@@ -362,25 +359,17 @@ namespace JC_helper
             //** 位置伺服 **//
             for ( int i = 0; i < _joint_num; ++i )
             {
-                    robot_ptr->pos_[ i ] = _q_target( i );
-                    robot_ptr->joints_[ i ]->setPosition( _q_target( i ) );
-                
+                robot_ptr->pos_[ i ] = _q_target( i );
+                robot_ptr->joints_[ i ]->setPosition( _q_target( i ) );
             }
             robot_ptr->hw_interface_->waitForSignal( 0 );
             //**-------------------------------**//
 
-            // lock_traj_joint.lock( );
             traj_joint.push_back( _q_target );
-            // lock_traj_joint.unlock( );
             _q_init = _q_target;
 
-            // auto t_stop     = std::chrono::steady_clock::now( );
-            // auto t_duration = std::chrono::duration< double >( t_stop - t_start );
+            on_stop_trajectory = *flag_turnoff;//由外界调用者决定什么时候停止
 
-            // if ( t_duration.count( ) < 0.0008 )
-            // {
-            //     std::this_thread::sleep_for( std::chrono::duration< double >( 0.0008 - t_duration.count( ) ) );
-            // }
         }
 
         if ( on_stop_trajectory )
@@ -394,68 +383,143 @@ namespace JC_helper
         FinishRunPlanningIK = true;
     }
 
-    void admittance::motion( rocos::Robot* robot_ptr )
+    void admittance::RunLink( rocos::Robot* robot_ptr,  const KDL::Frame frame_target, double max_path_v, double max_path_a )
     {
         //** 变量初始化 **//
-        std::unique_lock< std::mutex > lock_traj_joint( mutex_traj_joint, std::defer_lock );  //不上锁
-        int traj_joint_count = 0;
-        KDL::JntArray joint_command;
+        // std::unique_lock< std::mutex > lock_traj_joint( mutex_traj_joint, std::defer_lock );  //不上锁
+        KDL::Frame frame_intep;
+        KDL::JntArray _q_target( _joint_num );
+        KDL::JntArray _q_init( _joint_num );
+        std::vector< double > max_step;
+        KDL::Twist admittance_vel;
+        KDL::JntArray joints_vel( _joint_num );
+        KDL::Twist traj_vel;
+        KDL::Twist Cartesian_vel;
+
         //**-------------------------------**//
 
-        //** 正常情况下，接收IK解算后的关节轨迹 **//
-        while ( !on_stop_trajectory )
+        //** 程序初始化 **//
+
+        for ( int i = 0; i < _joint_num; i++ )
         {
-            //** 读取最新命令 **//
-            lock_traj_joint.lock( );
-            if ( traj_joint_count < traj_joint.size( ) )
+            max_step.push_back( robot_ptr->max_vel_[ i ] * 0.001 );
+            _q_init( i )   = robot_ptr->pos_[ i ];
+            _q_target( i ) = _q_init( i );
+        }
+        //**-------------------------------**//
+
+        //** 直线轨迹规划 **//
+
+        std::vector< KDL::Frame > traj_target;
+        KDL::Frame frame_init = robot_ptr->flange_;
+
+        if ( link_trajectory( traj_target, frame_init, frame_target, max_path_v, max_path_a ) < 0 )
+        {
+            PLOG_ERROR << "link trajectory planning fail ";
+            FinishRunPlanningIK = true;
+
+            return;
+        }
+
+        //**-------------------------------**//
+
+
+        //** 轨迹计算 **//
+        int traj_count{ 0 };
+        for ( ; traj_count < traj_target.size( ); traj_count++ )
+        {
+
+            // TODO 导纳计算
+            smd.set_force( my_ft_sensor.force_torque.force[ 0 ], my_ft_sensor.force_torque.force[ 1 ], my_ft_sensor.force_torque.force[ 2 ] );
+            // smd.set_force( 0, -20, 0 );
+            // smd.set_torque( 0, 0, 0 );
+            smd.calculate( frame_offset, admittance_vel );
+
+            //** 读取最新Frame **//
+          
+                frame_intep = frame_offset * traj_target[ traj_count ];  //导纳控制模式
+
+            //**-------------------------------**//
+
+            //** IK求解 **//
+            // if ( ( robot_ptr->kinematics_ ).CartToJnt( _q_init, frame_intep, _q_target ) < 0 )
+            // {
+            //     PLOG_ERROR << " CartToJnt failed  frame_intep =\n"
+            //                << frame_intep;
+            //     //! on_stop_trajectory = true;
+            //     //! break;
+
+
+            //**-------------------------------**//
+
+            //** 笛卡尔速度求解 **//
+                if ( moveL_vel( traj_vel, traj_count * 0.001, traj_target.front( ), traj_target.back( ) ,max_path_v,max_path_a) < 0 )
+                {
+                    PLOG_ERROR << "笛卡尔速度转关节速度失败";
+                    on_stop_trajectory = true;
+                    break;
+                }
+
+            Cartesian_vel.vel = traj_vel.vel + admittance_vel.vel;
+            Cartesian_vel.rot = traj_vel.rot + admittance_vel.rot;
+
+            _ik_vel.CartToJnt( _q_init, Cartesian_vel, joints_vel );
+            KDL::Multiply( joints_vel, 0.001, joints_vel );
+            KDL::Add( _q_init, joints_vel, _q_target );
+            //**-------------------------------**//
+
+            //** 速度保护**//
+            for ( int i = 0; i < _joint_num; i++ )
             {
-                joint_command = traj_joint[ traj_joint_count ];
-                lock_traj_joint.unlock( );
-            }
-            else
-            {
-                lock_traj_joint.unlock( );
-                PLOG_DEBUG << "已超过最新命令";
-                PLOG_DEBUG << traj_joint_count;
-                PLOG_DEBUG << traj_joint.size( );
-                if ( FinishRunPlanningIK )
-                    break;  //全部frame已经取出
-                else
-                    continue;
+                if ( abs( _q_target( i ) - _q_init( i ) ) > 0.1 )
+                {
+                    PLOG_ERROR << "joint[" << i << "] speep is too  fast";
+                    PLOG_ERROR << "target speed = " << abs( _q_target( i ) - _q_init( i ) )
+                               << " and  max_step=" << max_step[ i ];
+                    PLOG_ERROR << "_q_target( " << i << " )  = " << _q_target( i ) * 180 / M_PI;
+                    PLOG_ERROR << "_q_init( " << i << " ) =" << _q_init( i ) * 180 / M_PI;
+                    on_stop_trajectory = true;
+                    break;
+                }
             }
 
-            traj_joint_count++;
+            if ( on_stop_trajectory ) break;
+            //**-------------------------------**//
+
+            //** csv打印 **//
+            // out_joint_csv << std::to_string( traj_count * 0.001 ) << "\t,";
+            // for ( int i = 0; i < _joint_num - 1; i++ )
+            // {
+            //     out_joint_csv << std::to_string( _q_target( i ) ) << "\t,";
+            // }
+            // out_joint_csv << std::to_string( _q_target( 6 ) );
+            // out_joint_csv << "\n";
             //**-------------------------------**//
 
             //** 位置伺服 **//
             for ( int i = 0; i < _joint_num; ++i )
             {
-                robot_ptr->pos_[ i ] = joint_command( i );
-                robot_ptr->joints_[ i ]->setPosition( joint_command( i ) );
+                robot_ptr->pos_[ i ] = _q_target( i );
+                robot_ptr->joints_[ i ]->setPosition( _q_target( i ) );
             }
             robot_ptr->hw_interface_->waitForSignal( 0 );
             //**-------------------------------**//
-        }
-        //**--------------------------------------------------------------**//
 
-        //**紧急停止 ，可能原因：1.轨迹规划失败、2.IK求解失败 3.心跳保持超时**//
+            traj_joint.push_back( _q_target );
+            _q_init = _q_target;
+
+        }
+
         if ( on_stop_trajectory )
         {
-            PLOG_ERROR << "motion触发紧急停止";
-            // for ( int i = 0; i < _joint_num; ++i )
-            // {
-            //     PLOG_DEBUG << "joints_vel[ " << i << " ] = " << joints_vel[ i ];
-            //     PLOG_DEBUG << "joints_acc[ " << i << " ] = " << ( joints_vel[ i ] - joints_last_vel[ i ] ) / 0.001;
-            //     PLOG_DEBUG;
-            // }
-            //!紧急停止措施，对于仿真是立刻停止，实物才能看到效果
-            motion_stop( robot_ptr, std::ref( traj_joint ), traj_joint_count );
+            PLOG_ERROR << "IK 触发急停";
+            motion_stop( robot_ptr, std::ref( traj_joint ), traj_count );
         }
         else
-            PLOG_INFO << "motion 结束";
+            PLOG_INFO << "IK结束";
 
-        // robot_ptr->is_running_motion    = false;  //机械臂运动已结束，可以执行其他离线类运动
-        // on_stop_trajectory              = false;
+        FinishRunPlanningIK = true;
+        
     }
 
     void admittance::sensor_update( rocos::Robot* robot_ptr )
@@ -466,5 +530,46 @@ namespace JC_helper
     }
 
 #pragma endregion
+
+    int moveL_vel( KDL::Twist& Cartesian_vel, double t, KDL::Frame start, KDL::Frame end ,double max_path_v,double max_path_a)
+    {
+        //** 变量初始化 **//
+        KDL::Vector vel   = end.p - start.p;
+        double Plength = vel.Norm( );
+        KDL::Rotation R_start_end = start.M.Inverse( ) * end.M;
+        KDL::Vector ration_axis;
+        double angle                   = R_start_end.GetRotAngle( ration_axis );
+        const double equivalent_radius = 0.1;
+        double Rlength                 = ( equivalent_radius * abs( angle ) );
+        double Path_length             = std::max( Plength, Rlength );
+        rocos::DoubleS doubleS;
+        //**-------------------------------**//
+
+        doubleS.planProfile( 0, 0.0, 1.0, 0, 0, max_path_v / Path_length, max_path_a / Path_length,
+                             max_path_a * 2 / Path_length );
+
+        if ( !doubleS.isValidMovement( ) || !( doubleS.getDuration( ) > 0 ) )
+        {
+            PLOG_ERROR << "link velocity compution failed";
+            return -1;
+        }
+
+        if ( vel.Norm( ) < 1e-3 )
+            Cartesian_vel.vel = KDL::Vector{ };
+        else
+        {
+            vel.Normalize( );  //零向量单位化会变成【1，0，0】
+            Cartesian_vel.vel = vel * doubleS.vel( t ) * Path_length;
+        }
+
+        if ( angle < 1e-3 )
+            Cartesian_vel.rot = KDL::Vector{ };
+        else
+        {
+            Cartesian_vel.rot = ration_axis * doubleS.vel( t ) * Path_length;
+        }
+
+        return 0;
+    }
 
 }  // namespace JC_helper

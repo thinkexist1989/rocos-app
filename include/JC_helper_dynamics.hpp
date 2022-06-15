@@ -79,8 +79,8 @@ private:
     std::vector< double > torque_acc_offset{ 0, 0, 0 };
     std::vector< double > torque_last_acc_offset{ 0, 0, 0 };
 
-    std::vector< double > M{ 50.0, 50., 50., 50., 50., 50. };
-    std::vector< double > K{ 50., 50., 50., 30., 30., 30. };
+    std::vector< double > M{ 40.0, 40., 40., 40., 40., 40. };
+    std::vector< double > K{ 30., 30., 30., 30., 30., 30. };
     // std::vector< double > K{ 0., 0., 0., 100., 100., 100. };
     std::vector< double > B{ 50., 50., 50., 50., 50., 50. };
 
@@ -124,11 +124,24 @@ public:
     admittance( rocos::Robot* robot_ptr );
     ~admittance( );
     int init( KDL::Frame flange_pos );
-    void start( rocos::Robot* robot_ptr, const std::vector< KDL::Frame >& traj_target );
-    void IK( rocos::Robot* robot_ptr, const std::vector< KDL::Frame >& traj_target );
-    void motion( rocos::Robot* robot_ptr );
+    // void start( rocos::Robot* robot_ptr, const std::vector< KDL::Frame >& traj_target );
+    void Runteaching( rocos::Robot* robot_ptr, const  KDL::Frame  traj_target   ,bool * flag_turn_off );
+    void RunLink( rocos::Robot* robot_ptr,  const  KDL::Frame frame_taget ,double max_path_v,double max_path_a);
     void sensor_update( rocos::Robot* robot_ptr );
 };
+/**
+ * @brief  计算直线轨迹的线速度
+ * 
+ * @param Cartesian_vel 
+ * @param t 时间点
+ * @param start 起始位置
+ * @param end 终止位置
+ * @param max_path_v 直线轨迹最大速度
+ * @param max_path_a 直线轨迹最大加速度
+ * @return int 
+ */
+    int moveL_vel( KDL::Twist& Cartesian_vel, double t, KDL::Frame start, KDL::Frame end ,double max_path_v,double max_path_a);
+
 
 }  // namespace JC_helper
 

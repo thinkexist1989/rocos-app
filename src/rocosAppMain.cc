@@ -453,7 +453,7 @@ void signalHandler( int signo )
 
 #pragma region  //* 测试5 
 /**
- * @brief 测试5：机械臂标定 走正方体
+ * @brief 测试5：导纳测试
  *
  */
 namespace rocos
@@ -492,78 +492,175 @@ namespace rocos
         if ( str == std::string_view{ "run" } )
         {
             KDL::JntArray q_target( 7 );
-    
-                q_target( 0 ) = 0 * M_PI / 180;
-                q_target( 1 ) = -45 * M_PI / 180;
-                q_target( 2 ) = 0* M_PI / 180;
-                q_target( 3 ) = -90* M_PI / 180;
-                q_target( 4 ) = -0 * M_PI / 180;
-                q_target( 5 ) = 45 * M_PI / 180;
-                q_target( 6 ) = 0 * M_PI / 180;
 
-                MoveJ( q_target, 0.4, 1.5, 0, 0, false );
+            q_target( 0 ) = 0 * M_PI / 180;
+            q_target( 1 ) = -45 * M_PI / 180;
+            q_target( 2 ) = 0 * M_PI / 180;
+            q_target( 3 ) = -90 * M_PI / 180;
+            q_target( 4 ) = -0 * M_PI / 180;
+            q_target( 5 ) = 45 * M_PI / 180;
+            q_target( 6 ) = 0 * M_PI / 180;
 
-                //** 导纳调试 **//
-                // admittance_teaching();
+            MoveJ( q_target, 0.4, 1.5, 0, 0, false );
 
-                KDL::Frame frame_init = flange_;
+            //** 导纳调试 **//
+            // admittance_teaching();
 
+            KDL::Frame frame_init = flange_;
 
-                admittance_control( frame_init, frame_init * KDL::Frame{ KDL::Vector{ -0.1, 0, 0 } }, 0.1, 1 );
+            admittance_link( frame_init * KDL::Frame{ KDL::Vector{ -0.2, 0, 0 } }, 0.01, 1 );
 
-                // for(int i{0};i<3;i++)
-                // {
-                //     MoveL( frame_init * KDL::Frame{ KDL::Vector{ 0., 0, 0.05 } }, 0.2, 2, 0, 0, false );
-                //     MoveL( frame_init, 0.2, 2, 0, 0, false );
-                // }
+            // for(int i{0};i<3;i++)
+            // {
+            //     MoveL( frame_init * KDL::Frame{ KDL::Vector{ -0.1, 0,0 } }, 0.01, 1, 0, 0, false ,1);
+            //     MoveL( frame_init, 0.01, 1, 0, 0, false );
+            // }
 
-                // q_target( 0 ) = 5 * M_PI / 180;
-                // q_target( 1 ) = -40 * M_PI / 180;
-                // q_target( 2 ) = 5* M_PI / 180;
-                // q_target( 3 ) = -95* M_PI / 180;
-                // q_target( 4 ) = -5 * M_PI / 180;
-                // q_target( 5 ) = 50 * M_PI / 180;
-                // q_target( 6 ) = -5 * M_PI / 180;
+            // q_target( 0 ) = 5 * M_PI / 180;
+            // q_target( 1 ) = -40 * M_PI / 180;
+            // q_target( 2 ) = 5* M_PI / 180;
+            // q_target( 3 ) = -95* M_PI / 180;
+            // q_target( 4 ) = -5 * M_PI / 180;
+            // q_target( 5 ) = 50 * M_PI / 180;
+            // q_target( 6 ) = -5 * M_PI / 180;
 
-                // MoveJ( q_target, 0.001, 0.001, 0, 0, false );
+            // MoveJ( q_target, 0.001, 0.001, 0, 0, false );
 
-                //**-------------------------------**//
+            //**-------------------------------**//
 
-                //** 6维力调试 **//
-                // JC_helper::ft_sensor my_sensor{ };
-                // my_sensor.init( flange_ );
+            //** 6维力调试 **//
+            // JC_helper::ft_sensor my_sensor{ };
+            // my_sensor.init( flange_ );
 
-                // for ( int i{ 0 }; i < 5*60*1000; i++ )
-                // {
-                //     my_sensor.debug( flange_ );
-                // }
+            // for ( int i{ 0 }; i < 5*60*1000; i++ )
+            // {
+            //     my_sensor.debug( flange_ );
+            // }
 
-                //**-------------------------------**//
+            //**-------------------------------**//
 
-                //** 速度采集**//
-                // std::vector< double >
-                //     joints_last_vel( 7, 0 );
-                // std::vector< double >
-                //     joints_vel( 7, 0 );
-                // for ( int count{ 0 }; count < 5 * 60 ; count++ )
-                // {
-                //     for ( int i = 0; i < 7; ++i )
-                //     {
-                //         joints_last_vel[ i ] = joints_vel[ i ];
-                //         joints_vel[ i ]      = joints_[ i ]->getVelocity( );
-                //         PLOG_DEBUG << "joints_vel[ " << i << " ] = " << joints_vel[ i ];
-                //         PLOG_DEBUG << "joints_acc[ " << i << " ] = " << ( joints_vel[ i ] - joints_last_vel[ i ] ) / 1;
-                //         PLOG_DEBUG;
-                //     }
-                //     std::this_thread::sleep_for( std::chrono::milliseconds( 1000 ) );
-                // }
-                //**-------------------------------**//
+            //** 速度采集**//
+            // std::vector< double >
+            //     joints_last_vel( 7, 0 );
+            // std::vector< double >
+            //     joints_vel( 7, 0 );
+            // for ( int count{ 0 }; count < 5 * 60 ; count++ )
+            // {
+            //     for ( int i = 0; i < 7; ++i )
+            //     {
+            //         joints_last_vel[ i ] = joints_vel[ i ];
+            //         joints_vel[ i ]      = joints_[ i ]->getVelocity( );
+            //         PLOG_DEBUG << "joints_vel[ " << i << " ] = " << joints_vel[ i ];
+            //         PLOG_DEBUG << "joints_acc[ " << i << " ] = " << ( joints_vel[ i ] - joints_last_vel[ i ] ) / 1;
+            //         PLOG_DEBUG;
+            //     }
+            //     std::this_thread::sleep_for( std::chrono::milliseconds( 1000 ) );
+            // }
+            //**-------------------------------**//
         }
         PLOG_INFO << "全部测试结束,goodbye!";
     }
 }  // namespace rocos
 
 #pragma endregion
+
+#pragma region  //* 测试6
+/**
+ * @brief 测试6 ：全部按键、提拉杆、旋钮测试
+ *
+ */
+// namespace rocos
+// {
+
+// void split( const std::string& str,
+//             std::vector< std::string >& tokens,
+//             const std::string delim = " " )
+// {
+//     tokens.clear( );//!注意清除上次结果
+
+//     auto start    = str.find_first_not_of( delim, 0 );  // 分割到的字符串的第一个字符
+//     auto position = str.find_first_of( delim, start );  // 分隔符的位置
+//     while ( position != std::string::npos || start != std::string::npos )
+//     {
+//         // [start, position) 为分割下来的字符串
+//         tokens.emplace_back( std::move( str.substr( start, position - start ) ) );
+//         start    = str.find_first_not_of( delim, position );
+//         position = str.find_first_of( delim, start );
+//     }
+// }
+
+
+//     void Robot::test( )
+//     {
+
+//         std::string str{ "" };
+
+//         //** 电机使能检查 **//
+//         PLOG_INFO << "电机使能检查";
+
+//         for ( int i{ 0 }; i < jnt_num_; i++ )
+//         {
+//             if ( joints_[ i ]->getDriveState( ) != DriveState::OperationEnabled )
+//             {
+//                 for ( int j{ 0 }; j < 1; j++ )
+//                 {
+//                     PLOG_ERROR << "电机[" << i << "] 未使能，确定主站已初始化完成了？,输入y确认";
+//                     std::cin >> str;
+//                     if ( str != std::string_view{ "y" } )
+//                     {
+//                         PLOG_ERROR << "未输入yes, 判断主站 {未} 初始化完成,程序关闭";
+//                         exit( 0 );
+//                     }
+//                 }
+//             }
+//         }
+
+//         setEnabled( );
+//         //**-------------------------------**//
+
+//         PLOG_INFO << "当前环境是否安全,如果是,输入run开始执行程序";
+//         std::cin >> str;
+
+//         if ( str == std::string_view{ "run" } )
+//         {
+//             KDL::JntArray q_target( 7 );
+
+//             q_target( 0 ) = 0 * M_PI / 180;
+//             q_target( 1 ) = -45 * M_PI / 180;
+//             q_target( 2 ) = 0 * M_PI / 180;
+//             q_target( 3 ) = -90 * M_PI / 180;
+//             q_target( 4 ) = -0 * M_PI / 180;
+//             q_target( 5 ) = 45 * M_PI / 180;
+//             q_target( 6 ) = 0 * M_PI / 180;
+
+//             MoveJ( q_target, 0.4, 1.5, 0, 0, false );
+
+//             std::ifstream button_knob_csv{ };
+//             button_knob_csv.open("/home/think/rocos-app/debug/button_konb_pos.csv");
+//             std::vector< std::string > tokens;
+
+//             while ( button_knob_csv >> str )  //遇见/t,/n,空格停下
+//             {
+//                 split( str, tokens, "," );
+
+//                 KDL::Frame frame_target = KDL::Frame{ KDL::Rotation::RotY(M_PI/2) ,KDL::Vector{ std::stod( tokens[ 0 ] )/1000, std::stod( tokens[ 1 ] )/1000, std::stod( tokens[ 2 ] )/1000 }};
+
+//                 MoveJ_IK( frame_target, 0.4, 1.5, 0, 0, false );
+//                 sleep(2);
+//             }
+
+//             button_knob_csv.close();
+//         }
+//         PLOG_INFO << "全部测试结束,goodbye!";
+   
+//     }
+// }  // namespace rocos
+
+#pragma endregion
+
+
+
+
 
 int main( int argc, char* argv[] )
 {
