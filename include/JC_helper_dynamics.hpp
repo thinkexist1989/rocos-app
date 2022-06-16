@@ -16,7 +16,6 @@
 #include <plog/Log.h>
 #include <ruckig/ruckig.hpp>
 #include <vector>
-
 namespace rocos
 {
     class Robot;

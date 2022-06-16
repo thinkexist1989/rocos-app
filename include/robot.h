@@ -29,8 +29,8 @@
 #include <Eigen/StdVector>  //!< Eigen官网说明 https://eigen.tuxfamily.org/dox/group__TopicStlContainers.html
 #include <boost/smart_ptr.hpp>
 #include <vector>
-
 #include <kdl_parser/kdl_parser.hpp> //!< 解析URDF文件
+#include <gripper_client_cpp/gripper.hpp>
 
 namespace rocos {
     //! Class Robot
@@ -592,7 +592,8 @@ namespace rocos {
         friend class JC_helper::admittance ;
 
     private:
-            JC_helper::ft_sensor my_ft_sensor;
+            JC_helper::ft_sensor my_ft_sensor; //6维力传感器
+            JC_helper::gripper my_gripper;
 
     };
 

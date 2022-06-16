@@ -10,7 +10,7 @@ import _thread
 gripper = baseRobotiq2FGripper.robotiqbaseRobotiq2FGripper()
 command = [100, 100, 100]  # 位置、速度、力
 flag_turnoff = False
-
+my_server = 0
 
 def tcpServer(var):
     host = "127.0.0.1"
@@ -20,7 +20,7 @@ def tcpServer(var):
     s.bind((host, port))
     s.listen(10)  # 只能同时连接一个
 
-    while True:
+    while ~flag_turnoff:
         my_server, address = s.accept()
 
         while True:
@@ -44,7 +44,7 @@ def tcpServer(var):
                 #     break
                 # else:
                     gripper.my_refresh_Command(1, 0, 1, command[0], command[1], command[2])
-                    time.sleep(0.1)
+                    # time.sleep(0.6)
             else:
                 break
                 
@@ -68,3 +68,5 @@ def mainLoop(device):
 if __name__ == '__main__':
     _thread.start_new_thread(tcpServer, ("TCP",))
     mainLoop("/dev/ttyUSB0")
+    flag_turnoff= True
+    my_server.close()

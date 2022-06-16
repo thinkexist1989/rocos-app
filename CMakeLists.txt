@@ -65,7 +65,7 @@ include_directories(
         include
         include/${PROJECT_NAME}
         include/sdk
-        3rdparty/gripper/gripper_client_cpp/
+        3rdparty/gripper/
 )
 
 link_directories(
