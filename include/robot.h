@@ -519,6 +519,7 @@ namespace rocos {
 
     public:  //为了测试
         void test();
+        void pos_bag(bool* flag_turnoff );
 
     private:
         // TODO： 测试用MoveJ，阻塞运行，需要改为private
@@ -589,6 +590,10 @@ namespace rocos {
 
 
         friend class JC_helper::admittance ;
+
+    private:
+            JC_helper::ft_sensor my_ft_sensor;
+
     };
 
 

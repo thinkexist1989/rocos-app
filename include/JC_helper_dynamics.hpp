@@ -79,7 +79,7 @@ private:
     std::vector< double > torque_acc_offset{ 0, 0, 0 };
     std::vector< double > torque_last_acc_offset{ 0, 0, 0 };
 
-    std::vector< double > M{ 40.0, 40., 40., 40., 40., 40. };
+    std::vector< double > M{ 60.0, 60., 60., 60., 60., 60. };
     std::vector< double > K{ 30., 30., 30., 30., 30., 30. };
     // std::vector< double > K{ 0., 0., 0., 100., 100., 100. };
     std::vector< double > B{ 50., 50., 50., 50., 50., 50. };
@@ -114,14 +114,14 @@ private:
     std::atomic< bool > on_stop_trajectory{ false };
     std::vector< KDL::JntArray > traj_joint;
     bool FinishRunPlanningIK{ false };
-    ft_sensor my_ft_sensor{ };
+    ft_sensor  *my_ft_sensor_ptr{ nullptr };
     KDL::ChainIkSolverVel_pinv _ik_vel;
     spring_mass_dump smd{ };
 
     std::ofstream out_joint_csv{ };
 
 public:
-    admittance( rocos::Robot* robot_ptr );
+    admittance( rocos::Robot* robot_ptr , ft_sensor* ft_sensor_ptr );
     ~admittance( );
     int init( KDL::Frame flange_pos );
     // void start( rocos::Robot* robot_ptr, const std::vector< KDL::Frame >& traj_target );

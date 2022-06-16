@@ -30,7 +30,7 @@ namespace JC_helper
         // ! 爪子装上后，零漂消除不应该打开了，只有空载情况下才可以打开零漂消除
         SendCommand( &socketHandle, COMMAND_BIAS, FT_BIASING_OFF );
 
-        std::this_thread::sleep_for( std::chrono::duration< double >{ 2.0 } );
+        std::this_thread::sleep_for( std::chrono::duration< double >{ 3 } );
 
         SendCommand( &socketHandle, COMMAND_START, 3 );
         for ( int i = 0; i < 3; i++ )
@@ -210,9 +210,11 @@ namespace JC_helper
 
 #pragma region  //*导纳控制
 
-    admittance::admittance( rocos::Robot* robot_ptr ) : _ik_vel{ robot_ptr->kinematics_.getChain( ) }
+    admittance::admittance( rocos::Robot* robot_ptr  , ft_sensor* ft_sensor_ptr ) : _ik_vel{ robot_ptr->kinematics_.getChain( ) }
     {
+        my_ft_sensor_ptr = ft_sensor_ptr;
         out_joint_csv.open( "/home/think/rocos-app/debug/admittance_joints.csv" );
+
     }
 
     admittance::~admittance( )
@@ -223,11 +225,11 @@ namespace JC_helper
     int admittance::init( KDL::Frame flange_pos )
     {
         //** 6维力初始化 **//
-        if ( my_ft_sensor.init( flange_pos ) < 0 )
-        {
-            PLOG_ERROR << " force-torque sensor init failed ";
-            return -1;
-        }
+        // if ( my_ft_sensor.init( flange_pos ) < 0 )
+        // {
+        //     PLOG_ERROR << " force-torque sensor init failed ";
+        //     return -1;
+        // }
         //**-------------------------------**//
 
         PLOG_INFO << " init success";
@@ -302,7 +304,7 @@ namespace JC_helper
         for ( ; traj_count < max_count; traj_count++ )
         {
             // TODO 导纳计算
-            smd.set_force( my_ft_sensor.force_torque.force[ 0 ], my_ft_sensor.force_torque.force[ 1 ], my_ft_sensor.force_torque.force[ 2 ] );
+            smd.set_force( my_ft_sensor_ptr->force_torque.force[ 0 ], my_ft_sensor_ptr->force_torque.force[ 1 ], my_ft_sensor_ptr->force_torque.force[ 2 ] );
             // smd.set_force( 0, -20, 0 );
             // smd.set_torque( 0, 0, 0 );
             smd.calculate( frame_offset, admittance_vel );
@@ -430,7 +432,7 @@ namespace JC_helper
         {
 
             // TODO 导纳计算
-            smd.set_force( my_ft_sensor.force_torque.force[ 0 ], my_ft_sensor.force_torque.force[ 1 ], my_ft_sensor.force_torque.force[ 2 ] );
+            smd.set_force( my_ft_sensor_ptr->force_torque.force[0] ,my_ft_sensor_ptr->force_torque.force[ 1 ] , my_ft_sensor_ptr->force_torque.force[ 2 ] );
             // smd.set_force( 0, -20, 0 );
             // smd.set_torque( 0, 0, 0 );
             smd.calculate( frame_offset, admittance_vel );
@@ -526,7 +528,7 @@ namespace JC_helper
     {
         // 6维力信息刷新
         while ( !FinishRunPlanningIK )
-            my_ft_sensor.getting_data( robot_ptr->flange_ );
+            my_ft_sensor_ptr->getting_data( robot_ptr->flange_ );
     }
 
 #pragma endregion

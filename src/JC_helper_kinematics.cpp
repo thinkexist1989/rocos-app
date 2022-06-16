@@ -778,6 +778,24 @@ namespace JC_helper
 
                 robot_ptr->hw_interface_->waitForSignal( 0 );
             }
+            else//计算失败，紧急停止
+            {
+                PLOG_ERROR << "otg computation failed";
+                on_stop_trajectory = true;
+                input_lock.lock( );
+                input.control_interface = ruckig::ControlInterface::Velocity;
+                input.synchronization   = ruckig::Synchronization::None;
+
+                for ( int i = 0; i < _joint_num; i++ )
+                {
+                    input.target_velocity[ i ]     = 0.0;
+                    input.target_acceleration[ i ] = 0.0;
+                    input.max_velocity[ i ]        = robot_ptr->joints_[ i ]->getMaxVel( );
+                    input.max_acceleration[ i ]    = robot_ptr->joints_[ i ]->getMaxAcc( );
+                    input.max_jerk[ i ]            = robot_ptr->joints_[ i ]->getMaxJerk( );
+                }
+                input_lock.unlock( );
+            }
             //** 100ms进行一次心跳检查,紧急停止时不需要检查 **//
             if ( ( ( ++count ) == 100 ) && !on_stop_trajectory )
             {

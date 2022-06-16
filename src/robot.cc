@@ -62,7 +62,9 @@ namespace rocos {
 //        kinematics_.initTechServo();
         static plog::ColorConsoleAppender<plog::TxtFormatter> consoleAppender;
         plog::init(plog::debug, &consoleAppender); // Initialize the logger.
-        startMotionThread();
+        startMotionThread( );
+        std::this_thread::sleep_for( std::chrono::milliseconds( 2000 ) );
+        my_ft_sensor.init( flange_ );
     }
 
     bool Robot::parseUrdf(const string &urdf_file_path,
@@ -1570,7 +1572,7 @@ namespace rocos {
         else
             is_running_motion = true;
 
-        JC_helper::admittance admittance_control{ this};
+        JC_helper::admittance admittance_control{ this,&my_ft_sensor};
 
         if ( admittance_control.init( flange_ ) < 0 )
         {
@@ -1615,7 +1617,7 @@ namespace rocos {
         else
             is_running_motion = true;
 
-        JC_helper::admittance admittance_control{ this};
+        JC_helper::admittance admittance_control{ this,&my_ft_sensor};
 
         // admittance类里自带传感器类，需要初始化才能用
         if ( admittance_control.init( flange_ ) < 0 )
