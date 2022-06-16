@@ -57,8 +57,9 @@ int main( int argc, char** argv )
     //         return 0;
     //     }
     // }
-        sleep( 3 );
-    sendline = std::string( "255#100#100" );
+    // sleep( 3 ); 
+    sendline = std::string( "150#80#80" );
+    // sendline = std::string( "210#80#80" );
     if ( send( my_server, sendline.c_str( ), sendline.length( ), 0 ) < 0 )
     {
         printf( "send msg error: %s(errno: %d)\n", strerror( errno ), errno );

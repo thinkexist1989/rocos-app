@@ -83,6 +83,8 @@ private:
     std::vector< double > K{ 30., 30., 30., 30., 30., 30. };
     // std::vector< double > K{ 0., 0., 0., 100., 100., 100. };
     std::vector< double > B{ 50., 50., 50., 50., 50., 50. };
+    double damp  {1};
+
 
     double _dt{ 0.001 };
     KDL::Twist _Cartesian_vel;
@@ -104,6 +106,7 @@ public:
     void set_torque( double tor_que_x, double tor_que_y, double tor_que_z );
 
     void set_damp( double value );
+    void set_k(double vaule);
 };
 
 class admittance
@@ -116,11 +119,11 @@ private:
     bool FinishRunPlanningIK{ false };
     ft_sensor  *my_ft_sensor_ptr{ nullptr };
     KDL::ChainIkSolverVel_pinv _ik_vel;
-    spring_mass_dump smd{ };
 
     std::ofstream out_joint_csv{ };
 
 public:
+    spring_mass_dump smd{ };
     admittance( rocos::Robot* robot_ptr , ft_sensor* ft_sensor_ptr );
     ~admittance( );
     int init( KDL::Frame flange_pos );
@@ -128,6 +131,7 @@ public:
     void Runteaching( rocos::Robot* robot_ptr, const  KDL::Frame  traj_target   ,bool * flag_turn_off );
     void RunLink( rocos::Robot* robot_ptr,  const  KDL::Frame frame_taget ,double max_path_v,double max_path_a);
     void sensor_update( rocos::Robot* robot_ptr );
+    
 };
 /**
  * @brief  计算直线轨迹的线速度

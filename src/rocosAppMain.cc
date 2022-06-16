@@ -748,14 +748,77 @@ void Robot::pos_bag(bool* flag_turnoff )
 
         if ( str == std::string_view{ "run" } )
         {
+            //** 开启记录 **//
             bool flag_turnoff{ false };
             std::thread thread_pos_bag{ &rocos::Robot::pos_bag, this, &flag_turnoff };
 
-            // //** 读取文件的全部关节值，并执行 **//
+            //**-------------------------------**//
+
+#pragma region  //* 第一个按键
+
             KDL::JntArray q_target( 7 );
             std::ifstream button_knob_csv{ };  //真实飞机舱里三种按键测试
-            button_knob_csv.open( "/home/think/rocos-app/debug/button_konb_pos.csv" );
             std::vector< std::string > tokens;
+
+            // // //** 读取文件的全部关节值，并执行 **//
+            // button_knob_csv.open( "/home/think/rocos-app/debug/demo_1.csv" );
+
+            // while ( button_knob_csv >> str )  //遇见/t,/n,空格停下
+            // {
+            //     split( str, tokens, "," );
+
+            //     for ( int i{ 0 }; i < 7; i++ )
+            //     {
+            //         q_target( i ) = ( std::stod( tokens[ i ] ) );
+            //     }
+
+            //     MoveJ( q_target, 0.2, 0.5, 0, 0, false );
+            // }
+
+            // button_knob_csv.close( );
+
+            // // //**-------------------------------**//
+
+            // // //** 导纳调试 **//
+            // KDL::Frame frame_init = flange_;
+            // // admittance_link( frame_init * KDL::Frame{ KDL::Vector{ 0, 0, 0.008 } }, 0.0022, 0.1 );
+            // MoveL(frame_init * KDL::Frame{ KDL::Vector{ 0, 0, 0.0085 } }, 0.0022, 0.1 , 0, 0, false );
+            // // // admittance_teaching();
+            // // //**-------------------------------**//
+
+            // //** 导纳调试 **//
+            // frame_init = flange_;
+            // // admittance_link( frame_init * KDL::Frame{ KDL::Vector{ 0, 0, -0.008 } }, 0.0022, 0.1 );
+            // MoveL( frame_init * KDL::Frame{ KDL::Vector{ 0, 0, -0.0085 } }, 0.0022, 0.1, 0, 0, false );
+
+            // //**-------------------------------**//
+
+            // //** 读取文件的全部关节值，并执行 **//
+            // button_knob_csv.open( "/home/think/rocos-app/debug/demo_1_inverset.csv" );
+
+            // while ( button_knob_csv >> str )  //遇见/t,/n,空格停下
+            // {
+            //     split( str, tokens, "," );
+
+            //     for ( int i{ 0 }; i < 7; i++ )
+            //     {
+            //         q_target( i ) = ( std::stod( tokens[ i ] ) );
+            //     }
+
+            //     MoveJ( q_target, 0.2, 0.5, 0, 0, false );
+            // }
+
+            // button_knob_csv.close( );
+
+            // //**-------------------------------**//
+
+#pragma endregion
+
+#pragma region  //*第二个按键
+
+
+         // //** 读取文件的全部关节值，并执行 **//
+            button_knob_csv.open( "/home/think/rocos-app/debug/demo_2_inverst.csv" );
 
             while ( button_knob_csv >> str )  //遇见/t,/n,空格停下
             {
@@ -766,48 +829,25 @@ void Robot::pos_bag(bool* flag_turnoff )
                     q_target( i ) = ( std::stod( tokens[ i ] ) );
                 }
 
-                MoveJ( q_target, 0.2, 0.5, 0, 0, false );
+                MoveJ( q_target, 0.1, 0.5, 0, 0, false );
             }
 
             button_knob_csv.close( );
-            
+
             // //**-------------------------------**//
+
 
 
             // //** 导纳调试 **//
-            KDL::Frame frame_init = flange_;
-            // admittance_link( frame_init * KDL::Frame{ KDL::Vector{ 0, 0, 0.008 } }, 0.0022, 0.1 );
-            MoveL(frame_init * KDL::Frame{ KDL::Vector{ 0, 0, 0.0085 } }, 0.0022, 0.1 , 0, 0, false );
-            // // admittance_teaching();
+            // KDL::Frame frame_init = flange_;
+            // MoveL(frame_init * KDL::Frame{ KDL::Vector{ 0, 0, 0.0085 } }, 0.0022, 0.1 , 0, 0, false );
+            // admittance_teaching( );
             // //**-------------------------------**//
 
 
-            //** 导纳调试 **//
-           frame_init = flange_;
-            // admittance_link( frame_init * KDL::Frame{ KDL::Vector{ 0, 0, -0.008 } }, 0.0022, 0.1 );
-            MoveL(frame_init * KDL::Frame{ KDL::Vector{ 0, 0, -0.0085 } }, 0.0022, 0.1 , 0, 0, false );
 
-            //**-------------------------------**//
 
-            //** 读取文件的全部关节值，并执行 **//
-            button_knob_csv.open( "/home/think/rocos-app/debug/button_konb_pos_invert.csv" );
-
-            while ( button_knob_csv >> str )  //遇见/t,/n,空格停下
-            {
-                split( str, tokens, "," );
-
-                for ( int i{ 0 }; i < 7; i++ )
-                {
-                    q_target( i ) = ( std::stod( tokens[ i ] ) );
-                }
-
-                MoveJ( q_target, 0.2, 0.5, 0, 0, false );
-            }
-
-            button_knob_csv.close( );
-            
-            //**-------------------------------**//
-
+#pragma endregion
 
             flag_turnoff = false;
             thread_pos_bag.join( );

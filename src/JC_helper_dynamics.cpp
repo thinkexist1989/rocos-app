@@ -103,7 +103,7 @@ namespace JC_helper
     spring_mass_dump::spring_mass_dump( )
     {
         for ( int i{ 0 }; i < _joint_num; i++ )
-            B[ i ] = 2 * 1 * sqrt( M[ i ] * K[ i ] );
+            B[ i ] = 2 * damp * sqrt( M[ i ] * K[ i ] );
 
         out_dat.open( "/home/think/rocos-app/debug/admittance.csv" );
     }
@@ -198,13 +198,34 @@ namespace JC_helper
 
     void spring_mass_dump::set_damp( double value )
     {
-        static double damp = 1;
         damp += value;
 
         for ( int i{ 0 }; i < _joint_num; i++ )
             B[ i ] = 2 * damp * sqrt( M[ i ] * K[ i ] );
 
         PLOG_DEBUG << "damp  = " << damp;
+    }
+
+    void spring_mass_dump::set_k( double value )
+    {
+        if ( abs( value ) < 1e-3 )
+        {
+            for ( int i{ 0 }; i < _joint_num; i++ )
+            {
+                B[ i ] = 50;
+                K[ i ] = 0;
+            }
+        }
+        else
+        {
+            for ( int i{ 0 }; i < _joint_num; i++ )
+            {
+                K[ i ] = value;
+                B[ i ] = 2 * damp * sqrt( M[ i ] * K[ i ] );
+            }
+        }
+
+        PLOG_DEBUG << "k  = " << value;
     }
 #pragma endregion
 
