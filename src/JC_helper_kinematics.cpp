@@ -808,6 +808,8 @@ namespace JC_helper
                 else
                 {
                     PLOG_ERROR << "Some errors such as disconnecting from the controller";
+                    PLOG_DEBUG << "new_velocity"<< output.new_velocity[0];
+                    PLOG_DEBUG << "new_acceleration"<<output.new_acceleration[0];
                     on_stop_trajectory = true;
                     input_lock.lock( );
                     input.control_interface = ruckig::ControlInterface::Velocity;
@@ -2205,7 +2207,7 @@ namespace JC_helper
             // //!紧急停止措施，对于仿真是立刻停止，实物才能看到效果
             motion_stop( robot_ptr, std::ref(traj_joint), traj_joint_count);
             // //! 触发急停后就冷静3秒，防止手一直按着触发急停
-            std::this_thread::sleep_for( std::chrono::duration< double >{ 2.3 } );
+            std::this_thread::sleep_for( std::chrono::duration< double >{ 2 } );
         }
         else
             PLOG_INFO << "motion 结束";
@@ -2256,21 +2258,36 @@ namespace JC_helper
     }
     int SmartServo_Cartesian::command( const KDL::Vector& tem_v, const char* str )
     {
+
         if ( strcmp( str, "FLANGE" ) == 0 )
             return command( target * KDL::Frame{ tem_v } );
+            
         else if ( strcmp( str, "BASE" ) == 0 )
-            return command( target * KDL::Frame{ target.M.Inverse( ) * tem_v } );
+            return command( KDL::Frame{ tem_v } * target );
+
         else
+        {
+            PLOG_ERROR << "don't support this command type:" << str;
             return -1;
+        }
+
+
+
     }
     int SmartServo_Cartesian::command( const KDL::Rotation& tem_r, const char* str )
     {
+
         if ( strcmp( str, "FLANGE" ) == 0 )
             return command( target * KDL::Frame{ tem_r } );
+
         else if ( strcmp( str, "BASE" ) == 0 )
             return command( KDL::Frame{ tem_r * target.M, target.p } );
+
         else
+        {
+            PLOG_ERROR << "don't support this command type:" << str;
             return -1;
+        }
     }
 
     KDL::Frame SmartServo_Cartesian::link_trajectory( const KDL::Frame& start, const KDL::Frame& end, double s_p )
@@ -2577,7 +2594,7 @@ namespace JC_helper
 
     void motion_stop( rocos::Robot* robot_ptr, const std::vector< KDL::JntArray > &traj_joint ,int traj_joint_count)
     {
-              ruckig::Ruckig< _joint_num > otg{ 0.001 };
+            ruckig::Ruckig< _joint_num > otg{ 0.001 };
             ruckig::InputParameter< _joint_num > input;
             ruckig::OutputParameter< _joint_num > output;
             ruckig::Result res;
@@ -2626,8 +2643,8 @@ namespace JC_helper
                         //防止速度和加速度估计不准
                         //速度不可能超过50度
                         //加速度不可能超过80度
-                        input.current_velocity[ i ]     = KDL::sign( current_vel( i ) ) * std::min( abs( current_vel( i ) ), 0.87);
-                        input.current_acceleration[ i ] = KDL::sign( current_acc( i ) ) * std::min( abs( current_acc( i ) ), 1.4);
+                        input.current_velocity[ i ]     = KDL::sign( current_vel( i ) ) * std::min( abs( current_vel( i ) ), 30*M_PI/180);//!按照Rviz 40%笛卡尔速度选取最大值，后面要改回来
+                        input.current_acceleration[ i ] = KDL::sign( current_acc( i ) ) * std::min( abs( current_acc( i ) ), 50*M_PI/180);//!按照Rviz 40%笛卡尔加速度选取最大值，后面要改回来
 
                         printf( "pos(%d)=  %f, vel(%d)= %f , last vel(%d)= %f , acc(%d)= %f \n", i, input.current_position[ i ] * 180 / M_PI, i, input.current_velocity[ i ] * 180 / M_PI, i, last_vel( i ) * 180 / M_PI, i, input.current_acceleration[ i ] * 180 / M_PI );
 
@@ -2680,7 +2697,15 @@ namespace JC_helper
             }
     }
 #pragma endregion
+// 40%
+// 关节速度
+// 0.136345  =7.81
+// -0.989712 = 60
 
-
+// 笛卡尔速度
+// 0.12  = 7.148117   0.35=20   30
+// 0.03 = 1.623903  0.03=1.636884   0.09 = 4.991709  ·50
 
 }  // namespace JC_helper
+
+

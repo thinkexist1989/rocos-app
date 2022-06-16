@@ -62,7 +62,7 @@ int main( int argc, char** argv )
 
 
 
-    // sleep( 3 ); 
+    sleep( 1 ); 
     sendline = std::string( "150#80#80" );
     if ( send( my_server, sendline.c_str( ), sendline.length( ), 0 ) < 0 )
     {
@@ -70,13 +70,13 @@ int main( int argc, char** argv )
         return 0;
     }
 
-    sleep( 1 );
-    sendline = std::string( "210#80#80" );
-    if ( send( my_server, sendline.c_str( ), sendline.length( ), 0 ) < 0 )
-    {
-        printf( "send msg error: %s(errno: %d)\n", strerror( errno ), errno );
-        return 0;
-    }
+    // sleep( 1 );
+    // sendline = std::string( "210#80#80" );
+    // if ( send( my_server, sendline.c_str( ), sendline.length( ), 0 ) < 0 )
+    // {
+    //     printf( "send msg error: %s(errno: %d)\n", strerror( errno ), errno );
+    //     return 0;
+    // }
 
     close( my_server );
     return 0;

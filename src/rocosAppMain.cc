@@ -770,7 +770,7 @@ void Robot::pos_bag(bool* flag_turnoff )
             KDL::JntArray q_target( 7 );
             std::ifstream button_knob_csv{ };  //真实飞机舱里三种按键测试
             std::vector< std::string > tokens;
-
+            KDL::Frame frame_init;
 #if  0
 #pragma region  //* 第一个按键
 
@@ -796,7 +796,7 @@ void Robot::pos_bag(bool* flag_turnoff )
             //**-------------------------------**//
 
             //** 导纳调试 **//
-            KDL::Frame frame_init = flange_;
+            frame_init = flange_;
             MoveL(frame_init * KDL::Frame{ KDL::Vector{ 0, 0, 0.0085 } }, 0.0022, 0.1 , 0, 0, false );
             // admittance_link( frame_init * KDL::Frame{ KDL::Vector{ 0, 0, 0.008 } }, 0.0022, 0.1 );
             // admittance_teaching();
@@ -879,8 +879,70 @@ void Robot::pos_bag(bool* flag_turnoff )
 
 #endif
 
-            flag_turnoff = false;
-            thread_pos_bag.join( );
+            my_gripper.send_command( "150#80#120" );
+
+            //** 读取文件的全部关节值，并执行 **//
+            button_knob_csv.open( "/home/think/rocos-app/debug/demo_3.csv" );
+
+            while ( button_knob_csv >> str )  //遇见/t,/n,空格停下
+            {PLOG_DEBUG<<str;
+                split( str, tokens, "," );
+
+                for ( int i{ 0 }; i < 7; i++ )
+                {
+                    q_target( i ) = ( std::stod( tokens[ i ] ) );
+                }
+
+                MoveJ( q_target, 0.1, 0.5, 0, 0, false );
+            }
+
+            button_knob_csv.close( );
+
+            //**-------------------------------**//
+
+            MoveL( KDL::Frame{KDL::Rotation::RPY(-2.96854,0.145107,-3.03842),KDL::Vector{0.533036,-0.30144,0.585725}}, 0.0022, 0.1, 0, 0, false );
+
+            my_gripper.send_command( "180#80#120" );
+            sleep( 3 );
+
+            for(int i {0};i<jnt_num_;i++)
+                q_target( i ) = pos_[ i ];
+
+            q_target( 6 ) = 3.913 * M_PI / 180;
+            MoveJ( q_target, 0.05, 0.5, 0, 0, false );
+
+          q_target( 6 ) = 37.405     * M_PI / 180;
+          MoveJ( q_target, 0.05, 0.5, 0, 0, false );
+
+          q_target( 6 ) = 109.775 * M_PI / 180;
+          MoveJ( q_target, 0.05, 0.5, 0, 0, false );
+
+          frame_init = flange_;
+          
+         MoveL( KDL::Frame{KDL::Rotation::RPY(-2.96823,0.145508,-3.03834),KDL::Vector{0.528025,-0.296509,0.616402}}, 0.0022, 0.1, 0, 0, false );
+
+
+          //** 读取文件的全部关节值，并执行 **//
+          button_knob_csv.open( "/home/think/rocos-app/debug/demo_3_inverst.csv" );
+
+          while ( button_knob_csv >> str )  //遇见/t,/n,空格停下
+          {
+              split( str, tokens, "," );
+
+              for ( int i{ 0 }; i < 7; i++ )
+              {
+                  q_target( i ) = ( std::stod( tokens[ i ] ) );
+              }
+
+              MoveJ( q_target, 0.1, 0.5, 0, 0, false );
+          }
+
+          button_knob_csv.close( );
+
+          //**-------------------------------**//
+
+          flag_turnoff = false;
+          thread_pos_bag.join( );
         }
 
             PLOG_INFO << "全部测试结束,goodbye!";
@@ -902,8 +964,8 @@ int main( int argc, char* argv[] )
     }
 
     using namespace rocos;
-    boost::shared_ptr< HardwareInterface > hw = boost::make_shared< HardwareSim >( 7 );  // 仿真
-    // boost::shared_ptr< HardwareInterface > hw = boost::make_shared< Hardware >( );  //真实机械臂
+    // boost::shared_ptr< HardwareInterface > hw = boost::make_shared< HardwareSim >( 7 );  // 仿真
+    boost::shared_ptr< HardwareInterface > hw = boost::make_shared< Hardware >( );  //真实机械臂
 
     Robot robot( hw );
 
