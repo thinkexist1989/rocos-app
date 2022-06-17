@@ -517,9 +517,10 @@ namespace rocos {
         //停止运动
         void StopMotion();
 
-    public:  //为了测试
-        void test();
-        void pos_bag(bool* flag_turnoff );
+    public: 
+        void test(); //为了测试
+        void csv_record(bool* flag_turnoff );//为了方便记录数据
+        int csv_parse(const char * path,size_t max_size =2048);//为了方便记录数据
 
     private:
         // TODO： 测试用MoveJ，阻塞运行，需要改为private

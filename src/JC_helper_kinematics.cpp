@@ -239,8 +239,7 @@ namespace JC_helper
 
     int link_trajectory( std::vector< KDL::Frame >& traj, const KDL::Frame& start, const KDL::Frame& end, double max_path_v, double max_path_a )
     {
-        PLOG_DEBUG << "start = \n"
-                   << start;
+  
 
         //** 变量初始化 **//
         KDL::Vector Pstart        = start.p;
@@ -2643,8 +2642,8 @@ namespace JC_helper
                         //防止速度和加速度估计不准
                         //速度不可能超过50度
                         //加速度不可能超过80度
-                        input.current_velocity[ i ]     = KDL::sign( current_vel( i ) ) * std::min( abs( current_vel( i ) ), 30*M_PI/180);//!按照Rviz 40%笛卡尔速度选取最大值，后面要改回来
-                        input.current_acceleration[ i ] = KDL::sign( current_acc( i ) ) * std::min( abs( current_acc( i ) ), 50*M_PI/180);//!按照Rviz 40%笛卡尔加速度选取最大值，后面要改回来
+                        input.current_velocity[ i ]     = KDL::sign( current_vel( i ) ) * std::min( abs( current_vel( i ) ), 30*M_PI/180);//临时修改   按照Rviz 40%笛卡尔速度选取最大值，后面要改回来
+                        input.current_acceleration[ i ] = KDL::sign( current_acc( i ) ) * std::min( abs( current_acc( i ) ), 50*M_PI/180);//临时修改   按照Rviz 40%笛卡尔加速度选取最大值，后面要改回来
 
                         printf( "pos(%d)=  %f, vel(%d)= %f , last vel(%d)= %f , acc(%d)= %f \n", i, input.current_position[ i ] * 180 / M_PI, i, input.current_velocity[ i ] * 180 / M_PI, i, last_vel( i ) * 180 / M_PI, i, input.current_acceleration[ i ] * 180 / M_PI );
 

@@ -234,13 +234,13 @@ namespace JC_helper
     admittance::admittance( rocos::Robot* robot_ptr  , ft_sensor* ft_sensor_ptr ) : _ik_vel{ robot_ptr->kinematics_.getChain( ) }
     {
         my_ft_sensor_ptr = ft_sensor_ptr;
-        out_joint_csv.open( "/home/think/rocos-app/debug/admittance_joints.csv" );
+        // out_joint_csv.open( "/home/think/rocos-app/debug/admittance_joints.csv" );
 
     }
 
     admittance::~admittance( )
     {
-        out_joint_csv.close( );
+        // out_joint_csv.close( );
     }
 
     int admittance::init( KDL::Frame flange_pos )

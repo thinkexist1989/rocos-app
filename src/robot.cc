@@ -64,8 +64,8 @@ namespace rocos {
         plog::init(plog::debug, &consoleAppender); // Initialize the logger.
         startMotionThread( );
         std::this_thread::sleep_for( std::chrono::milliseconds( 1000 ) );
-        my_ft_sensor.init( flange_ );
-        my_gripper.init(  );
+        my_ft_sensor.init( flange_ );//临时修改
+        my_gripper.init(  );//临时修改
     }
 
     bool Robot::parseUrdf(const string &urdf_file_path,
@@ -1483,8 +1483,8 @@ namespace rocos {
         for (auto &i: interp)
             i.reset(new DoubleS{});
 
-        std::cout << "Joint Pos: \n"
-                  << GREEN << q.data << WHITE << std::endl;
+        // std::cout << "Joint Pos: \n"
+        //           << GREEN << q.data << WHITE << std::endl;
         for (int i = 0; i < jnt_num_; ++i) {
             if (q(i) == pos_[i]) {
                 std::cerr << RED << " Target pos[" << i << "]"
@@ -1581,7 +1581,7 @@ namespace rocos {
             return -1;
         }
 
-        admittance_control.smd.set_k( 0 );
+        admittance_control.smd.set_k( 0 );//临时修改
 
         std::shared_ptr< std::thread > _thread_ft_sensor{ nullptr };
         _thread_ft_sensor.reset( new std::thread{ &JC_helper::admittance::sensor_update, &admittance_control, this } );

@@ -119,7 +119,7 @@ private:
     ft_sensor  *my_ft_sensor_ptr{ nullptr };
     KDL::ChainIkSolverVel_pinv _ik_vel;
 
-    std::ofstream out_joint_csv{ };
+    // std::ofstream out_joint_csv{ };
 
 public:
     spring_mass_dump smd{ };
