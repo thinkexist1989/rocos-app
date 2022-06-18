@@ -5,6 +5,8 @@ import comModbusRtu
 import baseRobotiq2FGripper
 import time
 import _thread
+import atexit 
+
 
 
 gripper = baseRobotiq2FGripper.robotiqbaseRobotiq2FGripper()
@@ -12,7 +14,16 @@ command = [100, 100, 100]  # 位置、速度、力
 flag_turnoff = False
 my_server = 0
 
+@atexit.register 
+
+def clean(): 
+    global my_server
+    my_server.close()  
+
 def tcpServer(var):
+    global my_server
+    global flag_turnoff
+
     host = "127.0.0.1"
     port = 5000
     # print(var)
@@ -52,7 +63,7 @@ def tcpServer(var):
 
 
 def mainLoop(device):
-
+    global flag_turnoff
     gripper.client = comModbusRtu.communication()
     gripper.client.connectToDevice(device)
     gripper.my_refresh_Command(0, 0, 0, 0, 0, 0) #爪子初始化

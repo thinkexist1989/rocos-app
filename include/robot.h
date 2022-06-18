@@ -397,8 +397,8 @@ namespace rocos {
                      bool asynchronous = false);
 
         //! \brief 圆弧运动
-        //! \param pose_via 中间点
-        //! \param pose_to 目标点
+        //! \param pose_via 中间点,姿态给定无效，内部会自动计算
+        //! \param pose_to 目标点,姿态给定无效，内部会自动计算
         //! \param speed 关节速度限制（leading axis）
         //! \param acceleration 关节加速度限制
         //! \param time 最短运行时间

@@ -613,7 +613,7 @@ namespace rocos
         std::ofstream out_joint_csv{ };
         std::string str;
         std::vector< std::string > str_vec;
-        out_joint_csv.open( "/home/abc418/rocos-app/debug/joints.csv" );
+        out_joint_csv.open( "/home/think/rocos-app/debug/joints.csv" );
         while ( !( *flag_turnoff ) && str.compare( "exit" ) )
         {
             PLOG_DEBUG << " 输入“rem”并回车,命令格式:rem#movej#vel#acc;输入“exit”退出记录";
@@ -886,7 +886,7 @@ namespace rocos
             my_gripper.send_command( "150#80#120" );
 
             //** 读取文件的全部关节值，并执行 **//
-            button_knob_csv.open( "/home/abc418/rocos-app/debug/demo_3.csv" );
+            button_knob_csv.open( "/home/think/rocos-app/debug/demo_3.csv" );
             if ( !button_knob_csv.is_open( ) )
             {
                 PLOG_ERROR << "demo_3.csv 文件打开失败 ";
@@ -934,7 +934,7 @@ namespace rocos
             MoveL( KDL::Frame{flange_.M, KDL::Vector{ 0.528025, -0.296509, 0.616402 } }, 0.0022, 0.1, 0, 0, false );
 
             //** 读取文件的全部关节值，并执行 **//
-            button_knob_csv.open( "/home/abc418/rocos-app/debug/demo_3_inverst.csv" );
+            button_knob_csv.open( "/home/think/rocos-app/debug/demo_3_inverst.csv" );
             if ( !button_knob_csv.is_open( ) )
             {
                 PLOG_ERROR << "demo_3.csv 文件打开失败 ";
@@ -958,9 +958,22 @@ namespace rocos
             //**-------------------------------**//
 
 #    pragma endregion
+
+//** 第四个按键 **//
+           csv_parse( "/home/think/rocos-app/debug/demo_4.csv" );
+           csv_parse( "/home/think/rocos-app/debug/demo_4_inverst.csv" );
+//**-------------------------------**//
+
 #endif
-           csv_parse( "/home/abc418/rocos-app/debug/demo_4.csv" );
-            
+//** 第5个按键 **//
+        //    csv_parse( "/home/think/rocos-app/debug/demo_5.csv" );
+        //    csv_parse( "/home/think/rocos-app/debug/demo_5_inverst.csv" );
+//**-------------------------------**//
+
+//** 第6个按键 **//
+
+
+//**-------------------------------**//
 
             flag_turnoff = false;
             thread_pos_bag.join( );
@@ -982,8 +995,8 @@ int main( int argc, char* argv[] )
     }
 
     using namespace rocos;
-    boost::shared_ptr< HardwareInterface > hw = boost::make_shared< HardwareSim >( 7 );  // 仿真
-    // boost::shared_ptr< HardwareInterface > hw = boost::make_shared< Hardware >( );  //真实机械臂
+    // boost::shared_ptr< HardwareInterface > hw = boost::make_shared< HardwareSim >( 7 );  // 仿真
+    boost::shared_ptr< HardwareInterface > hw = boost::make_shared< Hardware >( );  //真实机械臂
 
     Robot robot( hw );
 

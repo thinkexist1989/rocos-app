@@ -63,7 +63,7 @@ int main( int argc, char** argv )
 
 
     sleep( 1 ); 
-    sendline = std::string( "150#80#80" );
+    sendline = std::string( "100#120#80" );
     if ( send( my_server, sendline.c_str( ), sendline.length( ), 0 ) < 0 )
     {
         printf( "send msg error: %s(errno: %d)\n", strerror( errno ), errno );

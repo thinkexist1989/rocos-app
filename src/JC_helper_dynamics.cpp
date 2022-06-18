@@ -494,7 +494,7 @@ namespace JC_helper
             //** 速度保护**//
             for ( int i = 0; i < _joint_num; i++ )
             {
-                if ( abs( _q_target( i ) - _q_init( i ) ) > 0.1 )
+                if ( abs( _q_target( i ) - _q_init( i ) ) > 0.1 )//临时修改 速度可能过大
                 {
                     PLOG_ERROR << "joint[" << i << "] speep is too  fast";
                     PLOG_ERROR << "target speed = " << abs( _q_target( i ) - _q_init( i ) )
