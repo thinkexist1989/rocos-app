@@ -2599,10 +2599,10 @@ namespace JC_helper
             ruckig::Result res;
             int joint_index{ 0 };
 
-            if ( traj_joint_count > 100 )
-                joint_index = 100;
-            else if ( traj_joint_count > 40 )
-                joint_index = traj_joint_count - 1;
+            if ( traj_joint_count > 180 )
+                joint_index = 180;
+            // else if ( traj_joint_count > 40 )
+            //     joint_index = traj_joint_count - 1;
             else
                 joint_index = 0;
 
@@ -2610,12 +2610,40 @@ namespace JC_helper
             {
                 try
                 {
+
                     PLOG_ERROR << "traj_joint.size( )  = " << traj_joint.size( );
                     PLOG_ERROR << "joint_index = " << joint_index;
                     PLOG_ERROR << "traj_joint_count = " << traj_joint_count;
-                    KDL::JntArray current_pos{ traj_joint[ traj_joint_count - 1 ] };
-                    KDL::JntArray last_pos{ traj_joint[ traj_joint_count - ( joint_index / 2 ) - 1 ] };
-                    KDL::JntArray last_last_pos{ traj_joint[ traj_joint_count - joint_index - 1 ] };
+
+                    int step = ( joint_index / 3 );
+
+
+                    KDL::JntArray sum(_joint_num);
+                    for ( int i{ 0 }; i < step; i++ )
+                    {
+                        KDL::Add( sum, traj_joint[ traj_joint_count - 1 - i ], sum );
+                    }
+                    KDL::Divide( sum, step, sum );
+                    KDL::JntArray current_pos{ sum };
+
+
+                    sum = KDL::JntArray( _joint_num );
+                    for ( int i{ step }; i < ( 2*step ); i++ )
+                    {
+                        KDL::Add( sum, traj_joint[ traj_joint_count - 1 - i ], sum );
+                    }
+                    KDL::Divide( sum, step, sum );
+                    KDL::JntArray last_pos{ sum };
+
+
+                    sum = KDL::JntArray( _joint_num );
+                    for ( int i{ 2*step }; i < ( 3 * step ); i++ )
+                    {
+                        KDL::Add( sum, traj_joint[ traj_joint_count - 1 - i ], sum );
+                    }
+                    KDL::Divide( sum, step, sum );
+                    KDL::JntArray last_last_pos{ sum };
+
 
                     KDL::JntArray current_vel( _joint_num );
                     KDL::JntArray last_vel( _joint_num );
@@ -2625,13 +2653,13 @@ namespace JC_helper
                     // print_JntArray( "last_last_pos", last_last_pos );
                     // print_JntArray( "last_pos", last_pos );
                     // print_JntArray( "current_pos", current_pos );
-                    KDL::Divide( current_vel, joint_index * 0.001 / 2, current_vel );
+                    KDL::Divide( current_vel, step*0.001, current_vel );
 
                     KDL::Subtract( last_pos, last_last_pos, last_vel );
-                    KDL::Divide( last_vel, joint_index * 0.001 / 2, last_vel );
+                    KDL::Divide( last_vel, step*0.001, last_vel );
 
                     KDL::Subtract( current_vel, last_vel, current_acc );
-                    KDL::Divide( current_acc, joint_index * 0.001 / 2, current_acc );
+                    KDL::Divide( current_acc, step*0.001, current_acc );
 
                     input.control_interface = ruckig::ControlInterface::Velocity;
                     input.synchronization   = ruckig::Synchronization::None;
@@ -2642,8 +2670,8 @@ namespace JC_helper
                         //防止速度和加速度估计不准
                         //速度不可能超过50度
                         //加速度不可能超过80度
-                        input.current_velocity[ i ]     = KDL::sign( current_vel( i ) ) * std::min( abs( current_vel( i ) ), 30*M_PI/180);//临时修改   按照Rviz 40%笛卡尔速度选取最大值，后面要改回来
-                        input.current_acceleration[ i ] = KDL::sign( current_acc( i ) ) * std::min( abs( current_acc( i ) ), 50*M_PI/180);//临时修改   按照Rviz 40%笛卡尔加速度选取最大值，后面要改回来
+                        input.current_velocity[ i ]     = KDL::sign( current_vel( i ) ) * std::min( abs( current_vel( i ) ), 1e10*M_PI/180);//临时修改   按照Rviz 40%笛卡尔速度选取最大值，后面要改回来
+                        input.current_acceleration[ i ] = KDL::sign( current_acc( i ) ) * std::min( abs( current_acc( i ) ), 1e10*M_PI/180);//临时修改   按照Rviz 40%笛卡尔加速度选取最大值，后面要改回来
 
                         printf( "pos(%d)=  %f, vel(%d)= %f , last vel(%d)= %f , acc(%d)= %f \n", i, input.current_position[ i ] * 180 / M_PI, i, input.current_velocity[ i ] * 180 / M_PI, i, last_vel( i ) * 180 / M_PI, i, input.current_acceleration[ i ] * 180 / M_PI );
 
@@ -2668,6 +2696,16 @@ namespace JC_helper
                         output.pass_to_input( input );
                         robot_ptr->hw_interface_->waitForSignal( 0 );
                     }
+
+                    if(res != ruckig::Result::Finished)
+                    {
+                        PLOG_ERROR << "OTG 计算失败,直接停止";
+                        for ( int i = 0; i < _joint_num; ++i )
+                        {
+                            robot_ptr->joints_[ i ]->setPosition( robot_ptr->pos_[ i ] );
+                        }
+                    }
+
                 }
                 catch ( const std::exception& e )
                 {
