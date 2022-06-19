@@ -304,6 +304,8 @@ namespace JC_helper
         KDL::Twist admittance_vel;
         KDL::JntArray joints_vel( _joint_num );
 
+        KDL::ChainJntToJacSolver jnt2jac{ robot_ptr->kinematics_.getChain( ) };
+        KDL::Jacobian jac{ _joint_num };
         //**-------------------------------**//
 
         //** 程序初始化 **//
@@ -318,7 +320,7 @@ namespace JC_helper
 
         //** 轨迹计算 **//
 
-            max_count = numeric_limits< int_least64_t >::max( );
+        max_count = numeric_limits< int_least64_t >::max( );
 
 
         int traj_count{ 0 };
@@ -331,7 +333,7 @@ namespace JC_helper
             smd.calculate( frame_offset, admittance_vel );
 
             //** 读取最新Frame **//
-            frame_target = frame_offset * traj_target;  //示教模式
+            // frame_target = frame_offset * traj_target;  //示教模式
             //**-------------------------------**//
 
             //** IK求解 **//
@@ -351,10 +353,21 @@ namespace JC_helper
             KDL::Add( _q_init, joints_vel, _q_target );
             //**-------------------------------**//
 
+            //** 避开奇异点 **//
+            jnt2jac.JntToJac( _q_target, jac );
+            if ( abs( jac.data.determinant( ) ) < 0.003 )
+            {
+                PLOG_ERROR << "target is a singular point";
+                on_stop_trajectory = true;
+                break;
+            }
+
+            //**-------------------------------**//
+
             //** 速度保护**//
             for ( int i = 0; i < _joint_num; i++ )
             {
-                if ( abs( _q_target( i ) - _q_init( i ) ) > 0.1 )
+                if ( abs( _q_target( i ) - _q_init( i ) ) > 0.1 )//临时修改,示教模式
                 {
                     PLOG_ERROR << "joint[" << i << "] speep is too  fast";
                     PLOG_ERROR << "target speed = " << abs( _q_target( i ) - _q_init( i ) )
@@ -419,6 +432,8 @@ namespace JC_helper
         KDL::Twist traj_vel;
         KDL::Twist Cartesian_vel;
 
+        KDL::ChainJntToJacSolver jnt2jac{ robot_ptr->kinematics_.getChain( ) };
+        KDL::Jacobian jac{ _joint_num };
         //**-------------------------------**//
 
         //** 程序初始化 **//
@@ -460,7 +475,7 @@ namespace JC_helper
 
             //** 读取最新Frame **//
           
-                frame_intep = frame_offset * traj_target[ traj_count ];  //导纳控制模式
+                // frame_intep = frame_offset * traj_target[ traj_count ];  //导纳控制模式
 
             //**-------------------------------**//
 
@@ -476,12 +491,12 @@ namespace JC_helper
             //**-------------------------------**//
 
             //** 笛卡尔速度求解 **//
-                if ( moveL_vel( traj_vel, traj_count * 0.001, traj_target.front( ), traj_target.back( ) ,max_path_v,max_path_a) < 0 )
-                {
-                    PLOG_ERROR << "笛卡尔速度转关节速度失败";
-                    on_stop_trajectory = true;
-                    break;
-                }
+            if ( moveL_vel( traj_vel, traj_count * 0.001, traj_target.front( ), traj_target.back( ), max_path_v, max_path_a ) < 0 )
+            {
+                PLOG_ERROR << "笛卡尔速度转关节速度失败";
+                on_stop_trajectory = true;
+                break;
+            }
 
             Cartesian_vel.vel = traj_vel.vel + admittance_vel.vel;
             Cartesian_vel.rot = traj_vel.rot + admittance_vel.rot;
@@ -489,6 +504,17 @@ namespace JC_helper
             _ik_vel.CartToJnt( _q_init, Cartesian_vel, joints_vel );
             KDL::Multiply( joints_vel, 0.001, joints_vel );
             KDL::Add( _q_init, joints_vel, _q_target );
+            //**-------------------------------**//
+
+            //** 避开奇异点 **//
+            jnt2jac.JntToJac( _q_target, jac );
+            if ( abs( jac.data.determinant( ) ) < 0.003 )
+            {
+                PLOG_ERROR << "target is a singular point";
+                on_stop_trajectory = true;
+                break;
+            }
+
             //**-------------------------------**//
 
             //** 速度保护**//

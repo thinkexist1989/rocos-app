@@ -16,6 +16,7 @@
 #include <ruckig/ruckig.hpp>
 #include <vector>
 #include <fstream>
+#include <Eigen/Geometry>
 
 #define RESET "\033[0m"
 

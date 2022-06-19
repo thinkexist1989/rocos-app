@@ -2058,8 +2058,10 @@ namespace JC_helper
         KDL::Frame frame_target;
         int count = 0;
         KDL::JntArray _q_target( _joint_num );
-
         std::vector< double > max_step;
+
+        KDL::ChainJntToJacSolver jnt2jac{ robot_ptr->kinematics_.getChain( ) };
+        KDL::Jacobian jac{ _joint_num };
         //**-------------------------------**//
 
         for ( int i = 0; i < _joint_num; i++ )
@@ -2104,6 +2106,16 @@ namespace JC_helper
 
             //**-------------------------------**//
 
+            //** 避开奇异点 **//
+            jnt2jac.JntToJac( _q_target, jac );
+            if ( abs( jac.data.determinant( ) ) < 0.003 )
+            {
+                PLOG_ERROR << "target is a singular point";
+                on_stop_trajectory = true;
+                break;
+            }
+
+            //**-------------------------------**//
             //** 速度保护 **//
             for ( int i = 0; i < _joint_num; i++ )
             {
@@ -2203,7 +2215,6 @@ namespace JC_helper
         if ( on_stop_trajectory )
         {
             PLOG_ERROR << "motion触发紧急停止";
-            // //!紧急停止措施，对于仿真是立刻停止，实物才能看到效果
             motion_stop( robot_ptr, std::ref(traj_joint), traj_joint_count);
             // //! 触发急停后就冷静3秒，防止手一直按着触发急停
             std::this_thread::sleep_for( std::chrono::duration< double >{ 2 } );
@@ -2598,13 +2609,24 @@ namespace JC_helper
             ruckig::OutputParameter< _joint_num > output;
             ruckig::Result res;
             int joint_index{ 0 };
+            KDL::ChainJntToJacSolver jnt2jac{robot_ptr->kinematics_.getChain()};
+            KDL::Jacobian jac{ _joint_num };
+            jnt2jac.JntToJac( traj_joint[ traj_joint_count - 1 ], jac );
 
-            if ( traj_joint_count > 180 )
-                joint_index = 180;
+            if ( abs( jac.data.determinant( ) ) < 0.003 )
+            {
+                PLOG_ERROR << "接近奇异点，直接停止";
+                joint_index = 0;
+            }
+           else if ( traj_joint_count > 50 )
+                joint_index = 50;
             // else if ( traj_joint_count > 40 )
             //     joint_index = traj_joint_count - 1;
-            else
-                joint_index = 0;
+           else
+           {
+               joint_index = 0;
+               PLOG_ERROR << "traj_joint 路径点太少，直接停止";
+           }
 
             if ( joint_index )
             {
@@ -2726,7 +2748,6 @@ namespace JC_helper
             }
             else
             {
-                PLOG_DEBUG << "traj_joint 路径点太少，直接停止";
                 for ( int i = 0; i < _joint_num; ++i )
                 {
                     robot_ptr->joints_[ i ]->setPosition( robot_ptr->pos_[ i ] );

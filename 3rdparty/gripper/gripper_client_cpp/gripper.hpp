@@ -49,6 +49,7 @@ public:
                 PLOG_ERROR.printf( "connect error: %s(errno: %d)\n", strerror( errno ), errno );
                 return -1;
             }
+            PLOG_INFO<< "gripper init success";
             return 0;
         }
 
@@ -66,7 +67,7 @@ public:
         }
 
  
-    };  // namespace gripper
+    };  
 }  // namespace JC_helper
 
 #endif

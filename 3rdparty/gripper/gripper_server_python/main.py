@@ -19,7 +19,7 @@ my_server = 0
 def clean(): 
     global my_server
     my_server.close()  
-    sleep(3)
+    time.sleep(0.6)
 
 def tcpServer(var):
     global my_server
@@ -27,7 +27,6 @@ def tcpServer(var):
 
     host = "127.0.0.1"
     port = 5000
-    # print(var)
     s = socket.socket()
     s.bind((host, port))
     s.listen(10)  # 只能同时连接一个
@@ -78,10 +77,11 @@ def mainLoop(device):
 
 
 if __name__ == '__main__':
-    
+    print("gripper 启动")
     _thread.start_new_thread(tcpServer, ("TCP",))
-    mainLoop("/dev/ttyUSB0")
+    mainLoop("/dev/serial_gripper")
+    print("gripper 结束")
     flag_turnoff= True
     my_server.close()
     my_server.clean()
-    sleep(3)
+    time.sleep(0.6)
