@@ -1581,7 +1581,7 @@ namespace rocos {
             return -1;
         }
 
-        admittance_control.smd.set_k( 0 );//临时修改,为了拖动
+        // admittance_control.smd.set_k( 0 );//临时修改,为了拖动
 
         std::shared_ptr< std::thread > _thread_ft_sensor{ nullptr };
         _thread_ft_sensor.reset( new std::thread{ &JC_helper::admittance::sensor_update, &admittance_control, this } );

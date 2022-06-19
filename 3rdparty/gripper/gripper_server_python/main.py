@@ -19,6 +19,7 @@ my_server = 0
 def clean(): 
     global my_server
     my_server.close()  
+    sleep(3)
 
 def tcpServer(var):
     global my_server
@@ -77,7 +78,10 @@ def mainLoop(device):
 
 
 if __name__ == '__main__':
+    
     _thread.start_new_thread(tcpServer, ("TCP",))
     mainLoop("/dev/ttyUSB0")
     flag_turnoff= True
     my_server.close()
+    my_server.clean()
+    sleep(3)

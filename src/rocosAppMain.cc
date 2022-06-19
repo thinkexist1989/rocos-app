@@ -582,7 +582,7 @@ namespace rocos
      * @brief 字符切割
      *
      * @param str 源字符串
-     * @param tokens 结果保持
+     * @param tokens 结果存储
      * @param delim 切割字符
      * @example 1,2,3-> [1] [2] [3]
      */
@@ -664,6 +664,9 @@ namespace rocos
     /**
      * @brief csv文件解析，解析格式：rem#movej#vel#acc 或者 rem#gripper#pos
      *
+     * @param path csv文件绝对路径
+     * @param max_size csv一行最大字符
+     * @return int
      */
     int Robot::csv_parse( const char* path, size_t max_size )
     {
@@ -680,12 +683,15 @@ namespace rocos
         char tem[ max_size ];               //存储单行
         std::vector< std::string > tokens;  //存储单行分解后的结果
         KDL::JntArray q_target( 7 );
-        int index{ 1 };
+        int index{ 1 };  //指示当前正在执行的文件
+        bool flag_invalid_status{ false };
 
         while ( input_csv.getline( tem, max_size ) )  //直接读取一行，以\n结束
         {
+            if ( strcmp( tem, "" ) == 0 ) continue;  //!跳过csv文件\n行
+
             split( tem, tokens, "," );
-            if ( tokens[ 0 ].find("movej")!=std::string::npos )
+            if ( tokens[ 0 ].find( "movej" ) != std::string::npos )
             {
                 for ( int i{ 0 }; i < 7; i++ )
                 {
@@ -695,11 +701,12 @@ namespace rocos
                 if ( MoveJ( q_target, std::stod( tokens[ 1 ] ), std::stod( tokens[ 2 ] ), 0, 0, false ) < 0 )
                 {
                     PLOG_ERROR << "第" + std::to_string( index ) + "行指令执行失败";
-                    return -1;
+                    flag_invalid_status = true;
+                    break;
                 }
                 index++;
             }
-            else if (  tokens[ 0 ].find("movel")!=std::string::npos )
+            else if ( tokens[ 0 ].find( "movel" ) != std::string::npos )
             {
                 double xyz[ 3 ];
                 double rpy[ 3 ];
@@ -712,11 +719,12 @@ namespace rocos
                 if ( MoveL( frame_target, std::stod( tokens[ 1 ] ), std::stod( tokens[ 2 ] ), 0, 0, false ) < 0 )
                 {
                     PLOG_ERROR << "第" + std::to_string( index ) + "行指令执行失败";
-                    return -1;
+                    flag_invalid_status = true;
+                    break;
                 }
                 index++;
             }
-            else if (  tokens[ 0 ].find("gripper")!=std::string::npos )
+            else if ( tokens[ 0 ].find( "gripper" ) != std::string::npos )
             {
                 my_gripper.send_command( tokens[ 1 ] + "#80#120" );
                 index++;
@@ -724,13 +732,23 @@ namespace rocos
             else
             {
                 PLOG_ERROR << "未知类型 :" << tokens[ 0 ];
-                return -1;
+                flag_invalid_status = true;
+                break;
             }
         }
 
         input_csv.close( );
-        PLOG_INFO << "csv文件执行完毕";
-        return 0;
+
+        if ( flag_invalid_status )
+        {
+            PLOG_ERROR << "csv文件执行失败";
+            return -1;
+        }
+        else
+        {
+            PLOG_INFO << "csv文件执行成功";
+            return 0;
+        }
     }
 
     void Robot::test( )
@@ -766,216 +784,271 @@ namespace rocos
         if ( str == std::string_view{ "run" } )
         {
             //** 开启记录 **//
-            bool flag_turnoff{ false };
-            std::thread thread_pos_bag{ &rocos::Robot::csv_record, this, &flag_turnoff };
-
+            bool flag_record_turnoff{ false };
+            std::thread thread_pos_bag{ &rocos::Robot::csv_record, this, &flag_record_turnoff };
             //**-------------------------------**//
 
             KDL::JntArray q_target( 7 );
             std::ifstream button_knob_csv{ };  //真实飞机舱里三种按键测试
             std::vector< std::string > tokens;
             KDL::Frame frame_init;
+            bool flag_csv_turnoff{ false };
 #if 0
 #    pragma region  //* 第一个按键
+      
 
-            my_gripper.send_command( "255#80#120" );
-
-            //** 读取文件的全部关节值，并执行 **//
-            button_knob_csv.open( "/home/think/rocos-app/debug/demo_1.csv" );
-
-            while ( button_knob_csv >> str )  //遇见/t,/n,空格停下
+            if ( flag_csv_turnoff || csv_parse( "/home/think/rocos-app/debug/demo_1_new.csv" ) < 0 )
             {
-                split( str, tokens, "," );
-
-                for ( int i{ 0 }; i < 7; i++ )
-                {
-                    q_target( i ) = ( std::stod( tokens[ i ] ) );
-                }
-
-                MoveJ( q_target, 0.2, 0.5, 0, 0, false );
+                PLOG_ERROR << "csv脚本执行失败";
+                flag_csv_turnoff = true;
             }
 
-            button_knob_csv.close( );
-
-            //**-------------------------------**//
-
-            //** 导纳调试 **//
-            frame_init = flange_;
-            MoveL(frame_init * KDL::Frame{ KDL::Vector{ 0, 0, 0.0085 } }, 0.0022, 0.1 , 0, 0, false );
-            // admittance_link( frame_init * KDL::Frame{ KDL::Vector{ 0, 0, 0.008 } }, 0.0022, 0.1 );
-            // admittance_teaching();
-            //**-------------------------------**//
-
-            // //** 导纳调试 **//
-            frame_init = flange_;
-            MoveL( frame_init * KDL::Frame{ KDL::Vector{ 0, 0, -0.0085 } }, 0.0022, 0.1, 0, 0, false );
-            // admittance_link( frame_init * KDL::Frame{ KDL::Vector{ 0, 0, -0.008 } }, 0.0022, 0.1 );
-            // //**-------------------------------**//
-
-            // //** 读取文件的全部关节值，并执行 **//
-            button_knob_csv.open( "/home/think/rocos-app/debug/demo_1_inverset.csv" );
-
-            while ( button_knob_csv >> str )  //遇见/t,/n,空格停下
+            if ( flag_csv_turnoff || csv_parse( "/home/think/rocos-app/debug/demo_1_new_inverst.csv" ) < 0 )
             {
-                split( str, tokens, "," );
-
-                for ( int i{ 0 }; i < 7; i++ )
-                {
-                    q_target( i ) = ( std::stod( tokens[ i ] ) );
-                }
-
-                MoveJ( q_target, 0.2, 0.5, 0, 0, false );
+                PLOG_ERROR << "csv脚本执行失败";
+                flag_csv_turnoff = true;
             }
-
-            button_knob_csv.close( );
-
-            // //**-------------------------------**//
 
 #    pragma endregion
 
 #    pragma region  //*第二个按键
-            my_gripper.send_command( "150#80#120" );
 
             // //** 读取文件的全部关节值，并执行 **//
             button_knob_csv.open( "/home/think/rocos-app/debug/demo_2.csv" );
 
-            while ( button_knob_csv >> str )  //遇见/t,/n,空格停下
+            if ( flag_csv_turnoff || !button_knob_csv.is_open( ) )
             {
-                split( str, tokens, "," );
+                PLOG_ERROR << "csv脚本执行失败 ";
+                flag_csv_turnoff = true;
+            }
+            else
+            {
+                my_gripper.send_command( "150#80#120" );
 
-                for ( int i{ 0 }; i < 7; i++ )
+                while ( button_knob_csv >> str )  //遇见/t,/n,空格停下
                 {
-                    q_target( i ) = ( std::stod( tokens[ i ] ) );
+                    split( str, tokens, "," );
+
+                    for ( int i{ 0 }; i < 7; i++ )
+                    {
+                        q_target( i ) = ( std::stod( tokens[ i ] ) );
+                    }
+
+                    MoveJ( q_target, 0.2, 0.5, 0, 0, false );
                 }
 
-                MoveJ( q_target, 0.2, 0.5, 0, 0, false );
+                button_knob_csv.close( );
+
+                my_gripper.send_command( "210#80#120" );
+
+                my_gripper.send_command( "150#80#120" );
             }
-
-            button_knob_csv.close( );
-
             // //**-------------------------------**//
-
-            my_gripper.send_command( "210#80#120" );
-
-            my_gripper.send_command( "150#80#120" );
 
             // //** 读取文件的全部关节值，并执行 **//
             button_knob_csv.open( "/home/think/rocos-app/debug/demo_2_inverst.csv" );
 
-            while ( button_knob_csv >> str )  //遇见/t,/n,空格停下
+            if ( flag_csv_turnoff || !button_knob_csv.is_open( ) )
             {
-                split( str, tokens, "," );
-
-                for ( int i{ 0 }; i < 7; i++ )
+                PLOG_ERROR << "csv脚本执行失败 ";
+                flag_csv_turnoff = true;
+            }
+            else
+            {
+                while ( button_knob_csv >> str )  //遇见/t,/n,空格停下
                 {
-                    q_target( i ) = ( std::stod( tokens[ i ] ) );
+                    split( str, tokens, "," );
+
+                    for ( int i{ 0 }; i < 7; i++ )
+                    {
+                        q_target( i ) = ( std::stod( tokens[ i ] ) );
+                    }
+
+                    MoveJ( q_target, 0.2, 0.5, 0, 0, false );
                 }
 
-                MoveJ( q_target, 0.2, 0.5, 0, 0, false );
+                button_knob_csv.close( );
+
+                // //**-------------------------------**//
+                my_gripper.send_command( "255#80#120" );
             }
-
-            button_knob_csv.close( );
-
-            // //**-------------------------------**//
-            my_gripper.send_command( "255#80#120" );
 
 #    pragma endregion
 
 #    pragma region  //*第三个按键
 
-            my_gripper.send_command( "150#80#120" );
-
             //** 读取文件的全部关节值，并执行 **//
             button_knob_csv.open( "/home/think/rocos-app/debug/demo_3.csv" );
-            if ( !button_knob_csv.is_open( ) )
+
+            if ( flag_csv_turnoff || !button_knob_csv.is_open( ) )
             {
-                PLOG_ERROR << "demo_3.csv 文件打开失败 ";
-                return;
+                PLOG_ERROR << "csv脚本执行失败 ";
+                flag_csv_turnoff = true;
             }
-
-            while ( button_knob_csv >> str )  //遇见/t,/n,空格停下
+            else
             {
-                PLOG_DEBUG << str;
-                split( str, tokens, "," );
+                my_gripper.send_command( "150#80#120" );
 
-                for ( int i{ 0 }; i < 7; i++ )
+                while ( button_knob_csv >> str )  //遇见/t,/n,空格停下
                 {
-                    q_target( i ) = ( std::stod( tokens[ i ] ) );
+                    split( str, tokens, "," );
+
+                    for ( int i{ 0 }; i < 7; i++ )
+                    {
+                        q_target( i ) = ( std::stod( tokens[ i ] ) );
+                    }
+
+                    MoveJ( q_target, 0.1, 0.5, 0, 0, false );
                 }
 
-                MoveJ( q_target, 0.1, 0.5, 0, 0, false );
+                button_knob_csv.close( );
             }
-
-            button_knob_csv.close( );
-
             //**-------------------------------**//
 
-            MoveL( KDL::Frame{ KDL::Rotation::RPY( -2.96854, 0.145107, -3.03842 ), KDL::Vector{ 0.533036, -0.30144, 0.585725 } }, 0.0022, 0.1, 0, 0, false );
+            if ( !flag_csv_turnoff && MoveL( KDL::Frame{ KDL::Rotation::RPY( -2.96854, 0.145107, -3.03842 ), KDL::Vector{ 0.533036, -0.30144, 0.585725 } }, 0.0022, 0.1, 0, 0, false ) < 0 )
+            {
+                PLOG_ERROR << "csv脚本执行失败 ";
+                flag_csv_turnoff = true;
+            }
 
-            my_gripper.send_command( "180#80#120" );
-            sleep( 3 );
+            if ( !flag_csv_turnoff )
+            {
+                my_gripper.send_command( "180#80#120" );
+                sleep( 3 );
 
-            for ( int i{ 0 }; i < jnt_num_; i++ )
-                q_target( i ) = pos_[ i ];
+                for ( int i{ 0 }; i < jnt_num_; i++ )
+                    q_target( i ) = pos_[ i ];
 
-            q_target( 6 ) = 3.913 * M_PI / 180;
-            MoveJ( q_target, 0.05, 0.5, 0, 0, false );
+                q_target( 6 ) = 3.913 * M_PI / 180;
+                MoveJ( q_target, 0.05, 0.5, 0, 0, false );
 
-            q_target( 6 ) = 37.405 * M_PI / 180;
-            MoveJ( q_target, 0.05, 0.5, 0, 0, false );
+                q_target( 6 ) = 37.405 * M_PI / 180;
+                MoveJ( q_target, 0.05, 0.5, 0, 0, false );
 
-            q_target( 6 ) = 109.775 * M_PI / 180;
-            MoveJ( q_target, 0.05, 0.5, 0, 0, false );
+                q_target( 6 ) = 109.775 * M_PI / 180;
+                MoveJ( q_target, 0.05, 0.5, 0, 0, false );
 
+                my_gripper.send_command( "150#80#120" );
+            }
 
-
-            my_gripper.send_command( "150#80#120" );
-            
-            MoveL( KDL::Frame{flange_.M, KDL::Vector{ 0.528025, -0.296509, 0.616402 } }, 0.0022, 0.1, 0, 0, false );
+            if ( !flag_csv_turnoff && MoveL( KDL::Frame{ flange_.M, KDL::Vector{ 0.528025, -0.296509, 0.616402 } }, 0.0022, 0.1, 0, 0, false ) < 0 )
+            {
+                PLOG_ERROR << "csv脚本执行失败 ";
+                flag_csv_turnoff = true;
+            }
 
             //** 读取文件的全部关节值，并执行 **//
             button_knob_csv.open( "/home/think/rocos-app/debug/demo_3_inverst.csv" );
-            if ( !button_knob_csv.is_open( ) )
+
+            if ( flag_csv_turnoff || !button_knob_csv.is_open( ) )
             {
-                PLOG_ERROR << "demo_3.csv 文件打开失败 ";
-                return;
+                PLOG_ERROR << "csv脚本执行失败 ";
+                flag_csv_turnoff = true;
             }
-
-            while ( button_knob_csv >> str )  //遇见/t,/n,空格停下
+            else
             {
-                split( str, tokens, "," );
-
-                for ( int i{ 0 }; i < 7; i++ )
+                while ( button_knob_csv >> str )  //遇见/t,/n,空格停下
                 {
-                    q_target( i ) = ( std::stod( tokens[ i ] ) );
+                    split( str, tokens, "," );
+
+                    for ( int i{ 0 }; i < 7; i++ )
+                    {
+                        q_target( i ) = ( std::stod( tokens[ i ] ) );
+                    }
+
+                    MoveJ( q_target, 0.1, 0.5, 0, 0, false );
                 }
 
-                MoveJ( q_target, 0.1, 0.5, 0, 0, false );
+                button_knob_csv.close( );
             }
-
-            button_knob_csv.close( );
-
             //**-------------------------------**//
 
 #    pragma endregion
 
-//** 第四个按键 **//
-           csv_parse( "/home/think/rocos-app/debug/demo_4.csv" );
-           csv_parse( "/home/think/rocos-app/debug/demo_4_inverst.csv" );
-//**-------------------------------**//
+            //** 第四个按键 **//
+            if ( flag_csv_turnoff || csv_parse( "/home/think/rocos-app/debug/demo_4.csv" ) < 0 )
+            {
+                PLOG_ERROR << "csv脚本执行失败";
+                flag_csv_turnoff = true;
+            }
 
+            if ( flag_csv_turnoff || csv_parse( "/home/think/rocos-app/debug/demo_4_inverst.csv" ) < 0 )
+            {
+                PLOG_ERROR << "csv脚本执行失败";
+                flag_csv_turnoff = true;
+            }
+
+            //**-------------------------------**//
+
+            //** 第5个按键 **//
+            if ( flag_csv_turnoff || csv_parse( "/home/think/rocos-app/debug/demo_5.csv" ) < 0 )
+            {
+                PLOG_ERROR << "csv脚本执行失败";
+                flag_csv_turnoff = true;
+            }
+
+            if ( flag_csv_turnoff || csv_parse( "/home/think/rocos-app/debug/demo_5_inverst.csv" ) < 0 )
+            {
+                PLOG_ERROR << "csv脚本执行失败";
+                flag_csv_turnoff = true;
+            }
+            //**-------------------------------**//
+
+
+
+            //** 第6个按键 **//
+
+            if ( flag_csv_turnoff || csv_parse( "/home/think/rocos-app/debug/demo_6.csv" ) < 0 )
+            {
+                PLOG_ERROR << "csv脚本执行失败";
+                flag_csv_turnoff = true;
+            }
+
+            if ( flag_csv_turnoff || csv_parse( "/home/think/rocos-app/debug/demo_6_inverst.csv" ) < 0 )
+            {
+                PLOG_ERROR << "csv脚本执行失败";
+                flag_csv_turnoff = true;
+            }
+            //**-------------------------------**//
+
+#    pragma region  //* 第7个按键
+      
+
+            if ( flag_csv_turnoff || csv_parse( "/home/think/rocos-app/debug/demo_7.csv" ) < 0 )
+            {
+                PLOG_ERROR << "csv脚本执行失败";
+                flag_csv_turnoff = true;
+            }
+
+            if ( flag_csv_turnoff || csv_parse( "/home/think/rocos-app/debug/demo_7_inverst.csv" ) < 0 )
+            {
+                PLOG_ERROR << "csv脚本执行失败";
+                flag_csv_turnoff = true;
+            }
+
+#    pragma endregion
+
+#    pragma region  //* 第8个按键
+      
+
+            if ( flag_csv_turnoff || csv_parse( "/home/think/rocos-app/debug/demo_8.csv" ) < 0 )
+            {
+                PLOG_ERROR << "csv脚本执行失败";
+                flag_csv_turnoff = true;
+            }
+
+            if ( flag_csv_turnoff || csv_parse( "/home/think/rocos-app/debug/demo_8_inverst.csv" ) < 0 )
+            {
+                PLOG_ERROR << "csv脚本执行失败";
+                flag_csv_turnoff = true;
+            }
+
+#    pragma endregion
 #endif
-//** 第5个按键 **//
-        //    csv_parse( "/home/think/rocos-app/debug/demo_5.csv" );
-        //    csv_parse( "/home/think/rocos-app/debug/demo_5_inverst.csv" );
-//**-------------------------------**//
-
-//** 第6个按键 **//
+            admittance_teaching();
 
 
-//**-------------------------------**//
-
-            flag_turnoff = false;
+            // flag_record_turnoff = true;
             thread_pos_bag.join( );
         }
 
