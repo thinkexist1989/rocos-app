@@ -794,9 +794,9 @@ namespace rocos
         if ( str == std::string_view{ "run" } )
         {
             //** 开启记录线程 **//
-            bool flag_record_turnoff{ false };
-            std::thread thread_pos_bag{ &rocos::Robot::csv_record, this, &flag_record_turnoff };
-            thread_pos_bag.detach();
+            // bool flag_record_turnoff{ false };
+            // std::thread thread_pos_bag{ &rocos::Robot::csv_record, this, &flag_record_turnoff };
+            // thread_pos_bag.detach();
             //**-------------------------------**//
 
             //** 开启TCP线程 **//
@@ -950,13 +950,13 @@ namespace rocos
 
 #pragma region  //*校准测试
 
-            // if ( flag_csv_turnoff || csv_parse( "/home/think/rocos-app/debug/demo_1.csv" ) < 0 )
-            // {
-            //     PLOG_ERROR << "csv脚本执行失败";
-            //     flag_csv_turnoff = true;
-            // }
+            if ( flag_csv_turnoff || csv_parse( "/home/think/rocos-app/debug/demo_6.csv" ) < 0 )
+            {
+                PLOG_ERROR << "csv脚本执行失败";
+                flag_csv_turnoff = true;
+            }
 
-            // if ( flag_csv_turnoff || csv_parse( "/home/think/rocos-app/debug/demo_1_inverst.csv" ) < 0 )
+            // if ( flag_csv_turnoff || csv_parse( "/home/think/rocos-app/debug/demo_6_inverst.csv" ) < 0 )
             // {
             //     PLOG_ERROR << "csv脚本执行失败";
             //     flag_csv_turnoff = true;
