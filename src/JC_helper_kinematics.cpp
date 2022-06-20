@@ -2108,9 +2108,11 @@ namespace JC_helper
 
             //** 避开奇异点 **//
             jnt2jac.JntToJac( _q_target, jac );
-            if ( abs( jac.data.determinant( ) ) < 0.003 )
+            // if ( abs( jac.data.determinant( ) ) < 0.001 )//临时修改
+            if ( 0)//临时修改
             {
-                PLOG_ERROR << "target is a singular point";
+                PLOG_ERROR << "target is a singular point det = "<<abs( jac.data.determinant( ) ) ;
+
                 on_stop_trajectory = true;
                 break;
             }
@@ -2611,22 +2613,30 @@ namespace JC_helper
             int joint_index{ 0 };
             KDL::ChainJntToJacSolver jnt2jac{robot_ptr->kinematics_.getChain()};
             KDL::Jacobian jac{ _joint_num };
-            jnt2jac.JntToJac( traj_joint[ traj_joint_count - 1 ], jac );
 
-            if ( abs( jac.data.determinant( ) ) < 0.003 )
+            if ( traj_joint_count > 0 )
             {
-                PLOG_ERROR << "接近奇异点，直接停止";
-                joint_index = 0;
+                // PLOG_DEBUG<< traj_joint_count;
+                jnt2jac.JntToJac( traj_joint[ traj_joint_count - 1 ], jac );
+
+                // if ( abs( jac.data.determinant( ) ) < 0.001 )//临时修改
+                if ( 0)//临时修改
+                {
+                    PLOG_ERROR << "接近奇异点，直接停止";
+                    joint_index = 0;
+                }
+                else if ( traj_joint_count > 50 )
+                    joint_index = 50;
+                // else if ( traj_joint_count > 40 )
+                //     joint_index = traj_joint_count - 1;
+                else
+                {
+                    joint_index = 0;
+                    PLOG_ERROR << "traj_joint 路径点太少，直接停止";
+                }
             }
-           else if ( traj_joint_count > 50 )
-                joint_index = 50;
-            // else if ( traj_joint_count > 40 )
-            //     joint_index = traj_joint_count - 1;
-           else
-           {
-               joint_index = 0;
-               PLOG_ERROR << "traj_joint 路径点太少，直接停止";
-           }
+            else
+                joint_index = 0;
 
             if ( joint_index )
             {
@@ -2692,8 +2702,8 @@ namespace JC_helper
                         //防止速度和加速度估计不准
                         //速度不可能超过50度
                         //加速度不可能超过80度
-                        input.current_velocity[ i ]     = KDL::sign( current_vel( i ) ) * std::min( abs( current_vel( i ) ), 30*M_PI/180);//临时修改   按照Rviz 40%笛卡尔速度选取最大值，后面要改回来
-                        input.current_acceleration[ i ] = KDL::sign( current_acc( i ) ) * std::min( abs( current_acc( i ) ), 50*M_PI/180);//临时修改   按照Rviz 40%笛卡尔加速度选取最大值，后面要改回来
+                        input.current_velocity[ i ]     = KDL::sign( current_vel( i ) ) * std::min( abs( current_vel( i ) ), 20*M_PI/180);//临时修改   按照Rviz 40%笛卡尔速度选取最大值，后面要改回来
+                        input.current_acceleration[ i ] = KDL::sign( current_acc( i ) ) * std::min( abs( current_acc( i ) ), 40*M_PI/180);//临时修改   按照Rviz 40%笛卡尔加速度选取最大值，后面要改回来
 
                         printf( "pos(%d)=  %f, vel(%d)= %f , last vel(%d)= %f , acc(%d)= %f \n", i, input.current_position[ i ] * 180 / M_PI, i, input.current_velocity[ i ] * 180 / M_PI, i, last_vel( i ) * 180 / M_PI, i, input.current_acceleration[ i ] * 180 / M_PI );
 

@@ -30,7 +30,8 @@
 #include <boost/smart_ptr.hpp>
 #include <vector>
 #include <kdl_parser/kdl_parser.hpp> //!< 解析URDF文件
-#include <gripper_client_cpp/gripper.hpp>
+#include <gripper.hpp>
+#include <JC_helper_TCP.hpp>
 
 namespace rocos {
     //! Class Robot
@@ -595,6 +596,7 @@ namespace rocos {
     private:
             JC_helper::ft_sensor my_ft_sensor; //6维力传感器
             JC_helper::gripper my_gripper;
+            JC_helper::TCP_server my_server;
 
     };
 

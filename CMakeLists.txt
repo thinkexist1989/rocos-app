@@ -55,6 +55,7 @@ add_subdirectory(3rdparty/trac_ik)
 add_subdirectory(3rdparty/kdl_parser)
 add_subdirectory(3rdparty/ruckig)
 add_subdirectory(3rdparty/plog)
+add_subdirectory(3rdparty/gripper)
 
 
 ###########
@@ -65,7 +66,6 @@ include_directories(
         include
         include/${PROJECT_NAME}
         include/sdk
-        3rdparty/gripper/
 )
 
 link_directories(
@@ -150,6 +150,7 @@ target_link_libraries(robot
         rocos::drive
         rocos::kinematics
         plog::plog
+        JC_helper::gripper
         )
 add_library(rocos::robot ALIAS robot)
 

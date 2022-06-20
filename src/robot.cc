@@ -64,8 +64,9 @@ namespace rocos {
         plog::init(plog::debug, &consoleAppender); // Initialize the logger.
         startMotionThread( );
         std::this_thread::sleep_for( std::chrono::milliseconds( 1000 ) );
-        my_ft_sensor.init( flange_ );
-        my_gripper.init(  );
+        my_ft_sensor.init( flange_ );//6维力初始化
+        my_gripper.init(  );//夹抓初始化
+        my_server.init( );//TCP服务器初始化
     }
 
     bool Robot::parseUrdf(const string &urdf_file_path,

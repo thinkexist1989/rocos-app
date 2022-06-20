@@ -355,7 +355,7 @@ namespace JC_helper
 
             //** 避开奇异点 **//
             jnt2jac.JntToJac( _q_target, jac );
-            if ( abs( jac.data.determinant( ) ) < 0.003 )
+            if ( abs( jac.data.determinant( ) ) < 0.006 )//临时修改
             {
                 PLOG_ERROR << "target is a singular point";
                 on_stop_trajectory = true;
