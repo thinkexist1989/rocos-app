@@ -882,11 +882,7 @@ namespace rocos
                 flag_csv_turnoff = true;
             }
 
-            if ( flag_csv_turnoff || csv_parse( "/home/think/rocos-app/debug/demo_5_inverst.csv" ) < 0 )
-            {
-                PLOG_ERROR << "csv脚本执行失败";
-                flag_csv_turnoff = true;
-            }
+
 #    pragma endregion
 
 #    pragma region  //* 第6个按键
@@ -897,11 +893,7 @@ namespace rocos
                 flag_csv_turnoff = true;
             }
 
-            if ( flag_csv_turnoff || csv_parse( "/home/think/rocos-app/debug/demo_6_inverst.csv" ) < 0 )
-            {
-                PLOG_ERROR << "csv脚本执行失败";
-                flag_csv_turnoff = true;
-            }
+     
 #    pragma endregion
 
 #    pragma region  //* 第7个按键
@@ -950,17 +942,18 @@ namespace rocos
 
 #pragma region  //*校准测试
 
-            if ( flag_csv_turnoff || csv_parse( "/home/think/rocos-app/debug/demo_6.csv" ) < 0 )
+            if ( flag_csv_turnoff || csv_parse( "/home/think/rocos-app/debug/demo_process_1.csv" ) < 0 )
             {
                 PLOG_ERROR << "csv脚本执行失败";
                 flag_csv_turnoff = true;
             }
-
-            // if ( flag_csv_turnoff || csv_parse( "/home/think/rocos-app/debug/demo_6_inverst.csv" ) < 0 )
+            // if ( flag_csv_turnoff || csv_parse( "/home/think/rocos-app/debug/demo_8_inverst.csv" ) < 0 )
             // {
             //     PLOG_ERROR << "csv脚本执行失败";
             //     flag_csv_turnoff = true;
             // }
+
+    
 
 #pragma endregion
 
