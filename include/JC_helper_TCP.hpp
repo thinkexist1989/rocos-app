@@ -27,6 +27,7 @@
 #include <sys/socket.h>
 #include <sys/types.h>
 #include <unistd.h>
+#include <atomic>
 
 namespace JC_helper
 {
@@ -35,10 +36,10 @@ namespace JC_helper
     private:
         int listenfd, connfd;         //监听的句柄、客户端的句柄
         struct sockaddr_in servaddr;  // IP地址
-        int count = 0;                //统计发送的次数
+        bool flag_init{false};                //初始化成功标志
 
     public:
-        bool flag_receive{ false };
+        std::atomic< bool > flag_receive{ false };
         std::vector< char > send_buf;  //发送buffer
         std::vector< char > receive_buff;
 
@@ -53,11 +54,13 @@ namespace JC_helper
             close( listenfd );
         }
 
-        int init( int port = 6000 )
+        int init( int port = 12345 )
         {
+            flag_init =false;
+
             memset( &servaddr, 0, sizeof( servaddr ) );
             servaddr.sin_family      = AF_INET;
-            servaddr.sin_addr.s_addr = htonl( INADDR_ANY );  //服务器ip就是自己
+            servaddr.sin_addr.s_addr = htonl( INADDR_ANY );  //监听全部ip
             servaddr.sin_port        = htons( port );        //监听端口号
 
             if ( ( listenfd = socket( AF_INET, SOCK_STREAM, 0 ) ) == -1 )
@@ -78,14 +81,15 @@ namespace JC_helper
                 return -1;
             }
             PLOG_INFO << "TCP init success";
+            flag_init =true;
             return 0;
         }
 
         int RunServer( )
         {
-            while ( 1 )  //!不断连接新client
+            while ( flag_init )  //!不断连接新client
             {
-                PLOG_INFO.printf( "======waiting for client's request======\n" );
+                PLOG_INFO.printf( "======waiting for client's request======" );
 
                 if ( ( connfd = accept( listenfd, ( struct sockaddr* )NULL, NULL ) ) == -1 )
                 {
@@ -94,6 +98,7 @@ namespace JC_helper
                 }
 
                 //!接入一个客户端
+                PLOG_INFO << "client 连接成功,id = " << connfd;
 
                 while ( 1 )  //不断接收client的消息，直至client主动断开连接
                 {
@@ -106,8 +111,8 @@ namespace JC_helper
                         receive_buff[ recv_num ] = '\0';
                         flag_receive             = true;
 
-                        sprintf( &send_buf[ 0 ], "i am server at %d times", count++ );               //反馈消息给客户端
-                        int send_len = send( connfd, &send_buf[ 0 ], strlen( &send_buf[ 0 ] ), 0 );  //反馈消息给客户端
+                        // sprintf( &send_buf[ 0 ], "i am server at %d times", count++ );               //反馈消息给客户端
+                        // int send_len = send( connfd, &send_buf[ 0 ], strlen( &send_buf[ 0 ] ), 0 );  //反馈消息给客户端
                     }
                     else
                     {

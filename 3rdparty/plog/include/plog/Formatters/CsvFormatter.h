@@ -54,4 +54,42 @@ namespace plog
 
     class CsvFormatter : public CsvFormatterImpl<false> {};
     class CsvFormatterUtcTime : public CsvFormatterImpl<true> {};
+    class JC_CsvFormatter : public CsvFormatterImpl< false >
+    {
+    public:
+        static util::nstring header( )
+        {
+            return PLOG_NSTR( "file;index;joint_0;joint_1;joint_2;joint_3;joint_4;joint_5;joint_6\n" );
+        }
+
+        static util::nstring format( const Record& record )
+        {
+        
+            util::nostringstream ss;
+
+            util::nstring message = record.getMessage( );
+
+            if ( message.size( ) > kMaxMessageSize )
+            {
+                message.resize( kMaxMessageSize );
+                message.append( PLOG_NSTR( "..." ) );
+            }
+
+            util::nistringstream split( message );
+            util::nstring token;
+
+            while ( !split.eof( ) )
+            {
+                std::getline( split, token, PLOG_NSTR( '"' ) );
+                ss  << token ;
+            }
+
+            // ss << PLOG_NSTR( "\n" );
+
+            return ss.str( );
+        }
+
+        static const size_t kMaxMessageSize = 32000;
+    };
+
 }

@@ -49,6 +49,10 @@ public:
                 PLOG_ERROR.printf( "connect error: %s(errno: %d)\n", strerror( errno ), errno );
                 return -1;
             }
+
+            if ( send_command( "150#80#120" ) < 0 )
+                return -1;
+
             PLOG_INFO<< "gripper init success";
             return 0;
         }

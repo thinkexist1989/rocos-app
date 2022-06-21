@@ -60,13 +60,29 @@ namespace rocos {
             }
         }
 //        kinematics_.initTechServo();
-        static plog::ColorConsoleAppender<plog::TxtFormatter> consoleAppender;
-        plog::init(plog::debug, &consoleAppender); // Initialize the logger.
+
+        static plog::ColorConsoleAppender< plog::TxtFormatter > consoleAppender;
+        plog::init< 0 >( plog::debug, &consoleAppender );//终端显示                                                                      // Initialize the logger.
+
+        //** 文件过大时，清空此文件的内容 **//
+        std::ofstream file_handle;
+        file_handle.open( "/home/think/rocos-app/debug/command_log.csv", std::ios_base::app );
+        file_handle.seekp( 0, file_handle.end );
+        size_t srcSize = file_handle.tellp( );
+        file_handle.close( );
+
+        if(srcSize>1073741824)
+        {
+            PLOG_DEBUG<<"command_log.csv 文件大小超过1GB,自动清除内容";
+            file_handle.open( "/home/think/rocos-app/debug/command_log.csv", std::ios_base::trunc );
+            file_handle.close( );
+        }
+        //**-------------------------------**//
+
+        static plog::RollingFileAppender< plog::JC_CsvFormatter > fileAppender( "/home/think/rocos-app/debug/command_log.csv",1073741824, 0 );  // 日记文件,最大一个文件，无限制大小
+        plog::init< 1 >( plog::debug, &fileAppender );           //输出到文件
+                                                                        
         startMotionThread( );
-        std::this_thread::sleep_for( std::chrono::milliseconds( 1000 ) );
-        my_ft_sensor.init( flange_ );//6维力初始化
-        my_gripper.init(  );//夹抓初始化
-        my_server.init( );//TCP服务器初始化
     }
 
     bool Robot::parseUrdf(const string &urdf_file_path,

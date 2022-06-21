@@ -105,7 +105,7 @@ namespace JC_helper
         for ( int i{ 0 }; i < _joint_num; i++ )
             B[ i ] = 2 * damp * sqrt( M[ i ] * K[ i ] );
 
-        out_dat.open( "/home/think/rocos-app/debug/admittance.csv" );
+        // out_dat.open( "/home/think/rocos-app/debug/admittance.csv" );
     }
 
     spring_mass_dump::~spring_mass_dump( )

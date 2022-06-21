@@ -573,8 +573,8 @@ namespace rocos
 
 #pragma endregion
 
-#pragma region  //*测试7 验收测试
-
+#pragma region  //*测试7 8个按钮标定
+#if 0
 namespace rocos
 {
 
@@ -765,7 +765,7 @@ namespace rocos
     {
         std::string str{ "" };
 
-        //** 电机使能检查 **//
+#    pragma region  //*电机使能检查
         PLOG_INFO << "电机使能检查";
 
         for ( int i{ 0 }; i < jnt_num_; i++ )
@@ -786,7 +786,7 @@ namespace rocos
         }
 
         setEnabled( );
-        //**-------------------------------**//
+#    pragma endregion
 
         PLOG_INFO << "当前环境是否安全,如果是,输入run开始执行程序";
         std::cin >> str;
@@ -811,8 +811,8 @@ namespace rocos
 
             //**-------------------------------**//
 
-#if 0
-#    pragma region  //*第一个按键
+#    if 0
+#        pragma region  //*第一个按键
 
             if ( flag_csv_turnoff || csv_parse( "/home/think/rocos-app/debug/demo_1.csv" ) < 0 )
             {
@@ -820,30 +820,18 @@ namespace rocos
                 flag_csv_turnoff = true;
             }
 
-            if ( flag_csv_turnoff || csv_parse( "/home/think/rocos-app/debug/demo_1_inverst.csv" ) < 0 )
-            {
-                PLOG_ERROR << "csv脚本执行失败";
-                flag_csv_turnoff = true;
-            }
+#        pragma endregion
 
-#    pragma endregion
-
-#    pragma region  //*第二个按键
+#        pragma region  //*第二个按键
             if ( flag_csv_turnoff || csv_parse( "/home/think/rocos-app/debug/demo_2.csv" ) < 0 )
             {
                 PLOG_ERROR << "csv脚本执行失败";
                 flag_csv_turnoff = true;
             }
 
-            if ( flag_csv_turnoff || csv_parse( "/home/think/rocos-app/debug/demo_2_inverst.csv" ) < 0 )
-            {
-                PLOG_ERROR << "csv脚本执行失败";
-                flag_csv_turnoff = true;
-            }
+#        pragma endregion
 
-#    pragma endregion
-
-#    pragma region  //*第三个按键
+#        pragma region  //*第三个按键
 
             if ( flag_csv_turnoff || csv_parse( "/home/think/rocos-app/debug/demo_3.csv" ) < 0 )
             {
@@ -851,15 +839,9 @@ namespace rocos
                 flag_csv_turnoff = true;
             }
 
-            if ( flag_csv_turnoff || csv_parse( "/home/think/rocos-app/debug/demo_3_inverst.csv" ) < 0 )
-            {
-                PLOG_ERROR << "csv脚本执行失败";
-                flag_csv_turnoff = true;
-            }
+#        pragma endregion
 
-#    pragma endregion
-
-#    pragma region  //*第4个按键
+#        pragma region  //*第4个按键
 
             if ( flag_csv_turnoff || csv_parse( "/home/think/rocos-app/debug/demo_4.csv" ) < 0 )
             {
@@ -867,14 +849,9 @@ namespace rocos
                 flag_csv_turnoff = true;
             }
 
-            if ( flag_csv_turnoff || csv_parse( "/home/think/rocos-app/debug/demo_4_inverst.csv" ) < 0 )
-            {
-                PLOG_ERROR << "csv脚本执行失败";
-                flag_csv_turnoff = true;
-            }
-#    pragma endregion
+#        pragma endregion
 
-#    pragma region  //*第5个按键
+#        pragma region  //*第5个按键
 
             if ( flag_csv_turnoff || csv_parse( "/home/think/rocos-app/debug/demo_5.csv" ) < 0 )
             {
@@ -882,10 +859,9 @@ namespace rocos
                 flag_csv_turnoff = true;
             }
 
+#        pragma endregion
 
-#    pragma endregion
-
-#    pragma region  //* 第6个按键
+#        pragma region  //* 第6个按键
 
             if ( flag_csv_turnoff || csv_parse( "/home/think/rocos-app/debug/demo_6.csv" ) < 0 )
             {
@@ -893,10 +869,9 @@ namespace rocos
                 flag_csv_turnoff = true;
             }
 
-     
-#    pragma endregion
+#        pragma endregion
 
-#    pragma region  //* 第7个按键
+#        pragma region  //* 第7个按键
 
             if ( flag_csv_turnoff || csv_parse( "/home/think/rocos-app/debug/demo_7.csv" ) < 0 )
             {
@@ -904,15 +879,9 @@ namespace rocos
                 flag_csv_turnoff = true;
             }
 
-            if ( flag_csv_turnoff || csv_parse( "/home/think/rocos-app/debug/demo_7_inverst.csv" ) < 0 )
-            {
-                PLOG_ERROR << "csv脚本执行失败";
-                flag_csv_turnoff = true;
-            }
+#        pragma endregion
 
-#    pragma endregion
-
-#    pragma region  //* 第8个按键
+#        pragma region  //* 第8个按键
 
             if ( flag_csv_turnoff || csv_parse( "/home/think/rocos-app/debug/demo_8.csv" ) < 0 )
             {
@@ -920,42 +889,19 @@ namespace rocos
                 flag_csv_turnoff = true;
             }
 
-            if ( flag_csv_turnoff || csv_parse( "/home/think/rocos-app/debug/demo_8_inverst.csv" ) < 0 )
-            {
-                PLOG_ERROR << "csv脚本执行失败";
-                flag_csv_turnoff = true;
-            }
+#        pragma endregion
 
-#    pragma endregion
-
-
-#    pragma region  //*流程1
+#        pragma region  //*流程1
 
             if ( flag_csv_turnoff || csv_parse( "/home/think/rocos-app/debug/demo_process_1.csv" ) < 0 )
             {
                 PLOG_ERROR << "csv脚本执行失败";
                 flag_csv_turnoff = true;
             }
-#    pragma endregion
+#        pragma endregion
 
-#endif
+#    endif
 
-#pragma region  //*校准测试
-
-            if ( flag_csv_turnoff || csv_parse( "/home/think/rocos-app/debug/demo_process_1.csv" ) < 0 )
-            {
-                PLOG_ERROR << "csv脚本执行失败";
-                flag_csv_turnoff = true;
-            }
-            // if ( flag_csv_turnoff || csv_parse( "/home/think/rocos-app/debug/demo_8_inverst.csv" ) < 0 )
-            // {
-            //     PLOG_ERROR << "csv脚本执行失败";
-            //     flag_csv_turnoff = true;
-            // }
-
-    
-
-#pragma endregion
 
             // flag_record_turnoff = true;
             // thread_pos_bag.join( );
@@ -964,6 +910,358 @@ namespace rocos
         PLOG_INFO << "全部测试结束,goodbye!";
     }
 }  // namespace rocos
+#endif
+
+#pragma endregion
+
+#pragma region  //*测试8  验收程序
+
+namespace rocos
+{
+
+    /**
+     * @brief 字符切割
+     *
+     * @param str 源字符串
+     * @param tokens 结果存储
+     * @param delim 切割字符
+     * @example 1,2,3-> [1] [2] [3]
+     */
+    void split( const std::string& str,
+                std::vector< std::string >& tokens,
+                const std::string& delim = " " )
+    {
+        tokens.clear( );  //!注意清除上次结果
+
+        auto start    = str.find_first_not_of( delim, 0 );  // 分割到的字符串的第一个字符
+        auto position = str.find_first_of( delim, start );  // 分隔符的位置
+        while ( position != std::string::npos || start != std::string::npos )
+        {
+            // [start, position) 为分割下来的字符串
+            tokens.emplace_back( std::move( str.substr( start, position - start ) ) );
+            start    = str.find_first_not_of( delim, position );
+            position = str.find_first_of( delim, start );
+        }
+    }
+
+    /**
+     * @brief 关节值记录线程,命令格式：rem#movej#vel#acc 或者 rem#movel#vel#acc 或者 rem#gripper#pos
+     *
+     * @param flag_turnoff 外部控制标志
+     */
+    void Robot::csv_record( bool* flag_turnoff )
+    {
+        std::ofstream out_joint_csv{ };
+        std::string str;
+        std::vector< std::string > str_vec;
+        out_joint_csv.open( "/home/think/rocos-app/debug/joints.csv" );
+        while ( !( *flag_turnoff ) && str.compare( "exit" ) )
+        {
+            PLOG_DEBUG << " 输入“rem”并回车,命令格式:rem#movej#vel#acc;输入“exit”退出记录";
+            std::cin >> str;
+            split( str, str_vec, "#" );
+
+            if ( str_vec[ 0 ].compare( "rem" ) == 0 )
+            {
+                if ( str_vec[ 1 ].compare( "movel" ) == 0 )
+                {
+                    PLOG_DEBUG << "记录movel ,速度=" << str_vec[ 2 ] << " 加速度= " << str_vec[ 3 ];
+                    out_joint_csv << "movel\t,";
+                    out_joint_csv << str_vec[ 2 ] << "\t," << str_vec[ 3 ] << "\t,";
+
+                    for ( int i{ 0 }; i < 3; i++ ) out_joint_csv
+                                                       << flange_.p[ i ] << "\t,";
+
+                    double rpy[ 3 ];
+                    flange_.M.GetRPY( rpy[ 0 ], rpy[ 1 ], rpy[ 2 ] );
+                    out_joint_csv << rpy[ 0 ] << "\t,";
+                    out_joint_csv << rpy[ 1 ] << "\t,";
+                    out_joint_csv << rpy[ 2 ] << "\n";
+                }
+                else if ( str_vec[ 1 ].compare( "movej" ) == 0 )
+                {
+                    PLOG_DEBUG << "记录movej ,速度=" << str_vec[ 2 ] << " 加速度= " << str_vec[ 3 ];
+
+                    out_joint_csv << "movej\t,";
+                    out_joint_csv << str_vec[ 2 ] << "\t," << str_vec[ 3 ] << "\t,";
+
+                    for ( int i{ 0 }; i < 6; i++ )
+                        out_joint_csv << pos_[ i ] << "\t,";
+                    out_joint_csv << pos_[ 6 ] << "\n";
+                }
+                else if ( str_vec[ 1 ].compare( "gripper" ) == 0 )
+                {
+                    PLOG_DEBUG << "记录gripper ,位置 =" << str_vec[ 2 ];
+
+                    out_joint_csv << "gripper\t,";
+                    out_joint_csv << str_vec[ 2 ] << "\n";
+                }
+            }
+        }
+        out_joint_csv.close( );
+        PLOG_DEBUG << "采集完毕";
+    }
+
+    /**
+     * @brief csv文件解析，解析格式：rem#movej#vel#acc 或者 rem#gripper#pos
+     *
+     * @param path csv文件绝对路径
+     * @param max_size csv一行最大字符
+     * @param index 从第几行开始执行，默认第1行
+     * @return int
+     */
+    int Robot::csv_parse( const char* path, size_t max_size,int start )
+    {
+        std::ifstream input_csv;
+        input_csv.open( path );
+        if ( input_csv.is_open( ) )
+            PLOG_INFO << "输入文件打开成功";
+        else
+        {
+            PLOG_ERROR << "输入文件打开失败";
+            return -1;
+        }
+
+        //**变量初始化 **//
+        char tem[ max_size ];               //存储单行
+        std::vector< std::string > tokens;  //存储单行分解后的结果
+        KDL::JntArray q_target( jnt_num_ );
+        int index{ start};  //指示当前正在执行文件的第几行指令
+        bool flag_invalid_status{ false };
+        std::string str;
+        //**-------------------------------**//
+
+        //** 跳转到指定行执行 **//
+        for ( int i{ 1 }; i < start; i++ )
+        {
+            input_csv.getline( tem, max_size );
+        }
+        //**-------------------------------**//
+
+        while ( input_csv.getline( tem, max_size ) )  //直接读取一行，以\n结束
+        {
+            PLOG_DEBUG << index;
+
+            std::cin >> str;
+
+            if ( strcmp( tem, "" ) == 0 )
+            {
+                index++;
+                continue;
+            }  //!跳过csv文件\n行
+
+            PLOG_DEBUG_( 1 ) << "\n"<<path << "," << index;
+
+            split( tem, tokens, "," );
+            if ( tokens[ 0 ].find( "movej" ) != std::string::npos )
+            {
+                for ( int i{ 0 }; i < 7; i++ )
+                {
+                    q_target( i ) = std::stod( tokens[ 3 + i ] );
+                }
+
+                if ( MoveJ( q_target, std::stod( tokens[ 1 ] ), std::stod( tokens[ 2 ] ), 0, 0, false ) < 0 )
+                {
+                    PLOG_ERROR << "第" + std::to_string( index ) + "行指令执行失败";
+                    flag_invalid_status = true;
+                    break;
+                }
+                index++;
+            }
+            else if ( tokens[ 0 ].find( "movel" ) != std::string::npos )
+            {
+                double xyz[ 3 ];
+                double rpy[ 3 ];
+                for ( int i{ 0 }; i < 3; i++ )
+                {
+                    xyz[ i ] = std::stod( tokens[ 3 + i ] );
+                    rpy[ i ] = std::stod( tokens[ 6 + i ] );
+                }
+                KDL::Frame frame_target{ KDL::Rotation::RPY( rpy[ 0 ], rpy[ 1 ], rpy[ 2 ] ), KDL::Vector{ xyz[ 0 ], xyz[ 1 ], xyz[ 2 ] } };
+                if ( MoveL( frame_target, std::stod( tokens[ 1 ] ), std::stod( tokens[ 2 ] ), 0, 0, false ) < 0 )
+                {
+                    PLOG_ERROR << "第" + std::to_string( index ) + "行指令执行失败";
+                    flag_invalid_status = true;
+                    break;
+                }
+                index++;
+            }
+            else if ( tokens[ 0 ].find( "gripper" ) != std::string::npos )
+            {
+                if ( my_gripper.send_command( tokens[ 1 ] + "#80#120" ) < 0 )
+                {
+                    PLOG_ERROR << "第" + std::to_string( index ) + "行指令执行失败";
+                    flag_invalid_status = true;
+                    break;
+                }
+                index++;
+            }
+            else
+            {
+                PLOG_ERROR << "未知类型 :" << tokens[ 0 ];
+                flag_invalid_status = true;
+                break;
+            }
+        }
+
+        input_csv.close( );
+
+        if ( flag_invalid_status )
+        {
+            PLOG_ERROR << "csv文件执行失败";
+            return -1;
+        }
+        else
+        {
+            PLOG_INFO << "csv文件执行成功";
+            return 0;
+        }
+    }
+
+/**
+ * @brief 检查上电起始位置，如果不在起始位置则继续上次指令
+ * 
+ */
+int  Robot::check_init_pos()
+{
+        bool is_in_initPos{ true };
+
+        if ( abs( pos_[ 0 ] ) > 1e-3 ) is_in_initPos = false;
+        if ( abs( pos_[ 1 ] - 0.371926 ) > 1e-3 ) is_in_initPos = false;
+        if ( abs( pos_[ 2 ] ) > 1e-3 ) is_in_initPos = false;
+        if ( abs( pos_[ 3 ] + 1.76311 ) > 1e-3 ) is_in_initPos = false;
+        if ( abs( pos_[ 4 ] ) > 1e-3 ) is_in_initPos = false;
+        if ( abs( pos_[ 5 ] + 1.9602 ) > 1e-3 ) is_in_initPos = false;
+        if ( abs( pos_[ 6 ] ) > 1e-3 ) is_in_initPos = false;
+
+        if ( !is_in_initPos )
+        {
+            PLOG_ERROR << "当前位置不在预定的起始位置，继续上次指令";
+            //** 读取文件最后一行 **//
+            std::ifstream input_command;
+            input_command.open( "/home/think/rocos-app/debug/command_log.csv" );
+
+            if ( !input_command.is_open( ) )
+            {
+                PLOG_ERROR << "command_log.csv文件不存在";
+                return -1;
+            }
+
+            char tem[ 2048 ];
+            while ( !input_command.eof( ) )  //遇见/t,/n,空格停下
+            {
+                input_command.getline( tem, 2048 );
+                PLOG_DEBUG<< tem;
+            }
+
+            input_command.close( );
+            //**-------------------------------**//
+
+            //** 分解字符串 **//
+            std::vector< std::string > tokens;  //存储单行分解后的结果
+            split( tem, tokens, "," );
+            //**-------------------------------**//
+
+            //** 继续执行上次指令 **//
+            if ( csv_parse( tokens[ 0 ].c_str( ), 2048, std::stod( tokens[ 1 ] ) ) < 0 )
+                return -1;
+            //**-------------------------------**//
+
+             return 0;
+        }
+        else
+        {
+            PLOG_INFO << "当前位置为起始位置";
+            return 0;
+        }
+}
+
+void Robot::test( )
+{
+    //**变量初始化 **//
+    std::string str{ "" };
+    //**-------------------------------**//
+
+    //** 程序初始化 **//
+    // my_ft_sensor.init( flange_ );//6维力初始化,暂时没用上
+
+    if ( my_gripper.init( ) < 0 )  //夹抓初始化
+        return;
+
+    if ( my_server.init( ) < 0 )  // TCP服务器初始化
+        return;
+    //**-------------------------------**//
+
+    //** 开启TCP服务器线程 **//
+    std::thread  { &JC_helper::TCP_server::RunServer, &my_server }.detach();
+    //**-------------------------------**//
+
+#pragma region  //*电机使能检查
+
+        for ( int i{ 0 }; i < jnt_num_; i++ )
+        {
+            if ( joints_[ i ]->getDriveState( ) != DriveState::OperationEnabled )
+            {
+                for ( int j{ 0 }; j < 1; j++ )
+                {
+                    PLOG_ERROR << "电机[" << i << "] 未使能，确定主站已初始化完成了？,输入y确认";
+                    std::cin >> str;
+                    if ( str != std::string_view{ "y" } )
+                    {
+                        PLOG_ERROR << "未输入yes, 判断主站 {未} 初始化完成,程序关闭";
+                        exit( 0 );
+                    }
+                }
+            }
+        }
+
+        setEnabled( );
+#pragma endregion
+
+#pragma region  //*上电起始位置检查
+        if ( check_init_pos( ) < 0 )
+        {
+            PLOG_ERROR << "无法返回起始位置!,不允许启动";
+            return ;
+        }
+#pragma endregion
+
+        PLOG_INFO << "当前环境是否安全,如果是,输入run开始执行程序";
+        std::cin >> str;
+
+        if ( str == std::string_view{ "run" } )
+        {
+            while ( isRuning )
+            {
+                std::this_thread::sleep_for( std::chrono::duration< double >( 0.1 ) );
+                if ( my_server.flag_receive )
+                {
+                    std::string receive_str{ &my_server.receive_buff[ 0 ] };
+
+                    PLOG_DEBUG << "TCP 服务器 收到：" << receive_str;
+                    if ( receive_str.find( "ROB" ) != std::string::npos && receive_str.find( "btn" ) != std::string::npos )  //!目前只能处理Received=ROB#btn#1指令
+                    {
+                        std::vector< std::string > tokens;  //存储字符串分解后的结果
+                        split( receive_str, tokens, "#" );
+
+                        if ( csv_parse( ( std::string{ "/home/think/rocos-app/debug/demo_" } + tokens[ 2 ] + std::string{ ".csv" } ).c_str( ) ) < 0 )
+                        {
+                            PLOG_ERROR << "csv脚本执行失败";
+                            return;
+                        }
+                    }
+                    else
+                        PLOG_ERROR << "undifined  robot's command : " << receive_str;
+
+                    my_server.receive_buff[ 0 ] = '\0';   //为下次消息接收做准备
+                    my_server.flag_receive      = false;  //为下次消息接收做准备
+                }
+            }
+        }
+
+        PLOG_INFO << "全部测试结束,goodbye!";
+    }
+} 
 
 #pragma endregion
 
@@ -977,8 +1275,8 @@ int main( int argc, char* argv[] )
     }
 
     using namespace rocos;
-    // boost::shared_ptr< HardwareInterface > hw = boost::make_shared< HardwareSim >( 7 );  // 仿真
-    boost::shared_ptr< HardwareInterface > hw = boost::make_shared< Hardware >( );  //真实机械臂
+    boost::shared_ptr< HardwareInterface > hw = boost::make_shared< HardwareSim >( 7 );  // 仿真
+    // boost::shared_ptr< HardwareInterface > hw = boost::make_shared< Hardware >( );  //真实机械臂
 
     Robot robot( hw );
 
