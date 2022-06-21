@@ -1010,7 +1010,7 @@ namespace rocos
      * @param index 从第几行开始执行，默认第1行
      * @return int
      */
-    int Robot::csv_parse( const char* path, size_t max_size,int start )
+    int Robot::csv_parse( const char* path, size_t max_size, int start )
     {
         std::ifstream input_csv;
         input_csv.open( path );
@@ -1026,7 +1026,7 @@ namespace rocos
         char tem[ max_size ];               //存储单行
         std::vector< std::string > tokens;  //存储单行分解后的结果
         KDL::JntArray q_target( jnt_num_ );
-        int index{ start};  //指示当前正在执行文件的第几行指令
+        int index{ start };  //指示当前正在执行文件的第几行指令
         bool flag_invalid_status{ false };
         std::string str;
         //**-------------------------------**//
@@ -1050,7 +1050,8 @@ namespace rocos
                 continue;
             }  //!跳过csv文件\n行
 
-            PLOG_DEBUG_( 1 ) << "\n"<<path << "," << index;
+            PLOG_DEBUG_( 1 ) << "\n"
+                             << path << "," << index;
 
             split( tem, tokens, "," );
             if ( tokens[ 0 ].find( "movej" ) != std::string::npos )
@@ -1059,8 +1060,7 @@ namespace rocos
                 {
                     q_target( i ) = std::stod( tokens[ 3 + i ] );
                 }
-
-                if ( MoveJ( q_target, std::stod( tokens[ 1 ] ), std::stod( tokens[ 2 ] ), 0, 0, false ) < 0 )
+                if ( MoveJ( q_target, std::stod( tokens[ 1 ] ),  std::stod( tokens[ 2 ] ), 0, 0, false ) < 0 )
                 {
                     PLOG_ERROR << "第" + std::to_string( index ) + "行指令执行失败";
                     flag_invalid_status = true;
@@ -1079,7 +1079,7 @@ namespace rocos
                 }
                 KDL::Frame frame_target{ KDL::Rotation::RPY( rpy[ 0 ], rpy[ 1 ], rpy[ 2 ] ), KDL::Vector{ xyz[ 0 ], xyz[ 1 ], xyz[ 2 ] } };
                 if ( MoveL( frame_target, std::stod( tokens[ 1 ] ), std::stod( tokens[ 2 ] ), 0, 0, false ) < 0 )
-                {
+                {  
                     PLOG_ERROR << "第" + std::to_string( index ) + "行指令执行失败";
                     flag_invalid_status = true;
                     break;
@@ -1118,21 +1118,49 @@ namespace rocos
         }
     }
 
-/**
- * @brief 检查上电起始位置，如果不在起始位置则继续上次指令
- * 
- */
-int  Robot::check_init_pos()
-{
+    /**
+     * @brief 检查上电起始位置，如果不在起始位置则继续上次指令
+     *
+     */
+    int Robot::check_init_pos( )
+    {
         bool is_in_initPos{ true };
 
-        if ( abs( pos_[ 0 ] ) > 1e-3 ) is_in_initPos = false;
-        if ( abs( pos_[ 1 ] - 0.371926 ) > 1e-3 ) is_in_initPos = false;
-        if ( abs( pos_[ 2 ] ) > 1e-3 ) is_in_initPos = false;
-        if ( abs( pos_[ 3 ] + 1.76311 ) > 1e-3 ) is_in_initPos = false;
-        if ( abs( pos_[ 4 ] ) > 1e-3 ) is_in_initPos = false;
-        if ( abs( pos_[ 5 ] + 1.9602 ) > 1e-3 ) is_in_initPos = false;
-        if ( abs( pos_[ 6 ] ) > 1e-3 ) is_in_initPos = false;
+        if ( abs( pos_[ 0 ] ) > 1e-3 )
+        {
+            PLOG_DEBUG << abs( pos_[ 0 ] );
+            is_in_initPos = false;
+        }
+        if ( abs( pos_[ 1 ] - 0.371926 ) > 1e-3 )
+        {
+            PLOG_DEBUG << abs( pos_[ 1 ] - 0.371926 );
+            is_in_initPos = false;
+        }
+        if ( abs( pos_[ 2 ] ) > 1e-3 )
+        {
+            PLOG_DEBUG << abs( pos_[ 2 ] );
+            is_in_initPos = false;
+        }
+        if ( abs( pos_[ 3 ] + 1.76311 ) > 1e-3 )
+        {
+            PLOG_DEBUG << abs( pos_[ 3 ] + 1.76311 );
+            is_in_initPos = false;
+        }
+        if ( abs( pos_[ 4 ] ) > 1e-3 )
+        {
+            PLOG_DEBUG << abs( pos_[ 4 ] );
+            is_in_initPos = false;
+        }
+        if ( abs( pos_[ 5 ] + 1.9602 ) > 1e-3 )
+        {
+            PLOG_DEBUG << abs( pos_[ 5 ] + 1.9602 );
+            is_in_initPos = false;
+        }
+        if ( abs( pos_[ 6 ] ) > 1e-3 )
+        {
+            PLOG_DEBUG << abs( pos_[ 6 ] );
+            is_in_initPos = false;
+        }
 
         if ( !is_in_initPos )
         {
@@ -1148,10 +1176,18 @@ int  Robot::check_init_pos()
             }
 
             char tem[ 2048 ];
+            char last_command[ 2048 ];
+
             while ( !input_command.eof( ) )  //遇见/t,/n,空格停下
             {
                 input_command.getline( tem, 2048 );
-                PLOG_DEBUG<< tem;
+
+                if ( strcmp( tem, "" ) == 0 )
+                    continue;
+                else
+                    strcpy( last_command, tem );
+
+                PLOG_DEBUG << last_command;
             }
 
             input_command.close( );
@@ -1159,42 +1195,42 @@ int  Robot::check_init_pos()
 
             //** 分解字符串 **//
             std::vector< std::string > tokens;  //存储单行分解后的结果
-            split( tem, tokens, "," );
+            split( last_command, tokens, "," );
             //**-------------------------------**//
 
             //** 继续执行上次指令 **//
             if ( csv_parse( tokens[ 0 ].c_str( ), 2048, std::stod( tokens[ 1 ] ) ) < 0 )
                 return -1;
             //**-------------------------------**//
-
-             return 0;
+            PLOG_INFO << "已自动回到起始位置";
+            return 0;
         }
         else
         {
             PLOG_INFO << "当前位置为起始位置";
             return 0;
         }
-}
+    }
 
-void Robot::test( )
-{
-    //**变量初始化 **//
-    std::string str{ "" };
-    //**-------------------------------**//
+    void Robot::test( )
+    {
+        //**变量初始化 **//
+        std::string str{ "" };
+        //**-------------------------------**//
 
-    //** 程序初始化 **//
-    // my_ft_sensor.init( flange_ );//6维力初始化,暂时没用上
+        //** 程序初始化 **//
+        // my_ft_sensor.init( flange_ );//6维力初始化,暂时没用上
 
-    if ( my_gripper.init( ) < 0 )  //夹抓初始化
-        return;
+        if ( my_gripper.init( ) < 0 )  //夹抓初始化
+            return;
 
-    if ( my_server.init( ) < 0 )  // TCP服务器初始化
-        return;
-    //**-------------------------------**//
+        if ( my_server.init( ) < 0 )  // TCP服务器初始化
+            return;
+        //**-------------------------------**//
 
-    //** 开启TCP服务器线程 **//
-    std::thread  { &JC_helper::TCP_server::RunServer, &my_server }.detach();
-    //**-------------------------------**//
+        //** 开启TCP服务器线程 **//
+        std::thread{ &JC_helper::TCP_server::RunServer, &my_server }.detach( );
+        //**-------------------------------**//
 
 #pragma region  //*电机使能检查
 
@@ -1222,7 +1258,7 @@ void Robot::test( )
         if ( check_init_pos( ) < 0 )
         {
             PLOG_ERROR << "无法返回起始位置!,不允许启动";
-            return ;
+            return;
         }
 #pragma endregion
 
@@ -1239,15 +1275,30 @@ void Robot::test( )
                     std::string receive_str{ &my_server.receive_buff[ 0 ] };
 
                     PLOG_DEBUG << "TCP 服务器 收到：" << receive_str;
-                    if ( receive_str.find( "ROB" ) != std::string::npos && receive_str.find( "btn" ) != std::string::npos )  //!目前只能处理Received=ROB#btn#1指令
+                    if ( receive_str.find( "ROB" ) != std::string::npos && receive_str.find( "btn" ) != std::string::npos )  //!目前只能处理ROB#btn#1指令
                     {
                         std::vector< std::string > tokens;  //存储字符串分解后的结果
                         split( receive_str, tokens, "#" );
 
-                        if ( csv_parse( ( std::string{ "/home/think/rocos-app/debug/demo_" } + tokens[ 2 ] + std::string{ ".csv" } ).c_str( ) ) < 0 )
+                        if ( tokens[ 2 ] == "9" )
                         {
-                            PLOG_ERROR << "csv脚本执行失败";
-                            return;
+                            if ( csv_parse( ( std::string{ "/home/think/rocos-app/debug/demo_" } + std::string{ "process_1" } + std::string{ ".csv" } ).c_str( ) ) < 0 )
+                            {
+                                PLOG_ERROR << "csv脚本执行失败";
+                                return;
+                            }
+                        }
+                        else if ( tokens[ 2 ] == "10" )
+                        {
+                            PLOG_ERROR << "该命令无效";
+                        }
+                        else
+                        {
+                            if ( csv_parse( ( std::string{ "/home/think/rocos-app/debug/demo_" } + tokens[ 2 ] + std::string{ ".csv" } ).c_str( ) ) < 0 )
+                            {
+                                PLOG_ERROR << "csv脚本执行失败";
+                                return;
+                            }
                         }
                     }
                     else
@@ -1261,7 +1312,7 @@ void Robot::test( )
 
         PLOG_INFO << "全部测试结束,goodbye!";
     }
-} 
+}  // namespace rocos
 
 #pragma endregion
 
@@ -1275,8 +1326,8 @@ int main( int argc, char* argv[] )
     }
 
     using namespace rocos;
-    boost::shared_ptr< HardwareInterface > hw = boost::make_shared< HardwareSim >( 7 );  // 仿真
-    // boost::shared_ptr< HardwareInterface > hw = boost::make_shared< Hardware >( );  //真实机械臂
+    // boost::shared_ptr< HardwareInterface > hw = boost::make_shared< HardwareSim >( 7 );  // 仿真
+    boost::shared_ptr< HardwareInterface > hw = boost::make_shared< Hardware >( );  //真实机械臂
 
     Robot robot( hw );
 
