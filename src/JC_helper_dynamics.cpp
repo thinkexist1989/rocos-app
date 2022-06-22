@@ -30,7 +30,7 @@ namespace JC_helper
         // ! 爪子装上后，零漂消除不应该打开了，只有空载情况下才可以打开零漂消除
         SendCommand( &socketHandle, COMMAND_BIAS, FT_BIASING_OFF );
 
-        std::this_thread::sleep_for( std::chrono::duration< double >{ 3 } );
+        std::this_thread::sleep_for( std::chrono::duration< double >{ 1 } );
 
         SendCommand( &socketHandle, COMMAND_START, 3 );
         for ( int i = 0; i < 3; i++ )
@@ -353,21 +353,21 @@ namespace JC_helper
             KDL::Add( _q_init, joints_vel, _q_target );
             //**-------------------------------**//
 
-            //** 避开奇异点 **//
-            jnt2jac.JntToJac( _q_target, jac );
-            if ( abs( jac.data.determinant( ) ) < 0.006 )//临时修改
-            {
-                PLOG_ERROR << "target is a singular point";
-                on_stop_trajectory = true;
-                break;
-            }
+            //** 避开奇异点 **////临时修改 容易误判，取消
+            // jnt2jac.JntToJac( _q_target, jac );
+            // if ( abs( jac.data.determinant( ) ) < 0.006 )
+            // {
+            //     PLOG_ERROR << "target is a singular point";
+            //     on_stop_trajectory = true;
+            //     break;
+            // }
 
             //**-------------------------------**//
 
             //** 速度保护**//
             for ( int i = 0; i < _joint_num; i++ )
             {
-                if ( abs( _q_target( i ) - _q_init( i ) ) > 0.1 )//临时修改,示教模式
+                if ( abs( _q_target( i ) - _q_init( i ) ) > max_step[i] )//临时修改,示教模式
                 {
                     PLOG_ERROR << "joint[" << i << "] speep is too  fast";
                     PLOG_ERROR << "target speed = " << abs( _q_target( i ) - _q_init( i ) )
@@ -412,6 +412,7 @@ namespace JC_helper
         {
             PLOG_ERROR << "IK 触发急停";
             motion_stop( robot_ptr, std::ref( traj_joint ), traj_count );
+            *flag_turnoff  = true ; //告知调用者，线程已停止
         }
         else
             PLOG_INFO << "IK结束";
