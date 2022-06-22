@@ -327,7 +327,6 @@ namespace JC_helper
         for ( ; traj_count < max_count; traj_count++ )
         {
             // TODO 导纳计算
-            PLOG_DEBUG<< my_ft_sensor_ptr->force_torque.force;
             smd.set_force( my_ft_sensor_ptr->force_torque.force[ 0 ], my_ft_sensor_ptr->force_torque.force[ 1 ], my_ft_sensor_ptr->force_torque.force[ 2 ] );
             // smd.set_force( 0, -20, 0 );
             // smd.set_torque( 0, 0, 0 );

@@ -1228,8 +1228,8 @@ namespace rocos
         if ( my_server.init( ) < 0 )  // TCP服务器初始化
             return;
 
-        if ( my_ft_sensor.init( flange_ ) )  // 6维力初始化
-            return;
+        // if ( my_ft_sensor.init( flange_ ) )  // 6维力初始化
+        //     return;
 
         //**-------------------------------**//
 
@@ -1266,6 +1266,10 @@ namespace rocos
             return;
         }
 #pragma endregion
+
+        if ( my_ft_sensor.init( flange_ ) )  // 6维力初始化
+            return;
+
 
         PLOG_INFO << "当前环境是否安全,如果是,输入run开始执行程序";
         std::cin >> str;
