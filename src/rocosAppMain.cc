@@ -1042,7 +1042,7 @@ namespace rocos
         {
             PLOG_DEBUG << index;
 
-            std::cin >> str;
+            // std::cin >> str; //临时修改
 
             if ( strcmp( tem, "" ) == 0 )
             {
@@ -1061,7 +1061,7 @@ namespace rocos
                     q_target( i ) = std::stod( tokens[ 3 + i ] );
                 }
                 //临时修改
-                if ( MoveJ( q_target, 5 * std::stod( tokens[ 1 ] ), 5 *  std::stod( tokens[ 2 ] ), 0, 0, false ) < 0 )
+                if ( MoveJ( q_target, 1.5 * std::stod( tokens[ 1 ] ), 1.5 *  std::stod( tokens[ 2 ] ), 0, 0, false ) < 0 )
                 {
                     PLOG_ERROR << "第" + std::to_string( index ) + "行指令执行失败";
                     flag_invalid_status = true;
@@ -1080,7 +1080,7 @@ namespace rocos
                 }
                 KDL::Frame frame_target{ KDL::Rotation::RPY( rpy[ 0 ], rpy[ 1 ], rpy[ 2 ] ), KDL::Vector{ xyz[ 0 ], xyz[ 1 ], xyz[ 2 ] } };
                 //临时修改
-                if ( MoveL( frame_target, 5*  std::stod( tokens[ 1 ] ), 5 *  std::stod( tokens[ 2 ] ), 0, 0, false ) < 0 )
+                if ( MoveL( frame_target,   std::stod( tokens[ 1 ] ),  std::stod( tokens[ 2 ] ), 0, 0, false ) < 0 )
                 {  
                     PLOG_ERROR << "第" + std::to_string( index ) + "行指令执行失败";
                     flag_invalid_status = true;
@@ -1228,8 +1228,8 @@ namespace rocos
         if ( my_server.init( ) < 0 )  // TCP服务器初始化
             return;
 
-        // if ( my_ft_sensor.init( flange_ ) )  // 6维力初始化
-        //     return;
+        if ( my_ft_sensor.init( flange_ ) )  // 6维力初始化
+            return;
 
         //**-------------------------------**//
 
@@ -1259,6 +1259,12 @@ namespace rocos
         setEnabled( );
 #pragma endregion
 
+    PLOG_INFO << "当前环境是否安全,如果是,输入run开始执行程序";
+        std::cin >> str;
+
+        if ( str == std::string_view{ "run" } )
+        {
+
 #pragma region  //*上电起始位置检查
         if ( check_init_pos( ) < 0 )
         {
@@ -1267,15 +1273,7 @@ namespace rocos
         }
 #pragma endregion
 
-        if ( my_ft_sensor.init( flange_ ) )  // 6维力初始化
-            return;
-
-
-        PLOG_INFO << "当前环境是否安全,如果是,输入run开始执行程序";
-        std::cin >> str;
-
-        if ( str == std::string_view{ "run" } )
-        {
+    
             while ( isRuning )
             {
                 std::this_thread::sleep_for( std::chrono::duration< double >( 0.1 ) );
@@ -1344,8 +1342,8 @@ int main( int argc, char* argv[] )
     }
 
     using namespace rocos;
-    boost::shared_ptr< HardwareInterface > hw = boost::make_shared< HardwareSim >( 7 );  // 仿真
-    // boost::shared_ptr< HardwareInterface > hw = boost::make_shared< Hardware >( );  //真实机械臂
+    // boost::shared_ptr< HardwareInterface > hw = boost::make_shared< HardwareSim >( 7 );  // 仿真
+    boost::shared_ptr< HardwareInterface > hw = boost::make_shared< Hardware >( );  //真实机械臂
 
     Robot robot( hw );
 

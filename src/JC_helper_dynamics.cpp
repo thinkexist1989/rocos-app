@@ -30,7 +30,7 @@ namespace JC_helper
         // ! 爪子装上后，零漂消除不应该打开了，只有空载情况下才可以打开零漂消除
         SendCommand( &socketHandle, COMMAND_BIAS, FT_BIASING_OFF );
 
-        std::this_thread::sleep_for( std::chrono::duration< double >{ 1 } );
+        std::this_thread::sleep_for( std::chrono::duration< double >{ 3 } );
 
         SendCommand( &socketHandle, COMMAND_START, 3 );
         for ( int i = 0; i < 3; i++ )
