@@ -122,4 +122,12 @@ namespace rocos {
         return ecPtr->ecatSlaveNameVec->at(id).c_str();
     }
 
+    HardwareInterface::HWState Hardware::getHardwareState() {
+        return static_cast<HardwareInterface::HWState >(ecPtr->ecatInfo->ecatState);
+    }
+
+    void Hardware::setHardwareState(HardwareInterface::HWState state) {
+        ecPtr->ecatInfo->ecatState = static_cast<EcatInfo::EcatState>(state);
+    }
+
 }

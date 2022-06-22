@@ -55,10 +55,25 @@ namespace rocos {
             HW_PROFINET  // reserved
         };
 
+
+        enum HWState {
+            UNKNOWN = 0,
+            INIT = 1,
+            PREOP = 2,
+            SAFEOP = 4,
+            OP = 8,
+            READY = 8,
+
+            BOOTSTRAP = 3
+        };
+
         virtual ~HardwareInterface();
 
         ///////////////////////Data Info/////////////////////////
         virtual Timestamp getTimestamp(); // Timestamp
+
+        virtual HWState getHardwareState();
+        virtual void setHardwareState(HWState state);
 
         virtual double getMinCycleTime(); // min cycle time
         virtual double getMaxCycleTime(); // max cycle time

@@ -1329,6 +1329,29 @@ int main( int argc, char* argv[] )
     // boost::shared_ptr< HardwareInterface > hw = boost::make_shared< HardwareSim >( 7 );  // 仿真
     boost::shared_ptr< HardwareInterface > hw = boost::make_shared< Hardware >( );  //真实机械臂
 
+
+    int ready_count = 0; //
+    int cycle_count = 0;
+    while(ready_count < 10 && cycle_count < 1000) {
+        hw->waitForSignal(0);
+        hw->setHardwareState(HardwareInterface::HWState::UNKNOWN);
+        hw->waitForSignal(0);
+        if(hw->getHardwareState() != HardwareInterface::HWState::READY) { //等待硬件状态Ready
+            ready_count++;
+        }
+
+        cycle_count++;
+    }
+
+    if(ready_count < 10) {
+        std::cout << "\033[1;31m"
+                  << "!!!!!!!!!!!Hardware is not ready!!!!!!!!!!"
+                  << "\033[0m" << std::endl;
+
+        return 1;
+    }
+
+
     Robot robot( hw );
 
     auto robotService = RobotServiceImpl::getInstance( &robot );

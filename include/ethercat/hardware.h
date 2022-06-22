@@ -80,6 +80,10 @@ namespace rocos {
 
         DriveState getDriverState(int id) override;
 
+        void setHardwareState(HWState state) override;
+
+        HWState getHardwareState() override;
+
         void waitForSignal(int id = 0) override;
 
     protected:
