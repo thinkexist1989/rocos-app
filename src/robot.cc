@@ -1598,7 +1598,7 @@ namespace rocos {
             return -1;
         }
 
-        // admittance_control.smd.set_k( 0 );//临时修改,为了拖动
+        admittance_control.smd.set_k( 0 );//临时修改,为了拖动
 
         std::shared_ptr< std::thread > _thread_ft_sensor{ nullptr };
         _thread_ft_sensor.reset( new std::thread{ &JC_helper::admittance::sensor_update, &admittance_control, this } );
@@ -1610,12 +1610,35 @@ namespace rocos {
 
             PLOG_INFO << " starting  teaching";
 
-            std::string str;
-            while ( str.compare( "break" ) != 0 )
+            //** 等待关闭指令 **//
+            // std::string str;
+            // while ( str.compare( "break" ) != 0 )
+            // {
+            //     PLOG_INFO << " enter 'break' to turnoff teaching function:";
+            //     std::cin >> str;
+            // }
+
+            my_server.receive_buff[ 0 ] = '\0';   //为下次消息接收做准备
+            my_server.flag_receive      = false;  //为下次消息接收做准备
+
+            while ( !flag_turnoff )
             {
-                PLOG_INFO << " enter 'break' to turnoff teaching function:";
-                std::cin >> str;
+                PLOG_INFO << "再次点击【导纳模式】按键，取消导纳控制";
+                std::this_thread::sleep_for( std::chrono::duration< double >( 1 ) );
+                if ( my_server.flag_receive )
+                {
+                    std::string receive_str{ &my_server.receive_buff[ 0 ] };
+
+                    my_server.receive_buff[ 0 ] = '\0';   //为下次消息接收做准备
+                    my_server.flag_receive      = false;  //为下次消息接收做准备
+
+                    if ( receive_str.find( "ROB" ) != std::string::npos && receive_str.find( "admittance" ) != std::string::npos )
+                        break;
+                }
             }
+
+            //**-------------------------------**//
+
             flag_turnoff = true;
 
             _thread_admittance_teaching->join( );

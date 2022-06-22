@@ -1060,7 +1060,8 @@ namespace rocos
                 {
                     q_target( i ) = std::stod( tokens[ 3 + i ] );
                 }
-                if ( MoveJ( q_target, std::stod( tokens[ 1 ] ),  std::stod( tokens[ 2 ] ), 0, 0, false ) < 0 )
+                //临时修改
+                if ( MoveJ( q_target, 5 * std::stod( tokens[ 1 ] ), 5 *  std::stod( tokens[ 2 ] ), 0, 0, false ) < 0 )
                 {
                     PLOG_ERROR << "第" + std::to_string( index ) + "行指令执行失败";
                     flag_invalid_status = true;
@@ -1078,7 +1079,8 @@ namespace rocos
                     rpy[ i ] = std::stod( tokens[ 6 + i ] );
                 }
                 KDL::Frame frame_target{ KDL::Rotation::RPY( rpy[ 0 ], rpy[ 1 ], rpy[ 2 ] ), KDL::Vector{ xyz[ 0 ], xyz[ 1 ], xyz[ 2 ] } };
-                if ( MoveL( frame_target, std::stod( tokens[ 1 ] ), std::stod( tokens[ 2 ] ), 0, 0, false ) < 0 )
+                //临时修改
+                if ( MoveL( frame_target, 5*  std::stod( tokens[ 1 ] ), 5 *  std::stod( tokens[ 2 ] ), 0, 0, false ) < 0 )
                 {  
                     PLOG_ERROR << "第" + std::to_string( index ) + "行指令执行失败";
                     flag_invalid_status = true;
@@ -1219,13 +1221,16 @@ namespace rocos
         //**-------------------------------**//
 
         //** 程序初始化 **//
-        // my_ft_sensor.init( flange_ );//6维力初始化,暂时没用上
 
         if ( my_gripper.init( ) < 0 )  //夹抓初始化
             return;
 
         if ( my_server.init( ) < 0 )  // TCP服务器初始化
             return;
+
+        if ( my_ft_sensor.init( flange_ ) )  // 6维力初始化
+            return;
+
         //**-------------------------------**//
 
         //** 开启TCP服务器线程 **//
@@ -1301,6 +1306,15 @@ namespace rocos
                             }
                         }
                     }
+                    //力控模式
+                    else if( receive_str.find( "ROB" ) != std::string::npos && receive_str.find( "admittance" ) != std::string::npos )  //!目前只能处理ROB#btn#1指令
+                    {
+                        if ( admittance_teaching( ) < 0 )
+                        {
+                            PLOG_ERROR << "导纳控制失败";
+                            return;
+                        }
+                    }
                     else
                         PLOG_ERROR << "undifined  robot's command : " << receive_str;
 
@@ -1326,8 +1340,8 @@ int main( int argc, char* argv[] )
     }
 
     using namespace rocos;
-    // boost::shared_ptr< HardwareInterface > hw = boost::make_shared< HardwareSim >( 7 );  // 仿真
-    boost::shared_ptr< HardwareInterface > hw = boost::make_shared< Hardware >( );  //真实机械臂
+    boost::shared_ptr< HardwareInterface > hw = boost::make_shared< HardwareSim >( 7 );  // 仿真
+    // boost::shared_ptr< HardwareInterface > hw = boost::make_shared< Hardware >( );  //真实机械臂
 
     Robot robot( hw );
 

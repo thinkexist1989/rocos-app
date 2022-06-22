@@ -2698,16 +2698,16 @@ namespace JC_helper
 
                     for ( int i = 0; i < _joint_num; i++ )
                     {
-                        input.current_position[ i ]     = current_pos( i )   ;
+                        input.current_position[ i ]     = robot_ptr->pos_[i]   ;//临时修改
                         //防止速度和加速度估计不准
                         //速度不可能超过50度
                         //加速度不可能超过80度
-                        input.current_velocity[ i ]     = KDL::sign( current_vel( i ) ) * std::min( abs( current_vel( i ) ), 20*M_PI/180);//临时修改   按照Rviz 40%笛卡尔速度选取最大值，后面要改回来
+                        input.current_velocity[ i ]     = KDL::sign( current_vel( i ) ) * std::min( abs( current_vel( i ) ), 30*M_PI/180);//临时修改   按照Rviz 40%笛卡尔速度选取最大值，后面要改回来
                         input.current_acceleration[ i ] = KDL::sign( current_acc( i ) ) * std::min( abs( current_acc( i ) ), 40*M_PI/180);//临时修改   按照Rviz 40%笛卡尔加速度选取最大值，后面要改回来
 
                         printf( "pos(%d)=  %f, vel(%d)= %f , last vel(%d)= %f , acc(%d)= %f \n", i, input.current_position[ i ] * 180 / M_PI, i, input.current_velocity[ i ] * 180 / M_PI, i, last_vel( i ) * 180 / M_PI, i, input.current_acceleration[ i ] * 180 / M_PI );
 
-                        input.target_position[ i ]     = current_pos( i );
+                        input.target_position[ i ]     = input.current_position[ i ] ;
                         input.target_velocity[ i ]     = 0;
                         input.target_acceleration[ i ] = 0;
 
