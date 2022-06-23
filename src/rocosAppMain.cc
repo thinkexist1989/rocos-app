@@ -1061,7 +1061,7 @@ namespace rocos
                     q_target( i ) = std::stod( tokens[ 3 + i ] );
                 }
                 //临时修改
-                if ( MoveJ( q_target, 1.5 * std::stod( tokens[ 1 ] ), 1.5 *  std::stod( tokens[ 2 ] ), 0, 0, false ) < 0 )
+                if ( MoveJ( q_target, 1.5 * std::stod( tokens[ 1 ] ), 1.5 * std::stod( tokens[ 2 ] ), 0, 0, false ) < 0 )
                 {
                     PLOG_ERROR << "第" + std::to_string( index ) + "行指令执行失败";
                     flag_invalid_status = true;
@@ -1080,8 +1080,8 @@ namespace rocos
                 }
                 KDL::Frame frame_target{ KDL::Rotation::RPY( rpy[ 0 ], rpy[ 1 ], rpy[ 2 ] ), KDL::Vector{ xyz[ 0 ], xyz[ 1 ], xyz[ 2 ] } };
                 //临时修改
-                if ( MoveL( frame_target,   std::stod( tokens[ 1 ] ),  std::stod( tokens[ 2 ] ), 0, 0, false ) < 0 )
-                {  
+                if ( MoveL( frame_target, std::stod( tokens[ 1 ] ), std::stod( tokens[ 2 ] ), 0, 0, false ) < 0 )
+                {
                     PLOG_ERROR << "第" + std::to_string( index ) + "行指令执行失败";
                     flag_invalid_status = true;
                     break;
@@ -1259,21 +1259,19 @@ namespace rocos
         setEnabled( );
 #pragma endregion
 
-    PLOG_INFO << "当前环境是否安全,如果是,输入run开始执行程序";
+        PLOG_INFO << "当前环境是否安全,如果是,输入run开始执行程序";
         std::cin >> str;
 
         if ( str == std::string_view{ "run" } )
         {
-
 #pragma region  //*上电起始位置检查
-        if ( check_init_pos( ) < 0 )
-        {
-            PLOG_ERROR << "无法返回起始位置!,不允许启动";
-            return;
-        }
+            if ( check_init_pos( ) < 0 )
+            {
+                PLOG_ERROR << "无法返回起始位置!,不允许启动";
+                return;
+            }
 #pragma endregion
 
-    
             while ( isRuning )
             {
                 std::this_thread::sleep_for( std::chrono::duration< double >( 0.1 ) );
@@ -1309,7 +1307,7 @@ namespace rocos
                         }
                     }
                     //力控模式
-                    else if( receive_str.find( "ROB" ) != std::string::npos && receive_str.find( "admittance" ) != std::string::npos )  //!目前只能处理ROB#btn#1指令
+                    else if ( receive_str.find( "ROB" ) != std::string::npos && receive_str.find( "admittance" ) != std::string::npos )  //!目前只能处理ROB#btn#1指令
                     {
                         if ( admittance_teaching( ) < 0 )
                         {
@@ -1342,31 +1340,56 @@ int main( int argc, char* argv[] )
     }
 
     using namespace rocos;
+
+
+    //** 等待主站清除共享内存,25后再启动APP **//
+    std::cerr << "\033[32m"
+              << "等待主站清除共享内存" << std::endl;
+    std::this_thread::sleep_for( std::chrono::duration< double >( 25 ) );
+    //**-------------------------------**//
+
     // boost::shared_ptr< HardwareInterface > hw = boost::make_shared< HardwareSim >( 7 );  // 仿真
     boost::shared_ptr< HardwareInterface > hw = boost::make_shared< Hardware >( );  //真实机械臂
 
+    //** 判断主站ECM是否启动成功 **//
+    //! 如果主站25S以内启动，既先主站清除内存，在hw与主站建立连接，那下面程序可以成功判断Ready 三次
+    //! 如果主站25S以外启动，既先初始化HW，再主站清除内存，那么在hw与主站就建立不了连接，那下面程序三次判断Not Ready 
+    //! 主站不启动和25S以外一样，建立不了连接
+    //!小结：主站必需25s以内启动，并且连续三次判断主站处于Ready状态，其余情况统统退出程序
 
-    int ready_count = 0; //
-    int cycle_count = 0;
-    while(ready_count < 10 && cycle_count < 1000) {
-        hw->waitForSignal(0);
-        hw->setHardwareState(HardwareInterface::HWState::UNKNOWN);
-        hw->waitForSignal(0);
-        if(hw->getHardwareState() != HardwareInterface::HWState::READY) { //等待硬件状态Ready
-            ready_count++;
+    int Ready_count{ 0 };
+    for ( int i{ 0 }; i < 3; i++ )
+    {
+        hw->setHardwareState( HardwareInterface::HWState::UNKNOWN );
+
+        std::this_thread::sleep_for( std::chrono::duration< double >( 0.1 ) );
+
+        if ( hw->getHardwareState( ) == HardwareInterface::HWState::READY )
+        {
+            Ready_count++;
+            std::cerr << "\033[32m"
+                      << "Ready" << std::endl;
         }
-
-        cycle_count++;
+        else
+        {
+            Ready_count = 0;
+            std::cerr << "\033[1;31m"
+                      << "Not Ready" << std::endl;
+        }
     }
 
-    if(ready_count < 10) {
-        std::cout << "\033[1;31m"
-                  << "!!!!!!!!!!!Hardware is not ready!!!!!!!!!!"
-                  << "\033[0m" << std::endl;
-
-        return 1;
+    if ( Ready_count == 3 )
+    {
+        std::cerr << "\033[32m"
+                  << "HardWare准备好,开始程序" << std::endl;
     }
-
+    else
+    {
+        std::cerr << "\033[1;31m"
+                  << "HardWare未准备好,程序退出" << std::endl;
+        return -1;
+    }
+    //**-------------------------------**//
 
     Robot robot( hw );
 
@@ -1376,6 +1399,7 @@ int main( int argc, char* argv[] )
 
     //------------------------wait----------------------------------
     robotService->runServer( );
+
     thread_test.join( );
     return 0;
 }
