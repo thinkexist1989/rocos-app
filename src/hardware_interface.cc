@@ -135,5 +135,12 @@ namespace rocos {
         return std::string();
     }
 
+    HardwareInterface::HWState HardwareInterface::getHardwareState() {
+        return HardwareInterface::READY;
+    }
+
+    void HardwareInterface::setHardwareState(HardwareInterface::HWState state) {
+    }
+
 }
 
