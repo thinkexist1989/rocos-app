@@ -1249,7 +1249,8 @@ namespace rocos
                     std::cin >> str;
                     if ( str != std::string_view{ "y" } )
                     {
-                        PLOG_ERROR << "未输入yes, 判断主站 {未} 初始化完成,程序关闭";
+                        PLOG_ERROR << "未输入y, 判断主站 {未} 初始化完成,程序关闭";
+                        
                         exit( 0 );
                     }
                 }
@@ -1323,7 +1324,11 @@ namespace rocos
                 }
             }
         }
-
+        else
+        {
+            PLOG_ERROR<<"不安全环境,电机抱闸";
+            setDisabled();
+        }
         PLOG_INFO << "全部测试结束,goodbye!";
     }
 }  // namespace rocos
