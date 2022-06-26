@@ -520,9 +520,6 @@ namespace rocos {
 
     public: 
         void test(); //为了测试
-        void csv_record(bool* flag_turnoff );//为了方便记录数据
-        int csv_parse(const char * path,size_t max_size =2048,int start=1);//为了方便记录数据
-        int check_init_pos(); //上电初始位置检查
 
     private:
         // TODO： 测试用MoveJ，阻塞运行，需要改为private
@@ -594,10 +591,6 @@ namespace rocos {
 
         friend class JC_helper::admittance ;
 
-    private:
-            JC_helper::ft_sensor my_ft_sensor; //6维力传感器
-            JC_helper::gripper my_gripper;
-            JC_helper::TCP_server my_server;
 
     };
 
