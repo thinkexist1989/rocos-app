@@ -591,6 +591,8 @@ namespace rocos {
 
         friend class JC_helper::admittance ;
 
+    private:
+            JC_helper::ft_sensor my_ft_sensor; //6维力传感器
 
     };
 

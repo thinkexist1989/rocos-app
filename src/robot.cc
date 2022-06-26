@@ -62,26 +62,8 @@ namespace rocos {
 //        kinematics_.initTechServo();
 
         static plog::ColorConsoleAppender< plog::TxtFormatter > consoleAppender;
-        static plog::RollingFileAppender<plog::CsvFormatter> log_Appender("/home/think/rocos-app/debug/log/log.csv", 10485760, 10000); //单文件最大 10M，最大10000个文件
-        plog::init< 0 >( plog::debug, &consoleAppender ).addAppender(&log_Appender);//终端显示并且写入log文件                                                                      // Initialize the logger.
+        plog::init< 0 >( plog::info, &consoleAppender );//终端显示                                                                      // Initialize the logger.
 
-        //** 文件过大时，清空此文件的内容 **//
-        std::ofstream file_handle;
-        file_handle.open( "/home/think/rocos-app/debug/command_log.csv", std::ios_base::app );
-        file_handle.seekp( 0, file_handle.end );
-        size_t srcSize = file_handle.tellp( );
-        file_handle.close( );
-
-        if(srcSize>1073741824)
-        {
-            PLOG_DEBUG<<"command_log.csv 文件大小超过1GB,自动清除内容";
-            file_handle.open( "/home/think/rocos-app/debug/command_log.csv", std::ios_base::trunc );
-            file_handle.close( );
-        }
-        //**-------------------------------**//
-
-        static plog::RollingFileAppender< plog::JC_CsvFormatter > fileAppender( "/home/think/rocos-app/debug/command_log.csv",1073741824, 0 );  // 日记文件,最大一个文件，无限制大小
-        plog::init< 1 >( plog::debug, &fileAppender );           //输出到文件
                                                                         
         startMotionThread( );
     }
@@ -1612,32 +1594,12 @@ namespace rocos {
             PLOG_INFO << " starting  teaching";
 
             //** 等待关闭指令 **//
-            // std::string str;
-            // while ( str.compare( "break" ) != 0 )
-            // {
-            //     PLOG_INFO << " enter 'break' to turnoff teaching function:";
-            //     std::cin >> str;
-            // }
-
-            my_server.receive_buff[ 0 ] = '\0';   //为下次消息接收做准备
-            my_server.flag_receive      = false;  //为下次消息接收做准备
-
-            while ( !flag_turnoff )
+            std::string str;
+            while ( str.compare( "break" ) != 0 )
             {
-                PLOG_INFO << "再次点击【导纳模式】按键，取消导纳控制";
-                std::this_thread::sleep_for( std::chrono::duration< double >( 1 ) );
-                if ( my_server.flag_receive )
-                {
-                    std::string receive_str{ &my_server.receive_buff[ 0 ] };
-
-                    my_server.receive_buff[ 0 ] = '\0';   //为下次消息接收做准备
-                    my_server.flag_receive      = false;  //为下次消息接收做准备
-
-                    if ( receive_str.find( "ROB" ) != std::string::npos && receive_str.find( "admittance" ) != std::string::npos )
-                        break;
-                }
+                PLOG_INFO << " enter 'break' to turnoff teaching function:";
+                std::cin >> str;
             }
-
             //**-------------------------------**//
 
             flag_turnoff = true;

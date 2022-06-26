@@ -586,6 +586,9 @@ namespace rocos
 
         //** 程序初始化 **//
 
+        // if ( my_ft_sensor.init( flange_ ) )  // 6维力初始化
+        //     return;
+
         //**-------------------------------**//
 
 #pragma region  //*电机使能检查
