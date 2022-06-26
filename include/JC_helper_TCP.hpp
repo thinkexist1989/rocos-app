@@ -34,7 +34,8 @@ namespace JC_helper
     class TCP_server
     {
     private:
-        int listenfd, connfd;         //监听的句柄、客户端的句柄
+        int listenfd{};//监听的句柄、
+        int connfd{};        // 客户端的句柄
         struct sockaddr_in servaddr;  // IP地址
         bool flag_init{false};                //初始化成功标志
 
@@ -69,6 +70,12 @@ namespace JC_helper
                 return -1;
             }
 
+            int on = 1;
+            if ( setsockopt( listenfd, SOL_SOCKET, SO_REUSEADDR, &on, sizeof( on ) ) < 0 )
+            {
+                PLOG_ERROR.printf( "setsockopt error: %s(errno: %d)\n", strerror( errno ), errno );
+            }
+
             if ( bind( listenfd, ( struct sockaddr* )&servaddr, sizeof( servaddr ) ) == -1 )
             {
                 PLOG_ERROR.printf( "bind socket error: %s(errno: %d)\n", strerror( errno ), errno );
@@ -100,7 +107,7 @@ namespace JC_helper
                 //!接入一个客户端
                 PLOG_INFO << "client 连接成功,id = " << connfd;
 
-                while ( 1 )  //不断接收client的消息，直至client主动断开连接
+                while ( flag_init )  //不断接收client的消息，直至client主动断开连接
                 {
                     //** 不断接受数据 **//
 
