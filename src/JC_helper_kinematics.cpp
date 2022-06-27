@@ -239,8 +239,6 @@ namespace JC_helper
 
     int link_trajectory( std::vector< KDL::Frame >& traj, const KDL::Frame& start, const KDL::Frame& end, double max_path_v, double max_path_a )
     {
-  
-
         //** 变量初始化 **//
         KDL::Vector Pstart        = start.p;
         KDL::Vector Pend          = end.p;
@@ -777,7 +775,7 @@ namespace JC_helper
 
                 robot_ptr->hw_interface_->waitForSignal( 0 );
             }
-            else//计算失败，紧急停止
+            else  //计算失败，紧急停止
             {
                 PLOG_ERROR << "otg computation failed";
                 on_stop_trajectory = true;
@@ -807,8 +805,8 @@ namespace JC_helper
                 else
                 {
                     PLOG_ERROR << "Some errors such as disconnecting from the controller";
-                    PLOG_DEBUG << "new_velocity"<< output.new_velocity[0];
-                    PLOG_DEBUG << "new_acceleration"<<output.new_acceleration[0];
+                    PLOG_DEBUG << "new_velocity" << output.new_velocity[ 0 ];
+                    PLOG_DEBUG << "new_acceleration" << output.new_acceleration[ 0 ];
                     on_stop_trajectory = true;
                     input_lock.lock( );
                     input.control_interface = ruckig::ControlInterface::Velocity;
@@ -900,7 +898,7 @@ namespace JC_helper
         bool flag_from_last_rotation{ false };
         double t_last_rotation{ 0.001 };             //上段姿态运行时刻
         double dt_link{ 0 };                         //当前段段姿态运行时刻
-        constexpr double sleep_time{ 0.001 * 0.8 };  //最长睡眠时间为1ms,最高于这个值会导致运动不连续
+        constexpr double sleep_time{ 0.001 * 0.95 };  //最长睡眠时间为1ms,最高于这个值会导致运动不连续
 
         //**-------------------------------**//
 
@@ -2058,16 +2056,23 @@ namespace JC_helper
         KDL::Frame frame_target;
         int count = 0;
         KDL::JntArray _q_target( _joint_num );
-        std::vector< double > max_step;
 
-        KDL::ChainJntToJacSolver jnt2jac{ robot_ptr->kinematics_.getChain( ) };
-        KDL::Jacobian jac{ _joint_num };
+        KDL::JntArray current_pos( _joint_num );
+        KDL::JntArray last_pos( _joint_num );
+        KDL::JntArray last_last_pos( _joint_num );
+
         //**-------------------------------**//
 
+        //** 程序初始化 **//
         for ( int i = 0; i < _joint_num; i++ )
         {
-            max_step.push_back( robot_ptr->max_vel_[ i ] * 0.001 );
+            current_pos( i )   = robot_ptr->pos_[ i ];
+            last_pos( i )      = current_pos( i );
+            last_last_pos( i ) = current_pos( i );
         }
+
+        //**-------------------------------**//
+
 
         //第一次启动需要等待command()
         while ( *external_finished_flag_ptr )
@@ -2106,33 +2111,19 @@ namespace JC_helper
 
             //**-------------------------------**//
 
-            //** 避开奇异点 **//
-            jnt2jac.JntToJac( _q_target, jac );
-            // if ( abs( jac.data.determinant( ) ) < 0.001 )//临时修改
-            if ( 0)//临时修改
-            {
-                PLOG_ERROR << "target is a singular point det = "<<abs( jac.data.determinant( ) ) ;
+            //** 速度和加速度保护 **//
 
+            if ( on_stop_trajectory ) break;
+
+            last_last_pos = last_pos;
+            last_pos      = current_pos;
+            current_pos   = _q_target;
+
+            if ( check_vel_acc( current_pos, last_pos, last_last_pos, robot_ptr->max_vel_, robot_ptr->max_acc_ ) < 0 )
+            {
                 on_stop_trajectory = true;
                 break;
             }
-
-            //**-------------------------------**//
-            //** 速度保护 **//
-            for ( int i = 0; i < _joint_num; i++ )
-            {
-                if ( abs( _q_target( i ) - _q_init( i ) ) > max_step[ i ] )
-                {
-                    PLOG_ERROR << "joint[" << i << "] speep is too  fast";
-                    PLOG_ERROR << "target speed = " << abs( _q_target( i ) - _q_init( i ) )
-                               << " and  max_step=" << max_step[ i ];
-                    PLOG_ERROR << "_q_target( " << i << " )  = " << _q_target( i ) * 180 / M_PI;
-                    PLOG_ERROR << "_q_init( " << i << " ) =" << _q_init( i ) * 180 / M_PI;
-                    on_stop_trajectory = true;
-                    break;
-                }
-            }
-            if ( on_stop_trajectory ) break;
             //**-------------------------------**//
 
             lock_traj_joint.lock( );
@@ -2156,7 +2147,21 @@ namespace JC_helper
         int count{ 0 };
         KDL::JntArray joint_command;
         int _tick_count{ robot_ptr->tick_count };
+
+        KDL::JntArray current_pos( _joint_num );
+        KDL::JntArray last_pos( _joint_num );
+        KDL::JntArray last_last_pos( _joint_num );
         //**-------------------------------**//
+
+        //** 程序初始化 **//
+        for ( int i = 0; i < _joint_num; i++ )
+        {
+            current_pos( i )   = robot_ptr->pos_[ i ];
+            last_pos( i )      = current_pos( i );
+            last_last_pos( i ) = current_pos( i );
+        }
+        //**-------------------------------**//
+
 
         //第一次启动需要等待command()
         while ( *external_finished_flag_ptr )
@@ -2182,6 +2187,10 @@ namespace JC_helper
             }
 
             traj_joint_count++;
+
+            last_last_pos = last_pos;
+            last_pos      = current_pos;
+            current_pos   = joint_command;
             //**-------------------------------**//
 
             //** 位置伺服 **//
@@ -2217,9 +2226,9 @@ namespace JC_helper
         if ( on_stop_trajectory )
         {
             PLOG_ERROR << "motion触发紧急停止";
-            motion_stop( robot_ptr, std::ref(traj_joint), traj_joint_count);
-            // //! 触发急停后就冷静3秒，防止手一直按着触发急停
-            std::this_thread::sleep_for( std::chrono::duration< double >{ 2 } );
+            motion_stop( robot_ptr, current_pos,last_pos,last_last_pos );
+            // //! 触发急停后就冷静2秒，防止手一直按着触发急停
+            std::this_thread::sleep_for( std::chrono::duration< double >{ 1 } );
         }
         else
             PLOG_INFO << "motion 结束";
@@ -2270,10 +2279,9 @@ namespace JC_helper
     }
     int SmartServo_Cartesian::command( const KDL::Vector& tem_v, const char* str )
     {
-
         if ( strcmp( str, "FLANGE" ) == 0 )
             return command( target * KDL::Frame{ tem_v } );
-            
+
         else if ( strcmp( str, "BASE" ) == 0 )
             return command( KDL::Frame{ tem_v } * target );
 
@@ -2282,13 +2290,9 @@ namespace JC_helper
             PLOG_ERROR << "don't support this command type:" << str;
             return -1;
         }
-
-
-
     }
     int SmartServo_Cartesian::command( const KDL::Rotation& tem_r, const char* str )
     {
-
         if ( strcmp( str, "FLANGE" ) == 0 )
             return command( target * KDL::Frame{ tem_r } );
 
@@ -2604,176 +2608,143 @@ namespace JC_helper
         a = acceleration[ 0 ];
     }
 
-    void motion_stop( rocos::Robot* robot_ptr, const std::vector< KDL::JntArray > &traj_joint ,int traj_joint_count)
+    void motion_stop( rocos::Robot* robot_ptr, const  KDL::JntArray & current_pos, const  KDL::JntArray &last_pos, const  KDL::JntArray & last_last_pos)
     {
-            ruckig::Ruckig< _joint_num > otg{ 0.001 };
-            ruckig::InputParameter< _joint_num > input;
-            ruckig::OutputParameter< _joint_num > output;
-            ruckig::Result res;
-            int joint_index{ 0 };
-            KDL::ChainJntToJacSolver jnt2jac{robot_ptr->kinematics_.getChain()};
-            KDL::Jacobian jac{ _joint_num };
+        //** 变量初始化 **//
+        ruckig::Ruckig< _joint_num > otg{ 0.001 };
+        ruckig::InputParameter< _joint_num > input;
+        ruckig::OutputParameter< _joint_num > output;
+        ruckig::Result res;
+        //**-------------------------------**//
 
-            if ( traj_joint_count > 0 )
+        try
+        {
+
+            KDL::JntArray current_vel( _joint_num );
+            KDL::JntArray last_vel( _joint_num );
+            KDL::JntArray current_acc( _joint_num );
+
+            KDL::Subtract( current_pos, last_pos, current_vel );
+            KDL::Divide( current_vel,  0.001, current_vel );
+
+            KDL::Subtract( last_pos, last_last_pos, last_vel );
+            KDL::Divide( last_vel,  0.001, last_vel );
+
+            KDL::Subtract( current_vel, last_vel, current_acc );
+            KDL::Divide( current_acc,  0.001, current_acc );
+
+            input.control_interface = ruckig::ControlInterface::Velocity;
+            input.synchronization   = ruckig::Synchronization::None;
+
+            for ( int i = 0; i < _joint_num; i++ )
             {
-                // PLOG_DEBUG<< traj_joint_count;
-                jnt2jac.JntToJac( traj_joint[ traj_joint_count - 1 ], jac );
+                input.current_position[ i ] = robot_ptr->pos_[ i ]; 
+                //防止速度和加速度估计不准
+                //速度不可能超过50度
+                //加速度不可能超过80度
+                input.current_velocity[ i ]     = KDL::sign( current_vel( i ) ) * std::min( abs( current_vel( i ) ), robot_ptr->max_vel_[ i ] );
+                input.current_acceleration[ i ] = KDL::sign( current_acc( i ) ) * std::min( abs( current_acc( i ) ), robot_ptr->max_acc_[ i ] );
 
-                // if ( abs( jac.data.determinant( ) ) < 0.001 )//临时修改
-                if ( 0)//临时修改
-                {
-                    PLOG_ERROR << "接近奇异点，直接停止";
-                    joint_index = 0;
-                }
-                else if ( traj_joint_count > 50 )
-                    joint_index = 50;
-                // else if ( traj_joint_count > 40 )
-                //     joint_index = traj_joint_count - 1;
-                else
-                {
-                    joint_index = 0;
-                    PLOG_ERROR << "traj_joint 路径点太少，直接停止";
-                }
+                printf( "pos(%d)=  %f, vel(%d)= %f , last vel(%d)= %f , acc(%d)= %f \n", i, input.current_position[ i ] * 180 / M_PI, i, input.current_velocity[ i ] * 180 / M_PI, i, last_vel( i ) * 180 / M_PI, i, input.current_acceleration[ i ] * 180 / M_PI );
+
+                input.target_position[ i ]     = input.current_position[ i ];
+                input.target_velocity[ i ]     = 0;
+                input.target_acceleration[ i ] = 0;
+
+                input.max_velocity[ i ]     = robot_ptr->joints_[ i ]->getMaxVel( );
+                input.max_acceleration[ i ] = robot_ptr->joints_[ i ]->getMaxAcc( );
+                input.max_jerk[ i ]         = robot_ptr->joints_[ i ]->getMaxJerk( );
             }
-            else
-                joint_index = 0;
 
-            if ( joint_index )
+            while ( ( res = otg.update( input, output ) ) == ruckig::Result::Working )
             {
-                try
+                const auto& p = output.new_position;
+
+                for ( int i = 0; i < _joint_num; ++i )
                 {
-
-                    PLOG_ERROR << "traj_joint.size( )  = " << traj_joint.size( );
-                    PLOG_ERROR << "joint_index = " << joint_index;
-                    PLOG_ERROR << "traj_joint_count = " << traj_joint_count;
-
-                    int step = ( joint_index / 3 );
-
-
-                    KDL::JntArray sum(_joint_num);
-                    for ( int i{ 0 }; i < step; i++ )
-                    {
-                        KDL::Add( sum, traj_joint[ traj_joint_count - 1 - i ], sum );
-                    }
-                    KDL::Divide( sum, step, sum );
-                    KDL::JntArray current_pos{ sum };
-
-
-                    sum = KDL::JntArray( _joint_num );
-                    for ( int i{ step }; i < ( 2*step ); i++ )
-                    {
-                        KDL::Add( sum, traj_joint[ traj_joint_count - 1 - i ], sum );
-                    }
-                    KDL::Divide( sum, step, sum );
-                    KDL::JntArray last_pos{ sum };
-
-
-                    sum = KDL::JntArray( _joint_num );
-                    for ( int i{ 2*step }; i < ( 3 * step ); i++ )
-                    {
-                        KDL::Add( sum, traj_joint[ traj_joint_count - 1 - i ], sum );
-                    }
-                    KDL::Divide( sum, step, sum );
-                    KDL::JntArray last_last_pos{ sum };
-
-
-                    KDL::JntArray current_vel( _joint_num );
-                    KDL::JntArray last_vel( _joint_num );
-                    KDL::JntArray current_acc( _joint_num );
-
-                    KDL::Subtract( current_pos, last_pos, current_vel );
-                    // print_JntArray( "last_last_pos", last_last_pos );
-                    // print_JntArray( "last_pos", last_pos );
-                    // print_JntArray( "current_pos", current_pos );
-                    KDL::Divide( current_vel, step*0.001, current_vel );
-
-                    KDL::Subtract( last_pos, last_last_pos, last_vel );
-                    KDL::Divide( last_vel, step*0.001, last_vel );
-
-                    KDL::Subtract( current_vel, last_vel, current_acc );
-                    KDL::Divide( current_acc, step*0.001, current_acc );
-
-                    input.control_interface = ruckig::ControlInterface::Velocity;
-                    input.synchronization   = ruckig::Synchronization::None;
-
-                    for ( int i = 0; i < _joint_num; i++ )
-                    {
-                        input.current_position[ i ]     = robot_ptr->pos_[i]   ;//临时修改
-                        //防止速度和加速度估计不准
-                        //速度不可能超过50度
-                        //加速度不可能超过80度
-                        input.current_velocity[ i ]     = KDL::sign( current_vel( i ) ) * std::min( abs( current_vel( i ) ), 30*M_PI/180);//临时修改   按照Rviz 40%笛卡尔速度选取最大值，后面要改回来
-                        input.current_acceleration[ i ] = KDL::sign( current_acc( i ) ) * std::min( abs( current_acc( i ) ), 40*M_PI/180);//临时修改   按照Rviz 40%笛卡尔加速度选取最大值，后面要改回来
-
-                        printf( "pos(%d)=  %f, vel(%d)= %f , last vel(%d)= %f , acc(%d)= %f \n", i, input.current_position[ i ] * 180 / M_PI, i, input.current_velocity[ i ] * 180 / M_PI, i, last_vel( i ) * 180 / M_PI, i, input.current_acceleration[ i ] * 180 / M_PI );
-
-                        input.target_position[ i ]     = input.current_position[ i ] ;
-                        input.target_velocity[ i ]     = 0;
-                        input.target_acceleration[ i ] = 0;
-
-                        input.max_velocity[ i ]     = robot_ptr->joints_[ i ]->getMaxVel( );
-                        input.max_acceleration[ i ] = robot_ptr->joints_[ i ]->getMaxAcc( );
-                        input.max_jerk[ i ]         = robot_ptr->joints_[ i ]->getMaxJerk( );
-                    }
-
-                    while ( ( res = otg.update( input, output ) ) == ruckig::Result::Working )
-                    {
-                        const auto& p = output.new_position;
-
-                        for ( int i = 0; i < _joint_num; ++i )
-                        {
-                            robot_ptr->pos_[ i ] = p[ i ];
-                            robot_ptr->joints_[ i ]->setPosition( p[ i ] );
-                        }
-                        output.pass_to_input( input );
-                        robot_ptr->hw_interface_->waitForSignal( 0 );
-                    }
-
-                    if(res != ruckig::Result::Finished)
-                    {
-                        PLOG_ERROR << "OTG 计算失败,直接停止";
-                        for ( int i = 0; i < _joint_num; ++i )
-                        {
-                            robot_ptr->joints_[ i ]->setPosition( robot_ptr->pos_[ i ] );
-                        }
-                    }
-
+                    robot_ptr->pos_[ i ] = p[ i ];
+                    robot_ptr->joints_[ i ]->setPosition( p[ i ] );
                 }
-                catch ( const std::exception& e )
-                {
-                    PLOG_ERROR << e.what( );
-                    for ( int i = 0; i < _joint_num; ++i )
-                    {
-                        robot_ptr->joints_[ i ]->setPosition( robot_ptr->pos_[ i ] );
-                    }
-                }
-                catch ( ... )
-                {
-                    PLOG_ERROR << "未知错误";
-                    for ( int i = 0; i < _joint_num; ++i )
-                    {
-                        robot_ptr->joints_[ i ]->setPosition( robot_ptr->pos_[ i ] );
-                    }
-                }
+                output.pass_to_input( input );
+                robot_ptr->hw_interface_->waitForSignal( 0 );
             }
-            else
+
+            if ( res != ruckig::Result::Finished )
             {
+                PLOG_ERROR << "OTG 计算失败,直接停止";
                 for ( int i = 0; i < _joint_num; ++i )
                 {
                     robot_ptr->joints_[ i ]->setPosition( robot_ptr->pos_[ i ] );
                 }
             }
+        }
+        catch ( const std::exception& e )
+        {
+            PLOG_ERROR << e.what( );
+            for ( int i = 0; i < _joint_num; ++i )
+            {
+                robot_ptr->joints_[ i ]->setPosition( robot_ptr->pos_[ i ] );
+            }
+        }
+        catch ( ... )
+        {
+            PLOG_ERROR << "未知错误";
+            for ( int i = 0; i < _joint_num; ++i )
+            {
+                robot_ptr->joints_[ i ]->setPosition( robot_ptr->pos_[ i ] );
+            }
+        }
     }
 #pragma endregion
-// 40%
-// 关节速度
-// 0.136345  =7.81
-// -0.989712 = 60
 
-// 笛卡尔速度
-// 0.12  = 7.148117   0.35=20   30
-// 0.03 = 1.623903  0.03=1.636884   0.09 = 4.991709  ·50
+    int check_vel_acc( const KDL::JntArray& current_pos, const KDL::JntArray& last_pos, const KDL::JntArray& last_last_pos, const std::vector< double >& max_vel, const std::vector< double >& max_acc )
+    {
+        KDL::JntArray current_vel( _joint_num );
+        KDL::JntArray last_vel( _joint_num );
+        KDL::JntArray current_acc( _joint_num );
+
+        KDL::Subtract( current_pos, last_pos, current_vel );
+        KDL::Divide( current_vel, 0.001, current_vel );
+
+        KDL::Subtract( last_pos, last_last_pos, last_vel );
+        KDL::Divide( last_vel, 0.001, last_vel );
+
+        KDL::Subtract( current_vel, last_vel, current_acc );
+        KDL::Divide( current_acc, 0.001, current_acc );
+
+        for ( int i{ 0 }; i < _joint_num; i++ )
+        {
+            if ( current_vel( i ) > max_vel[i] )
+            {
+                PLOG_ERROR << "joint[" << i << "] velocity is too  fast";
+                PLOG_ERROR << "target velocity = " << current_vel( i )*180/M_PI
+                           << " and  max velocity=" << max_vel[i] *180/M_PI ;
+                PLOG_ERROR << "last_pos[" << i << "] =" << last_pos( i )*180/M_PI;
+                PLOG_ERROR << "current_pos[" << i << "] =" << current_pos( i )*180/M_PI;
+
+                return -1;
+            }
+
+            if ( current_acc( i ) > max_acc[ i ] )
+            {
+                PLOG_ERROR << "joint[" << i << "] acceleration is too  fast";
+                PLOG_ERROR << "target acceleration = " << current_acc( i ) * 180 / M_PI
+                           << " and  max acceleration=" << max_acc[ i ] * 180 / M_PI;
+                return -1;
+            }
+        }
+                return 0;
+
+    }
+
+   
+    // 40%
+    // 关节速度
+    // 0.136345  =7.81
+    // -0.989712 = 60
+
+    // 笛卡尔速度
+    // 0.12  = 7.148117   0.35=20   30
+    // 0.03 = 1.623903  0.03=1.636884   0.09 = 4.991709  ·50
 
 }  // namespace JC_helper
-
-

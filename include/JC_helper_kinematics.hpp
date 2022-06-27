@@ -318,7 +318,21 @@ namespace JC_helper
      * @param traj_joint 存储关节的轨迹
      * @param traj_joint_count =101代表0-100的关节都已经执行
      */
-    void motion_stop( rocos::Robot* robot_ptr, const std::vector< KDL::JntArray >& traj_joint, int traj_joint_count );
+       void motion_stop( rocos::Robot* robot_ptr, const  KDL::JntArray & current_pos, const  KDL::JntArray &last_pos, const  KDL::JntArray & last_last_pos);
+
+
+
+/**
+ * @brief 速度和加速度检查
+ * 
+ * @param current_pos 当前位置
+ * @param last_pos 上次位置
+ * @param last_last_pos 上上次位置
+ * @param max_vel 最大速度
+ * @param max_acc 最大加速度
+ * @return int 
+ */
+    int check_vel_acc( const KDL::JntArray& current_pos, const KDL::JntArray& last_pos, const KDL::JntArray& last_last_pos, const std::vector< double >& max_vel, const std::vector< double >& max_acc );
 
    
 }  // namespace JC_helper

@@ -114,7 +114,6 @@ private:
     KDL::Frame frame_offset{ };
     std::mutex mutex_traj_joint;
     std::atomic< bool > on_stop_trajectory{ false };
-    std::vector< KDL::JntArray > traj_joint;
     bool FinishRunPlanningIK{ false };
     ft_sensor  *my_ft_sensor_ptr{ nullptr };
     KDL::ChainIkSolverVel_pinv _ik_vel;
