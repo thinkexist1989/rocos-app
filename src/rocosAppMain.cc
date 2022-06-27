@@ -619,6 +619,17 @@ namespace rocos
 
         if ( str == std::string_view{ "run" } )
         {
+
+            KDL::JntArray _target(7);
+            _target(1)= -45*M_PI/180;
+            _target(3)= -90*M_PI/180;
+            _target( 5 ) = 45 * M_PI / 180;
+            MoveJ( _target, 1, 1, 0, 0, false );
+            for ( int i{ 0 }; i < 1000; i++ )
+            {
+                Dragging( DRAGGING_FLAG::BASE_X, DRAGGING_DIRRECTION::POSITION, 1, 1 );
+                std::this_thread::sleep_for( std::chrono::duration< double >( 0.002 ) );
+            }
         }
         else
         {
