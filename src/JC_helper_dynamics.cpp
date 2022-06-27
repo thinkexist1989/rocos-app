@@ -367,8 +367,7 @@ namespace JC_helper
             last_pos      = current_pos;
             current_pos   = _q_target;
 
-            std::vector< double > max_acc( _joint_num, 50 * M_PI / 180 );//临时修改,为了更安全
-            if ( check_vel_acc( current_pos, last_pos, last_last_pos, robot_ptr->max_vel_, max_acc   ) < 0 )
+            if ( check_vel_acc( current_pos, last_pos, last_last_pos, robot_ptr->max_vel_, robot_ptr->max_acc_ ) < 0 )
             {
                 on_stop_trajectory = true;
                 break;
@@ -517,8 +516,7 @@ namespace JC_helper
             last_pos      = current_pos;
             current_pos   = _q_target;
 
-            std::vector< double > max_acc( _joint_num, 50 * M_PI / 180 );//临时修改,为了更安全
-            if ( check_vel_acc( current_pos, last_pos, last_last_pos, robot_ptr->max_vel_,  max_acc   ) < 0 )
+            if ( check_vel_acc( current_pos, last_pos, last_last_pos, robot_ptr->max_vel_, robot_ptr->max_acc_ ) < 0 )
             {
                 on_stop_trajectory = true;
                 break;
