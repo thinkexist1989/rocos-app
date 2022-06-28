@@ -224,6 +224,7 @@ target_link_libraries(protocol
         ${_GRPC_GRPCPP}
         ${_PROTOBUF_LIBPROTOBUF}
         rocos::robot
+        z
         )
 add_library(rocos::protocol ALIAS protocol)
 
