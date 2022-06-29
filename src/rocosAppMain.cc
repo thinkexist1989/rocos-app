@@ -620,15 +620,75 @@ namespace rocos
         if ( str == std::string_view{ "run" } )
         {
 
-            KDL::JntArray _target(7);
-            _target(1)= -45*M_PI/180;
-            _target(3)= -90*M_PI/180;
-            _target( 5 ) = 45 * M_PI / 180;
-            MoveJ( _target, 1, 1, 0, 0, false );
-            for ( int i{ 0 }; i < 1000; i++ )
-            {
-                Dragging( DRAGGING_FLAG::BASE_X, DRAGGING_DIRRECTION::POSITION, 1, 1 );
-                std::this_thread::sleep_for( std::chrono::duration< double >( 0.002 ) );
+            using namespace KDL;
+            Frame f_p1;
+            Frame f_p2;
+            Frame f_p3;
+            Frame f_p4;
+            Frame f_p5;
+            KDL::JntArray q( 7 );
+
+            q( 0 ) = 0 * M_PI / 180;
+            q( 1 ) = -45 * M_PI / 180;
+            q( 2 ) = 0 * M_PI / 180;
+            q( 3 ) = -90* M_PI / 180;
+            q( 4 ) = 0 * M_PI / 180;
+            q( 5 ) = 45 * M_PI / 180;
+            q( 6 ) = 0 * M_PI / 180;
+
+            kinematics_.JntToCart( q, f_p1 );
+
+            {  //测试moveC
+
+                std::cout << "----------------test moveC start---------------" << std::endl;
+                f_p2 = f_p1 * Frame{ KDL::Rotation::RotX( 90 * M_PI / 180 ), Vector{ 0.0, -0.1, -0.1 } };
+                f_p3 = f_p1 * Frame{ KDL::Rotation::RotY( 90 * M_PI / 180 ), Vector{ 0.0, 0.0, -0.2 } };
+
+                MoveJ( q, 1, 1, 0, 0, false );
+
+                MoveC( f_p2, f_p3, 0.05, 0.05, 0, 0, Robot::OrientationMode::FIXED, false );
+
+              
+                std::cout << "----------------test moveC end---------------" << std::endl;
+            }
+
+            {  //测试moveL
+
+                std::cout << "----------------test moveL start---------------" << std::endl;
+
+                f_p2 = f_p1 * Frame{ KDL::Rotation::RotZ( 90 * M_PI / 180 ), Vector{ 0.1, 0.0, 0 } };
+               
+                MoveJ( q, 1, 1, 0, 0, false );
+                MoveL( f_p2, 0.01, 0.01, 0, 0, false );
+                std::cout << "----------------test moveL end---------------" << std::endl;
+            }
+
+            {  //测试moveL(只旋转，不移动)
+
+                std::cout << "----------------test moveL start---------------" << std::endl;
+                f_p2 = f_p1 * Frame{ KDL::Rotation::RotZ( 90 * M_PI / 180 ) };
+
+                MoveJ( q, 1, 1, 0, 0, false );
+                MoveL( f_p2, 0.01, 0.01, 0, 0, false );
+                std::cout << "----------------test moveL end---------------" << std::endl;
+            }
+
+            {  //测试MultiMoveL，
+                std::cout << "----------------test MultiMoveL start---------------" << std::endl;
+
+                MoveJ( q, 1, 1, 0, 0, false );
+                f_p1 = f_p1 * KDL::Frame{ KDL::Vector{ 0.0, -0.15, 0.0 } };
+                f_p2 = f_p1 * KDL::Frame{ KDL::Vector{ -0.3, 0.0, 0.0 } };
+                f_p3 = f_p2 * KDL::Frame{ KDL::Vector{ 0.0, 0.3, 0.0 } };
+                f_p4 = f_p3 * KDL::Frame{ KDL::Vector{ 0.3, 0.0, 0.0 } };
+
+                std::vector< KDL::Frame > points{ f_p1, f_p2, f_p3, f_p4 };
+                std::vector< double > max_path_v{ 0.10, 0.10, 0.10, 0.10 };
+                std::vector< double > max_path_a{ 0.2, 0.2, 0.2, 0.2 };
+                std::vector< double > bound_dist{ 0.05, 0.05, 0.05, 0.05 };
+
+                MultiMoveL( points, bound_dist, max_path_v, max_path_a, false );
+                std::cout << "----------------test MultiMoveL end---------------" << std::endl;
             }
         }
         else
