@@ -896,8 +896,8 @@ namespace JC_helper
         double path_a{ 0 };
         int OnlineDoubleS_count{ 1 };
         bool flag_from_last_rotation{ false };
-        double t_last_rotation{ 0.001 };             //上段姿态运行时刻
-        double dt_link{ 0 };                         //当前段段姿态运行时刻
+        double t_last_rotation{ 0.001 };              //上段姿态运行时刻
+        double dt_link{ 0 };                          //当前段段姿态运行时刻
         constexpr double sleep_time{ 0.001 * 0.95 };  //最长睡眠时间为1ms,最高于这个值会导致运动不连续
 
         //**-------------------------------**//
@@ -2073,7 +2073,6 @@ namespace JC_helper
 
         //**-------------------------------**//
 
-
         //第一次启动需要等待command()
         while ( *external_finished_flag_ptr )
             ;
@@ -2115,15 +2114,17 @@ namespace JC_helper
 
             if ( on_stop_trajectory ) break;
 
-            last_last_pos = last_pos;
-            last_pos      = current_pos;
-            current_pos   = _q_target;
 
-            if ( check_vel_acc( current_pos, last_pos, last_last_pos, robot_ptr->max_vel_, robot_ptr->max_acc_ ) < 0 )
+            if ( check_vel_acc( _q_target, current_pos, last_pos, robot_ptr->max_vel_, robot_ptr->max_acc_ ) < 0 )
             {
                 on_stop_trajectory = true;
                 break;
             }
+          
+            last_last_pos = last_pos;
+            last_pos      = current_pos;
+            current_pos   = _q_target;
+          
             //**-------------------------------**//
 
             lock_traj_joint.lock( );
@@ -2161,7 +2162,6 @@ namespace JC_helper
             last_last_pos( i ) = current_pos( i );
         }
         //**-------------------------------**//
-
 
         //第一次启动需要等待command()
         while ( *external_finished_flag_ptr )
@@ -2226,7 +2226,7 @@ namespace JC_helper
         if ( on_stop_trajectory )
         {
             PLOG_ERROR << "motion触发紧急停止";
-            motion_stop( robot_ptr, current_pos,last_pos,last_last_pos );
+            motion_stop( robot_ptr, current_pos, last_pos, last_last_pos );
             // //! 触发急停后就冷静2秒，防止手一直按着触发急停
             std::this_thread::sleep_for( std::chrono::duration< double >{ 1 } );
         }
@@ -2608,7 +2608,7 @@ namespace JC_helper
         a = acceleration[ 0 ];
     }
 
-    void motion_stop( rocos::Robot* robot_ptr, const  KDL::JntArray & current_pos, const  KDL::JntArray &last_pos, const  KDL::JntArray & last_last_pos)
+    void motion_stop( rocos::Robot* robot_ptr, const KDL::JntArray& current_pos, const KDL::JntArray& last_pos, const KDL::JntArray& last_last_pos )
     {
         //** 变量初始化 **//
         ruckig::Ruckig< _joint_num > otg{ 0.001 };
@@ -2619,26 +2619,25 @@ namespace JC_helper
 
         try
         {
-
             KDL::JntArray current_vel( _joint_num );
             KDL::JntArray last_vel( _joint_num );
             KDL::JntArray current_acc( _joint_num );
 
             KDL::Subtract( current_pos, last_pos, current_vel );
-            KDL::Divide( current_vel,  0.001, current_vel );
+            KDL::Divide( current_vel, 0.001, current_vel );
 
             KDL::Subtract( last_pos, last_last_pos, last_vel );
-            KDL::Divide( last_vel,  0.001, last_vel );
+            KDL::Divide( last_vel, 0.001, last_vel );
 
             KDL::Subtract( current_vel, last_vel, current_acc );
-            KDL::Divide( current_acc,  0.001, current_acc );
+            KDL::Divide( current_acc, 0.001, current_acc );
 
             input.control_interface = ruckig::ControlInterface::Velocity;
             input.synchronization   = ruckig::Synchronization::None;
 
             for ( int i = 0; i < _joint_num; i++ )
             {
-                input.current_position[ i ] = robot_ptr->pos_[ i ]; 
+                input.current_position[ i ] = robot_ptr->pos_[ i ];
                 //防止速度和加速度估计不准
                 //速度不可能超过50度
                 //加速度不可能超过80度
@@ -2695,6 +2694,7 @@ namespace JC_helper
             }
         }
     }
+
 #pragma endregion
 
     int check_vel_acc( const KDL::JntArray& current_pos, const KDL::JntArray& last_pos, const KDL::JntArray& last_last_pos, const std::vector< double >& max_vel, const std::vector< double >& max_acc )
@@ -2714,13 +2714,13 @@ namespace JC_helper
 
         for ( int i{ 0 }; i < _joint_num; i++ )
         {
-            if ( current_vel( i ) > max_vel[i] )
+            if ( current_vel( i ) > max_vel[ i ] )
             {
                 PLOG_ERROR << "joint[" << i << "] velocity is too  fast";
-                PLOG_ERROR << "target velocity = " << current_vel( i )*180/M_PI
-                           << " and  max velocity=" << max_vel[i] *180/M_PI ;
-                PLOG_ERROR << "last_pos[" << i << "] =" << last_pos( i )*180/M_PI;
-                PLOG_ERROR << "current_pos[" << i << "] =" << current_pos( i )*180/M_PI;
+                PLOG_ERROR << "target velocity = " << current_vel( i ) * 180 / M_PI
+                           << " and  max velocity=" << max_vel[ i ] * 180 / M_PI;
+                PLOG_ERROR << "last_pos[" << i << "] =" << last_pos( i ) * 180 / M_PI;
+                PLOG_ERROR << "current_pos[" << i << "] =" << current_pos( i ) * 180 / M_PI;
 
                 return -1;
             }
@@ -2733,18 +2733,9 @@ namespace JC_helper
                 return -1;
             }
         }
-                return 0;
-
+        return 0;
     }
 
-   
-    // 40%
-    // 关节速度
-    // 0.136345  =7.81
-    // -0.989712 = 60
 
-    // 笛卡尔速度
-    // 0.12  = 7.148117   0.35=20   30
-    // 0.03 = 1.623903  0.03=1.636884   0.09 = 4.991709  ·50
 
 }  // namespace JC_helper

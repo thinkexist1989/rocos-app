@@ -363,15 +363,17 @@ namespace JC_helper
 
             if ( on_stop_trajectory ) break;
 
-            last_last_pos = last_pos;
-            last_pos      = current_pos;
-            current_pos   = _q_target;
 
-            if ( check_vel_acc( current_pos, last_pos, last_last_pos, robot_ptr->max_vel_, robot_ptr->max_acc_ ) < 0 )
+            if ( check_vel_acc( _q_target, current_pos, last_pos, robot_ptr->max_vel_, robot_ptr->max_acc_ ) < 0 )
             {
                 on_stop_trajectory = true;
                 break;
             }
+
+            last_last_pos = last_pos;
+            last_pos      = current_pos;
+            current_pos   = _q_target;
+
             //**-------------------------------**//
 
             //** csv打印 **//
@@ -512,15 +514,17 @@ namespace JC_helper
 
             if ( on_stop_trajectory ) break;
 
-            last_last_pos = last_pos;
-            last_pos      = current_pos;
-            current_pos   = _q_target;
-
-            if ( check_vel_acc( current_pos, last_pos, last_last_pos, robot_ptr->max_vel_, robot_ptr->max_acc_ ) < 0 )
+        
+            if ( check_vel_acc( _q_target, current_pos, last_pos, robot_ptr->max_vel_, robot_ptr->max_acc_ ) < 0 )
             {
                 on_stop_trajectory = true;
                 break;
             }
+
+            last_last_pos = last_pos;
+            last_pos      = current_pos;
+            current_pos   = _q_target;
+
             //**-------------------------------**//
 
             //** csv打印 **//
