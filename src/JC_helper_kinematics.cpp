@@ -851,6 +851,7 @@ namespace JC_helper
 #pragma endregion
 
 #pragma region  //*笛卡尔空间点动功能实现
+#if 0
     SmartServo_Cartesian::SmartServo_Cartesian( std::atomic< bool >* finished_flag_ptr )
     {
         external_finished_flag_ptr = finished_flag_ptr;
@@ -1056,7 +1057,7 @@ namespace JC_helper
                     }
                     else if ( _command_flag >= 2 )
                     {
-#pragma region  //** 公共参数设置 **//
+#    pragma region     //** 公共参数设置 **//
 
                         Vector p1{ path_p.p };
                         Vector p_mid{ last_target.p };
@@ -1070,7 +1071,7 @@ namespace JC_helper
                         double alpha         = acos( cos_alpha );
                         double radius        = 0;
                         PLOG_DEBUG;
-#pragma endregion  //**-------------------------------**//
+#    pragma endregion  //**-------------------------------**//
 
                         //! 0度平行和只旋转目标 处理在此
                         if ( ( 1 - cos_alpha ) <= big_eps || bc.Norm( ) < 5 * big_eps )
@@ -1079,7 +1080,7 @@ namespace JC_helper
                             alpha  = 0;
                             radius = 0;
 
-#pragma region  //**路径在线doubleS参数设置 **//
+#    pragma region  //**路径在线doubleS参数设置 **//
                             double length_circle_link{ ( target.p - path_p.p ).Norm( ) };
 
                             if ( length_circle_link <= eps )  //!两段直线都为虚直线，在后面会重新正确计算
@@ -1091,9 +1092,9 @@ namespace JC_helper
                             KDL::Vector ration_axis;
                             double angle = R_stat_end.GetRotAngle( ration_axis );  //新目标的旋转角度
 
-#pragma endregion  //**-------------------------------**//
+#    pragma endregion  //**-------------------------------**//
 
-#pragma region  //**上段姿态在线doubleS参数设置 **//
+#    pragma region  //**上段姿态在线doubleS参数设置 **//
                             double s_r{ 0 };
                             double sd_r{ 0 };
                             double sdd_r{ 0 };
@@ -1139,9 +1140,9 @@ namespace JC_helper
                             // PLOG_ERROR << "last sd_r at end time  = " << var2;
                             // PLOG_ERROR << "last sdd_r at end time  = " << var3;
 
-#pragma endregion  //**-------------------------------**//
+#    pragma endregion  //**-------------------------------**//
 
-#pragma region  //**本段姿态在线doubleS参数设置 **//
+#    pragma region  //**本段姿态在线doubleS参数设置 **//
 
                             bool flag_is_same_axis{ false };
 
@@ -1182,7 +1183,7 @@ namespace JC_helper
                             // PLOG_ERROR << "sd_r at end time  = " << sd_r;
                             // PLOG_ERROR << "sdd_r at end time  = " << sdd_r;
 
-#pragma endregion  //**-------------------------------**//
+#    pragma endregion  //**-------------------------------**//
 
                             //两段虚直线时，把路劲时间限制为两段姿态的时间，那么0>1时，所用时间也正好时总姿态时间,并且截取到后两位
                             //截取的原因：_OnlineDoubleS对时间计算不精确，导致s_p=1时，略超过了预定的时间
@@ -1501,7 +1502,7 @@ namespace JC_helper
                             alpha  = M_PI;
                             radius = 0;
 
-#pragma region  //**路径在线doubleS参数设置 **//
+#    pragma region  //**路径在线doubleS参数设置 **//
 
                             double s_p{ 0 };
                             double sd_p{ 0 };
@@ -1510,9 +1511,9 @@ namespace JC_helper
                             double length_circle_link{ ( last_target.p - path_p.p ).Norm( ) };
                             _OnlineDoubleS.calculate( 0, 1, path_v / length_circle_link, 0, path_a / length_circle_link, 0, max_path_v / length_circle_link, max_path_a / length_circle_link, 2 * max_path_a / length_circle_link );
 
-#pragma endregion  //**-------------------------------**//
+#    pragma endregion  //**-------------------------------**//
 
-#pragma region  //**姿态在线doubleS参数设置 **//
+#    pragma region  //**姿态在线doubleS参数设置 **//
                             double s_r{ 0 };
                             double sd_r{ 0 };
                             double sdd_r{ 0 };
@@ -1525,7 +1526,7 @@ namespace JC_helper
                             _last_rotaion_OnlineDoubleS.calculate( s_r, 1, sd_r, 0, sdd_r, 0, 1e7, 1e7, 1e7, _OnlineDoubleS.get_duration( ) );
                             double last_ratation_duration{ _last_rotaion_OnlineDoubleS.get_duration( ) };
 
-#pragma endregion  //**-------------------------------**//
+#    pragma endregion  //**-------------------------------**//
 
                             PLOG_DEBUG;
 
@@ -1640,7 +1641,7 @@ namespace JC_helper
                         else
                         {
                             PLOG_DEBUG;
-#pragma region  //** 圆弧参数设置 **//
+#    pragma region     //** 圆弧参数设置 **//
 
                             radius = remain_length * tan( ( M_PI - alpha ) / 2 );
 
@@ -1671,16 +1672,16 @@ namespace JC_helper
                                 throw "Z Axis Calculation error";
                             }
                             F_base_circleCenter.M = KDL::Rotation{ V_base_t, ( z * V_base_t ), z };
-#pragma endregion  //**-------------------------------**//
+#    pragma endregion  //**-------------------------------**//
 
-#pragma region  //**路径在线doubleS参数设置 **//
+#    pragma region  //**路径在线doubleS参数设置 **//
                             double length_circle_link{ ( ( target.p - F_base_circleend.p ).Norm( ) < eps ? 0 : ( target.p - F_base_circleend.p ).Norm( ) ) + alpha * radius };
                             double bound_length = alpha * radius / length_circle_link;  //圆弧段长占总长百分比
                             _OnlineDoubleS.calculate( 0, 1, path_v / length_circle_link, 0, path_a / length_circle_link, 0, max_path_v / length_circle_link, max_path_a / length_circle_link, 2 * max_path_a / length_circle_link );
 
-#pragma endregion  //**-------------------------------**//
+#    pragma endregion  //**-------------------------------**//
 
-#pragma region  //** 直线段参数设置 **//
+#    pragma region     //** 直线段参数设置 **//
 
                             KDL::Rotation R_stat_end = last_target.M.Inverse( ) * target.M;
                             KDL::Vector ration_axis;
@@ -1688,9 +1689,9 @@ namespace JC_helper
                             double ratation_length = ( equivalent_radius * abs( angle ) );
                             double path_length     = ( target.p - F_base_circleend.p ).Norm( );
                             double length          = std::max( ratation_length, path_length );
-#pragma endregion  //**-------------------------------**//
+#    pragma endregion  //**-------------------------------**//
 
-#pragma region  //**上段姿态在线doubleS参数设置 **//
+#    pragma region  //**上段姿态在线doubleS参数设置 **//
                             double s_r{ 0 };
                             double sd_r{ 0 };
                             double sdd_r{ 0 };
@@ -1706,14 +1707,14 @@ namespace JC_helper
                             _last_rotaion_OnlineDoubleS.calculate( s_r, 1, sd_r, 0, sdd_r, 0, 1e7, 1e7, 1e7, _OnlineDoubleS.get_duration( ) * radio_angle );
                             double last_ratation_duration{ abs( remain_angle ) < eps ? 0 : _last_rotaion_OnlineDoubleS.get_duration( ) };
 
-#pragma endregion  //**-------------------------------**//
+#    pragma endregion  //**-------------------------------**//
 
-#pragma region  //**本段姿态在线doubleS参数设置 **//
+#    pragma region  //**本段姿态在线doubleS参数设置 **//
 
                             _rotaion_OnlineDoubleS.calculate( 0, 1, 0, 0, 0, 0, 1e7, 1e7, 1e7, _OnlineDoubleS.get_duration( ) * ( 1 - radio_angle ) );
                             double ratation_duration{ abs( angle ) < eps ? 0 : _rotaion_OnlineDoubleS.get_duration( ) };
 
-#pragma endregion  //**-------------------------------**//
+#    pragma endregion  //**-------------------------------**//
 
                             double s_p{ 0 };
                             double sd_p{ 0 };
@@ -2226,7 +2227,7 @@ namespace JC_helper
         if ( on_stop_trajectory )
         {
             PLOG_ERROR << "motion触发紧急停止";
-            motion_stop( robot_ptr, current_pos, last_pos, last_last_pos );
+            Joint_stop( robot_ptr, current_pos, last_pos, last_last_pos );
             // //! 触发急停后就冷静2秒，防止手一直按着触发急停
             std::this_thread::sleep_for( std::chrono::duration< double >{ 1 } );
         }
@@ -2608,7 +2609,237 @@ namespace JC_helper
         a = acceleration[ 0 ];
     }
 
-    void motion_stop( rocos::Robot* robot_ptr, const KDL::JntArray& current_pos, const KDL::JntArray& last_pos, const KDL::JntArray& last_last_pos )
+#endif
+
+    SmartServo_Cartesian::SmartServo_Cartesian( std::atomic< bool >* finished_flag_ptr  , const KDL::Chain& robot_chain ) : _ik_vel{ robot_chain }
+    {
+        joint_current.resize( _joint_num );
+        joint_target.resize( _joint_num );
+        joint_vel.resize( _joint_num );
+        joint_last_vel.resize( _joint_num );
+        joint_last_pos.resize( _joint_num );
+        joint_last_last_pos.resize( _joint_num );
+        external_finished_flag_ptr = finished_flag_ptr;
+    }
+
+    void SmartServo_Cartesian::init( const KDL::JntArray& joint_init, double target_vel, double max_vel , double max_acc , double max_jerk )
+    {
+        input.current_position[ 0 ]     = 0;
+        input.current_velocity[ 0 ]     = 0;
+        input.current_acceleration[ 0 ] = 0;
+
+        input.target_position[ 0 ]     = 0;
+        input.target_velocity[ 0 ]     = target_vel;
+        input.target_acceleration[ 0 ] = 0;
+
+        input.max_velocity[ 0 ]     = max_vel;
+        input.max_acceleration[ 0 ] = max_acc;
+        input.max_jerk[ 0 ]         = max_jerk;
+
+        input.control_interface = ruckig::ControlInterface::Velocity;
+        input.synchronization   = ruckig::Synchronization::None;
+
+        flag_stop = false;
+
+        joint_current = joint_init;
+        joint_target  = joint_init;
+
+        KDL::SetToZero( joint_vel );
+        KDL::SetToZero( joint_last_vel );
+
+
+        joint_last_pos      = joint_init;
+        joint_last_last_pos = joint_init;
+
+        _Cartesian_vel_index =0;//0代表无方向
+
+        _reference_frame.clear( ); //空字符代表无参考坐标系
+
+           PLOG_INFO << "笛卡尔空间点动初始化完成";
+    }
+
+    int SmartServo_Cartesian::update( KDL::JntArray& joint_vel ,rocos::Robot * robot_ptr)
+    {
+        KDL::SetToZero( joint_vel );
+        KDL::Twist Cartesian_vel{ };
+
+        res = otg.update( input, output );
+
+        if ( res != ruckig::Result::Working && res != ruckig::Result::Finished )
+        {
+            PLOG_ERROR << "OTG 计算失败";
+            return -1;
+        }
+
+        const auto& res_vel = output.new_velocity;
+
+        if ( abs( _Cartesian_vel_index ) <= 3 )  //移动
+        {
+            Cartesian_vel.vel[ abs( _Cartesian_vel_index )-1 ] = sign( _Cartesian_vel_index ) * res_vel[ 0 ];
+        }
+        else  //旋转
+        {
+            Cartesian_vel.rot[ abs( _Cartesian_vel_index ) - 4 ] = sign( _Cartesian_vel_index ) * res_vel[ 0 ];
+        }
+
+        if(_reference_frame.compare("flange")==0)
+        {  //** 转变速度矢量的参考系，由flange系变为base系，但没有改变参考点（还是flange） **//
+            Cartesian_vel = robot_ptr->flange_.M * Cartesian_vel;
+        }
+
+        output.pass_to_input( input );
+
+        //!雅克比默认参考系为base,参考点为flange
+        if ( _ik_vel.CartToJnt( joint_current, Cartesian_vel, joint_vel ) != 0 )
+        {
+            PLOG_DEBUG<< _ik_vel.CartToJnt( joint_current, Cartesian_vel, joint_vel );
+            PLOG_ERROR << "雅克比计算错误";
+            return -1;
+        }
+
+        if ( res == ruckig::Result::Working )
+        {
+            return 1;
+        }
+        else
+        {
+            // PLOG_INFO << "完成！";
+            return 0;
+        }
+    }
+
+    void SmartServo_Cartesian::RunMotion( rocos::Robot* robot_ptr )
+    {
+        int t_count = 0;            //时间计数
+        int _tick_count{ robot_ptr->tick_count };
+        
+        //! 由init()保证成立，由command()来打破
+        while (*external_finished_flag_ptr) 
+        {
+            ;  //等待指令
+        }
+
+        while ( 1 )
+        {
+            if ( !flag_stop )
+                t_count++;
+
+            if ( t_count > 100 )
+            {
+                t_count = 0;
+                if ( _tick_count != robot_ptr->tick_count  )
+                    _tick_count = robot_ptr->tick_count ;
+                else
+                {
+                    PLOG_ERROR << "心跳超时，停止！";
+                    Cartesian_stop( );//速度目标设置为0
+                }
+            }
+
+            int res = update( joint_vel,robot_ptr );
+
+            if ( res < 0 )  // OTG的 error 状态
+            {
+                //关节空间急停
+                flag_stop = true;
+                Joint_stop( robot_ptr, joint_current, joint_last_pos, joint_last_last_pos );
+                sleep( 2 );
+                break;
+            }
+            else  // working 或者finished状态
+            {
+                KDL::Add( joint_last_vel, joint_vel, joint_vel );
+                KDL::Multiply( joint_vel, 0.5, joint_vel );
+                joint_last_vel = joint_vel;
+
+                KDL::Multiply( joint_vel, servo_dt, joint_vel );
+                KDL::Add( joint_current, joint_vel, joint_target );
+
+                //** 速度和加速度保护 **//
+                static std::vector<double> max_acc(_joint_num,2);
+                if ( check_vel_acc( joint_target, joint_current, joint_last_pos, robot_ptr->max_vel_,max_acc ) < 0 )
+                {
+                    //关节空间急停
+                    flag_stop = true;
+                    Joint_stop( robot_ptr, joint_current, joint_last_pos, joint_last_last_pos );
+                    sleep( 2 );
+                    break;
+                }
+
+                joint_last_last_pos = joint_last_pos;
+                joint_last_pos      = joint_current;
+                joint_current       = joint_target;
+
+                //**-------------------------------**//
+
+                //** 位置伺服 **//
+                for ( int i = 0; i < _joint_num; ++i )
+                {
+                    robot_ptr->pos_[ i ] = joint_target( i );
+                    robot_ptr->joints_[ i ]->setPosition( joint_target( i ) );
+                }
+                robot_ptr->hw_interface_->waitForSignal( 0 );
+                //**-------------------------------**//
+
+                if ( res == 0 && flag_stop )  // finished 状态
+                {
+                    PLOG_INFO << "笛卡尔空间急停已完成";
+
+                    break;
+                }
+            }
+        }
+
+        ( *external_finished_flag_ptr ) = true;   //这次smart servo已结束，等待下一次smart servo
+        robot_ptr->is_running_motion    = false;  //机械臂运动已结束，可以执行其他离线类运动
+        PLOG_INFO << "笛卡尔空间点动全部结束";
+    }
+
+    void SmartServo_Cartesian::command( int Cartesian_vel_index,const char * reference_frame )
+    {
+
+        if ( _Cartesian_vel_index == 0 )
+            _Cartesian_vel_index = Cartesian_vel_index;
+
+        if ( _reference_frame.empty( ) )
+            _reference_frame = reference_frame;
+
+
+        if ( !flag_stop )
+        {
+            if ( _Cartesian_vel_index != Cartesian_vel_index )
+            {
+                PLOG_ERROR << "方向变换，停止！";
+                Cartesian_stop( );
+            }
+            else if(_reference_frame.compare( reference_frame )!=0)
+            {
+                PLOG_ERROR << "参考坐标系变换，停止！";
+                Cartesian_stop( );
+            }
+            else
+                *external_finished_flag_ptr = false;
+        }
+        else
+            PLOG_ERROR << "紧急停止中,不允许修改目标";
+    }
+
+    void SmartServo_Cartesian::Cartesian_stop(double max_vel , double max_acc , double max_jerk  )
+    {
+        flag_stop                      = true;
+        input.target_position[ 0 ]     = 0;
+        input.target_velocity[ 0 ]     = 0;
+        input.target_acceleration[ 0 ] = 0;
+
+        input.max_velocity[ 0 ]     = max_vel;
+        input.max_acceleration[ 0 ] = max_acc;
+        input.max_jerk[ 0 ]         = max_jerk;
+    }
+
+
+#pragma endregion
+
+    void Joint_stop( rocos::Robot* robot_ptr, const KDL::JntArray& current_pos, const KDL::JntArray& last_pos, const KDL::JntArray& last_last_pos )
     {
         //** 变量初始化 **//
         ruckig::Ruckig< _joint_num > otg{ 0.001 };
@@ -2652,7 +2883,10 @@ namespace JC_helper
 
                 input.max_velocity[ i ]     = robot_ptr->joints_[ i ]->getMaxVel( );
                 input.max_acceleration[ i ] = robot_ptr->joints_[ i ]->getMaxAcc( );
+                PLOG_DEBUG<<  robot_ptr->joints_[ i ]->getMaxAcc( );
                 input.max_jerk[ i ]         = robot_ptr->joints_[ i ]->getMaxJerk( );
+                PLOG_DEBUG<<  robot_ptr->joints_[ i ]->getMaxJerk( );
+
             }
 
             while ( ( res = otg.update( input, output ) ) == ruckig::Result::Working )
@@ -2676,6 +2910,8 @@ namespace JC_helper
                     robot_ptr->joints_[ i ]->setPosition( robot_ptr->pos_[ i ] );
                 }
             }
+            else
+                PLOG_INFO << "关节空间急停已完成";
         }
         catch ( const std::exception& e )
         {
@@ -2695,7 +2931,6 @@ namespace JC_helper
         }
     }
 
-#pragma endregion
 
     int check_vel_acc( const KDL::JntArray& current_pos, const KDL::JntArray& last_pos, const KDL::JntArray& last_last_pos, const std::vector< double >& max_vel, const std::vector< double >& max_acc )
     {
@@ -2735,7 +2970,5 @@ namespace JC_helper
         }
         return 0;
     }
-
-
 
 }  // namespace JC_helper

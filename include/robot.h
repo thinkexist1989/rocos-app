@@ -582,11 +582,12 @@ namespace rocos {
     public:
         friend void JC_helper::SmartServo_Joint::RunSmartServo(rocos::Robot *);
 
-        friend void JC_helper::SmartServo_Cartesian::RunSmartServo_Ik(rocos::Robot *);
 
-        friend void JC_helper::SmartServo_Cartesian::RunSmartServo_Motion(rocos::Robot *);
+        friend int JC_helper::SmartServo_Cartesian::update( KDL::JntArray& joint_vel, rocos::Robot* robot_ptr );
 
-        friend void JC_helper::motion_stop( rocos::Robot* robot_ptr, const KDL::JntArray& current_pos, const KDL::JntArray& last_pos, const KDL::JntArray& last_last_pos );
+        friend void JC_helper::SmartServo_Cartesian::RunMotion( rocos::Robot* );
+
+        friend void JC_helper::Joint_stop( rocos::Robot* robot_ptr, const KDL::JntArray& current_pos, const KDL::JntArray& last_pos, const KDL::JntArray& last_last_pos );
 
         friend class JC_helper::admittance ;
 

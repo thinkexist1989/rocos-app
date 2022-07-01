@@ -716,7 +716,7 @@ int main( int argc, char* argv[] )
     //** 等待主站清除共享内存,25后再启动APP **//
     std::cerr << "\033[32m"
               << "等待主站清除共享内存" << std::endl;
-    std::this_thread::sleep_for( std::chrono::duration< double >( 15 ) );
+    std::this_thread::sleep_for( std::chrono::duration< double >( 10 ) );
     //**-------------------------------**//
 
     boost::shared_ptr< HardwareInterface > hw = boost::make_shared< HardwareSim >( 7 );  // 仿真

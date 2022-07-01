@@ -62,7 +62,7 @@ namespace rocos {
 //        kinematics_.initTechServo();
 
         static plog::ColorConsoleAppender< plog::TxtFormatter > consoleAppender;
-        plog::init< 0 >( plog::info, &consoleAppender );//终端显示                                                                      // Initialize the logger.
+        plog::init< 0 >( plog::debug, &consoleAppender );//终端显示                                                                      // Initialize the logger.
 
                                                                         
         startMotionThread( );
@@ -1095,10 +1095,8 @@ namespace rocos {
         //** 变量初始化 **//
         static std::atomic< bool > _dragging_finished_flag{ true };
         static JC_helper::SmartServo_Joint _SmartServo_Joint{ &_dragging_finished_flag };
-        static JC_helper::SmartServo_Cartesian _SmartServo_Cartesian{ &_dragging_finished_flag };
+        static JC_helper::SmartServo_Cartesian _SmartServo_Cartesian{ &_dragging_finished_flag , kinematics_.getChain() };
         static std::shared_ptr< boost::thread > _thread_planning{ nullptr };
-        static std::shared_ptr< boost::thread > _thread_IK{ nullptr };
-        static std::shared_ptr< boost::thread > _thread_motion{ nullptr };
         KDL::JntArray target_joint{ static_cast< unsigned int >( jnt_num_ ) };
         KDL::Frame target_frame{ };
         int index{ static_cast< int >( flag ) };
@@ -1208,20 +1206,13 @@ namespace rocos {
                 _thread_planning->join( );
                 _thread_planning = nullptr;
             }
-            if ( _thread_IK )
-            {
-                _thread_IK->join( );
-                _thread_IK = nullptr;
-            }
-            if ( _thread_motion )
-            {
-                _thread_motion->join( );
-                _thread_motion = nullptr;
-            }
-            _SmartServo_Cartesian.init( JC_helper::vector_2_JntArray( pos_ ), flange_, 0, 0, max_speed, max_acceleration, 2 * max_acceleration );
-            _thread_planning.reset( new boost::thread{ &JC_helper::SmartServo_Cartesian::RunSmartServo_Plannig, &_SmartServo_Cartesian } );
-            _thread_IK.reset( new boost::thread{ &JC_helper::SmartServo_Cartesian::RunSmartServo_Ik, &_SmartServo_Cartesian, this } );
-            _thread_motion.reset( new boost::thread{ &JC_helper::SmartServo_Cartesian::RunSmartServo_Motion, &_SmartServo_Cartesian, this } );
+
+            if ( index % 10 <= 2 )
+                _SmartServo_Cartesian.init( JC_helper::vector_2_JntArray( pos_ ), max_speed * 0.15 );
+            else
+                _SmartServo_Cartesian.init( JC_helper::vector_2_JntArray( pos_ ), max_speed * 0.5);
+
+                _thread_planning.reset( new boost::thread{ &JC_helper::SmartServo_Cartesian::RunMotion, &_SmartServo_Cartesian, this } );
         }
         //**-------------------------------**//
 
@@ -1251,31 +1242,10 @@ namespace rocos {
             case DRAGGING_FLAG::FLANGE_PITCH:
             case DRAGGING_FLAG::FLANGE_YAW:
 
-                index = index - static_cast< int >( DRAGGING_FLAG::FLANGE_X );
+                index = index - static_cast< int >( DRAGGING_FLAG::FLANGE_X ) + 1;
 
-                if ( index <= 2 )
-                {
-                    KDL::Vector tem_vector{ };
-                    tem_vector( index ) = static_cast< double >( dir ) * max_speed * vector_speed_scale;
-                    res                 = _SmartServo_Cartesian.command( tem_vector ,"FLANGE");
-                }
-                else
-                {
-                    KDL::Rotation tem_rotation{ };
-                    switch ( index - 3 )
-                    {
-                        case 0: tem_rotation = KDL::Rotation::RotX( static_cast< double >( dir ) * max_speed * rotation_speed_scale ); break;
-                        case 1: tem_rotation = KDL::Rotation::RotY( static_cast< double >( dir ) * max_speed * rotation_speed_scale ); break;
-                        case 2: tem_rotation = KDL::Rotation::RotZ( static_cast< double >( dir ) * max_speed * rotation_speed_scale ); break;
-                    }
-                    res = _SmartServo_Cartesian.command( tem_rotation ,"FLANGE");
-                }
-
-                if ( res < 0 )
-                    PLOG_DEBUG << "执行失败";
-                else
-                    PLOG_DEBUG << "执行成功";
-
+                index = index * static_cast< double >( dir );
+                _SmartServo_Cartesian.command( index, "flange" );
                 break;
 
             case DRAGGING_FLAG::TOOL_X:
@@ -1285,30 +1255,8 @@ namespace rocos {
             case DRAGGING_FLAG::TOOL_PITCH:
             case DRAGGING_FLAG::TOOL_YAW:
 
-                index = index - static_cast< int >( DRAGGING_FLAG::TOOL_X );
-
-                if ( index <= 2 )  // TODO 没有tool 系，用base系
-                {
-                    KDL::Vector tem_vector{ };
-                    tem_vector( index ) = static_cast< double >( dir ) * max_speed * vector_speed_scale;
-                    res                 = _SmartServo_Cartesian.command( tem_vector,"TOOL" );
-                }
-                else  // TODO 没有tool 系，用base系
-                {
-                    KDL::Rotation tem_rotation{ };
-                    switch ( index - 3 )
-                    {
-                        case 0: tem_rotation = KDL::Rotation::RotX( static_cast< double >( dir ) * max_speed * rotation_speed_scale ); break;
-                        case 1: tem_rotation = KDL::Rotation::RotY( static_cast< double >( dir ) * max_speed * rotation_speed_scale ); break;
-                        case 2: tem_rotation = KDL::Rotation::RotZ( static_cast< double >( dir ) * max_speed * rotation_speed_scale ); break;
-                    }
-                    res = _SmartServo_Cartesian.command( tem_rotation ,"TOOL");
-                }
-
-                if ( res < 0 )
-                    PLOG_DEBUG << "执行失败";
-                else
-                    PLOG_DEBUG << "执行成功";
+                PLOG_ERROR << " 笛卡尔点动功能暂时不支持 TOOL系";
+                return -1;
                 break;
 
             case DRAGGING_FLAG::OBJECT_X:
@@ -1318,31 +1266,8 @@ namespace rocos {
             case DRAGGING_FLAG::OBJECT_PITCH:
             case DRAGGING_FLAG::OBJECT_YAW:
 
-                index = index - static_cast< int >( DRAGGING_FLAG::OBJECT_X );
-
-                if ( index <= 2 )  // TODO 没有object 系，用base系
-                {
-                    KDL::Vector tem_vector{ };
-                    tem_vector( index ) = static_cast< double >( dir ) * max_speed * vector_speed_scale;
-                    res                 = _SmartServo_Cartesian.command( tem_vector,"OBJECT" );
-                }
-                else  // TODO 没有object 系，用base系
-                {
-                    KDL::Rotation tem_rotation{ };
-                    switch ( index - 3 )
-                    {
-                        case 0: tem_rotation = KDL::Rotation::RotX( static_cast< double >( dir ) * max_speed * rotation_speed_scale ); break;
-                        case 1: tem_rotation = KDL::Rotation::RotY( static_cast< double >( dir ) * max_speed * rotation_speed_scale ); break;
-                        case 2: tem_rotation = KDL::Rotation::RotZ( static_cast< double >( dir ) * max_speed * rotation_speed_scale ); break;
-                    }
-                    res = _SmartServo_Cartesian.command( tem_rotation,"OBJECT" );
-                }
-
-                if ( res < 0 )
-                    PLOG_DEBUG << "执行失败";
-                else
-                    PLOG_DEBUG << "执行成功";
-
+                PLOG_ERROR << " 笛卡尔点动功能暂时不支持 OBJECT系";
+                return -1;
                 break;
 
             case DRAGGING_FLAG::BASE_X:
@@ -1352,31 +1277,9 @@ namespace rocos {
             case DRAGGING_FLAG::BASE_PITCH:
             case DRAGGING_FLAG::BASE_YAW:
 
-                index = index - static_cast< int >( DRAGGING_FLAG::BASE_X );
-
-                if ( index <= 2 )
-                {
-                    KDL::Vector tem_vector{ };
-                    tem_vector( index ) = static_cast< double >( dir ) * max_speed * vector_speed_scale;
-                    res                 = _SmartServo_Cartesian.command( tem_vector ,"BASE");
-                }
-                else
-                {
-                    KDL::Rotation tem_rotation{ };
-                    switch ( index - 3 )
-                    {
-                        case 0: tem_rotation = KDL::Rotation::RotX( static_cast< double >( dir ) * max_speed * rotation_speed_scale ); break;
-                        case 1: tem_rotation = KDL::Rotation::RotY( static_cast< double >( dir ) * max_speed * rotation_speed_scale ); break;
-                        case 2: tem_rotation = KDL::Rotation::RotZ( static_cast< double >( dir ) * max_speed * rotation_speed_scale ); break;
-                    }
-                    res = _SmartServo_Cartesian.command( tem_rotation,"BASE" );
-                }
-
-                if ( res < 0 )
-                    PLOG_DEBUG << "执行失败";
-                else
-                    PLOG_DEBUG << "执行成功";
-
+                index = index - static_cast< int >( DRAGGING_FLAG::BASE_X ) + 1;
+                index = index * static_cast< double >( dir );
+                _SmartServo_Cartesian.command( index, "base" );
                 break;
 
             default:

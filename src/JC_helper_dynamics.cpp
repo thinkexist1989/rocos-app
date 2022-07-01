@@ -404,7 +404,7 @@ namespace JC_helper
         if ( on_stop_trajectory )
         {
             PLOG_ERROR << "IK 触发急停";
-            motion_stop( robot_ptr, current_pos, last_pos, last_last_pos );
+            Joint_stop( robot_ptr, current_pos, last_pos, last_last_pos );
             *flag_turnoff  = true ; //告知调用者，因为速度太大而线程已停止
         }
         else
@@ -553,7 +553,7 @@ namespace JC_helper
         if ( on_stop_trajectory )
         {
             PLOG_ERROR << "IK 触发急停";
-            motion_stop( robot_ptr, current_pos, last_pos, last_last_pos );
+            Joint_stop( robot_ptr, current_pos, last_pos, last_last_pos );
         }
         else
             PLOG_INFO << "IK结束";

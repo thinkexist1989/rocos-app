@@ -3,7 +3,9 @@
 
 #include "highspeed_udp.hpp"
 #include "kdl/frames.hpp"
+#include <Eigen/Geometry>
 #include <atomic>
+#include <fstream>
 #include <interpolate.h>
 #include <iostream>
 #include <kdl/chainiksolvervel_pinv.hpp>
@@ -15,8 +17,6 @@
 #include <plog/Log.h>
 #include <ruckig/ruckig.hpp>
 #include <vector>
-#include <fstream>
-#include <Eigen/Geometry>
 
 #define RESET "\033[0m"
 
@@ -183,6 +183,7 @@ namespace JC_helper
         void command( KDL::JntArray q_target );
     };
 
+#if 0 
     class OnlineDoubleS
     {
     private:
@@ -231,8 +232,61 @@ namespace JC_helper
         void get_pos_vel_acc( double t, double& p, double& v, double& a );
     };
 
+#endif
+
     class SmartServo_Cartesian
     {
+    private:
+        //** 变量初始化 **//
+        ruckig::Ruckig< 1 > otg{ 0.001 };
+        ruckig::InputParameter< 1 > input;
+        ruckig::OutputParameter< 1 > output;
+        ruckig::Result res;
+        const int _joint_num{ 7};
+        KDL::Vector _vel{ };
+        KDL::ChainIkSolverVel_pinv _ik_vel;
+        const double servo_dt = 0.001;
+        std::atomic< bool > flag_stop{ false };
+
+        KDL::JntArray joint_current{ };
+        KDL::JntArray joint_target{ };
+        KDL::JntArray joint_vel{ };
+        KDL::JntArray joint_last_vel{ };
+
+        KDL::JntArray joint_last_pos{ };
+        KDL::JntArray joint_last_last_pos{ };
+
+        int _Cartesian_vel_index{ 0 };
+        std::atomic< bool >* external_finished_flag_ptr;
+
+        std::string  _reference_frame {""};
+        //**-------------------------------**//
+    public:
+
+        SmartServo_Cartesian(  std::atomic< bool >* , const KDL::Chain& robot_chain ) ;
+
+        void init( const KDL::JntArray& joint_init, double target_vel, double max_vel = 0.3, double max_acc = 1, double max_jerk = 1 );
+      
+      
+        /**
+         * @brief  只有OTG正常计算，且不在奇异位置，joint_vel才会为有效值，其余情况通通为0
+         * @return  otg失败 = -1；雅克比在奇异位置 = -1;working = 1;finished  = 0
+         * @param joints 当前位置
+         * @param Cartesian_vel  目标速度矢量
+         * @param index  速度矢量的哪个方向，移动或者旋转
+         * @param joint_vel  结果输出
+         */
+
+        int update( KDL::JntArray& joint_vel, rocos::Robot* robot_ptr );
+
+        void RunMotion( rocos::Robot* robot_ptr );
+
+        void command( int Cartesian_vel_index ,const char * reference_frame);
+
+        void Cartesian_stop( double max_vel=1, double max_acc =30 , double max_jerk=200 );
+
+#if 0
+
     private:
         std::atomic< bool > on_stop_trajectory{ false };
         std::atomic< bool >* external_finished_flag_ptr;
@@ -293,6 +347,8 @@ namespace JC_helper
         KDL::Frame cirlular_trajectory( const KDL::Frame& F_base_circlestart, const KDL::Frame& F_base_circleend, const KDL::Frame& F_base_circleCenter, double s_p, double alpha );
         KDL::Frame cirlular_trajectory( const KDL::Frame& F_base_circlestart, const KDL::Frame& F_base_circleend, const KDL::Frame& F_base_circleCenter, double s_p, double s_r, double alpha );
         KDL::Rotation ratation_trajectory( const KDL::Rotation& start, const KDL::Rotation& end, double s_r, bool flag_big_angle = false );
+
+#endif
     };
 
     inline KDL::JntArray vector_2_JntArray( std::vector< double > pos )
@@ -318,23 +374,20 @@ namespace JC_helper
      * @param traj_joint 存储关节的轨迹
      * @param traj_joint_count =101代表0-100的关节都已经执行
      */
-       void motion_stop( rocos::Robot* robot_ptr, const  KDL::JntArray & current_pos, const  KDL::JntArray &last_pos, const  KDL::JntArray & last_last_pos);
+    void Joint_stop( rocos::Robot* robot_ptr, const KDL::JntArray& current_pos, const KDL::JntArray& last_pos, const KDL::JntArray& last_last_pos );
 
-
-
-/**
- * @brief 速度和加速度检查
- * 
- * @param current_pos 当前位置
- * @param last_pos 上次位置
- * @param last_last_pos 上上次位置
- * @param max_vel 最大速度
- * @param max_acc 最大加速度
- * @return int 
- */
+    /**
+     * @brief 速度和加速度检查
+     *
+     * @param current_pos 当前位置
+     * @param last_pos 上次位置
+     * @param last_last_pos 上上次位置
+     * @param max_vel 最大速度
+     * @param max_acc 最大加速度
+     * @return int
+     */
     int check_vel_acc( const KDL::JntArray& current_pos, const KDL::JntArray& last_pos, const KDL::JntArray& last_last_pos, const std::vector< double >& max_vel, const std::vector< double >& max_acc );
 
-   
 }  // namespace JC_helper
 
 #endif
