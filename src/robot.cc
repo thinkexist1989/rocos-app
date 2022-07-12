@@ -584,6 +584,8 @@ namespace rocos {
             PLOG_ERROR << " Motion is still running and waiting for it to finish";
             return -1;
         }
+        else
+            is_running_motion = true;
 
         if ( motion_thread_ ){ motion_thread_->join( );motion_thread_=nullptr; }
 
@@ -592,15 +594,14 @@ namespace rocos {
             motion_thread_.reset(new boost::thread{&Robot::RunMoveJ, this, q,
                                                    speed, acceleration, time,
                                                    radius});
-            is_running_motion = true;
-        } else  //同步执行
+        } 
+        else  //同步执行
         {
             motion_thread_.reset( new boost::thread{ &Robot::RunMoveJ, this, q,
                                                      speed, acceleration, time,
                                                      radius } );
             motion_thread_->join( );
             motion_thread_=nullptr;
-            is_running_motion = false;
         }
 
         return 0;
@@ -933,6 +934,179 @@ namespace rocos {
 
         return 0;
     }
+
+
+
+
+
+
+
+
+
+    int Robot::MoveC( const KDL::Frame& center, double theta, int axiz  , double speed,
+                      double acceleration, double time, double radius,
+                      Robot::OrientationMode mode, bool asynchronous, int max_running_count )
+    {
+        if ( radius )
+        {
+            PLOG_ERROR << " radius not supported yet";
+            return -1;
+        }
+        if ( time )
+        {
+            PLOG_ERROR << " time not supported yet";
+            return -1;
+        }
+        if ( max_running_count < 1 )
+        {
+            PLOG_ERROR << "max_running_count parameters must be greater than 0";
+            return -1;
+        }
+        if ( CheckBeforeMove( flange_, speed, acceleration, time, radius ) < 0 )
+        {
+            PLOG_ERROR << "given parameters is invalid";
+            return -1;
+        }
+
+        if ( is_running_motion )  //最大一条任务异步执行
+        {
+            PLOG_ERROR << RED << " Motion is still running and waiting for it to finish" << WHITE;
+            return -1;
+        }
+        else
+            is_running_motion = true;
+
+        if ( motion_thread_ )
+        {
+            motion_thread_->join( );
+            motion_thread_ = nullptr;
+        }
+
+        //** 变量初始化 **//
+        traj_.clear( );
+        KDL::JntArray q_init( jnt_num_ );
+        KDL::JntArray q_target( jnt_num_ );
+        KDL::Frame frame_init = flange_;
+        std::vector< double > max_step;
+        bool orientation_fixed = mode == Robot::OrientationMode::FIXED;
+        std::vector< KDL::Frame > traj_target;
+        //**-------------------------------**//
+
+        for ( int i = 0; i < jnt_num_; i++ )
+        {
+            q_init( i )   = pos_[ i ];
+            q_target( i ) = pos_[ i ];
+            max_step.push_back( max_vel_[ i ] * 0.001 );
+        }
+
+        if ( JC_helper::circle_trajectory( traj_target, frame_init, center, theta,axiz, speed, acceleration,
+                                           orientation_fixed ) < 0 )
+        {
+            PLOG_ERROR << "circle trajectory planning fail ";
+             is_running_motion =false;
+            return -1;
+        }
+
+        //** 轨迹IK计算，计算失败，可以重新计算，有最大计算次数限制{max_running_count} **//
+        int ik_count{ 0 };
+        for ( ; ik_count < max_running_count; ik_count++ )
+        {
+            try
+            {
+                for ( int i = 0; i < jnt_num_; i++ )
+                {
+                    q_init( i ) = pos_[ i ];
+                }
+                traj_.clear( );
+
+                PLOG_INFO << "---------------------------------------";
+
+                for ( const auto& target : traj_target )
+                {
+                    if ( kinematics_.CartToJnt( q_init, target, q_target ) < 0 )
+                    {
+                
+                        throw -1;
+                    }
+                    //防止奇异位置速度激增
+                    for ( int i = 0; i < jnt_num_; i++ )
+                    {
+                        if ( abs( q_target( i ) - q_init( i ) ) > max_step[ i ] )
+                        {
+                            PLOG_ERROR << "joint[" << i << "] speep is too  fast";
+                            PLOG_ERROR << "target speed = " << abs( q_target( i ) - q_init( i ) )
+                                       << " and  max_step=" << max_step[ i ];
+                            PLOG_ERROR << "q_target( " << i << " )  = " << q_target( i ) * 180 / M_PI;
+                            PLOG_ERROR << "q_init( " << i << " ) =" << q_init( i ) * 180 / M_PI;
+                    
+                            throw -2;
+                        }
+                    }
+                    q_init = q_target;
+                    traj_.push_back( q_target );
+                }
+
+                //在此处时，代表规划成功
+                break;
+            }
+            catch ( int flag_error )
+            {
+                switch ( flag_error )
+                {
+                    case -1: PLOG_ERROR << " CartToJnt failed on the " << ik_count << " times"; break;
+                    case -2: PLOG_ERROR << " joint speep is too  fast "; break;
+                    default: PLOG_ERROR << "Undefined error!";  is_running_motion =false;return -1;
+                }
+            }
+            catch ( ... )
+            {
+                PLOG_ERROR << "Undefined error!";
+                 is_running_motion =false;
+                return -1;
+            }
+        }
+
+        if ( ik_count == max_running_count )
+        {
+            PLOG_ERROR << "CartToJnt still failed even after " << max_running_count << " attempts";
+             is_running_motion =false;
+            return -1;
+        }
+
+        //**-------------------------------**//
+
+        if ( asynchronous )  //异步执行
+        {
+            motion_thread_.reset( new boost::thread{ &Robot::RunMoveL, this, std::ref( traj_ ) } );
+            is_running_motion = true;
+        }
+        else  //同步执行
+        {
+            motion_thread_.reset( new boost::thread{ &Robot::RunMoveL, this, std::ref( traj_ ) } );
+            motion_thread_->join( );
+            motion_thread_    = nullptr;
+            is_running_motion = false;
+        }
+
+        return 0;
+    }
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
     int Robot::MoveP(Frame pose, double speed, double acceleration, double time,
                      double radius, bool asynchronous) {

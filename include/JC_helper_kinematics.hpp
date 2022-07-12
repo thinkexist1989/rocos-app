@@ -148,18 +148,33 @@ namespace JC_helper
     int circle_trajectory( std::vector< KDL::Frame >& traj, const KDL::Frame& f_p1, const KDL::Frame& f_p2, const KDL::Frame& f_p3, double max_path_v = 0.01, double max_path_a = 0.01, bool fixed_rotation = true );
 
     /**
-     * @brief 位置保持，只旋转姿态
+     * @brief 利用轴角公式计算旋转姿态和位置（推荐）,参数只有圆心坐标;
      *
-     * @param traj 输出计算结果
-     * @param f_p 位置保持
-     * @param f_r1 起始姿态
-     * @param f_r2 终止姿态
-     * @param max_path_v 最大速度
-     * @param max_path_a 最大加速度
-     * @param equivalent_radius 等效半径，用于乘以角度得到等效弧度
+     * @param traj
+     * @param f_p1 起始位姿
+     * @param center 圆心位姿
+     * @param theta13  旋转角度
+     * @param axiz  旋转轴
+     * @param max_path_v 最大笛卡尔速度
+     * @param max_path_a 最大笛卡尔加速度
+     * @param fixed_rotation是否保持姿态：是->姿态不变；否->姿态指向圆心方向变换
      * @return int
      */
-    int rotation_trajectory( std::vector< KDL::Frame >& traj, const KDL::Vector& f_p, const KDL::Rotation& f_r1, const KDL::Rotation& f_r2, double max_path_v = 0.01, double max_path_a = 0.01, double equivalent_radius = 0.01 );
+    int circle_trajectory( std::vector< KDL::Frame >& traj, const KDL::Frame& f_p1, const KDL::Frame& center, double theta13, int axiz, double max_path_v, double max_path_a, bool fixed_rotation );
+
+        /**
+         * @brief 位置保持，只旋转姿态
+         *
+         * @param traj 输出计算结果
+         * @param f_p 位置保持
+         * @param f_r1 起始姿态
+         * @param f_r2 终止姿态
+         * @param max_path_v 最大速度
+         * @param max_path_a 最大加速度
+         * @param equivalent_radius 等效半径，用于乘以角度得到等效弧度
+         * @return int
+         */
+        int rotation_trajectory( std::vector< KDL::Frame >& traj, const KDL::Vector& f_p, const KDL::Rotation& f_r1, const KDL::Rotation& f_r2, double max_path_v = 0.01, double max_path_a = 0.01, double equivalent_radius = 0.01 );
 
     constexpr size_t _joint_num{ 7 };
 

@@ -661,6 +661,79 @@ namespace JC_helper
         return 0;
     }
 
+
+
+
+
+    int circle_trajectory( std::vector< KDL::Frame >& traj, const KDL::Frame& f_p1, const KDL::Frame& center, double theta13, int axiz , double max_path_v , double max_path_a , bool fixed_rotation   )
+    {
+        using namespace KDL;
+        const double epsilon = 1e-6;
+
+        double radius = (f_p1.p  - center.p).Normalize( ); //半径
+
+        if(radius< epsilon) { PLOG_ERROR<< "圆弧圆心太靠近起始位置" ;  return -1; }
+        else if (  abs(theta13)  < epsilon)  { PLOG_ERROR<< "圆弧旋转角度太小" ;  return -1; }
+        else if(abs(axiz)>2) { PLOG_ERROR<< "圆弧旋转轴只能选择:【0-X、1-Y、2-Z】" ;  return -1; }
+
+    Vector center_f_p1 = f_p1.p - center.p;  //待旋转的向量
+    Vector rot_axiz{ };
+
+
+    switch ( axiz )
+    {
+        case 0:
+            rot_axiz = center.M.UnitX( );
+            break;
+        case 1:
+            rot_axiz = center.M.UnitY( );
+            break;
+        case 2:
+            rot_axiz = center.M.UnitZ( );
+            break;
+        default:
+           PLOG_ERROR<< "圆弧旋转轴只能选择:【0-X、1-Y、2-Z】" ;  return -1; 
+    }
+
+
+
+
+        ::rocos::DoubleS doubleS;
+        double path_length = ( radius * abs(theta13 )  );
+        doubleS.planDoubleSProfile( 0, 0, 1, 0, 0, max_path_v / path_length, max_path_a / path_length, 2 * max_path_a / path_length );
+        bool success = doubleS.isValidMovement( );
+        if ( success < 0 || !( doubleS.getDuration( ) > 0 ) )
+        {
+            PLOG_ERROR << "planDoubleSProfile failed";
+            return -1;
+        }
+        double T_total = doubleS.getDuration( );
+
+
+
+        //** 轨迹规划 **//
+        double dt{ 0.0 };
+        double s{ 0.0 };
+        while ( dt <= T_total )
+        {
+            s = doubleS.pos( dt );
+            if ( fixed_rotation )
+                traj.push_back( KDL::Frame( f_p1.M, center.p + KDL::Rotation::Rot2( rot_axiz, theta13 * s ) * center_f_p1 ) );
+            else
+                traj.push_back( KDL::Frame( KDL::Rotation::Rot2( rot_axiz, theta13 * s ) * f_p1.M, center.p + KDL::Rotation::Rot2( rot_axiz, theta13 * s ) * center_f_p1 ) );
+            dt += 0.001;
+        }
+        return 0;
+    }
+
+
+
+
+
+
+
+
+
     int rotation_trajectory( std::vector< KDL::Frame >& traj, const KDL::Vector& f_p, const KDL::Rotation& f_r1, const KDL::Rotation& f_r2, double max_path_v, double max_path_a, double equivalent_radius )
     {
         using namespace KDL;
@@ -794,7 +867,7 @@ namespace JC_helper
                 input_lock.unlock( );
             }
             //** 100ms进行一次心跳检查,紧急停止时不需要检查 **//
-            if ( ( ( ++count ) == 100 ) && !on_stop_trajectory )
+            if ( ( ( ++count ) > 100 ) && !on_stop_trajectory )
             {
                 count = 0;
 
@@ -805,8 +878,7 @@ namespace JC_helper
                 else
                 {
                     PLOG_ERROR << "Some errors such as disconnecting from the controller";
-                    PLOG_DEBUG << "new_velocity" << output.new_velocity[ 0 ];
-                    PLOG_DEBUG << "new_acceleration" << output.new_acceleration[ 0 ];
+            
                     on_stop_trajectory = true;
                     input_lock.lock( );
                     input.control_interface = ruckig::ControlInterface::Velocity;

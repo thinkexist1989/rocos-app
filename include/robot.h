@@ -400,8 +400,8 @@ namespace rocos {
         //! \brief 圆弧运动
         //! \param pose_via 中间点,姿态给定无效，内部会自动计算
         //! \param pose_to 目标点,姿态给定无效，内部会自动计算
-        //! \param speed 关节速度限制（leading axis）
-        //! \param acceleration 关节加速度限制
+        //! \param speed 笛卡尔空间速度限制（leading axis）
+        //! \param acceleration 笛卡尔空间加速度限制
         //! \param time 最短运行时间
         //! \param radius 过渡半径
         //! \param mode 姿态运行模式, UNCONSTRAINED姿态随动
@@ -411,6 +411,22 @@ namespace rocos {
         int MoveC(Frame pose_via, Frame pose_to, double speed = 0.25,
                   double acceleration = 1.2, double time = 0.0, double radius = 0.0,
                   OrientationMode mode = UNCONSTRAINED, bool asynchronous = false,int max_running_count =10);
+
+        //! \brief 圆弧运动
+        //! \param center 圆弧圆心位姿
+        //! \param theta 圆弧旋转角度
+        //! \param axiz   绕圆心位姿的哪个轴转（0-X、1-Y、2-Z）
+        //! \param speed 笛卡尔速度限制（leading axis）
+        //! \param acceleration 笛卡尔加速度限制
+        //! \param time 最短运行时间
+        //! \param radius 过渡半径
+        //! \param mode 姿态运行模式, UNCONSTRAINED姿态随动
+        //! \param asynchronous 是否异步运行
+        //! \param max_running_count MoveL规划失败重新尝试规划的最大次数
+        //! \return 错误标志位,成功返回0
+        int MoveC( const KDL::Frame& center, double theta, int axiz =2  , double speed = 0.25,
+                  double acceleration = 1.2, double time = 0.0, double radius = 0.0,
+                  OrientationMode mode = UNCONSTRAINED, bool asynchronous = false,int max_running_count =10 );
 
         //! \brief TODO: 什么是MoveP?
         //! \param pose 位姿

@@ -638,58 +638,58 @@ namespace rocos
 
             kinematics_.JntToCart( q, f_p1 );
 
-            {  //测试moveC
+            // {  //测试moveC
 
-                std::cout << "----------------test moveC start---------------" << std::endl;
-                f_p2 = f_p1 * Frame{ KDL::Rotation::RotX( 90 * M_PI / 180 ), Vector{ 0.0, -0.1, -0.1 } };
-                f_p3 = f_p1 * Frame{ KDL::Rotation::RotY( 90 * M_PI / 180 ), Vector{ 0.0, 0.0, -0.2 } };
+            //     std::cout << "----------------test moveC start---------------" << std::endl;
+            //     f_p2 = f_p1 * Frame{ KDL::Rotation::RotX( 90 * M_PI / 180 ), Vector{ 0.0, -0.1, -0.1 } };
+            //     f_p3 = f_p1 * Frame{ KDL::Rotation::RotY( 90 * M_PI / 180 ), Vector{ 0.0, 0.0, -0.2 } };
 
-                MoveJ( q, 1, 1, 0, 0, false );
+            //     MoveJ( q, 1, 1, 0, 0, false );
 
-                MoveC( f_p2, f_p3, 0.05, 0.05, 0, 0, Robot::OrientationMode::FIXED, false );
+            //     MoveC( f_p2, f_p3, 0.05, 0.05, 0, 0, Robot::OrientationMode::FIXED, false );
 
               
-                std::cout << "----------------test moveC end---------------" << std::endl;
-            }
+            //     std::cout << "----------------test moveC end---------------" << std::endl;
+            // }
 
             {  //测试moveL
 
                 std::cout << "----------------test moveL start---------------" << std::endl;
 
                 f_p2 = f_p1 * Frame{ KDL::Rotation::RotZ( 90 * M_PI / 180 ), Vector{ 0.1, 0.0, 0 } };
-               
-                MoveJ( q, 1, 1, 0, 0, false );
+                sleep( 3 );
+                MoveJ( q, 1, 1, 0, 0, true );
                 MoveL( f_p2, 0.01, 0.01, 0, 0, false );
                 std::cout << "----------------test moveL end---------------" << std::endl;
             }
 
-            {  //测试moveL(只旋转，不移动)
+            // {  //测试moveL(只旋转，不移动)
 
-                std::cout << "----------------test moveL start---------------" << std::endl;
-                f_p2 = f_p1 * Frame{ KDL::Rotation::RotZ( 90 * M_PI / 180 ) };
+            //     std::cout << "----------------test moveL start---------------" << std::endl;
+            //     f_p2 = f_p1 * Frame{ KDL::Rotation::RotZ( 90 * M_PI / 180 ) };
 
-                MoveJ( q, 1, 1, 0, 0, false );
-                MoveL( f_p2, 0.01, 0.01, 0, 0, false );
-                std::cout << "----------------test moveL end---------------" << std::endl;
-            }
+            //     MoveJ( q, 1, 1, 0, 0, false );
+            //     MoveL( f_p2, 0.01, 0.01, 0, 0, false );
+            //     std::cout << "----------------test moveL end---------------" << std::endl;
+            // }
 
-            {  //测试MultiMoveL，
-                std::cout << "----------------test MultiMoveL start---------------" << std::endl;
+            // {  //测试MultiMoveL，
+            //     std::cout << "----------------test MultiMoveL start---------------" << std::endl;
 
-                MoveJ( q, 1, 1, 0, 0, false );
-                f_p1 = f_p1 * KDL::Frame{ KDL::Vector{ 0.0, -0.15, 0.0 } };
-                f_p2 = f_p1 * KDL::Frame{ KDL::Vector{ -0.3, 0.0, 0.0 } };
-                f_p3 = f_p2 * KDL::Frame{ KDL::Vector{ 0.0, 0.3, 0.0 } };
-                f_p4 = f_p3 * KDL::Frame{ KDL::Vector{ 0.3, 0.0, 0.0 } };
+            //     MoveJ( q, 1, 1, 0, 0, false );
+            //     f_p1 = f_p1 * KDL::Frame{ KDL::Vector{ 0.0, -0.15, 0.0 } };
+            //     f_p2 = f_p1 * KDL::Frame{ KDL::Vector{ -0.3, 0.0, 0.0 } };
+            //     f_p3 = f_p2 * KDL::Frame{ KDL::Vector{ 0.0, 0.3, 0.0 } };
+            //     f_p4 = f_p3 * KDL::Frame{ KDL::Vector{ 0.3, 0.0, 0.0 } };
 
-                std::vector< KDL::Frame > points{ f_p1, f_p2, f_p3, f_p4 };
-                std::vector< double > max_path_v{ 0.10, 0.10, 0.10, 0.10 };
-                std::vector< double > max_path_a{ 0.2, 0.2, 0.2, 0.2 };
-                std::vector< double > bound_dist{ 0.05, 0.05, 0.05, 0.05 };
+            //     std::vector< KDL::Frame > points{ f_p1, f_p2, f_p3, f_p4 };
+            //     std::vector< double > max_path_v{ 0.10, 0.10, 0.10, 0.10 };
+            //     std::vector< double > max_path_a{ 0.2, 0.2, 0.2, 0.2 };
+            //     std::vector< double > bound_dist{ 0.05, 0.05, 0.05, 0.05 };
 
-                MultiMoveL( points, bound_dist, max_path_v, max_path_a, false );
-                std::cout << "----------------test MultiMoveL end---------------" << std::endl;
-            }
+            //     MultiMoveL( points, bound_dist, max_path_v, max_path_a, false );
+            //     std::cout << "----------------test MultiMoveL end---------------" << std::endl;
+            // }
         }
         else
         {
@@ -716,7 +716,7 @@ int main( int argc, char* argv[] )
     //** 等待主站清除共享内存,25后再启动APP **//
     std::cerr << "\033[32m"
               << "等待主站清除共享内存" << std::endl;
-    std::this_thread::sleep_for( std::chrono::duration< double >( 10 ) );
+    std::this_thread::sleep_for( std::chrono::duration< double >( 0.1 ) );
     //**-------------------------------**//
 
     boost::shared_ptr< HardwareInterface > hw = boost::make_shared< HardwareSim >( 7 );  // 仿真
