@@ -2787,6 +2787,7 @@ namespace JC_helper
 
         while ( 1 )
         {
+            //** 心跳检查 **//
             if ( !flag_stop )
                 t_count++;
 
@@ -2801,6 +2802,7 @@ namespace JC_helper
                     Cartesian_stop( );  //速度目标设置为0
                 }
             }
+            //**-------------------------------**//
 
             int res = update( joint_vel, robot_ptr );
 
@@ -2823,7 +2825,8 @@ namespace JC_helper
 
                 //** 速度和加速度保护 **//
                 static std::vector< double > max_acc( _joint_num, 2 );//临时修改 ,因为10的加速度实在太大了
-                if ( check_vel_acc( joint_target, joint_current, joint_last_pos, robot_ptr->max_vel_, max_acc ) < 0 )
+                //! 急停状态下不用速度检查，因为会和笛卡尔急停冲突（笛卡尔急停会使得关节加速度超大，必触发急停保护）
+                if ( !flag_stop && check_vel_acc( joint_target, joint_current, joint_last_pos, robot_ptr->max_vel_, max_acc ) < 0 )
                 {
                     //关节空间急停
                     flag_stop = true;
