@@ -936,13 +936,6 @@ namespace rocos {
     }
 
 
-
-
-
-
-
-
-
     int Robot::MoveC( const KDL::Frame& center, double theta, int axiz  , double speed,
                       double acceleration, double time, double radius,
                       Robot::OrientationMode mode, bool asynchronous, int max_running_count )
@@ -1090,22 +1083,6 @@ namespace rocos {
 
         return 0;
     }
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 
 
     int Robot::MoveP(Frame pose, double speed, double acceleration, double time,

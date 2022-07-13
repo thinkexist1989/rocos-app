@@ -406,7 +406,7 @@ namespace rocos {
         //! \param radius 过渡半径
         //! \param mode 姿态运行模式, UNCONSTRAINED姿态随动
         //! \param asynchronous 是否异步运行
-        //! \param max_running_count MoveL规划失败重新尝试规划的最大次数
+        //! \param max_running_count MoveC规划失败重新尝试规划的最大次数
         //! \return 错误标志位,成功返回0
         int MoveC(Frame pose_via, Frame pose_to, double speed = 0.25,
                   double acceleration = 1.2, double time = 0.0, double radius = 0.0,
@@ -422,7 +422,7 @@ namespace rocos {
         //! \param radius 过渡半径
         //! \param mode 姿态运行模式, UNCONSTRAINED姿态随动
         //! \param asynchronous 是否异步运行
-        //! \param max_running_count MoveL规划失败重新尝试规划的最大次数
+        //! \param max_running_count MoveC规划失败重新尝试规划的最大次数
         //! \return 错误标志位,成功返回0
         int MoveC( const KDL::Frame& center, double theta, int axiz =2  , double speed = 0.25,
                   double acceleration = 1.2, double time = 0.0, double radius = 0.0,

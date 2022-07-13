@@ -661,45 +661,50 @@ namespace JC_helper
         return 0;
     }
 
-
-
-
-
-    int circle_trajectory( std::vector< KDL::Frame >& traj, const KDL::Frame& f_p1, const KDL::Frame& center, double theta13, int axiz , double max_path_v , double max_path_a , bool fixed_rotation   )
+    int circle_trajectory( std::vector< KDL::Frame >& traj, const KDL::Frame& f_p1, const KDL::Frame& center, double theta13, int axiz, double max_path_v, double max_path_a, bool fixed_rotation )
     {
         using namespace KDL;
         const double epsilon = 1e-6;
 
-        double radius = (f_p1.p  - center.p).Normalize( ); //半径
+        double radius = ( f_p1.p - center.p ).Normalize( );  //半径
 
-        if(radius< epsilon) { PLOG_ERROR<< "圆弧圆心太靠近起始位置" ;  return -1; }
-        else if (  abs(theta13)  < epsilon)  { PLOG_ERROR<< "圆弧旋转角度太小" ;  return -1; }
-        else if(abs(axiz)>2) { PLOG_ERROR<< "圆弧旋转轴只能选择:【0-X、1-Y、2-Z】" ;  return -1; }
+        if ( radius < epsilon )
+        {
+            PLOG_ERROR << "圆弧圆心太靠近起始位置";
+            return -1;
+        }
+        else if ( abs( theta13 ) < epsilon )
+        {
+            PLOG_ERROR << "圆弧旋转角度太小";
+            return -1;
+        }
+        else if ( abs( axiz ) > 2 )
+        {
+            PLOG_ERROR << "圆弧旋转轴只能选择:【0-X、1-Y、2-Z】";
+            return -1;
+        }
 
-    Vector center_f_p1 = f_p1.p - center.p;  //待旋转的向量
-    Vector rot_axiz{ };
+        Vector center_f_p1 = f_p1.p - center.p;  //待旋转的向量
+        Vector rot_axiz{ };
 
-
-    switch ( axiz )
-    {
-        case 0:
-            rot_axiz = center.M.UnitX( );
-            break;
-        case 1:
-            rot_axiz = center.M.UnitY( );
-            break;
-        case 2:
-            rot_axiz = center.M.UnitZ( );
-            break;
-        default:
-           PLOG_ERROR<< "圆弧旋转轴只能选择:【0-X、1-Y、2-Z】" ;  return -1; 
-    }
-
-
-
+        switch ( axiz )
+        {
+            case 0:
+                rot_axiz = center.M.UnitX( );
+                break;
+            case 1:
+                rot_axiz = center.M.UnitY( );
+                break;
+            case 2:
+                rot_axiz = center.M.UnitZ( );
+                break;
+            default:
+                PLOG_ERROR << "圆弧旋转轴只能选择:【0-X、1-Y、2-Z】";
+                return -1;
+        }
 
         ::rocos::DoubleS doubleS;
-        double path_length = ( radius * abs(theta13 )  );
+        double path_length =  radius * abs( theta13 ) ;
         doubleS.planDoubleSProfile( 0, 0, 1, 0, 0, max_path_v / path_length, max_path_a / path_length, 2 * max_path_a / path_length );
         bool success = doubleS.isValidMovement( );
         if ( success < 0 || !( doubleS.getDuration( ) > 0 ) )
@@ -708,8 +713,6 @@ namespace JC_helper
             return -1;
         }
         double T_total = doubleS.getDuration( );
-
-
 
         //** 轨迹规划 **//
         double dt{ 0.0 };
@@ -725,14 +728,6 @@ namespace JC_helper
         }
         return 0;
     }
-
-
-
-
-
-
-
-
 
     int rotation_trajectory( std::vector< KDL::Frame >& traj, const KDL::Vector& f_p, const KDL::Rotation& f_r1, const KDL::Rotation& f_r2, double max_path_v, double max_path_a, double equivalent_radius )
     {
@@ -878,7 +873,7 @@ namespace JC_helper
                 else
                 {
                     PLOG_ERROR << "Some errors such as disconnecting from the controller";
-            
+
                     on_stop_trajectory = true;
                     input_lock.lock( );
                     input.control_interface = ruckig::ControlInterface::Velocity;
@@ -2683,7 +2678,7 @@ namespace JC_helper
 
 #endif
 
-    SmartServo_Cartesian::SmartServo_Cartesian( std::atomic< bool >* finished_flag_ptr  , const KDL::Chain& robot_chain ) : _ik_vel{ robot_chain }
+    SmartServo_Cartesian::SmartServo_Cartesian( std::atomic< bool >* finished_flag_ptr, const KDL::Chain& robot_chain ) : _ik_vel{ robot_chain }
     {
         joint_current.resize( _joint_num );
         joint_target.resize( _joint_num );
@@ -2694,7 +2689,7 @@ namespace JC_helper
         external_finished_flag_ptr = finished_flag_ptr;
     }
 
-    void SmartServo_Cartesian::init( const KDL::JntArray& joint_init, double target_vel, double max_vel , double max_acc , double max_jerk )
+    void SmartServo_Cartesian::init( const KDL::JntArray& joint_init, double target_vel, double max_vel, double max_acc, double max_jerk )
     {
         input.current_position[ 0 ]     = 0;
         input.current_velocity[ 0 ]     = 0;
@@ -2719,18 +2714,17 @@ namespace JC_helper
         KDL::SetToZero( joint_vel );
         KDL::SetToZero( joint_last_vel );
 
-
         joint_last_pos      = joint_init;
         joint_last_last_pos = joint_init;
 
-        _Cartesian_vel_index =0;//0代表无方向
+        _Cartesian_vel_index = 0;  // 0代表无方向
 
-        _reference_frame.clear( ); //空字符代表无参考坐标系
+        _reference_frame.clear( );  //空字符代表无参考坐标系
 
-           PLOG_INFO << "笛卡尔空间点动初始化完成";
+        PLOG_INFO << "笛卡尔空间点动初始化完成";
     }
 
-    int SmartServo_Cartesian::update( KDL::JntArray& joint_vel ,rocos::Robot * robot_ptr)
+    int SmartServo_Cartesian::update( KDL::JntArray& joint_vel, rocos::Robot* robot_ptr )
     {
         KDL::SetToZero( joint_vel );
         KDL::Twist Cartesian_vel{ };
@@ -2747,14 +2741,14 @@ namespace JC_helper
 
         if ( abs( _Cartesian_vel_index ) <= 3 )  //移动
         {
-            Cartesian_vel.vel[ abs( _Cartesian_vel_index )-1 ] = sign( _Cartesian_vel_index ) * res_vel[ 0 ];
+            Cartesian_vel.vel[ abs( _Cartesian_vel_index ) - 1 ] = sign( _Cartesian_vel_index ) * res_vel[ 0 ];
         }
         else  //旋转
         {
             Cartesian_vel.rot[ abs( _Cartesian_vel_index ) - 4 ] = sign( _Cartesian_vel_index ) * res_vel[ 0 ];
         }
 
-        if(_reference_frame.compare("flange")==0)
+        if ( _reference_frame.compare( "flange" ) == 0 )
         {  //** 转变速度矢量的参考系，由flange系变为base系，但没有改变参考点（还是flange） **//
             Cartesian_vel = robot_ptr->flange_.M * Cartesian_vel;
         }
@@ -2764,7 +2758,7 @@ namespace JC_helper
         //!雅克比默认参考系为base,参考点为flange
         if ( _ik_vel.CartToJnt( joint_current, Cartesian_vel, joint_vel ) != 0 )
         {
-            PLOG_DEBUG<< _ik_vel.CartToJnt( joint_current, Cartesian_vel, joint_vel );
+            PLOG_DEBUG << _ik_vel.CartToJnt( joint_current, Cartesian_vel, joint_vel );
             PLOG_ERROR << "雅克比计算错误";
             return -1;
         }
@@ -2782,11 +2776,11 @@ namespace JC_helper
 
     void SmartServo_Cartesian::RunMotion( rocos::Robot* robot_ptr )
     {
-        int t_count = 0;            //时间计数
+        int t_count = 0;  //时间计数
         int _tick_count{ robot_ptr->tick_count };
-        
+
         //! 由init()保证成立，由command()来打破
-        while (*external_finished_flag_ptr) 
+        while ( *external_finished_flag_ptr )
         {
             ;  //等待指令
         }
@@ -2799,16 +2793,16 @@ namespace JC_helper
             if ( t_count > 100 )
             {
                 t_count = 0;
-                if ( _tick_count != robot_ptr->tick_count  )
-                    _tick_count = robot_ptr->tick_count ;
+                if ( _tick_count != robot_ptr->tick_count )
+                    _tick_count = robot_ptr->tick_count;
                 else
                 {
                     PLOG_ERROR << "心跳超时，停止！";
-                    Cartesian_stop( );//速度目标设置为0
+                    Cartesian_stop( );  //速度目标设置为0
                 }
             }
 
-            int res = update( joint_vel,robot_ptr );
+            int res = update( joint_vel, robot_ptr );
 
             if ( res < 0 )  // OTG的 error 状态
             {
@@ -2828,8 +2822,8 @@ namespace JC_helper
                 KDL::Add( joint_current, joint_vel, joint_target );
 
                 //** 速度和加速度保护 **//
-                static std::vector<double> max_acc(_joint_num,2);
-                if ( check_vel_acc( joint_target, joint_current, joint_last_pos, robot_ptr->max_vel_,max_acc ) < 0 )
+                static std::vector< double > max_acc( _joint_num, 2 );//临时修改 ,因为10的加速度实在太大了
+                if ( check_vel_acc( joint_target, joint_current, joint_last_pos, robot_ptr->max_vel_, max_acc ) < 0 )
                 {
                     //关节空间急停
                     flag_stop = true;
@@ -2867,15 +2861,13 @@ namespace JC_helper
         PLOG_INFO << "笛卡尔空间点动全部结束";
     }
 
-    void SmartServo_Cartesian::command( int Cartesian_vel_index,const char * reference_frame )
+    void SmartServo_Cartesian::command( int Cartesian_vel_index, const char* reference_frame )
     {
-
         if ( _Cartesian_vel_index == 0 )
             _Cartesian_vel_index = Cartesian_vel_index;
 
         if ( _reference_frame.empty( ) )
             _reference_frame = reference_frame;
-
 
         if ( !flag_stop )
         {
@@ -2884,7 +2876,7 @@ namespace JC_helper
                 PLOG_ERROR << "方向变换，停止！";
                 Cartesian_stop( );
             }
-            else if(_reference_frame.compare( reference_frame )!=0)
+            else if ( _reference_frame.compare( reference_frame ) != 0 )
             {
                 PLOG_ERROR << "参考坐标系变换，停止！";
                 Cartesian_stop( );
@@ -2896,7 +2888,7 @@ namespace JC_helper
             PLOG_ERROR << "紧急停止中,不允许修改目标";
     }
 
-    void SmartServo_Cartesian::Cartesian_stop(double max_vel , double max_acc , double max_jerk  )
+    void SmartServo_Cartesian::Cartesian_stop( double max_vel, double max_acc, double max_jerk )
     {
         flag_stop                      = true;
         input.target_position[ 0 ]     = 0;
@@ -2907,7 +2899,6 @@ namespace JC_helper
         input.max_acceleration[ 0 ] = max_acc;
         input.max_jerk[ 0 ]         = max_jerk;
     }
-
 
 #pragma endregion
 
@@ -2955,10 +2946,7 @@ namespace JC_helper
 
                 input.max_velocity[ i ]     = robot_ptr->joints_[ i ]->getMaxVel( );
                 input.max_acceleration[ i ] = robot_ptr->joints_[ i ]->getMaxAcc( );
-                PLOG_DEBUG<<  robot_ptr->joints_[ i ]->getMaxAcc( );
-                input.max_jerk[ i ]         = robot_ptr->joints_[ i ]->getMaxJerk( );
-                PLOG_DEBUG<<  robot_ptr->joints_[ i ]->getMaxJerk( );
-
+                input.max_jerk[ i ] = robot_ptr->joints_[ i ]->getMaxJerk( );
             }
 
             while ( ( res = otg.update( input, output ) ) == ruckig::Result::Working )
@@ -3002,7 +2990,6 @@ namespace JC_helper
             }
         }
     }
-
 
     int check_vel_acc( const KDL::JntArray& current_pos, const KDL::JntArray& last_pos, const KDL::JntArray& last_last_pos, const std::vector< double >& max_vel, const std::vector< double >& max_acc )
     {

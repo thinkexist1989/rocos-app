@@ -652,14 +652,31 @@ namespace rocos
             //     std::cout << "----------------test moveC end---------------" << std::endl;
             // }
 
-            {  //测试moveL
+            // {  //测试moveL
 
-                std::cout << "----------------test moveL start---------------" << std::endl;
+            //     std::cout << "----------------test moveL start---------------" << std::endl;
+
+            //     f_p2 = f_p1 * Frame{ KDL::Rotation::RotZ( 90 * M_PI / 180 ), Vector{ 0.1, 0.0, 0 } };
+            //     sleep( 3 );
+            //     MoveJ( q, 1, 1, 0, 0, false );
+            //     MoveL( f_p2, 0.01, 0.01, 0, 0, false );
+            //     std::cout << "----------------test moveL end---------------" << std::endl;
+            // }
+
+            {  //测试moveC
+
+                std::cout << "----------------test moveC start---------------" << std::endl;
 
                 f_p2 = f_p1 * Frame{ KDL::Rotation::RotZ( 90 * M_PI / 180 ), Vector{ 0.1, 0.0, 0 } };
-                sleep( 3 );
-                MoveJ( q, 1, 1, 0, 0, true );
-                MoveL( f_p2, 0.01, 0.01, 0, 0, false );
+                f_p3 = f_p1 * Frame{ KDL::Rotation::RotZ( 90 * M_PI / 180 ), Vector{ 0.17, 0.22, 0 } };
+                KDL:: Frame center = f_p1 * Frame{ Vector{ 0.0, 0.0, 0.1 } };
+
+                for ( int i{ 0 }; i < 1; i++ )
+                {
+                    MoveJ( q, 1, 1, 0, 0, false );
+                    MoveC( center, M_PI,2, 0.1, 0.01, 0, 0, Robot::OrientationMode::UNCONSTRAINED, false );
+                }
+
                 std::cout << "----------------test moveL end---------------" << std::endl;
             }
 
