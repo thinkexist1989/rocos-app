@@ -1,7 +1,7 @@
 cmake_minimum_required(VERSION 3.10)
 
 
-project(ruckig VERSION 0.6.5 LANGUAGES CXX)
+project(ruckig VERSION 0.7.1 LANGUAGES CXX)
 
 
 list(INSERT CMAKE_MODULE_PATH 0 ${CMAKE_CURRENT_SOURCE_DIR}/cmake)
@@ -43,12 +43,7 @@ target_link_libraries(ruckig PUBLIC)
 
 if(MSVC)
   target_compile_definitions(ruckig PUBLIC _USE_MATH_DEFINES)
-  target_compile_options(ruckig PRIVATE /W4 /WX)
-
-else()
-  target_compile_options(ruckig PRIVATE -Werror -Wall -Wextra)
 endif()
-
 
 if(EXPOSE_INTERNAL)
   target_compile_definitions(ruckig PUBLIC WITH_EXPOSE_INTERNAL)
@@ -75,13 +70,13 @@ endif()
 
 if(BUILD_EXAMPLES)
   foreach(example IN ITEMS 1_position 2_position_offline 5_velocity 6_stop 7_minimum_duration 8_dynamic_dofs)
-    add_executable(example-${example} "examples/${example}.cpp")
+    add_executable(example-${example} examples/${example}.cpp)
     target_link_libraries(example-${example} PRIVATE ruckig)
   endforeach()
 
   if(BUILD_ONLINE_CLIENT)
     foreach(example IN ITEMS 3_waypoints 4_waypoints_online 9_dynamic_dofs_waypoints)
-      add_executable(example-${example} "examples/${example}.cpp")
+      add_executable(example-${example} examples/${example}.cpp)
       target_link_libraries(example-${example} PRIVATE ruckig)
     endforeach()
   endif()
@@ -154,21 +149,28 @@ install(FILES
 if(BUILD_TESTS)
   enable_testing()
 
-  foreach(test IN ITEMS otg-test)
-    add_executable(${test} "test/${test}.cpp")
-    if(Reflexxes)
-      target_compile_definitions(${test} PUBLIC WITH_REFLEXXES)
-    endif()
-    target_link_libraries(${test} PRIVATE ruckig)
-    target_include_directories(${test} PRIVATE third_party)
-    add_test(NAME ${test} COMMAND ${test})
-  endforeach()
+  add_executable(test-target test/test-target.cpp test/test-target-known.cpp)
 
-  if(BUILD_BENCHMARK)
-    add_executable(otg-benchmark "test/otg-benchmark.cpp")
-    if(Reflexxes)
-      target_compile_definitions(otg-benchmark PUBLIC WITH_REFLEXXES)
-    endif()
-    target_link_libraries(otg-benchmark PRIVATE ruckig)
+  target_link_libraries(test-target PRIVATE ruckig)
+  target_include_directories(test-target PRIVATE third_party)
+  if(MSVC)
+    target_compile_options(test-target PRIVATE /W4)
+  else()
+    target_compile_options(test-target PRIVATE -Wall -Wextra -Werror)
   endif()
+  if(Reflexxes)
+    target_compile_definitions(test-target PUBLIC WITH_REFLEXXES)
+  endif()
+
+  add_test(NAME test-target COMMAND test-target)
+endif()
+
+
+if(BUILD_BENCHMARK)
+  add_executable(benchmark-target test/benchmark-target.cpp)
+
+  if(Reflexxes)
+    target_compile_definitions(benchmark-target PUBLIC WITH_REFLEXXES)
+  endif()
+  target_link_libraries(benchmark-target PRIVATE ruckig)
 endif()
