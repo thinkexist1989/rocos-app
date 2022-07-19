@@ -257,7 +257,6 @@ namespace JC_helper
         ruckig::InputParameter< 1 > input;
         ruckig::OutputParameter< 1 > output;
         ruckig::Result res;
-        const int _joint_num{ 7};
         KDL::Vector _vel{ };
         KDL::ChainIkSolverVel_pinv _ik_vel;
         const double servo_dt = 0.001;
