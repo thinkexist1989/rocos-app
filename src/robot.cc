@@ -1359,9 +1359,9 @@ namespace rocos {
             }
 
             if ( index % 10 <= 2 )
-                _SmartServo_Cartesian.init( JC_helper::vector_2_JntArray( pos_ ), max_speed * 0.15 );
+                _SmartServo_Cartesian.init( this, max_speed * 0.15 );
             else
-                _SmartServo_Cartesian.init( JC_helper::vector_2_JntArray( pos_ ), max_speed * 0.5);
+                _SmartServo_Cartesian.init( this, max_speed * 0.5);
 
                 _thread_planning.reset( new boost::thread{ &JC_helper::SmartServo_Cartesian::RunMotion, &_SmartServo_Cartesian, this } );
         }

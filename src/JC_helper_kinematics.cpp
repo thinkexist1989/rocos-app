@@ -2689,7 +2689,7 @@ namespace JC_helper
         external_finished_flag_ptr = finished_flag_ptr;
     }
 
-    void SmartServo_Cartesian::init( const KDL::JntArray& joint_init, double target_vel, double max_vel, double max_acc, double max_jerk )
+    void SmartServo_Cartesian::init( rocos::Robot* robot_ptr, double target_vel, double max_vel, double max_acc, double max_jerk )
     {
         input.current_position[ 0 ]     = 0;
         input.current_velocity[ 0 ]     = 0;
@@ -2708,18 +2708,23 @@ namespace JC_helper
 
         flag_stop = false;
 
-        joint_current = joint_init;
-        joint_target  = joint_init;
 
         KDL::SetToZero( joint_vel );
         KDL::SetToZero( joint_last_vel );
 
-        joint_last_pos      = joint_init;
-        joint_last_last_pos = joint_init;
+        for ( int i{ 0 }; i < _joint_num; i++ )
+        {
+            joint_current( i ) = robot_ptr->pos_[ i ];
+            joint_target( i )  = joint_current( i );
+            joint_last_pos( i )      = joint_current( i );
+            joint_last_last_pos( i ) = joint_current( i );
+        }
 
         _Cartesian_vel_index = 0;  // 0代表无方向
 
         _reference_frame.clear( );  //空字符代表无参考坐标系
+
+        current_flange  = KDL::Frame{ };
 
         PLOG_INFO << "笛卡尔空间点动初始化完成";
     }
@@ -2728,6 +2733,7 @@ namespace JC_helper
     {
         KDL::SetToZero( joint_vel );
         KDL::Twist Cartesian_vel{ };
+
 
         res = otg.update( input, output );
 
@@ -2750,7 +2756,10 @@ namespace JC_helper
 
         if ( _reference_frame.compare( "flange" ) == 0 )
         {  //** 转变速度矢量的参考系，由flange系变为base系，但没有改变参考点（还是flange） **//
-            Cartesian_vel = robot_ptr->flange_.M * Cartesian_vel;
+            {
+                robot_ptr->kinematics_.JntToCart( vector_2_JntArray( robot_ptr->pos_ ), current_flange );
+                Cartesian_vel = current_flange.M * Cartesian_vel;
+            }
         }
 
         output.pass_to_input( input );
@@ -2842,12 +2851,8 @@ namespace JC_helper
                 //**-------------------------------**//
 
                 //** 位置伺服 **//
-                for ( int i = 0; i < _joint_num; ++i )
-                {
-                    robot_ptr->pos_[ i ] = joint_target( i );
-                    robot_ptr->joints_[ i ]->setPosition( joint_target( i ) );
-                }
-                robot_ptr->hw_interface_->waitForSignal( 0 );
+                safety_servo(robot_ptr,joint_target);
+
                 //**-------------------------------**//
 
                 if ( res == 0 && flag_stop )  // finished 状态
@@ -2954,15 +2959,8 @@ namespace JC_helper
 
             while ( ( res = otg.update( input, output ) ) == ruckig::Result::Working )
             {
-                const auto& p = output.new_position;
-
-                for ( int i = 0; i < _joint_num; ++i )
-                {
-                    robot_ptr->pos_[ i ] = p[ i ];
-                    robot_ptr->joints_[ i ]->setPosition( p[ i ] );
-                }
+                safety_servo( robot_ptr, output.new_position );
                 output.pass_to_input( input );
-                robot_ptr->hw_interface_->waitForSignal( 0 );
             }
 
             if ( res != ruckig::Result::Finished )
@@ -3033,4 +3031,49 @@ namespace JC_helper
         return 0;
     }
 
+    int safety_servo( rocos::Robot* robot_ptr, const std::array< double, _joint_num >& target_pos )
+    {
+        double p{ 0 };
+        for ( int i = 0; i < _joint_num; ++i )
+        {
+            p = std::max( std::min( target_pos[ i ], robot_ptr->joints_[ i ]->getMaxPosLimit( ) ), robot_ptr->joints_[ i ]->getMinPosLimit( ) );
+
+            robot_ptr->pos_[ i ] = p;
+            robot_ptr->joints_[ i ]->setPosition( p );
+        }
+
+        robot_ptr->hw_interface_->waitForSignal( 0 );
+
+        return 0;
+    }
+
+    int safety_servo( rocos::Robot* robot_ptr, const std::vector< double >& target_pos )
+    {
+        double p{ 0 };
+        for ( int i = 0; i < _joint_num; ++i )
+        {
+            p = std::max( std::min( target_pos[ i ], robot_ptr->joints_[ i ]->getMaxPosLimit( ) ), robot_ptr->joints_[ i ]->getMinPosLimit( ) );
+
+            robot_ptr->pos_[ i ] = p;
+            robot_ptr->joints_[ i ]->setPosition( p );
+        }
+
+        robot_ptr->hw_interface_->waitForSignal( 0 );
+        return 0;
+    }
+
+    int safety_servo( rocos::Robot* robot_ptr, const KDL::JntArray& target_pos )
+    {
+        double p{ 0 };
+        for ( int i = 0; i < _joint_num; ++i )
+        {
+            p = std::max( std::min( target_pos(i), robot_ptr->joints_[ i ]->getMaxPosLimit( ) ), robot_ptr->joints_[ i ]->getMinPosLimit( ) );
+
+            robot_ptr->pos_[ i ] = p;
+            robot_ptr->joints_[ i ]->setPosition( p );
+        }
+
+        robot_ptr->hw_interface_->waitForSignal( 0 );
+        return 0;
+    }
 }  // namespace JC_helper

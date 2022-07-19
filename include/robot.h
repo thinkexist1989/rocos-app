@@ -598,14 +598,17 @@ namespace rocos {
     public:
         friend void JC_helper::SmartServo_Joint::RunSmartServo(rocos::Robot *);
 
-
-        friend int JC_helper::SmartServo_Cartesian::update( KDL::JntArray& joint_vel, rocos::Robot* robot_ptr );
-
-        friend void JC_helper::SmartServo_Cartesian::RunMotion( rocos::Robot* );
+        friend class JC_helper::SmartServo_Cartesian ;
 
         friend void JC_helper::Joint_stop( rocos::Robot* robot_ptr, const KDL::JntArray& current_pos, const KDL::JntArray& last_pos, const KDL::JntArray& last_last_pos );
 
         friend class JC_helper::admittance ;
+
+        friend int JC_helper::safety_servo(rocos::Robot* robot_ptr,const std::array<double, _joint_num> & target_pos);
+
+        friend int JC_helper::safety_servo( rocos::Robot* robot_ptr, const std::vector< double > &target_pos );
+
+        friend int JC_helper::safety_servo( rocos::Robot* robot_ptr, const KDL::JntArray &target_pos );
 
     private:
             JC_helper::ft_sensor my_ft_sensor; //6维力传感器

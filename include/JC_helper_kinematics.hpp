@@ -275,12 +275,15 @@ namespace JC_helper
         std::atomic< bool >* external_finished_flag_ptr;
 
         std::string  _reference_frame {""};
+
+        KDL::Frame current_flange{ };  //!因为flang_.M一直在刷新，实时读取有问题，不得已这么处理
+
         //**-------------------------------**//
     public:
 
         SmartServo_Cartesian(  std::atomic< bool >* , const KDL::Chain& robot_chain ) ;
 
-        void init( const KDL::JntArray& joint_init, double target_vel, double max_vel = 0.3, double max_acc = 1, double max_jerk = 1 );
+        void init( rocos::Robot* robot_ptr  , double target_vel, double max_vel = 0.3, double max_acc = 1, double max_jerk = 1 );
       
       
         /**
@@ -402,6 +405,33 @@ namespace JC_helper
      * @return int
      */
     int check_vel_acc( const KDL::JntArray& current_pos, const KDL::JntArray& last_pos, const KDL::JntArray& last_last_pos, const std::vector< double >& max_vel, const std::vector< double >& max_acc );
+
+    /**
+     * @brief 带安全位置检查的伺服
+     *
+     * @param robot_ptr
+     * @param target_pos 目标位置
+     * @return int
+     */
+     int safety_servo(rocos::Robot* robot_ptr,const std::array<double, _joint_num> & target_pos);
+
+     /**
+     * @brief 带安全位置检查的伺服
+     *
+     * @param robot_ptr
+     * @param target_pos 目标位置
+     * @return int
+     */   
+    int safety_servo( rocos::Robot* robot_ptr, const std::vector< double > &target_pos );
+
+     /**
+     * @brief 带安全位置检查的伺服
+     *
+     * @param robot_ptr
+     * @param target_pos 目标位置
+     * @return int
+     */   
+    int safety_servo( rocos::Robot* robot_ptr, const KDL::JntArray &target_pos );
 
 }  // namespace JC_helper
 
