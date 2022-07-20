@@ -2678,7 +2678,7 @@ namespace JC_helper
 
 #endif
 
-    SmartServo_Cartesian::SmartServo_Cartesian( std::atomic< bool >* finished_flag_ptr, const KDL::Chain& robot_chain ) : _ik_vel{ robot_chain }
+    SmartServo_Cartesian::SmartServo_Cartesian( std::atomic< bool >* finished_flag_ptr, const KDL::Chain& robot_chain ) : _ik_vel{ robot_chain },FK_slover{robot_chain}
     {
         joint_current.resize( _joint_num );
         joint_target.resize( _joint_num );
@@ -2757,7 +2757,7 @@ namespace JC_helper
         if ( _reference_frame.compare( "flange" ) == 0 )
         {  //** 转变速度矢量的参考系，由flange系变为base系，但没有改变参考点（还是flange） **//
             {
-                robot_ptr->kinematics_.JntToCart( vector_2_JntArray( robot_ptr->pos_ ), current_flange );
+                FK_slover.JntToCart( vector_2_JntArray( robot_ptr->pos_ ), current_flange );
                 Cartesian_vel = current_flange.M * Cartesian_vel;
             }
         }

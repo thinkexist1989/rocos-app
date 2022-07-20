@@ -275,7 +275,9 @@ namespace JC_helper
 
         std::string  _reference_frame {""};
 
-        KDL::Frame current_flange{ };  //!因为flang_.M一直在刷新，实时读取有问题，不得已这么处理
+        KDL::ChainFkSolverPos_recursive   FK_slover;  //!因为flang_.M一直在刷新，实时读取有问题，暂时这么处理
+        KDL::Frame current_flange{ };  
+
 
         //**-------------------------------**//
     public:
