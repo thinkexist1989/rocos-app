@@ -1350,7 +1350,7 @@ namespace rocos {
             _thread_planning.reset( new boost::thread{ &JC_helper::SmartServo_Joint::RunSmartServo, &_SmartServo_Joint, this } );
         }
         //笛卡尔空间点动指令
-        else if ( _dragging_finished_flag && DRAGGING_FLAG::FLANGE_X <= flag && DRAGGING_FLAG::BASE_YAW >= flag )
+        else if ( _dragging_finished_flag && DRAGGING_FLAG::TOOL_X <= flag && DRAGGING_FLAG::BASE_YAW >= flag )
         {
             if ( _thread_planning )
             {
@@ -1406,9 +1406,13 @@ namespace rocos {
             case DRAGGING_FLAG::TOOL_PITCH:
             case DRAGGING_FLAG::TOOL_YAW:
 
-                PLOG_ERROR << " 笛卡尔点动功能暂时不支持 TOOL系";
-                return -1;
+                PLOG_WARNING << " 笛卡尔点动功能暂时不支持 {TOOL},替换为{BASE}";
+
+                index = index - static_cast< int >( DRAGGING_FLAG::TOOL_X ) + 1;
+                index = index * static_cast< double >( dir );
+                _SmartServo_Cartesian.command( index, "base" );
                 break;
+
 
             case DRAGGING_FLAG::OBJECT_X:
             case DRAGGING_FLAG::OBJECT_Y:
@@ -1417,8 +1421,11 @@ namespace rocos {
             case DRAGGING_FLAG::OBJECT_PITCH:
             case DRAGGING_FLAG::OBJECT_YAW:
 
-                PLOG_ERROR << " 笛卡尔点动功能暂时不支持 OBJECT系";
-                return -1;
+                PLOG_WARNING << " 笛卡尔点动功能暂时不支持 {OBJECT},替换为{BASE}";
+
+                index = index - static_cast< int >( DRAGGING_FLAG::OBJECT_X ) + 1;
+                index = index * static_cast< double >( dir );
+                _SmartServo_Cartesian.command( index, "base" );
                 break;
 
             case DRAGGING_FLAG::BASE_X:
@@ -1434,7 +1441,11 @@ namespace rocos {
                 break;
 
             default:
-                PLOG_ERROR << " Undefined command flag";
+                PLOG_ERROR << " Undefined command flag: " << index;
+                //! 在此处位置时会置位is_running_motion
+                //! 如果没有jogging 运动线程 且 is_running_motion 被置位，那is_running_motion就会被永久卡住
+                if ( _dragging_finished_flag && is_running_motion )
+                    is_running_motion = false;
                 return -1;
         }
         return 0;
