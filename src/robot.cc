@@ -710,7 +710,7 @@ namespace rocos {
                     {
                         throw -1;
                     }
-                    //防止奇异位置速度激增
+                    //*防止奇异位置速度激增
                     for ( int i = 0; i < jnt_num_; i++ )
                     {
                         if ( abs( q_target( i ) - q_init( i ) ) > max_step[ i ] )
@@ -723,6 +723,7 @@ namespace rocos {
                             throw -2;
                         }
                     }
+                    //**-------------------------------**//
                     q_init = q_target;
                     traj_.push_back( q_target );
 
@@ -873,7 +874,7 @@ namespace rocos {
                 
                         throw -1;
                     }
-                    //防止奇异位置速度激增
+                    //** 防止奇异位置速度激增 **//
                     for ( int i = 0; i < jnt_num_; i++ )
                     {
                         if ( abs( q_target( i ) - q_init( i ) ) > max_step[ i ] )
@@ -887,6 +888,7 @@ namespace rocos {
                             throw -2;
                         }
                     }
+                    //**-------------------------------**//
                     q_init = q_target;
                     traj_.push_back( q_target );
                 }
@@ -1022,7 +1024,7 @@ namespace rocos {
                 
                         throw -1;
                     }
-                    //防止奇异位置速度激增
+                    //** 防止奇异位置速度激增 **//
                     for ( int i = 0; i < jnt_num_; i++ )
                     {
                         if ( abs( q_target( i ) - q_init( i ) ) > max_step[ i ] )
@@ -1036,6 +1038,7 @@ namespace rocos {
                             throw -2;
                         }
                     }
+                    //**-------------------------------**//
                     q_init = q_target;
                     traj_.push_back( q_target );
                 }
@@ -1203,7 +1206,7 @@ namespace rocos {
                           << WHITE << std::endl;
                 return -1;
             }
-            //防止奇异位置速度激增
+            //** 防止奇异位置速度激增 **//
             for ( int i = 0; i < jnt_num_; i++ )
             {
                 if ( abs( q_target( i ) - q_init( i ) ) > max_step[ i ] )
@@ -1220,7 +1223,7 @@ namespace rocos {
                     return -1;
                 }
             }
-
+            //**-------------------------------**//
             traj_.push_back(q_target);
             count++;
         }
@@ -1543,18 +1546,32 @@ namespace rocos {
     }
 
     void Robot::RunMoveJ(JntArray q, double speed, double acceleration, double time, double radius) {
+        //** 变量初始化 **//
         double dt = 0.0;
         double max_time = 0.0;
         std::vector<std::shared_ptr<DoubleS> > interp(jnt_num_);
+        std::vector<double > max_step;
+        std::vector<double > target_pos;//为了速度检查
+        std::vector<double > init_pos;//为了速度检查
+        //**-------------------------------**//
+
+        //** 程序初始化 **//
         for (auto &i: interp)
             i.reset(new DoubleS{});
+
+        for ( int i{ 0 }; i < jnt_num_; i++ )
+        {
+            max_step.push_back( max_vel_[ i ] * 0.001 );
+            target_pos.push_back( pos_[ i ] );
+            init_pos.push_back( pos_[ i ] );
+        }
+        //**-------------------------------**//
 
         // std::cout << "Joint Pos: \n"
         //           << GREEN << q.data << WHITE << std::endl;
         for (int i = 0; i < jnt_num_; ++i) {
             if (q(i) == pos_[i]) {
-                std::cerr << RED << " Target pos[" << i << "]"
-                          << "is same as  pos_[" << i << "]" << WHITE << std::endl;
+                PLOG_WARNING << " Target pos[" << i << "] is same as  pos_[" << i << "]";
                 need_plan_[i] = false;
                 continue;
             }
@@ -1568,8 +1585,7 @@ namespace rocos {
                                           speed, acceleration, max_jerk_[i]);
 
             if (!interp[i]->isValidMovement() || !(interp[i]->getDuration() > 0)) {
-                std::cerr << RED << "RunMoveJ():movej trajectory "
-                          << "is infeasible " << WHITE << std::endl;
+                PLOG_ERROR<< "movej trajectory is infeasible";
                 is_running_motion = false;
                 return;
             }
@@ -1581,18 +1597,50 @@ namespace rocos {
                 interp[i]->JC_scaleToDuration(max_time);
         }
 
-        while (dt <= max_time) {
-            for (int i = 0; i < jnt_num_; ++i) {
-                if (!need_plan_[i])
+        //** 速度检查 **//
+        dt =0;
+        while ( dt <= max_time )
+        {
+            for ( int i = 0; i < jnt_num_; i++ )
+            {
+                  target_pos[i] =   interp[i]->pos(dt);
+
+                if ( abs( target_pos[i] -init_pos[i]   ) > max_step[ i ] )
+                {
+                    PLOG_ERROR << "joint[" << i << "] speep is too  fast";
+                    PLOG_ERROR << "target speed = " << abs( target_pos[i] -init_pos[i]   ) 
+                               << " and  max_step=" << max_step[ i ];
+                    PLOG_ERROR << "q_target( " << i << " )  = " << target_pos[i] * 180 / M_PI;
+                    PLOG_ERROR << "q_init( " << i << " ) =" << init_pos[i]  * 180 / M_PI;
+
+                    is_running_motion = false;
+                    return;
+                }
+                else
+                    init_pos[ i ] = target_pos[ i ];
+            }
+
+            dt += 0.001;
+        }
+        //**-------------------------------**//
+
+        //** 伺服控制 **//
+        dt = 0;
+        while ( dt <= max_time )
+        {
+            for ( int i = 0; i < jnt_num_; ++i )
+            {
+                if ( !need_plan_[ i ] )
                     continue;
 
-                pos_[i] = interp[i]->pos(dt);  //! 需要更新一下实时位置
-                joints_[i]->setPosition(pos_[i]);
+                pos_[ i ] = interp[ i ]->pos( dt );  //! 需要更新一下实时位置
+                joints_[ i ]->setPosition( pos_[ i ] );
             }
             dt += 0.001;
 
-            hw_interface_->waitForSignal(0);
+            hw_interface_->waitForSignal( 0 );
         }
+        //**-------------------------------**//
 
         is_running_motion = false;
     }
