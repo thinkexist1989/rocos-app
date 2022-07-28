@@ -109,9 +109,10 @@ namespace rocos {
     bool Robot::parseDriveParamsFromUrdf(const string &urdf_file_path) {
         jnt_num_ = hw_interface_->getSlaveNumber();
 
-        if (kinematics_.getChain().getNrOfJoints() < jnt_num_) {
+        if (kinematics_.getChain().getNrOfJoints() > jnt_num_) {
             // if the number of joints in urdf is LESS than that in hardware, just warning but it's fine
             std::cout << "[WARNING][rocos::robot] the hardware slave number is more than joint number." << std::endl;
+            return false;
         } else if (kinematics_.getChain().getNrOfJoints() < jnt_num_) {
             // if the number of joints in urdf is GREATER than that in hardware, error occured and return
             std::cerr << "[ERROR][rocos::robot] the hardware slave number is less than joint number." << std::endl;
