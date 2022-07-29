@@ -12,6 +12,7 @@
  *
  */
 
+#include <atomic>
 #include <boost/thread.hpp>
 #include <errno.h>
 #include <iostream>
@@ -20,6 +21,7 @@
 #include <plog/Formatters/TxtFormatter.h>
 #include <plog/Init.h>
 #include <plog/Log.h>
+#include <signal.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -27,16 +29,18 @@
 #include <sys/socket.h>
 #include <sys/types.h>
 #include <unistd.h>
-#include <atomic>
 
 namespace JC_helper
 {
+
     class TCP_server
     {
     private:
-        int listenfd, connfd;         //监听的句柄、客户端的句柄
+        static int listenfd;    //监听的句柄、
+        static int connfd;      //客户端的句柄
+        static bool flag_init;  //初始化成功标志
+
         struct sockaddr_in servaddr;  // IP地址
-        bool flag_init{false};                //初始化成功标志
 
     public:
         std::atomic< bool > flag_receive{ false };
@@ -56,7 +60,7 @@ namespace JC_helper
 
         int init( int port = 12345 )
         {
-            flag_init =false;
+            flag_init = false;
 
             memset( &servaddr, 0, sizeof( servaddr ) );
             servaddr.sin_family      = AF_INET;
@@ -67,6 +71,13 @@ namespace JC_helper
             {
                 PLOG_ERROR.printf( "create socket error: %s(errno: %d)\n", strerror( errno ), errno );
                 return -1;
+            }
+
+            int on = 1;
+            if ( setsockopt( listenfd, SOL_SOCKET, SO_REUSEADDR, &on, sizeof( on ) ) < 0 )
+            {
+                PLOG_ERROR.printf( "setsockopt error: %s(errno: %d)\n", strerror( errno ), errno );
+            return -1;
             }
 
             if ( bind( listenfd, ( struct sockaddr* )&servaddr, sizeof( servaddr ) ) == -1 )
@@ -80,8 +91,15 @@ namespace JC_helper
                 PLOG_ERROR.printf( "listen socket error: %s(errno: %d)\n", strerror( errno ), errno );
                 return -1;
             }
+
+            if ( signal( SIGINT, my_close ) == SIG_ERR )
+            {
+                PLOG_ERROR << "TCP 线程绑定ctrl+c信号 失败";
+                return -1;
+            }
+
             PLOG_INFO << "TCP init success";
-            flag_init =true;
+            flag_init = true;
             return 0;
         }
 
@@ -100,7 +118,7 @@ namespace JC_helper
                 //!接入一个客户端
                 PLOG_INFO << "client 连接成功,id = " << connfd;
 
-                while ( 1 )  //不断接收client的消息，直至client主动断开连接
+                while ( flag_init )  //不断接收client的消息，直至client主动断开连接
                 {
                     //** 不断接受数据 **//
 
@@ -126,10 +144,27 @@ namespace JC_helper
             }
 
             close( connfd );
-            close( listenfd );
             return 0;
         }
+
+        static void my_close( int sig )
+        {
+            if ( sig == SIGINT )
+            {
+                // ctrl+c退出时执行的代码
+                PLOG_INFO << "按下ctrl+c,清除TCP资源,程序退出";
+                close( connfd );
+                close( listenfd );
+                flag_init = false;
+                exit( 0 );
+            }
+        }
     };
+
+    inline int TCP_server::listenfd   = 0;
+    inline int TCP_server::connfd     = 0;
+    inline bool TCP_server::flag_init = false;
+
 }  // namespace JC_helper
 
 #if 0
@@ -153,6 +188,5 @@ int main( int argc, char** argv )
         }
     }
 }
-
 
 #endif
