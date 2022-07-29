@@ -402,9 +402,9 @@ namespace JC_helper
     /**
      * @brief 速度和加速度检查
      *
-     * @param current_pos 当前位置
-     * @param last_pos 上次位置
-     * @param last_last_pos 上上次位置
+     * @param current_pos 准备下发的位置
+     * @param last_pos 当前位置
+     * @param last_last_pos 上次位置
      * @param max_vel 最大速度
      * @param max_acc 最大加速度
      * @return int

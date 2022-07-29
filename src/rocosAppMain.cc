@@ -37,22 +37,6 @@
 #include <string>
 bool isRuning = true;
 
-/// \brief 处理终端的Ctrl-C信号
-/// \param signo
-void signalHandler( int signo )
-{
-    if ( signo == SIGINT )
-    {
-        std::cout << "\033[1;31m"
-                  << "[!!SIGNAL!!]"
-                  << "INTERRUPT by CTRL-C"
-                  << "\033[0m" << std::endl;
-
-        isRuning = false;
-        exit( 0 );
-    }
-}
-
 #pragma region  //*测试 1
 // void test( )
 // {
@@ -193,7 +177,7 @@ void signalHandler( int signo )
 
 #pragma endregion
 
-#pragma region  //*测试2
+#pragma region  //*测试2  演示
 // namespace rocos
 // {
 //     void Robot::test( )
@@ -304,7 +288,7 @@ void signalHandler( int signo )
 
 #pragma endregion
 
-#pragma region  //*测试3
+#pragma region  //*测试3 3个抖动位置测试
 // namespace rocos
 // {
 //     void Robot::test( )
@@ -364,11 +348,8 @@ void signalHandler( int signo )
 
 #pragma endregion
 
-#pragma region  //* 测试4
-/**
- * @brief 测试4：机械臂标定的50个路点
- *
- */
+#pragma region  //* 测试4 机械臂标定的50个路点
+
 // namespace rocos
 // {
 //     void Robot::test( )
@@ -451,11 +432,8 @@ void signalHandler( int signo )
 
 #pragma endregion
 
-#pragma region  //* 测试5
-/**
- * @brief 测试5：导纳测试
- *
- */
+#pragma region  //* 测试5 导纳测试
+
 #if 0
 namespace rocos
 {
@@ -573,7 +551,7 @@ namespace rocos
 
 #pragma endregion
 
-#pragma region  //*测试9  上电保护程序
+#pragma region  //*测试9  完整上电保护程序
 
 namespace rocos
 {
@@ -585,9 +563,6 @@ namespace rocos
         //**-------------------------------**//
 
         //** 程序初始化 **//
-
-        // if ( my_ft_sensor.init( flange_ ) )  // 6维力初始化
-        //     return;
 
         //**-------------------------------**//
 
@@ -619,94 +594,73 @@ namespace rocos
 
         if ( str == std::string_view{ "run" } )
         {
-
             using namespace KDL;
-            Frame f_p1;
-            Frame f_p2;
-            Frame f_p3;
-            Frame f_p4;
-            Frame f_p5;
-            KDL::JntArray q( 7 );
+            KDL::JntArray q_target( 7 );
+            KDL::Frame f_p1;
+            KDL::Frame f_p2;
+            KDL::Frame f_p3;
+            KDL::Frame f_p4;
+            KDL::Frame f_p5;
+            KDL::Frame f_p6;
 
-            q( 0 ) = 0 * M_PI / 180;
-            q( 1 ) = -45 * M_PI / 180;
-            q( 2 ) = 0 * M_PI / 180;
-            q( 3 ) = -90* M_PI / 180;
-            q( 4 ) = 0 * M_PI / 180;
-            q( 5 ) = 45 * M_PI / 180;
-            q( 6 ) = 0 * M_PI / 180;
+            KDL::Frame f_c_p1;
+            KDL::Frame f_c_p2;
+            KDL::Frame f_c_p3;
+            KDL::Frame f_c_p0;
 
-            kinematics_.JntToCart( q, f_p1 );
+            q_target( 0 ) = 0 * M_PI / 180;
+            q_target( 1 ) = -45 * M_PI / 180;
+            q_target( 2 ) = 0 * M_PI / 180;
+            q_target( 3 ) = -90 * M_PI / 180;
+            q_target( 4 ) = 0 * M_PI / 180;
+            q_target( 5 ) = 45 * M_PI / 180;
+            q_target( 6 ) = 0 * M_PI / 180;
 
-            // {  //测试moveC
+            MoveJ( q_target, 0.4, 0.2, 0, 0, false );
 
-            //     std::cout << "----------------test moveC start---------------" << std::endl;
-            //     f_p2 = f_p1 * Frame{ KDL::Rotation::RotX( 90 * M_PI / 180 ), Vector{ 0.0, -0.1, -0.1 } };
-            //     f_p3 = f_p1 * Frame{ KDL::Rotation::RotY( 90 * M_PI / 180 ), Vector{ 0.0, 0.0, -0.2 } };
+            kinematics_.JntToCart( q_target, f_p1 );
+            f_p1 = f_p1 * KDL::Frame{ KDL::Vector{ 0.0, -0.15, 0.0 } };
+            f_p2 = f_p1 * KDL::Frame{ KDL::Vector{ -0.3, 0.0, 0.0 } };
+            f_p3 = f_p2 * KDL::Frame{ KDL::Vector{ 0.0, 0.3, 0.0 } };
+            f_p4 = f_p3 * KDL::Frame{ KDL::Vector{ 0.3, 0.0, 0.0 } };
+            f_p5 = f_p4 * KDL::Frame{ KDL::Vector{ 0.0, -0.15, 0.0 } };
 
-            //     MoveJ( q, 1, 1, 0, 0, false );
+            std::vector< KDL::Frame > points{ f_p1, f_p2, f_p3, f_p4, f_p5 };
+            std::vector< double > max_path_v{ 0.30, 0.30, 0.30, 0.30, 0.30 };
+            std::vector< double > max_path_a{ 0.2, 0.2, 0.2, 0.2, 0.2 };
+            std::vector< double > bound_dist{ 0.05, 0.05, 0.05, 0.05, 0.0 };
 
-            //     MoveC( f_p2, f_p3, 0.05, 0.05, 0, 0, Robot::OrientationMode::FIXED, false );
+            MultiMoveL( points, bound_dist, max_path_v, max_path_a, false );
 
-              
-            //     std::cout << "----------------test moveC end---------------" << std::endl;
-            // }
+            f_p6 = f_p5 * KDL::Frame{ KDL::Vector{ -0.3, 0.3, 0.0 } };
+            MoveL( f_p6, 0.2, 0.2, 0, 0, false );
 
-            // {  //测试moveL
+            for ( int i = 0; i < jnt_num_; i++ )
+                q_target( i ) = 0;
+            MoveJ( q_target, 0.2, 0.2, 0, 0, false );
 
-            //     std::cout << "----------------test moveL start---------------" << std::endl;
+            q_target( 0 ) = 0 * M_PI / 180;
+            q_target( 1 ) = 45 * M_PI / 180;
+            q_target( 2 ) = 0 * M_PI / 180;
+            q_target( 3 ) = 90 * M_PI / 180;
+            q_target( 4 ) = 0 * M_PI / 180;
+            q_target( 5 ) = 45 * M_PI / 180;
+            q_target( 6 ) = 0 * M_PI / 180;
 
-            //     f_p2 = f_p1 * Frame{ KDL::Rotation::RotZ( 90 * M_PI / 180 ), Vector{ 0.1, 0.0, 0 } };
-            //     sleep( 3 );
-            //     MoveJ( q, 1, 1, 0, 0, false );
-            //     MoveL( f_p2, 0.01, 0.01, 0, 0, false );
-            //     std::cout << "----------------test moveL end---------------" << std::endl;
-            // }
+            MoveJ( q_target, 0.2, 0.2, 0, 0, false );
 
-            {  //测试moveC
+            kinematics_.JntToCart( q_target, f_c_p0 );
 
-                std::cout << "----------------test moveC start---------------" << std::endl;
+            f_c_p1 = f_c_p0 * KDL::Frame{ KDL::Vector{ -0.1, -0.1, 0 } };
+            f_c_p2 = f_c_p0 * KDL::Frame{ KDL::Vector{ -0.2, 0.0, 0 } };
+            f_c_p3 = f_c_p0 * KDL::Frame{ KDL::Vector{ -0.1, 0.1, 0 } };
 
-                f_p2 = f_p1 * Frame{ KDL::Rotation::RotZ( 90 * M_PI / 180 ), Vector{ 0.1, 0.0, 0 } };
-                f_p3 = f_p1 * Frame{ KDL::Rotation::RotZ( 90 * M_PI / 180 ), Vector{ 0.17, 0.22, 0 } };
-                KDL:: Frame center = f_p1 * Frame{ Vector{ 0.0, 0.0, 0.1 } };
+            MoveC( f_c_p1, f_c_p2, 0.2, 0.2, 0, 0, Robot::OrientationMode::FIXED, false );
+            MoveC( f_c_p3, f_c_p0, 0.2, 0.2, 0, 0, Robot::OrientationMode::FIXED, false );
 
-                for ( int i{ 0 }; i < 1; i++ )
-                {
-                    MoveJ( q, 1, 1, 0, 0, false );
-                    MoveC( center, M_PI,2, 0.1, 0.01, 0, 0, Robot::OrientationMode::UNCONSTRAINED, false );
-                }
-
-                std::cout << "----------------test moveL end---------------" << std::endl;
-            }
-
-            // {  //测试moveL(只旋转，不移动)
-
-            //     std::cout << "----------------test moveL start---------------" << std::endl;
-            //     f_p2 = f_p1 * Frame{ KDL::Rotation::RotZ( 90 * M_PI / 180 ) };
-
-            //     MoveJ( q, 1, 1, 0, 0, false );
-            //     MoveL( f_p2, 0.01, 0.01, 0, 0, false );
-            //     std::cout << "----------------test moveL end---------------" << std::endl;
-            // }
-
-            // {  //测试MultiMoveL，
-            //     std::cout << "----------------test MultiMoveL start---------------" << std::endl;
-
-            //     MoveJ( q, 1, 1, 0, 0, false );
-            //     f_p1 = f_p1 * KDL::Frame{ KDL::Vector{ 0.0, -0.15, 0.0 } };
-            //     f_p2 = f_p1 * KDL::Frame{ KDL::Vector{ -0.3, 0.0, 0.0 } };
-            //     f_p3 = f_p2 * KDL::Frame{ KDL::Vector{ 0.0, 0.3, 0.0 } };
-            //     f_p4 = f_p3 * KDL::Frame{ KDL::Vector{ 0.3, 0.0, 0.0 } };
-
-            //     std::vector< KDL::Frame > points{ f_p1, f_p2, f_p3, f_p4 };
-            //     std::vector< double > max_path_v{ 0.10, 0.10, 0.10, 0.10 };
-            //     std::vector< double > max_path_a{ 0.2, 0.2, 0.2, 0.2 };
-            //     std::vector< double > bound_dist{ 0.05, 0.05, 0.05, 0.05 };
-
-            //     MultiMoveL( points, bound_dist, max_path_v, max_path_a, false );
-            //     std::cout << "----------------test MultiMoveL end---------------" << std::endl;
-            // }
+            for ( int i = 0; i < jnt_num_; i++ )
+                q_target( i ) = 0;
+            MoveJ( q_target, 0.2, 0.2, 0, 0, false );
         }
         else
         {
@@ -718,6 +672,26 @@ namespace rocos
 }  // namespace rocos
 
 #pragma endregion
+
+
+
+
+
+/// \brief 处理终端的Ctrl-C信号
+/// \param signo
+void signalHandler( int signo )
+{
+    if ( signo == SIGINT )
+    {
+        std::cout << "\033[1;31m"
+                  << "[!!SIGNAL!!]"
+                  << "INTERRUPT by CTRL-C"
+                  << "\033[0m" << std::endl;
+
+        isRuning = false;
+        exit( 0 );
+    }
+}
 
 int main( int argc, char* argv[] )
 {
@@ -733,11 +707,11 @@ int main( int argc, char* argv[] )
     //** 等待主站清除共享内存,25后再启动APP **//
     std::cerr << "\033[32m"
               << "等待主站清除共享内存" << std::endl;
-    std::this_thread::sleep_for( std::chrono::duration< double >( 0.1 ) );
+    std::this_thread::sleep_for( std::chrono::duration< double >( 10 ) );
     //**-------------------------------**//
 
-    boost::shared_ptr< HardwareInterface > hw = boost::make_shared< HardwareSim >( 7 );  // 仿真
-    // boost::shared_ptr< HardwareInterface > hw = boost::make_shared< Hardware >( );  //真实机械臂
+    // boost::shared_ptr< HardwareInterface > hw = boost::make_shared< HardwareSim >( 7 );  // 仿真
+    boost::shared_ptr< HardwareInterface > hw = boost::make_shared< Hardware >( );  //真实机械臂
 
     //** 判断主站ECM是否启动成功 **//
     //! 如果主站25S以内启动，既先主站清除内存，在hw与主站建立连接，那下面程序可以成功判断Ready 三次
@@ -789,5 +763,6 @@ int main( int argc, char* argv[] )
     robotService->runServer( );
 
     thread_test.join( );
+
     return 0;
 }
