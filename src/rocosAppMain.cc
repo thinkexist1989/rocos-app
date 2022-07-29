@@ -1127,8 +1127,8 @@ namespace rocos
     int Robot::check_init_pos( )
     {
         bool is_in_initPos{ true };
-
-        if ( abs( pos_[ 0 ] ) > 1e-3 )
+        sleep(4);
+        if ( abs( pos_[ 0 ] ) > 0.23 )
         {
             PLOG_DEBUG << abs( pos_[ 0 ] );
             is_in_initPos = false;
@@ -1166,46 +1166,9 @@ namespace rocos
 
         if ( !is_in_initPos )
         {
-            PLOG_ERROR << "当前位置不在预定的起始位置，继续上次指令";
-            //** 读取文件最后一行 **//
-            std::ifstream input_command;
-            input_command.open( "/home/think/rocos-app/debug/command_log.csv" );
-
-            if ( !input_command.is_open( ) )
-            {
-                PLOG_ERROR << "command_log.csv文件不存在";
-                return -1;
-            }
-
-            char tem[ 2048 ];
-            char last_command[ 2048 ];
-
-            while ( !input_command.eof( ) )  //遇见/t,/n,空格停下
-            {
-                input_command.getline( tem, 2048 );
-
-                if ( strcmp( tem, "" ) == 0 )
-                    continue;
-                else
-                    strcpy( last_command, tem );
-
-                PLOG_DEBUG << last_command;
-            }
-
-            input_command.close( );
-            //**-------------------------------**//
-
-            //** 分解字符串 **//
-            std::vector< std::string > tokens;  //存储单行分解后的结果
-            split( last_command, tokens, "," );
-            //**-------------------------------**//
-
-            //** 继续执行上次指令 **//
-            if ( csv_parse( tokens[ 0 ].c_str( ), 2048, std::stod( tokens[ 1 ] ) ) < 0 )
-                return -1;
-            //**-------------------------------**//
-            PLOG_INFO << "已自动回到起始位置";
-            return 0;
+            PLOG_ERROR << "当前位置不在预定的起始位置";
+           
+            return -1;
         }
         else
         {
