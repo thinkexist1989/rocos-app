@@ -1603,7 +1603,9 @@ namespace rocos {
         {
             for ( int i = 0; i < jnt_num_; i++ )
             {
-                  target_pos[i] =   interp[i]->pos(dt);
+                if ( !need_plan_[ i ] ) continue; //不需要规划的关节自然不需要速度检查
+
+                target_pos[ i ] = interp[ i ]->pos( dt );
 
                 if ( abs( target_pos[i] -init_pos[i]   ) > max_step[ i ] )
                 {
