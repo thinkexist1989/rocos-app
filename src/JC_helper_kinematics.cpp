@@ -770,7 +770,7 @@ namespace JC_helper
     }
 
     //! init()只负责轨迹的信息重置，运行状态Flag由各运动线程结束后{手动重置}
-    void SmartServo_Joint::init( std::vector< double > q_init, std::vector< double > v_init, std::vector< double > a_init, double max_v, double max_a, double max_j )
+    void SmartServo_Joint::init( const std::vector< std::atomic<double> > &q_init,  const std::vector< std::atomic<double> > & v_init,  const std::vector< std::atomic<double> > & a_init, double max_v, double max_a, double max_j )
     {
         input.control_interface = ruckig::ControlInterface::Position;
         input.synchronization   = ruckig::Synchronization::Phase;

@@ -22,7 +22,7 @@
 #include <kdl_parser/kdl_parser.hpp> // 用于将urdf文件解析为KDL::Tree
 
 namespace rocos {
-    Robot::Robot(boost::shared_ptr<HardwareInterface> hw) : hw_interface_(hw) {
+    Robot::Robot(boost::shared_ptr<HardwareInterface> hw) : hw_interface_(hw),pos_(_joint_num),vel_(_joint_num),acc_(_joint_num) {
         parseUrdf("robot.urdf", "base_link", "link_7");
 
 //        addAllJoints( ); // TODO: 这个应该直接加到参数解析里面，解析之后加入关节，顺序和主站顺序可能不一样
@@ -31,9 +31,9 @@ namespace rocos {
         target_positions_prev_.resize(jnt_num_);
         target_velocities_.resize(jnt_num_);
         target_torques_.resize(jnt_num_);
-        pos_.resize(jnt_num_);
-        vel_.resize(jnt_num_);
-        acc_.resize(jnt_num_);
+        // pos_.resize(jnt_num_);
+        // vel_.resize(jnt_num_);
+        // acc_.resize(jnt_num_);
         max_vel_.resize(jnt_num_);
         max_acc_.resize(jnt_num_);
         max_jerk_.resize(jnt_num_);
@@ -311,9 +311,9 @@ namespace rocos {
         target_positions_prev_.resize(jnt_num_);
         target_velocities_.resize(jnt_num_);
         target_torques_.resize(jnt_num_);
-        pos_.resize(jnt_num_);
-        vel_.resize(jnt_num_);
-        acc_.resize(jnt_num_);
+        // pos_.resize(jnt_num_);
+        // vel_.resize(jnt_num_);
+        // acc_.resize(jnt_num_);
         max_vel_.resize(jnt_num_);
         max_acc_.resize(jnt_num_);
         max_jerk_.resize(jnt_num_);

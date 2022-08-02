@@ -340,8 +340,8 @@ namespace rocos {
         //! 更新法兰系,工具系,工件系pose
         void updateCartesianInfo() {
             JntArray q_in(jnt_num_);
-            q_in.data =
-                    Eigen::Map<Eigen::VectorXd, Eigen::Unaligned>(pos_.data(), pos_.size());
+            for( int i{0};i<jnt_num_;i++)
+            q_in(i) = pos_[i];
             //            std::cout << q_in.data << std::endl;
 
             // Flange Reference
@@ -557,9 +557,9 @@ namespace rocos {
         std::vector<double> target_velocities_;
         std::vector<double> target_torques_;
 
-        std::vector<double> pos_;
-        std::vector<double> vel_;
-        std::vector<double> acc_;
+        std::vector< std::atomic<double>> pos_;
+        std::vector< std::atomic<double>> vel_;
+        std::vector< std::atomic<double>> acc_;
 
         std::vector<double> max_vel_;
         std::vector<double> max_acc_;

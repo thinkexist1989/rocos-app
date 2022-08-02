@@ -197,7 +197,7 @@ namespace JC_helper
 
     public:
         SmartServo_Joint( std::atomic< bool >* finished_flag_ptr );
-        void init( std::vector< double > q_init, std::vector< double > v_init, std::vector< double > a_init, double max_v, double max_a, double max_j );
+        void init( const std::vector< std::atomic<double> > & q_init, const std::vector< std::atomic<double> > &  v_init, const std::vector< std::atomic<double> > &  a_init, double max_v, double max_a, double max_j );
         void RunSmartServo( rocos::Robot* robot_ptr );
         void command( KDL::JntArray q_target );
     };
@@ -374,7 +374,7 @@ namespace JC_helper
 #endif
     };
 
-    inline KDL::JntArray vector_2_JntArray( std::vector< double > pos )
+    inline KDL::JntArray vector_2_JntArray( const std::vector< std::atomic<double> > & pos )
     {
         KDL::JntArray _pos( pos.size( ) );
         for ( int i = 0; i < pos.size( ); i++ )
