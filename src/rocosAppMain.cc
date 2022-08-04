@@ -337,7 +337,7 @@ int main( int argc, char* argv[] )
     std::this_thread::sleep_for( std::chrono::duration< double >( 13 ) );
     //**-------------------------------**//
 
-    boost::shared_ptr< HardwareInterface > hw = boost::make_shared< HardwareSim >( 7 );  // 仿真
+    boost::shared_ptr< HardwareInterface > hw = boost::make_shared< HardwareSim >( _joint_num );  // 仿真
     // boost::shared_ptr< HardwareInterface > hw = boost::make_shared< Hardware >( );  //真实机械臂
 
     //** 判断主站ECM是否启动成功 **//
