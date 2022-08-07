@@ -886,15 +886,13 @@ namespace JC_helper
             // cout << ( *it ).second.second << endl;
             if ( decryptText == ( *it ).first )
             {
-                std::cout << GREEN << "===================== 认 证 通 过 =====================" << WHITE << std::endl;
-                std::cout << GREEN << "===================== 欢迎使用 ROCOS-Application =====================" << WHITE << std::endl;
-
+                std::cout << GREEN << base64::base64_decode( "PT09PT09PT09PT09PT09PT09PT09IOiupCDor4Eg6YCaIOi/hyA9PT09PT09PT09PT09PT09PT09PT0=") << WHITE << std::endl;
                 return 0;
             }
         }
 
-        std::cout << RED << "===================== 认 证 失 败 =====================" << WHITE << std::endl;
-        std::cout << RED << "====请联系管理人: luoyang@sia.cn 或 193355797@qq.com===" << WHITE << std::endl;
+        std::cout << RED <<base64::base64_decode( "PT09PT09PT09PT09PT09PT09PT09IOiupCDor4Eg5aSxIOi0pSA9PT09PT09PT09PT09PT09PT09PT0=")  << WHITE << std::endl;
+        std::cout << RED <<base64::base64_decode( "PT09Peivt+iBlOezu+euoeeQhuS6ujogbHVveWFuZ0BzaWEuY24g5oiWIDE5MzM1NTc5N0BxcS5jb209PT0=")  << WHITE << std::endl;
 
         return -1;
     }
