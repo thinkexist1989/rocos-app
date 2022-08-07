@@ -696,8 +696,12 @@ std::string RsaPriEncrypt( const std::string& clear_text, const std::string& pri
     if ( ret >= 0 )
     {
         encrypt_text = std::string( text, ret );
-        PLOG_INFO << "text= " << text;
-        PLOG_INFO << "ret= " << ret;
+    }
+    else
+    {
+        PLOG_ERROR << "RSA_private_encrypt error";
+        BIO_free_all( keybio );
+        return std::string( "" );
     }
 
     // 释放内存
