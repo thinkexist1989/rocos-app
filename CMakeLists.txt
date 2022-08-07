@@ -45,6 +45,7 @@ find_package(yaml-cpp REQUIRED)
 find_package(Threads REQUIRED)
 find_package(Qt5 REQUIRED COMPONENTS Core)
 find_package(Eigen3 REQUIRED)
+find_package(OpenSSL REQUIRED)
 
 ##################
 ##   3rdparty   ##
@@ -74,7 +75,7 @@ link_directories(
 
 file(GLOB_RECURSE SRCS src/*.cpp)
 file(GLOB_RECURSE HDRS include/*.h include/*.hpp)
-file(GLOB_RECURSE CONFIG_FILE config/*.urdf)
+file(GLOB_RECURSE CONFIG_FILE config/*.urdf  config/public.key  config/license )
 
 set(DEP_LIBS
         dl
@@ -143,6 +144,7 @@ add_library(robot
         src/robot.cc
         src/JC_helper_kinematics.cpp
         src/JC_helper_dynamics.cpp
+        src/JC_helper_authenticate.cpp
         )
 target_link_libraries(robot
         PUBLIC
@@ -151,6 +153,7 @@ target_link_libraries(robot
         rocos::kinematics
         plog::plog
         JC_helper::gripper
+        OpenSSL::SSL
         )
 add_library(rocos::robot ALIAS robot)
 
@@ -251,6 +254,7 @@ target_link_libraries(${PROJECT_NAME}
 
 # Copy config files to bin/
 file(COPY ${CONFIG_FILE} DESTINATION ${CMAKE_BINARY_DIR}/bin)
+
 
 
 #############

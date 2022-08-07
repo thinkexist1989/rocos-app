@@ -18,11 +18,12 @@
 // email: luoyang@sia.cn
 
 #include "robot.h"
-
+#include "JC_helper_authenticate.hpp"
 #include <kdl_parser/kdl_parser.hpp> // 用于将urdf文件解析为KDL::Tree
 
 namespace rocos {
     Robot::Robot(boost::shared_ptr<HardwareInterface> hw) : hw_interface_(hw),pos_(_joint_num),vel_(_joint_num),acc_(_joint_num) {
+        
         parseUrdf("robot.urdf", "base_link", "link_"+std::to_string(_joint_num));
 
 //        addAllJoints( ); // TODO: 这个应该直接加到参数解析里面，解析之后加入关节，顺序和主站顺序可能不一样
@@ -64,7 +65,11 @@ namespace rocos {
         static plog::ColorConsoleAppender< plog::TxtFormatter > consoleAppender;
         plog::init< 0 >( plog::debug, &consoleAppender );//终端显示                                                                      // Initialize the logger.
 
-                                                                        
+        if ( JC_helper::authentication( ) < 0 )
+        {
+            exit( 0 );
+        }
+
         startMotionThread( );
     }
 
