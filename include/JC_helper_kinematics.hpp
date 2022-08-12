@@ -17,6 +17,7 @@
 #include <vector>
 #include <fstream>
 #include <Eigen/Geometry>
+#include <trac_ik/trac_ik.hpp>
 
 #define RESET "\033[0m"
 
@@ -54,6 +55,8 @@
 
 //示例
 // std::cout << BLUE << " hello world " << std::endl;
+
+constexpr size_t _joint_num{ 7 };
 
 namespace rocos
 {
@@ -161,7 +164,6 @@ namespace JC_helper
      */
     int rotation_trajectory( std::vector< KDL::Frame >& traj, const KDL::Vector& f_p, const KDL::Rotation& f_r1, const KDL::Rotation& f_r2, double max_path_v = 0.01, double max_path_a = 0.01, double equivalent_radius = 0.01 );
 
-    constexpr size_t _joint_num{ 7 };
 
     class SmartServo_Joint
     {
@@ -178,10 +180,12 @@ namespace JC_helper
 
     public:
         SmartServo_Joint( std::atomic< bool >* finished_flag_ptr );
-        void init( std::vector< double > q_init, std::vector< double > v_init, std::vector< double > a_init, double max_v, double max_a, double max_j );
+        void init( const std::vector< std::atomic<double> > & q_init, const std::vector< std::atomic<double> > &  v_init, const std::vector< std::atomic<double> > &  a_init, double max_v, double max_a, double max_j );
         void RunSmartServo( rocos::Robot* robot_ptr );
         void command( KDL::JntArray q_target );
     };
+
+#if 0 
 
     class OnlineDoubleS
     {
@@ -230,9 +234,68 @@ namespace JC_helper
         void get_pos_vel_acc( int i, double& p, double& v, double& a );
         void get_pos_vel_acc( double t, double& p, double& v, double& a );
     };
+#endif
 
     class SmartServo_Cartesian
     {
+
+
+private:
+        //** 变量初始化 **//
+        ruckig::Ruckig< 1 > otg{ 0.001 };
+        ruckig::InputParameter< 1 > input;
+        ruckig::OutputParameter< 1 > output;
+        ruckig::Result res;
+        KDL::Vector _vel{ };
+        KDL::ChainIkSolverVel_pinv _ik_vel;
+        const double servo_dt = 0.001;
+        std::atomic< bool > flag_stop{ false };
+
+        KDL::JntArray joint_current{ };
+        KDL::JntArray joint_target{ };
+        KDL::JntArray joint_vel{ };
+        KDL::JntArray joint_last_vel{ };
+
+        KDL::JntArray joint_last_pos{ };
+        KDL::JntArray joint_last_last_pos{ };
+
+        int _Cartesian_vel_index{ 0 };
+        std::atomic< bool >* external_finished_flag_ptr;
+
+        std::string  _reference_frame {""};
+
+        KDL::ChainFkSolverPos_recursive   FK_slover;  //!因为flang_.M一直在刷新，实时读取有问题，暂时这么处理
+        KDL::Frame current_flange{ };  
+
+
+        //**-------------------------------**//
+    public:
+
+        SmartServo_Cartesian(  std::atomic< bool >* , const KDL::Chain& robot_chain ) ;
+
+        void init( rocos::Robot* robot_ptr  , double target_vel, double max_vel = 0.3, double max_acc = 1, double max_jerk = 1 );
+      
+      
+        /**
+         * @brief  只有OTG正常计算，且不在奇异位置，joint_vel才会为有效值，其余情况通通为0
+         * @return  otg失败 = -1；雅克比在奇异位置 = -1;working = 1;finished  = 0
+         * @param joints 当前位置
+         * @param Cartesian_vel  目标速度矢量
+         * @param index  速度矢量的哪个方向，移动或者旋转
+         * @param joint_vel  结果输出
+         */
+
+        int update( KDL::JntArray& joint_vel, rocos::Robot* robot_ptr );
+
+        void RunMotion( rocos::Robot* robot_ptr );
+
+        void command( int Cartesian_vel_index ,const char * reference_frame);
+
+        void Cartesian_stop( double max_vel=1, double max_acc =30 , double max_jerk=200 );
+
+#if 0
+
+
     private:
         std::atomic< bool > on_stop_trajectory{ false };
         std::atomic< bool >* external_finished_flag_ptr;
@@ -293,9 +356,10 @@ namespace JC_helper
         KDL::Frame cirlular_trajectory( const KDL::Frame& F_base_circlestart, const KDL::Frame& F_base_circleend, const KDL::Frame& F_base_circleCenter, double s_p, double alpha );
         KDL::Frame cirlular_trajectory( const KDL::Frame& F_base_circlestart, const KDL::Frame& F_base_circleend, const KDL::Frame& F_base_circleCenter, double s_p, double s_r, double alpha );
         KDL::Rotation ratation_trajectory( const KDL::Rotation& start, const KDL::Rotation& end, double s_r, bool flag_big_angle = false );
+  #endif
     };
 
-    inline KDL::JntArray vector_2_JntArray( std::vector< double > pos )
+    inline KDL::JntArray vector_2_JntArray( const std::vector< std::atomic<double> > & pos )
     {
         KDL::JntArray _pos( pos.size( ) );
         for ( int i = 0; i < pos.size( ); i++ )
@@ -318,7 +382,46 @@ namespace JC_helper
      * @param traj_joint 存储关节的轨迹
      * @param traj_joint_count =101代表0-100的关节都已经执行
      */
-    void motion_stop( rocos::Robot* robot_ptr, const std::vector< KDL::JntArray >& traj_joint, int traj_joint_count );
+ void Joint_stop( rocos::Robot* robot_ptr, const KDL::JntArray& current_pos, const KDL::JntArray& last_pos, const KDL::JntArray& last_last_pos );
+
+    /**
+     * @brief 速度和加速度检查
+     *
+     * @param current_pos 准备下发的位置
+     * @param last_pos 当前位置
+     * @param last_last_pos 上次位置
+     * @param max_vel 最大速度
+     * @param max_acc 最大加速度
+     * @return int
+     */
+    int check_vel_acc( const KDL::JntArray& current_pos, const KDL::JntArray& last_pos, const KDL::JntArray& last_last_pos, const std::vector< double >& max_vel, const std::vector< double >& max_acc );
+
+    /**
+     * @brief 带安全位置检查的伺服
+     *
+     * @param robot_ptr
+     * @param target_pos 目标位置
+     * @return int
+     */
+     int safety_servo(rocos::Robot* robot_ptr,const std::array<double, _joint_num> & target_pos);
+
+     /**
+     * @brief 带安全位置检查的伺服
+     *
+     * @param robot_ptr
+     * @param target_pos 目标位置
+     * @return int
+     */   
+    int safety_servo( rocos::Robot* robot_ptr, const std::vector< double > &target_pos );
+
+     /**
+     * @brief 带安全位置检查的伺服
+     *
+     * @param robot_ptr
+     * @param target_pos 目标位置
+     * @return int
+     */   
+    int safety_servo( rocos::Robot* robot_ptr, const KDL::JntArray &target_pos );
 
    
 }  // namespace JC_helper

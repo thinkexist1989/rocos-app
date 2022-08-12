@@ -299,23 +299,31 @@ namespace JC_helper
         KDL::Frame frame_target;
         KDL::JntArray _q_target( _joint_num );
         KDL::JntArray _q_init( _joint_num );
-        std::vector< double > max_step;
         int_least64_t max_count{ 0 };
         KDL::Twist admittance_vel;
         KDL::JntArray joints_vel( _joint_num );
 
-        KDL::ChainJntToJacSolver jnt2jac{ robot_ptr->kinematics_.getChain( ) };
-        KDL::Jacobian jac{ _joint_num };
+        KDL::JntArray current_pos( _joint_num );
+        KDL::JntArray last_pos( _joint_num );
+        KDL::JntArray last_last_pos( _joint_num );
+
         //**-------------------------------**//
 
         //** 程序初始化 **//
 
         for ( int i = 0; i < _joint_num; i++ )
         {
-            max_step.push_back( robot_ptr->max_vel_[ i ] * 0.001 );
             _q_init( i )   = robot_ptr->pos_[ i ];
             _q_target( i ) = _q_init( i );
         }
+
+        for ( int i = 0; i < _joint_num; i++ )
+        {
+            current_pos( i )   = robot_ptr->pos_[ i ];
+            last_pos( i )      = current_pos( i );
+            last_last_pos( i ) = current_pos( i );
+        }
+
         //**-------------------------------**//
 
         //** 轨迹计算 **//
@@ -328,8 +336,6 @@ namespace JC_helper
         {
             // TODO 导纳计算
             smd.set_force( my_ft_sensor_ptr->force_torque.force[ 0 ], my_ft_sensor_ptr->force_torque.force[ 1 ], my_ft_sensor_ptr->force_torque.force[ 2 ] );
-            // smd.set_force( 0, -20, 0 );
-            // smd.set_torque( 0, 0, 0 );
             smd.calculate( frame_offset, admittance_vel );
 
             //** 读取最新Frame **//
@@ -353,33 +359,20 @@ namespace JC_helper
             KDL::Add( _q_init, joints_vel, _q_target );
             //**-------------------------------**//
 
-            //** 避开奇异点 **////临时修改 容易误判，取消
-            // jnt2jac.JntToJac( _q_target, jac );
-            // if ( abs( jac.data.determinant( ) ) < 0.006 )
-            // {
-            //     PLOG_ERROR << "target is a singular point";
-            //     on_stop_trajectory = true;
-            //     break;
-            // }
-
-            //**-------------------------------**//
-
-            //** 速度保护**//
-            for ( int i = 0; i < _joint_num; i++ )
-            {
-                if ( abs( _q_target( i ) - _q_init( i ) ) > max_step[i] )//临时修改,示教模式
-                {
-                    PLOG_ERROR << "joint[" << i << "] speep is too  fast";
-                    PLOG_ERROR << "target speed = " << abs( _q_target( i ) - _q_init( i ) )
-                               << " and  max_step=" << max_step[ i ];
-                    PLOG_ERROR << "_q_target( " << i << " )  = " << _q_target( i ) * 180 / M_PI;
-                    PLOG_ERROR << "_q_init( " << i << " ) =" << _q_init( i ) * 180 / M_PI;
-                    on_stop_trajectory = true;
-                    break;
-                }
-            }
+            //** 速度和加速度保护 **//
 
             if ( on_stop_trajectory ) break;
+
+            if ( check_vel_acc( _q_target, current_pos, last_pos, robot_ptr->max_vel_, robot_ptr->max_acc_ ) < 0 )
+            {
+                on_stop_trajectory = true;
+                break;
+            }
+
+            last_last_pos = last_pos;
+            last_pos      = current_pos;
+            current_pos   = _q_target;
+
             //**-------------------------------**//
 
             //** csv打印 **//
@@ -393,15 +386,12 @@ namespace JC_helper
             //**-------------------------------**//
 
             //** 位置伺服 **//
-            for ( int i = 0; i < _joint_num; ++i )
-            {
-                robot_ptr->pos_[ i ] = _q_target( i );
-                robot_ptr->joints_[ i ]->setPosition( _q_target( i ) );
-            }
-            robot_ptr->hw_interface_->waitForSignal( 0 );
+
+            //!提供位置保护，防止越过关节限位
+            safety_servo( robot_ptr, _q_target );
+
             //**-------------------------------**//
 
-            traj_joint.push_back( _q_target );
             _q_init = _q_target;
 
             on_stop_trajectory = *flag_turnoff;//由外界调用者决定什么时候停止
@@ -411,9 +401,9 @@ namespace JC_helper
         if ( on_stop_trajectory )
         {
             PLOG_ERROR << "IK 触发急停";
-            motion_stop( robot_ptr, std::ref( traj_joint ), traj_count );
-            *flag_turnoff  = true ; //告知调用者，线程已停止
-        }
+            Joint_stop( robot_ptr, current_pos, last_pos, last_last_pos );
+            *flag_turnoff  = true ; //告知调用者，因为速度太大而线程已停止
+         }
         else
             PLOG_INFO << "IK结束";
 
@@ -433,8 +423,9 @@ namespace JC_helper
         KDL::Twist traj_vel;
         KDL::Twist Cartesian_vel;
 
-        KDL::ChainJntToJacSolver jnt2jac{ robot_ptr->kinematics_.getChain( ) };
-        KDL::Jacobian jac{ _joint_num };
+        KDL::JntArray current_pos( _joint_num );
+        KDL::JntArray last_pos( _joint_num );
+        KDL::JntArray last_last_pos( _joint_num );
         //**-------------------------------**//
 
         //** 程序初始化 **//
@@ -445,6 +436,15 @@ namespace JC_helper
             _q_init( i )   = robot_ptr->pos_[ i ];
             _q_target( i ) = _q_init( i );
         }
+
+        for ( int i = 0; i < _joint_num; i++ )
+        {
+            current_pos( i )   = robot_ptr->pos_[ i ];
+            last_pos( i )      = current_pos( i );
+            last_last_pos( i ) = current_pos( i );
+        }
+
+
         //**-------------------------------**//
 
         //** 直线轨迹规划 **//
@@ -507,33 +507,20 @@ namespace JC_helper
             KDL::Add( _q_init, joints_vel, _q_target );
             //**-------------------------------**//
 
-            //** 避开奇异点 **//
-            jnt2jac.JntToJac( _q_target, jac );
-            if ( abs( jac.data.determinant( ) ) < 0.003 )
+            //** 速度和加速度保护 **//
+
+            if ( on_stop_trajectory ) break;
+
+            if ( check_vel_acc( _q_target, current_pos, last_pos, robot_ptr->max_vel_, robot_ptr->max_acc_ ) < 0 )
             {
-                PLOG_ERROR << "target is a singular point";
                 on_stop_trajectory = true;
                 break;
             }
 
-            //**-------------------------------**//
+            last_last_pos = last_pos;
+            last_pos      = current_pos;
+            current_pos   = _q_target;
 
-            //** 速度保护**//
-            for ( int i = 0; i < _joint_num; i++ )
-            {
-                if ( abs( _q_target( i ) - _q_init( i ) ) > 0.1 )//临时修改 速度可能过大
-                {
-                    PLOG_ERROR << "joint[" << i << "] speep is too  fast";
-                    PLOG_ERROR << "target speed = " << abs( _q_target( i ) - _q_init( i ) )
-                               << " and  max_step=" << max_step[ i ];
-                    PLOG_ERROR << "_q_target( " << i << " )  = " << _q_target( i ) * 180 / M_PI;
-                    PLOG_ERROR << "_q_init( " << i << " ) =" << _q_init( i ) * 180 / M_PI;
-                    on_stop_trajectory = true;
-                    break;
-                }
-            }
-
-            if ( on_stop_trajectory ) break;
             //**-------------------------------**//
 
             //** csv打印 **//
@@ -547,15 +534,12 @@ namespace JC_helper
             //**-------------------------------**//
 
             //** 位置伺服 **//
-            for ( int i = 0; i < _joint_num; ++i )
-            {
-                robot_ptr->pos_[ i ] = _q_target( i );
-                robot_ptr->joints_[ i ]->setPosition( _q_target( i ) );
-            }
-            robot_ptr->hw_interface_->waitForSignal( 0 );
+
+            //!提供位置保护，防止越过关节限位
+            safety_servo( robot_ptr, _q_target );
+
             //**-------------------------------**//
 
-            traj_joint.push_back( _q_target );
             _q_init = _q_target;
 
         }
@@ -563,7 +547,7 @@ namespace JC_helper
         if ( on_stop_trajectory )
         {
             PLOG_ERROR << "IK 触发急停";
-            motion_stop( robot_ptr, std::ref( traj_joint ), traj_count );
+            Joint_stop( robot_ptr, current_pos, last_pos, last_last_pos );
         }
         else
             PLOG_INFO << "IK结束";

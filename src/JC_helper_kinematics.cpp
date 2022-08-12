@@ -1,9 +1,5 @@
 #include "JC_helper_kinematics.hpp"
 #include "robot.h"
-/** 待处理问题：
- * 2. dragging 笛卡尔空间版 加入
- * 3. drggging 关节空间改进，允许给笛卡尔位姿
- */
 
 namespace JC_helper
 {
@@ -239,8 +235,6 @@ namespace JC_helper
 
     int link_trajectory( std::vector< KDL::Frame >& traj, const KDL::Frame& start, const KDL::Frame& end, double max_path_v, double max_path_a )
     {
-  
-
         //** 变量初始化 **//
         KDL::Vector Pstart        = start.p;
         KDL::Vector Pend          = end.p;
@@ -708,7 +702,7 @@ namespace JC_helper
     }
 
     //! init()只负责轨迹的信息重置，运行状态Flag由各运动线程结束后{手动重置}
-    void SmartServo_Joint::init( std::vector< double > q_init, std::vector< double > v_init, std::vector< double > a_init, double max_v, double max_a, double max_j )
+    void SmartServo_Joint::init( const std::vector< std::atomic<double> > &q_init,  const std::vector< std::atomic<double> > & v_init,  const std::vector< std::atomic<double> > & a_init, double max_v, double max_a, double max_j )
     {
         input.control_interface = ruckig::ControlInterface::Position;
         input.synchronization   = ruckig::Synchronization::Phase;
@@ -763,21 +757,14 @@ namespace JC_helper
             }
             else if ( res == ruckig::Result::Working )
             {
-                const auto& p = output.new_position;
+                safety_servo( robot_ptr, output.new_position );
 
-                for ( int i = 0; i < _joint_num; ++i )
-                {
-                    robot_ptr->pos_[ i ] = p[ i ];
-                    robot_ptr->joints_[ i ]->setPosition( p[ i ] );
-                }
-                // PLOG_DEBUG << "p[ 0 ]=" << p[ 0 ] << " p[ 1]=" << p[ 1 ] ;
+   
                 input_lock.lock( );
                 output.pass_to_input( input );
                 input_lock.unlock( );
-
-                robot_ptr->hw_interface_->waitForSignal( 0 );
             }
-            else//计算失败，紧急停止
+            else  //计算失败，紧急停止
             {
                 PLOG_ERROR << "otg computation failed";
                 on_stop_trajectory = true;
@@ -796,7 +783,7 @@ namespace JC_helper
                 input_lock.unlock( );
             }
             //** 100ms进行一次心跳检查,紧急停止时不需要检查 **//
-            if ( ( ( ++count ) == 100 ) && !on_stop_trajectory )
+            if ( ( ( ++count ) > 100 ) && !on_stop_trajectory )
             {
                 count = 0;
 
@@ -807,8 +794,7 @@ namespace JC_helper
                 else
                 {
                     PLOG_ERROR << "Some errors such as disconnecting from the controller";
-                    PLOG_DEBUG << "new_velocity"<< output.new_velocity[0];
-                    PLOG_DEBUG << "new_acceleration"<<output.new_acceleration[0];
+
                     on_stop_trajectory = true;
                     input_lock.lock( );
                     input.control_interface = ruckig::ControlInterface::Velocity;
@@ -853,6 +839,7 @@ namespace JC_helper
 #pragma endregion
 
 #pragma region  //*笛卡尔空间点动功能实现
+#if 0
     SmartServo_Cartesian::SmartServo_Cartesian( std::atomic< bool >* finished_flag_ptr )
     {
         external_finished_flag_ptr = finished_flag_ptr;
@@ -2764,15 +2751,410 @@ namespace JC_helper
                 }
             }
     }
-#pragma endregion
-// 40%
-// 关节速度
-// 0.136345  =7.81
-// -0.989712 = 60
 
-// 笛卡尔速度
-// 0.12  = 7.148117   0.35=20   30
-// 0.03 = 1.623903  0.03=1.636884   0.09 = 4.991709  ·50
+#endif
+
+    SmartServo_Cartesian::SmartServo_Cartesian( std::atomic< bool >* finished_flag_ptr, const KDL::Chain& robot_chain ) : _ik_vel{ robot_chain },FK_slover{robot_chain}
+
+ {
+        joint_current.resize( _joint_num );
+        joint_target.resize( _joint_num );
+        joint_vel.resize( _joint_num );
+        joint_last_vel.resize( _joint_num );
+        joint_last_pos.resize( _joint_num );
+        joint_last_last_pos.resize( _joint_num );
+        external_finished_flag_ptr = finished_flag_ptr;
+    }
+
+    void SmartServo_Cartesian::init( rocos::Robot* robot_ptr, double target_vel, double max_vel, double max_acc, double max_jerk )
+    {
+        input.current_position[ 0 ]     = 0;
+        input.current_velocity[ 0 ]     = 0;
+        input.current_acceleration[ 0 ] = 0;
+
+        input.target_position[ 0 ]     = 0;
+        input.target_velocity[ 0 ]     = target_vel;
+        input.target_acceleration[ 0 ] = 0;
+
+        input.max_velocity[ 0 ]     = max_vel;
+        input.max_acceleration[ 0 ] = max_acc;
+        input.max_jerk[ 0 ]         = max_jerk;
+
+        input.control_interface = ruckig::ControlInterface::Velocity;
+        input.synchronization   = ruckig::Synchronization::None;
+
+        flag_stop = false;
+
+
+        KDL::SetToZero( joint_vel );
+        KDL::SetToZero( joint_last_vel );
+
+        for ( int i{ 0 }; i < _joint_num; i++ )
+        {
+            joint_current( i ) = robot_ptr->pos_[ i ];
+            joint_target( i )  = joint_current( i );
+            joint_last_pos( i )      = joint_current( i );
+            joint_last_last_pos( i ) = joint_current( i );
+        }
+
+        _Cartesian_vel_index = 0;  // 0代表无方向
+
+        _reference_frame.clear( );  //空字符代表无参考坐标系
+
+        current_flange  = KDL::Frame{ };
+
+        PLOG_INFO << "笛卡尔空间点动初始化完成";
+    }
+
+    int SmartServo_Cartesian::update( KDL::JntArray& joint_vel, rocos::Robot* robot_ptr )
+    {
+        KDL::SetToZero( joint_vel );
+        KDL::Twist Cartesian_vel{ };
+
+
+        res = otg.update( input, output );
+
+        if ( res != ruckig::Result::Working && res != ruckig::Result::Finished )
+        {
+            PLOG_ERROR << "OTG 计算失败";
+            return -1;
+        }
+
+        const auto& res_vel = output.new_velocity;
+
+        if ( abs( _Cartesian_vel_index ) <= 3 )  //移动
+        {
+            Cartesian_vel.vel[ abs( _Cartesian_vel_index ) - 1 ] = sign( _Cartesian_vel_index ) * res_vel[ 0 ];
+        }
+        else  //旋转
+        {
+            Cartesian_vel.rot[ abs( _Cartesian_vel_index ) - 4 ] = sign( _Cartesian_vel_index ) * res_vel[ 0 ];
+        }
+
+        if ( _reference_frame.compare( "flange" ) == 0 )
+        {  //** 转变速度矢量的参考系，由flange系变为base系，但没有改变参考点（还是flange） **//
+            {
+                FK_slover.JntToCart( vector_2_JntArray( robot_ptr->pos_ ), current_flange );
+                Cartesian_vel = current_flange.M * Cartesian_vel;
+            }
+        }
+
+        output.pass_to_input( input );
+
+        //!雅克比默认参考系为base,参考点为flange
+        if ( _ik_vel.CartToJnt( joint_current, Cartesian_vel, joint_vel ) != 0 )
+        {
+            PLOG_DEBUG << _ik_vel.CartToJnt( joint_current, Cartesian_vel, joint_vel );
+            PLOG_ERROR << "雅克比计算错误";
+            return -1;
+        }
+
+        if ( res == ruckig::Result::Working )
+        {
+            return 1;
+        }
+        else
+        {
+            // PLOG_INFO << "完成！";
+            return 0;
+        }
+    }
+
+    void SmartServo_Cartesian::RunMotion( rocos::Robot* robot_ptr )
+    {
+        int t_count = 0;  //时间计数
+        int _tick_count{ robot_ptr->tick_count };
+
+        //! 由init()保证成立，由command()来打破
+        while ( *external_finished_flag_ptr )
+        {
+            ;  //等待指令
+        }
+
+        while ( 1 )
+        {
+            //** 心跳检查 **//
+            if ( !flag_stop )
+                t_count++;
+
+            if ( t_count > 100 )
+            {
+                t_count = 0;
+                if ( _tick_count != robot_ptr->tick_count )
+                    _tick_count = robot_ptr->tick_count;
+                else
+                {
+                    PLOG_ERROR << "心跳超时，停止！";
+                    Cartesian_stop( );  //速度目标设置为0
+                }
+            }
+            //**-------------------------------**//
+
+            int res = update( joint_vel, robot_ptr );
+
+            if ( res < 0 )  // OTG的 error 状态
+            {
+                //关节空间急停
+                flag_stop = true;
+                Joint_stop( robot_ptr, joint_current, joint_last_pos, joint_last_last_pos );
+                sleep( 2 );
+                break;
+            }
+            else  // working 或者finished状态
+            {
+                KDL::Add( joint_last_vel, joint_vel, joint_vel );
+                KDL::Multiply( joint_vel, 0.5, joint_vel );
+                joint_last_vel = joint_vel;
+
+                KDL::Multiply( joint_vel, servo_dt, joint_vel );
+                KDL::Add( joint_current, joint_vel, joint_target );
+
+                //** 速度和加速度保护 **//
+                static std::vector< double > _max_acc( _joint_num, 2 );//临时修改 ,因为10的加速度实在太大了
+                //! 急停状态下不用速度检查，因为会和笛卡尔急停冲突（笛卡尔急停会使得关节加速度超大，必触发关节急停保护）
+                if ( !flag_stop && check_vel_acc( joint_target, joint_current, joint_last_pos, robot_ptr->max_vel_, _max_acc ) < 0 )
+                {
+                    //关节空间急停
+                    flag_stop = true;
+                    Joint_stop( robot_ptr, joint_current, joint_last_pos, joint_last_last_pos );
+                    sleep( 2 );
+                    break;
+                }
+
+                joint_last_last_pos = joint_last_pos;
+                joint_last_pos      = joint_current;
+                joint_current       = joint_target;
+
+                //**-------------------------------**//
+
+                //** 位置伺服 **//
+                safety_servo(robot_ptr,joint_target);
+
+                //**-------------------------------**//
+
+                if ( res == 0 && flag_stop )  // finished 状态
+                {
+                    PLOG_INFO << "笛卡尔空间急停已完成";
+
+                    break;
+                }
+            }
+        }
+
+        ( *external_finished_flag_ptr ) = true;   //这次smart servo已结束，等待下一次smart servo
+        robot_ptr->is_running_motion    = false;  //机械臂运动已结束，可以执行其他离线类运动
+        PLOG_INFO << "笛卡尔空间点动全部结束";
+    }
+
+    void SmartServo_Cartesian::command( int Cartesian_vel_index, const char* reference_frame )
+    {
+        if ( _Cartesian_vel_index == 0 )
+            _Cartesian_vel_index = Cartesian_vel_index;
+
+        if ( _reference_frame.empty( ) )
+            _reference_frame = reference_frame;
+
+        if ( !flag_stop )
+        {
+            if ( _Cartesian_vel_index != Cartesian_vel_index )
+            {
+                PLOG_ERROR << "方向变换，停止！";
+                Cartesian_stop( );
+            }
+            else if ( _reference_frame.compare( reference_frame ) != 0 )
+            {
+                PLOG_ERROR << "参考坐标系变换，停止！";
+                Cartesian_stop( );
+            }
+            else
+                *external_finished_flag_ptr = false;
+        }
+        else
+            PLOG_ERROR << "紧急停止中,不允许修改目标";
+    }
+
+    void SmartServo_Cartesian::Cartesian_stop( double max_vel, double max_acc, double max_jerk )
+    {
+        flag_stop                      = true;
+        input.target_position[ 0 ]     = 0;
+        input.target_velocity[ 0 ]     = 0;
+        input.target_acceleration[ 0 ] = 0;
+
+        input.max_velocity[ 0 ]     = max_vel;
+        input.max_acceleration[ 0 ] = max_acc;
+        input.max_jerk[ 0 ]         = max_jerk;
+    }
+
+#pragma endregion
+
+   void Joint_stop( rocos::Robot* robot_ptr, const KDL::JntArray& current_pos, const KDL::JntArray& last_pos, const KDL::JntArray& last_last_pos )
+    {
+        //** 变量初始化 **//
+        ruckig::Ruckig< _joint_num > otg{ 0.001 };
+        ruckig::InputParameter< _joint_num > input;
+        ruckig::OutputParameter< _joint_num > output;
+        ruckig::Result res;
+        //**-------------------------------**//
+
+        try
+        {
+            KDL::JntArray current_vel( _joint_num );
+            KDL::JntArray last_vel( _joint_num );
+            KDL::JntArray current_acc( _joint_num );
+
+            KDL::Subtract( current_pos, last_pos, current_vel );
+            KDL::Divide( current_vel, 0.001, current_vel );
+
+            KDL::Subtract( last_pos, last_last_pos, last_vel );
+            KDL::Divide( last_vel, 0.001, last_vel );
+
+            KDL::Subtract( current_vel, last_vel, current_acc );
+            KDL::Divide( current_acc, 0.001, current_acc );
+
+            input.control_interface = ruckig::ControlInterface::Velocity;
+            input.synchronization   = ruckig::Synchronization::None;
+
+            for ( int i = 0; i < _joint_num; i++ )
+            {
+                input.current_position[ i ] = robot_ptr->pos_[ i ];
+                //防止速度和加速度估计不准
+                //速度不可能超过50度
+                //加速度不可能超过80度
+                input.current_velocity[ i ]     = KDL::sign( current_vel( i ) ) * std::min( abs( current_vel( i ) ), robot_ptr->max_vel_[ i ] );
+                input.current_acceleration[ i ] = KDL::sign( current_acc( i ) ) * std::min( abs( current_acc( i ) ), robot_ptr->max_acc_[ i ] );
+
+                printf( "pos(%d)=  %f, vel(%d)= %f , last vel(%d)= %f , acc(%d)= %f \n", i, input.current_position[ i ] * 180 / M_PI, i, input.current_velocity[ i ] * 180 / M_PI, i, last_vel( i ) * 180 / M_PI, i, input.current_acceleration[ i ] * 180 / M_PI );
+
+                input.target_position[ i ]     = input.current_position[ i ];
+                input.target_velocity[ i ]     = 0;
+                input.target_acceleration[ i ] = 0;
+
+                input.max_velocity[ i ]     = robot_ptr->joints_[ i ]->getMaxVel( );
+                input.max_acceleration[ i ] = robot_ptr->joints_[ i ]->getMaxAcc( );
+                input.max_jerk[ i ] = robot_ptr->joints_[ i ]->getMaxJerk( );
+            }
+
+            while ( ( res = otg.update( input, output ) ) == ruckig::Result::Working )
+            {
+                safety_servo( robot_ptr, output.new_position );
+                output.pass_to_input( input );
+            }
+
+            if ( res != ruckig::Result::Finished )
+            {
+                PLOG_ERROR << "OTG 计算失败,直接停止";
+                for ( int i = 0; i < _joint_num; ++i )
+                {
+                    robot_ptr->joints_[ i ]->setPosition( robot_ptr->pos_[ i ] );
+                }
+            }
+            else
+                PLOG_INFO << "关节空间急停已完成";
+        }
+        catch ( const std::exception& e )
+        {
+            PLOG_ERROR << e.what( );
+            for ( int i = 0; i < _joint_num; ++i )
+            {
+                robot_ptr->joints_[ i ]->setPosition( robot_ptr->pos_[ i ] );
+            }
+        }
+        catch ( ... )
+        {
+            PLOG_ERROR << "未知错误";
+            for ( int i = 0; i < _joint_num; ++i )
+            {
+                robot_ptr->joints_[ i ]->setPosition( robot_ptr->pos_[ i ] );
+            }
+        }
+    }
+
+    int check_vel_acc( const KDL::JntArray& current_pos, const KDL::JntArray& last_pos, const KDL::JntArray& last_last_pos, const std::vector< double >& max_vel, const std::vector< double >& max_acc )
+    {
+        KDL::JntArray current_vel( _joint_num );
+        KDL::JntArray last_vel( _joint_num );
+        KDL::JntArray current_acc( _joint_num );
+
+        KDL::Subtract( current_pos, last_pos, current_vel );
+        KDL::Divide( current_vel, 0.001, current_vel );
+
+        KDL::Subtract( last_pos, last_last_pos, last_vel );
+        KDL::Divide( last_vel, 0.001, last_vel );
+
+        KDL::Subtract( current_vel, last_vel, current_acc );
+        KDL::Divide( current_acc, 0.001, current_acc );
+
+        for ( int i{ 0 }; i < _joint_num; i++ )
+        {
+            if ( abs( current_vel( i ) ) > max_vel[ i ] )
+            {
+                PLOG_ERROR << "joint[" << i << "] velocity is too  fast";
+                PLOG_ERROR << "target velocity = " << current_vel( i ) * 180 / M_PI
+                           << " and  max velocity=" << max_vel[ i ] * 180 / M_PI;
+                PLOG_ERROR << "last_pos[" << i << "] =" << last_pos( i ) * 180 / M_PI;
+                PLOG_ERROR << "current_pos[" << i << "] =" << current_pos( i ) * 180 / M_PI;
+
+                return -1;
+            }
+
+            if ( abs( current_acc( i ) ) > max_acc[ i ] )
+            {
+                PLOG_ERROR << "joint[" << i << "] acceleration is too  fast";
+                PLOG_ERROR << "target acceleration = " << current_acc( i ) * 180 / M_PI
+                           << " and  max acceleration=" << max_acc[ i ] * 180 / M_PI;
+                return -1;
+            }
+        }
+        return 0;
+    }
+
+    int safety_servo( rocos::Robot* robot_ptr, const std::array< double, _joint_num >& target_pos )
+    {
+        double p{ 0 };
+        for ( int i = 0; i < _joint_num; ++i )
+        {
+            p = std::max( std::min( target_pos[ i ], robot_ptr->joints_[ i ]->getMaxPosLimit( ) ), robot_ptr->joints_[ i ]->getMinPosLimit( ) );
+
+            robot_ptr->pos_[ i ] = p;
+            robot_ptr->joints_[ i ]->setPosition( p );
+        }
+
+        robot_ptr->hw_interface_->waitForSignal( 0 );
+
+        return 0;
+    }
+
+    int safety_servo( rocos::Robot* robot_ptr, const std::vector< double >& target_pos )
+    {
+        double p{ 0 };
+        for ( int i = 0; i < _joint_num; ++i )
+        {
+            p = std::max( std::min( target_pos[ i ], robot_ptr->joints_[ i ]->getMaxPosLimit( ) ), robot_ptr->joints_[ i ]->getMinPosLimit( ) );
+
+            robot_ptr->pos_[ i ] = p;
+            robot_ptr->joints_[ i ]->setPosition( p );
+        }
+
+        robot_ptr->hw_interface_->waitForSignal( 0 );
+        return 0;
+    }
+
+    int safety_servo( rocos::Robot* robot_ptr, const KDL::JntArray& target_pos )
+    {
+        double p{ 0 };
+        for ( int i = 0; i < _joint_num; ++i )
+        {
+            p = std::max( std::min( target_pos( i ), robot_ptr->joints_[ i ]->getMaxPosLimit( ) ), robot_ptr->joints_[ i ]->getMinPosLimit( ) );
+
+            robot_ptr->pos_[ i ] = p;
+            robot_ptr->joints_[ i ]->setPosition( p );
+        }
+
+        robot_ptr->hw_interface_->waitForSignal( 0 );
+        return 0;
+    }
+
+
 
 }  // namespace JC_helper
 

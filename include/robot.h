@@ -340,9 +340,9 @@ namespace rocos {
         //! 更新法兰系,工具系,工件系pose
         void updateCartesianInfo() {
             JntArray q_in(jnt_num_);
-            q_in.data =
-                    Eigen::Map<Eigen::VectorXd, Eigen::Unaligned>(pos_.data(), pos_.size());
-            //            std::cout << q_in.data << std::endl;
+
+            for( int i{0};i<jnt_num_;i++)
+            q_in(i) = pos_[i];
 
             // Flange Reference
             JntToCart(q_in, flange_);
@@ -400,13 +400,13 @@ namespace rocos {
         //! \brief 圆弧运动
         //! \param pose_via 中间点,姿态给定无效，内部会自动计算
         //! \param pose_to 目标点,姿态给定无效，内部会自动计算
-        //! \param speed 关节速度限制（leading axis）
-        //! \param acceleration 关节加速度限制
+        //! \param speed 笛卡尔空间速度限制（leading axis）
+        //! \param acceleration 笛卡尔空间加速度限制
         //! \param time 最短运行时间
         //! \param radius 过渡半径
         //! \param mode 姿态运行模式, UNCONSTRAINED姿态随动
         //! \param asynchronous 是否异步运行
-        //! \param max_running_count MoveL规划失败重新尝试规划的最大次数
+        //! \param max_running_count MoveC规划失败重新尝试规划的最大次数
         //! \return 错误标志位,成功返回0
         int MoveC(Frame pose_via, Frame pose_to, double speed = 0.25,
                   double acceleration = 1.2, double time = 0.0, double radius = 0.0,
@@ -544,9 +544,10 @@ namespace rocos {
         std::vector<double> target_velocities_;
         std::vector<double> target_torques_;
 
-        std::vector<double> pos_;
-        std::vector<double> vel_;
-        std::vector<double> acc_;
+        std::vector< std::atomic<double>> pos_;
+        std::vector< std::atomic<double>> vel_;
+        std::vector< std::atomic<double>> acc_;
+
 
         std::vector<double> max_vel_;
         std::vector<double> max_acc_;
@@ -583,21 +584,24 @@ namespace rocos {
         std::atomic<int> tick_count{0};
 
     public:
-        friend void JC_helper::SmartServo_Joint::RunSmartServo(rocos::Robot *);
+        friend void JC_helper::SmartServo_Joint::RunSmartServo( rocos::Robot* );
 
-        friend void JC_helper::SmartServo_Cartesian::RunSmartServo_Ik(rocos::Robot *);
+        friend class JC_helper::SmartServo_Cartesian;
 
-        friend void JC_helper::SmartServo_Cartesian::RunSmartServo_Motion(rocos::Robot *);
+        friend void JC_helper::Joint_stop( rocos::Robot* robot_ptr, const KDL::JntArray& current_pos, const KDL::JntArray& last_pos, const KDL::JntArray& last_last_pos );
 
-        friend void JC_helper::motion_stop( rocos::Robot* robot_ptr, const std::vector< KDL::JntArray > &traj_joint ,int traj_joint_count);
+        friend class JC_helper::admittance;
 
+        friend int JC_helper::safety_servo( rocos::Robot* robot_ptr, const std::array< double, _joint_num >& target_pos );
 
-        friend class JC_helper::admittance ;
+        friend int JC_helper::safety_servo( rocos::Robot* robot_ptr, const std::vector< double >& target_pos );
+
+        friend int JC_helper::safety_servo( rocos::Robot* robot_ptr, const KDL::JntArray& target_pos );
 
     private:
-            JC_helper::ft_sensor my_ft_sensor; //6维力传感器
-            JC_helper::gripper my_gripper;
-            JC_helper::TCP_server my_server;
+        JC_helper::ft_sensor my_ft_sensor;  // 6维力传感器
+        JC_helper::gripper my_gripper;
+        JC_helper::TCP_server my_server;
 
     };
 

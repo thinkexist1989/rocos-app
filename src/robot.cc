@@ -22,8 +22,8 @@
 #include <kdl_parser/kdl_parser.hpp> // 用于将urdf文件解析为KDL::Tree
 
 namespace rocos {
-    Robot::Robot(boost::shared_ptr<HardwareInterface> hw) : hw_interface_(hw) {
-        parseUrdf("robot.urdf", "base_link", "link_7");
+    Robot::Robot(boost::shared_ptr<HardwareInterface> hw) : hw_interface_(hw),pos_(_joint_num),vel_(_joint_num),acc_(_joint_num) {
+        parseUrdf("robot.urdf", "base_link", "link_"+std::to_string(_joint_num));
 
 //        addAllJoints( ); // TODO: 这个应该直接加到参数解析里面，解析之后加入关节，顺序和主站顺序可能不一样
 
@@ -31,9 +31,9 @@ namespace rocos {
         target_positions_prev_.resize(jnt_num_);
         target_velocities_.resize(jnt_num_);
         target_torques_.resize(jnt_num_);
-        pos_.resize(jnt_num_);
-        vel_.resize(jnt_num_);
-        acc_.resize(jnt_num_);
+        // pos_.resize(jnt_num_);
+        // vel_.resize(jnt_num_);
+        // acc_.resize(jnt_num_);
         max_vel_.resize(jnt_num_);
         max_acc_.resize(jnt_num_);
         max_jerk_.resize(jnt_num_);
@@ -62,26 +62,9 @@ namespace rocos {
 //        kinematics_.initTechServo();
 
         static plog::ColorConsoleAppender< plog::TxtFormatter > consoleAppender;
-        static plog::RollingFileAppender<plog::CsvFormatter> log_Appender("/home/think/rocos-app/debug/log/log.csv", 10485760, 10000); //单文件最大 10M，最大10000个文件
+        static plog::RollingFileAppender<plog::CsvFormatter> log_Appender("log/log.csv", 10485760, 10000); //单文件最大 10M，最大10000个文件
         plog::init< 0 >( plog::debug, &consoleAppender ).addAppender(&log_Appender);//终端显示并且写入log文件                                                                      // Initialize the logger.
 
-        //** 文件过大时，清空此文件的内容 **//
-        std::ofstream file_handle;
-        file_handle.open( "/home/think/rocos-app/debug/command_log.csv", std::ios_base::app );
-        file_handle.seekp( 0, file_handle.end );
-        size_t srcSize = file_handle.tellp( );
-        file_handle.close( );
-
-        if(srcSize>1073741824)
-        {
-            PLOG_DEBUG<<"command_log.csv 文件大小超过1GB,自动清除内容";
-            file_handle.open( "/home/think/rocos-app/debug/command_log.csv", std::ios_base::trunc );
-            file_handle.close( );
-        }
-        //**-------------------------------**//
-
-        static plog::RollingFileAppender< plog::JC_CsvFormatter > fileAppender( "/home/think/rocos-app/debug/command_log.csv",1073741824, 0 );  // 日记文件,最大一个文件，无限制大小
-        plog::init< 1 >( plog::debug, &fileAppender );           //输出到文件
                                                                         
         startMotionThread( );
     }
@@ -127,9 +110,10 @@ namespace rocos {
     bool Robot::parseDriveParamsFromUrdf(const string &urdf_file_path) {
         jnt_num_ = hw_interface_->getSlaveNumber();
 
-        if (kinematics_.getChain().getNrOfJoints() < jnt_num_) {
+        if (kinematics_.getChain().getNrOfJoints() > jnt_num_) {
             // if the number of joints in urdf is LESS than that in hardware, just warning but it's fine
             std::cout << "[WARNING][rocos::robot] the hardware slave number is more than joint number." << std::endl;
+            return false;
         } else if (kinematics_.getChain().getNrOfJoints() < jnt_num_) {
             // if the number of joints in urdf is GREATER than that in hardware, error occured and return
             std::cerr << "[ERROR][rocos::robot] the hardware slave number is less than joint number." << std::endl;
@@ -328,9 +312,9 @@ namespace rocos {
         target_positions_prev_.resize(jnt_num_);
         target_velocities_.resize(jnt_num_);
         target_torques_.resize(jnt_num_);
-        pos_.resize(jnt_num_);
-        vel_.resize(jnt_num_);
-        acc_.resize(jnt_num_);
+        // pos_.resize(jnt_num_);
+        // vel_.resize(jnt_num_);
+        // acc_.resize(jnt_num_);
         max_vel_.resize(jnt_num_);
         max_acc_.resize(jnt_num_);
         max_jerk_.resize(jnt_num_);
@@ -597,28 +581,29 @@ namespace rocos {
             return -1;
         }
 
-        if (is_running_motion)  //最大异步执行一条任务
+        if ( is_running_motion )  //最大异步执行一条任务
         {
             PLOG_ERROR << " Motion is still running and waiting for it to finish";
             return -1;
         }
+        else
+            is_running_motion = true;
 
         if ( motion_thread_ ){ motion_thread_->join( );motion_thread_=nullptr; }
 
         if (asynchronous)  //异步执行
         {
-            motion_thread_.reset(new boost::thread{&Robot::RunMoveJ, this, q,
-                                                   speed, acceleration, time,
-                                                   radius});
-            is_running_motion = true;
-        } else  //同步执行
+            motion_thread_.reset( new boost::thread{ &Robot::RunMoveJ, this, q,
+                                                     speed, acceleration, time,
+                                                     radius } );
+        }
+        else  //同步执行
         {
             motion_thread_.reset( new boost::thread{ &Robot::RunMoveJ, this, q,
                                                      speed, acceleration, time,
                                                      radius } );
             motion_thread_->join( );
             motion_thread_=nullptr;
-            is_running_motion = false;
         }
 
         return 0;
@@ -726,7 +711,7 @@ namespace rocos {
                     {
                         throw -1;
                     }
-                    //防止奇异位置速度激增
+                    //*防止奇异位置速度激增
                     for ( int i = 0; i < jnt_num_; i++ )
                     {
                         if ( abs( q_target( i ) - q_init( i ) ) > max_step[ i ] )
@@ -739,6 +724,7 @@ namespace rocos {
                             throw -2;
                         }
                     }
+                    //**-------------------------------**//
                     q_init = q_target;
                     traj_.push_back( q_target );
 
@@ -889,7 +875,7 @@ namespace rocos {
                 
                         throw -1;
                     }
-                    //防止奇异位置速度激增
+                    //** 防止奇异位置速度激增 **//
                     for ( int i = 0; i < jnt_num_; i++ )
                     {
                         if ( abs( q_target( i ) - q_init( i ) ) > max_step[ i ] )
@@ -903,6 +889,7 @@ namespace rocos {
                             throw -2;
                         }
                     }
+                    //**-------------------------------**//
                     q_init = q_target;
                     traj_.push_back( q_target );
                 }
@@ -1069,7 +1056,7 @@ namespace rocos {
                           << WHITE << std::endl;
                 return -1;
             }
-            //防止奇异位置速度激增
+            //** 防止奇异位置速度激增 **//
             for ( int i = 0; i < jnt_num_; i++ )
             {
                 if ( abs( q_target( i ) - q_init( i ) ) > max_step[ i ] )
@@ -1086,7 +1073,7 @@ namespace rocos {
                     return -1;
                 }
             }
-
+            //**-------------------------------**//
             traj_.push_back(q_target);
             count++;
         }
@@ -1113,10 +1100,8 @@ namespace rocos {
         //** 变量初始化 **//
         static std::atomic< bool > _dragging_finished_flag{ true };
         static JC_helper::SmartServo_Joint _SmartServo_Joint{ &_dragging_finished_flag };
-        static JC_helper::SmartServo_Cartesian _SmartServo_Cartesian{ &_dragging_finished_flag };
+        static JC_helper::SmartServo_Cartesian _SmartServo_Cartesian{ &_dragging_finished_flag , kinematics_.getChain() };
         static std::shared_ptr< boost::thread > _thread_planning{ nullptr };
-        static std::shared_ptr< boost::thread > _thread_IK{ nullptr };
-        static std::shared_ptr< boost::thread > _thread_motion{ nullptr };
         KDL::JntArray target_joint{ static_cast< unsigned int >( jnt_num_ ) };
         KDL::Frame target_frame{ };
         int index{ static_cast< int >( flag ) };
@@ -1219,27 +1204,21 @@ namespace rocos {
             _thread_planning.reset( new boost::thread{ &JC_helper::SmartServo_Joint::RunSmartServo, &_SmartServo_Joint, this } );
         }
         //笛卡尔空间点动指令
-        else if ( _dragging_finished_flag && DRAGGING_FLAG::FLANGE_X <= flag && DRAGGING_FLAG::BASE_YAW >= flag )
+        else if ( _dragging_finished_flag && DRAGGING_FLAG::TOOL_X <= flag && DRAGGING_FLAG::BASE_YAW >= flag )
         {
             if ( _thread_planning )
             {
                 _thread_planning->join( );
                 _thread_planning = nullptr;
             }
-            if ( _thread_IK )
-            {
-                _thread_IK->join( );
-                _thread_IK = nullptr;
-            }
-            if ( _thread_motion )
-            {
-                _thread_motion->join( );
-                _thread_motion = nullptr;
-            }
-            _SmartServo_Cartesian.init( JC_helper::vector_2_JntArray( pos_ ), flange_, 0, 0, max_speed, max_acceleration, 2 * max_acceleration );
-            _thread_planning.reset( new boost::thread{ &JC_helper::SmartServo_Cartesian::RunSmartServo_Plannig, &_SmartServo_Cartesian } );
-            _thread_IK.reset( new boost::thread{ &JC_helper::SmartServo_Cartesian::RunSmartServo_Ik, &_SmartServo_Cartesian, this } );
-            _thread_motion.reset( new boost::thread{ &JC_helper::SmartServo_Cartesian::RunSmartServo_Motion, &_SmartServo_Cartesian, this } );
+           
+
+            if ( index % 10 <= 2 )
+                _SmartServo_Cartesian.init( this, max_speed * 0.15 );
+            else
+                _SmartServo_Cartesian.init( this, max_speed * 0.5);
+
+                _thread_planning.reset( new boost::thread{ &JC_helper::SmartServo_Cartesian::RunMotion, &_SmartServo_Cartesian, this } );
         }
         //**-------------------------------**//
 
@@ -1269,31 +1248,11 @@ namespace rocos {
             case DRAGGING_FLAG::FLANGE_PITCH:
             case DRAGGING_FLAG::FLANGE_YAW:
 
-                index = index - static_cast< int >( DRAGGING_FLAG::FLANGE_X );
 
-                if ( index <= 2 )
-                {
-                    KDL::Vector tem_vector{ };
-                    tem_vector( index ) = static_cast< double >( dir ) * max_speed * vector_speed_scale;
-                    res                 = _SmartServo_Cartesian.command( tem_vector ,"FLANGE");
-                }
-                else
-                {
-                    KDL::Rotation tem_rotation{ };
-                    switch ( index - 3 )
-                    {
-                        case 0: tem_rotation = KDL::Rotation::RotX( static_cast< double >( dir ) * max_speed * rotation_speed_scale ); break;
-                        case 1: tem_rotation = KDL::Rotation::RotY( static_cast< double >( dir ) * max_speed * rotation_speed_scale ); break;
-                        case 2: tem_rotation = KDL::Rotation::RotZ( static_cast< double >( dir ) * max_speed * rotation_speed_scale ); break;
-                    }
-                    res = _SmartServo_Cartesian.command( tem_rotation ,"FLANGE");
-                }
+                index = index - static_cast< int >( DRAGGING_FLAG::FLANGE_X ) + 1;
 
-                if ( res < 0 )
-                    PLOG_DEBUG << "执行失败";
-                else
-                    PLOG_DEBUG << "执行成功";
-
+                index = index * static_cast< double >( dir );
+                _SmartServo_Cartesian.command( index, "flange" );
                 break;
 
             case DRAGGING_FLAG::TOOL_X:
@@ -1303,31 +1262,14 @@ namespace rocos {
             case DRAGGING_FLAG::TOOL_PITCH:
             case DRAGGING_FLAG::TOOL_YAW:
 
-                index = index - static_cast< int >( DRAGGING_FLAG::TOOL_X );
 
-                if ( index <= 2 )  // TODO 没有tool 系，用base系
-                {
-                    KDL::Vector tem_vector{ };
-                    tem_vector( index ) = static_cast< double >( dir ) * max_speed * vector_speed_scale;
-                    res                 = _SmartServo_Cartesian.command( tem_vector,"TOOL" );
-                }
-                else  // TODO 没有tool 系，用base系
-                {
-                    KDL::Rotation tem_rotation{ };
-                    switch ( index - 3 )
-                    {
-                        case 0: tem_rotation = KDL::Rotation::RotX( static_cast< double >( dir ) * max_speed * rotation_speed_scale ); break;
-                        case 1: tem_rotation = KDL::Rotation::RotY( static_cast< double >( dir ) * max_speed * rotation_speed_scale ); break;
-                        case 2: tem_rotation = KDL::Rotation::RotZ( static_cast< double >( dir ) * max_speed * rotation_speed_scale ); break;
-                    }
-                    res = _SmartServo_Cartesian.command( tem_rotation ,"TOOL");
-                }
+                PLOG_WARNING << " 笛卡尔点动功能暂时不支持 {TOOL},替换为{BASE}";
 
-                if ( res < 0 )
-                    PLOG_DEBUG << "执行失败";
-                else
-                    PLOG_DEBUG << "执行成功";
+                index = index - static_cast< int >( DRAGGING_FLAG::TOOL_X ) + 1;
+                index = index * static_cast< double >( dir );
+                _SmartServo_Cartesian.command( index, "base" );
                 break;
+
 
             case DRAGGING_FLAG::OBJECT_X:
             case DRAGGING_FLAG::OBJECT_Y:
@@ -1336,31 +1278,11 @@ namespace rocos {
             case DRAGGING_FLAG::OBJECT_PITCH:
             case DRAGGING_FLAG::OBJECT_YAW:
 
-                index = index - static_cast< int >( DRAGGING_FLAG::OBJECT_X );
+                PLOG_WARNING << " 笛卡尔点动功能暂时不支持 {OBJECT},替换为{BASE}";
 
-                if ( index <= 2 )  // TODO 没有object 系，用base系
-                {
-                    KDL::Vector tem_vector{ };
-                    tem_vector( index ) = static_cast< double >( dir ) * max_speed * vector_speed_scale;
-                    res                 = _SmartServo_Cartesian.command( tem_vector,"OBJECT" );
-                }
-                else  // TODO 没有object 系，用base系
-                {
-                    KDL::Rotation tem_rotation{ };
-                    switch ( index - 3 )
-                    {
-                        case 0: tem_rotation = KDL::Rotation::RotX( static_cast< double >( dir ) * max_speed * rotation_speed_scale ); break;
-                        case 1: tem_rotation = KDL::Rotation::RotY( static_cast< double >( dir ) * max_speed * rotation_speed_scale ); break;
-                        case 2: tem_rotation = KDL::Rotation::RotZ( static_cast< double >( dir ) * max_speed * rotation_speed_scale ); break;
-                    }
-                    res = _SmartServo_Cartesian.command( tem_rotation,"OBJECT" );
-                }
-
-                if ( res < 0 )
-                    PLOG_DEBUG << "执行失败";
-                else
-                    PLOG_DEBUG << "执行成功";
-
+                index = index - static_cast< int >( DRAGGING_FLAG::OBJECT_X ) + 1;
+                index = index * static_cast< double >( dir );
+                _SmartServo_Cartesian.command( index, "base" );
                 break;
 
             case DRAGGING_FLAG::BASE_X:
@@ -1370,35 +1292,18 @@ namespace rocos {
             case DRAGGING_FLAG::BASE_PITCH:
             case DRAGGING_FLAG::BASE_YAW:
 
-                index = index - static_cast< int >( DRAGGING_FLAG::BASE_X );
 
-                if ( index <= 2 )
-                {
-                    KDL::Vector tem_vector{ };
-                    tem_vector( index ) = static_cast< double >( dir ) * max_speed * vector_speed_scale;
-                    res                 = _SmartServo_Cartesian.command( tem_vector ,"BASE");
-                }
-                else
-                {
-                    KDL::Rotation tem_rotation{ };
-                    switch ( index - 3 )
-                    {
-                        case 0: tem_rotation = KDL::Rotation::RotX( static_cast< double >( dir ) * max_speed * rotation_speed_scale ); break;
-                        case 1: tem_rotation = KDL::Rotation::RotY( static_cast< double >( dir ) * max_speed * rotation_speed_scale ); break;
-                        case 2: tem_rotation = KDL::Rotation::RotZ( static_cast< double >( dir ) * max_speed * rotation_speed_scale ); break;
-                    }
-                    res = _SmartServo_Cartesian.command( tem_rotation,"BASE" );
-                }
-
-                if ( res < 0 )
-                    PLOG_DEBUG << "执行失败";
-                else
-                    PLOG_DEBUG << "执行成功";
-
+                index = index - static_cast< int >( DRAGGING_FLAG::BASE_X ) + 1;
+                index = index * static_cast< double >( dir );
+                _SmartServo_Cartesian.command( index, "base" );
                 break;
 
             default:
-                PLOG_ERROR << " Undefined command flag";
+                PLOG_ERROR << " Undefined command flag: " << index;
+                //! 在此处位置时会置位is_running_motion
+                //! 如果没有jogging 运动线程 且 is_running_motion 被置位，那is_running_motion就会被永久卡住
+                if ( _dragging_finished_flag && is_running_motion )
+                    is_running_motion = false;
                 return -1;
         }
         return 0;
@@ -1494,19 +1399,33 @@ namespace rocos {
         return 0;
     }
 
-    void Robot::RunMoveJ(JntArray q, double speed, double acceleration, double time, double radius) {
+void Robot::RunMoveJ(JntArray q, double speed, double acceleration, double time, double radius) {
+        //** 变量初始化 **//
         double dt = 0.0;
         double max_time = 0.0;
         std::vector<std::shared_ptr<DoubleS> > interp(jnt_num_);
+        std::vector<double > max_step;
+        std::vector<double > target_pos;//为了速度检查
+        std::vector<double > init_pos;//为了速度检查
+        //**-------------------------------**//
+
+        //** 程序初始化 **//
         for (auto &i: interp)
             i.reset(new DoubleS{});
+
+        for ( int i{ 0 }; i < jnt_num_; i++ )
+        {
+            max_step.push_back( max_vel_[ i ] * 0.001 );
+            target_pos.push_back( pos_[ i ] );
+            init_pos.push_back( pos_[ i ] );
+        }
+        //**-------------------------------**//
 
         // std::cout << "Joint Pos: \n"
         //           << GREEN << q.data << WHITE << std::endl;
         for (int i = 0; i < jnt_num_; ++i) {
             if (q(i) == pos_[i]) {
-                std::cerr << RED << " Target pos[" << i << "]"
-                          << "is same as  pos_[" << i << "]" << WHITE << std::endl;
+                PLOG_WARNING << " Target pos[" << i << "] is same as  pos_[" << i << "]";
                 need_plan_[i] = false;
                 continue;
             }
@@ -1520,8 +1439,7 @@ namespace rocos {
                                           speed, acceleration, max_jerk_[i]);
 
             if (!interp[i]->isValidMovement() || !(interp[i]->getDuration() > 0)) {
-                std::cerr << RED << "RunMoveJ():movej trajectory "
-                          << "is infeasible " << WHITE << std::endl;
+                PLOG_ERROR<< "movej trajectory is infeasible";
                 is_running_motion = false;
                 return;
             }
@@ -1533,18 +1451,52 @@ namespace rocos {
                 interp[i]->JC_scaleToDuration(max_time);
         }
 
-        while (dt <= max_time) {
-            for (int i = 0; i < jnt_num_; ++i) {
-                if (!need_plan_[i])
+        //** 速度检查 **//
+        dt =0;
+        while ( dt <= max_time )
+        {
+            for ( int i = 0; i < jnt_num_; i++ )
+            {
+                if ( !need_plan_[ i ] ) continue; //不需要规划的关节自然不需要速度检查
+
+                target_pos[ i ] = interp[ i ]->pos( dt );
+
+                if ( abs( target_pos[i] -init_pos[i]   ) > max_step[ i ] )
+                {
+                    PLOG_ERROR << "joint[" << i << "] speep is too  fast";
+                    PLOG_ERROR << "target speed = " << abs( target_pos[i] -init_pos[i]   ) 
+                               << " and  max_step=" << max_step[ i ];
+                    PLOG_ERROR << "q_target( " << i << " )  = " << target_pos[i] * 180 / M_PI;
+                    PLOG_ERROR << "q_init( " << i << " ) =" << init_pos[i]  * 180 / M_PI;
+
+                    is_running_motion = false;
+                    return;
+                }
+                else
+                    init_pos[ i ] = target_pos[ i ];
+            }
+
+            dt += 0.001;
+        }
+        //**-------------------------------**//
+
+        //** 伺服控制 **//
+        dt = 0;
+        while ( dt <= max_time )
+        {
+            for ( int i = 0; i < jnt_num_; ++i )
+            {
+                if ( !need_plan_[ i ] )
                     continue;
 
-                pos_[i] = interp[i]->pos(dt);  //! 需要更新一下实时位置
-                joints_[i]->setPosition(pos_[i]);
+                pos_[ i ] = interp[ i ]->pos( dt );  //! 需要更新一下实时位置
+                joints_[ i ]->setPosition( pos_[ i ] );
             }
             dt += 0.001;
 
-            hw_interface_->waitForSignal(0);
+            hw_interface_->waitForSignal( 0 );
         }
+        //**-------------------------------**//
 
         is_running_motion = false;
     }
