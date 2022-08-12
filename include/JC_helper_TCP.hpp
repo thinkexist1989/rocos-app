@@ -74,6 +74,7 @@ namespace JC_helper
             if ( setsockopt( listenfd, SOL_SOCKET, SO_REUSEADDR, &on, sizeof( on ) ) < 0 )
             {
                 PLOG_ERROR.printf( "setsockopt error: %s(errno: %d)\n", strerror( errno ), errno );
+                return -1;
             }
 
             if ( bind( listenfd, ( struct sockaddr* )&servaddr, sizeof( servaddr ) ) == -1 )

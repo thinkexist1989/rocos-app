@@ -387,12 +387,9 @@ namespace JC_helper
             //**-------------------------------**//
 
             //** 位置伺服 **//
-            for ( int i = 0; i < _joint_num; ++i )
-            {
-                robot_ptr->pos_[ i ] = _q_target( i );
-                robot_ptr->joints_[ i ]->setPosition( _q_target( i ) );
-            }
-            robot_ptr->hw_interface_->waitForSignal( 0 );
+            //!提供位置保护，防止越过关节限位
+            safety_servo( robot_ptr, _q_target );
+
             //**-------------------------------**//
 
             _q_init = _q_target;
@@ -538,12 +535,10 @@ namespace JC_helper
             //**-------------------------------**//
 
             //** 位置伺服 **//
-            for ( int i = 0; i < _joint_num; ++i )
-            {
-                robot_ptr->pos_[ i ] = _q_target( i );
-                robot_ptr->joints_[ i ]->setPosition( _q_target( i ) );
-            }
-            robot_ptr->hw_interface_->waitForSignal( 0 );
+
+            //!提供位置保护，防止越过关节限位
+            safety_servo( robot_ptr, _q_target );
+
             //**-------------------------------**//
 
             _q_init = _q_target;
