@@ -173,7 +173,7 @@ namespace rocos {
 
         virtual bool isValidMovement( ) const;
 
-        virtual double scaleToDuration( double newDuration );
+        // virtual double scaleToDuration( double newDuration )  ;
 
         //!该时间缩放会对起始和终止速度乘以(Old_T/New_T)
         virtual double JC_scaleToDuration( double newDuration );

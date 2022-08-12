@@ -3056,7 +3056,7 @@ namespace JC_helper
         double p{ 0 };
         for ( int i = 0; i < _joint_num; ++i )
         {
-            p = std::max( std::min( target_pos(i), robot_ptr->joints_[ i ]->getMaxPosLimit( ) ), robot_ptr->joints_[ i ]->getMinPosLimit( ) );
+            p = std::max( std::min( target_pos( i ), robot_ptr->joints_[ i ]->getMaxPosLimit( ) ), robot_ptr->joints_[ i ]->getMinPosLimit( ) );
 
             robot_ptr->pos_[ i ] = p;
             robot_ptr->joints_[ i ]->setPosition( p );

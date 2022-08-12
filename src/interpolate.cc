@@ -806,100 +806,100 @@ namespace rocos {
         _plannedProfile = true;
     }
 
-    double DoubleS::scaleToDuration(double newDuration) {
-        if (newDuration < (_t[7] - _t[0])) {
-            DEBUG("New duration must be longer!\n");
-            return _t[7] - _t[0];
-        }
+    // double DoubleS::scaleToDuration(double newDuration) {
+    //     if (newDuration < (_t[7] - _t[0])) {
+    //         DEBUG("New duration must be longer!\n");
+    //         return _t[7] - _t[0];
+    //     }
 
-        double t0 = _t[0];
-        double p0 = _x[0];
-        double pf = _x[7];
-        double v0 = _v[0];
-        double vf = _v[7];
+    //     double t0 = _t[0];
+    //     double p0 = _x[0];
+    //     double pf = _x[7];
+    //     double v0 = _v[0];
+    //     double vf = _v[7];
 
-        double j_limit = _j[1];
+    //     double j_limit = _j[1];
 
-        double Ta = _t[3] - _t[0];
-        double Tv = _t[4] - _t[3];
-        double Td = _t[7] - _t[4];
-        double T = _t[7] - _t[0];
+    //     double Ta = _t[3] - _t[0];
+    //     double Tv = _t[4] - _t[3];
+    //     double Td = _t[7] - _t[4];
+    //     double T = _t[7] - _t[0];
 
-        Ta = Ta * newDuration / T;
-        Tv = Tv * newDuration / T;
-        Td = Td * newDuration / T;
+    //     Ta = Ta * newDuration / T;
+    //     Tv = Tv * newDuration / T;
+    //     Td = Td * newDuration / T;
 
-        // decrease the cursing velocity
-        double vmax = -(p0 - pf + (Ta * v0) / 2 + (Td * vf) / 2) / (Ta / 2 + Td / 2 + Tv);
-        double amax_a = _a[1];
+    //     // decrease the cursing velocity
+    //     double vmax = -(p0 - pf + (Ta * v0) / 2 + (Td * vf) / 2) / (Ta / 2 + Td / 2 + Tv);
+    //     double amax_a = _a[1];
 
-        // decrease jmax_a jmin_a jmax_d jmin_d and re-plan time interval
-        double Ta_acc, Ta_dec, jmax_a, jmax_d, amin_d;
-        if ((vmax - v0) * j_limit < amax_a * amax_a) {
-            Ta_acc = 0.5 * Ta;
-            jmax_a = (vmax - v0) / (Ta_acc * Ta_acc);
-        } else {
-            Ta_acc = Ta - (vmax - v0) / amax_a;
-            jmax_a = amax_a / Ta_acc;
-        }
+    //     // decrease jmax_a jmin_a jmax_d jmin_d and re-plan time interval
+    //     double Ta_acc, Ta_dec, jmax_a, jmax_d, amin_d;
+    //     if ((vmax - v0) * j_limit < amax_a * amax_a) {
+    //         Ta_acc = 0.5 * Ta;
+    //         jmax_a = (vmax - v0) / (Ta_acc * Ta_acc);
+    //     } else {
+    //         Ta_acc = Ta - (vmax - v0) / amax_a;
+    //         jmax_a = amax_a / Ta_acc;
+    //     }
 
-        if ((vmax - vf) * j_limit < amax_a * amax_a) {
-            Ta_dec = 0.5 * Td;
-            jmax_d = -(vmax - vf) / (Ta_dec * Ta_dec);
-        } else {
-            Ta_dec = Td - (vmax - vf) / amax_a;
-            jmax_d = -amax_a / Ta_dec;
-        }
+    //     if ((vmax - vf) * j_limit < amax_a * amax_a) {
+    //         Ta_dec = 0.5 * Td;
+    //         jmax_d = -(vmax - vf) / (Ta_dec * Ta_dec);
+    //     } else {
+    //         Ta_dec = Td - (vmax - vf) / amax_a;
+    //         jmax_d = -amax_a / Ta_dec;
+    //     }
 
-        amax_a = jmax_a * Ta_acc;
-        amin_d = jmax_d * Ta_dec;
-        vmax = v0 + (Ta - Ta_acc) * amax_a;
+    //     amax_a = jmax_a * Ta_acc;
+    //     amin_d = jmax_d * Ta_dec;
+    //     vmax = v0 + (Ta - Ta_acc) * amax_a;
 
-        double tempTv = (pf - p0) / vmax - Ta / 2.0 * (1.0 + v0 / vmax) - Td / 2.0 * (1.0 + vf / vmax);
-        if (tempTv < 0 || fabs(tempTv - Tv) > 1e-4) {
-            DEBUG("Re-plan to scale duration failed!\n");
-            return getDuration();
-        }
+    //     double tempTv = (pf - p0) / vmax - Ta / 2.0 * (1.0 + v0 / vmax) - Td / 2.0 * (1.0 + vf / vmax);
+    //     if (tempTv < 0 || fabs(tempTv - Tv) > 1e-4) {
+    //         DEBUG("Re-plan to scale duration failed!\n");
+    //         return getDuration();
+    //     }
 
-        T = Ta + Tv + Td;
+    //     T = Ta + Tv + Td;
 
-        _j[1] = jmax_a;
-        _j[3] = -jmax_a;
-        _j[5] = jmax_d;
-        _j[7] = -jmax_d;
+    //     _j[1] = jmax_a;
+    //     _j[3] = -jmax_a;
+    //     _j[5] = jmax_d;
+    //     _j[7] = -jmax_d;
 
-        double Td_acc = Ta_acc;
-        double Tv_acc = Ta - 2.0 * Ta_acc;
+    //     double Td_acc = Ta_acc;
+    //     double Tv_acc = Ta - 2.0 * Ta_acc;
 
-        double Td_dec = Ta_dec;
-        double Tv_dec = Td - 2.0 * Ta_dec;
+    //     double Td_dec = Ta_dec;
+    //     double Tv_dec = Td - 2.0 * Ta_dec;
 
-        _t[0] = t0;
-        _t[1] = _t[0] + Ta_acc;
-        _t[2] = _t[1] + Tv_acc;
-        _t[3] = _t[2] + Td_acc;
-        _t[4] = _t[3] + Tv;
-        _t[5] = _t[4] + Ta_dec;
-        _t[6] = _t[5] + Tv_dec;
-        _t[7] = _t[6] + Td_dec;
+    //     _t[0] = t0;
+    //     _t[1] = _t[0] + Ta_acc;
+    //     _t[2] = _t[1] + Tv_acc;
+    //     _t[3] = _t[2] + Td_acc;
+    //     _t[4] = _t[3] + Tv;
+    //     _t[5] = _t[4] + Ta_dec;
+    //     _t[6] = _t[5] + Tv_dec;
+    //     _t[7] = _t[6] + Td_dec;
 
-        _a[1] = amax_a;
-        _a[2] = amax_a;
-        _a[5] = amin_d;
-        _a[6] = amin_d;
+    //     _a[1] = amax_a;
+    //     _a[2] = amax_a;
+    //     _a[5] = amin_d;
+    //     _a[6] = amin_d;
 
-        _v[3] = vmax;
-        _v[4] = vmax;
+    //     _v[3] = vmax;
+    //     _v[4] = vmax;
 
-        _v[1] = vel(_t[1]);
-        _v[2] = vel(_t[2]);
-        _v[5] = vel(_t[5]);
-        _v[6] = vel(_t[6]);
+    //     _v[1] = vel(_t[1]);
+    //     _v[2] = vel(_t[2]);
+    //     _v[5] = vel(_t[5]);
+    //     _v[6] = vel(_t[6]);
 
-        _plannedProfile = true;
+    //     _plannedProfile = true;
 
-        return getDuration();
-    }
+    //     return getDuration();
+    // }
 
     double DoubleS::JC_scaleToDuration( double newDuration)
     {
