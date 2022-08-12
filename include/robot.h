@@ -455,6 +455,8 @@ namespace rocos {
          * @param max_path_v 最大速度
          * @param max_path_a 最大加速度
          * @param asynchronous 是否异步运行
+         * @param max_running_count 规划失败重新尝试规划的最大次数
+         * 
          * @example 
             Frame f_p1;
             Frame f_p2;
@@ -475,7 +477,7 @@ namespace rocos {
          */
         int
         MultiMoveL(const std::vector<KDL::Frame> &point, std::vector<double> bound_dist, std::vector<double> max_path_v,
-                   std::vector<double> max_path_a, bool asynchronous = false);
+                   std::vector<double> max_path_a, bool asynchronous = false,int max_running_count = 10);
 
 
         enum class DRAGGING_FLAG :int {

@@ -427,7 +427,7 @@ namespace JC_helper
             bool isplanned = doubleS_1_P.isValidMovement( );
             if ( !isplanned || !( doubleS_1_P.getDuration( ) > 0 ) )
             {
-                std::cout << RED << "multi_link_trajectory()：Linear trajectory planning fails,try to decrease given parameter [max_path_v] " << GREEN << std::endl;
+                PLOG_ERROR<<"Linear trajectory planning fails,try to decrease given parameter [max_path_v] " << GREEN << std::endl;
                 return -1;
             }
 
@@ -435,7 +435,7 @@ namespace JC_helper
             isplanned = doubleS_1_R.isValidMovement( );
             if ( !isplanned || !( doubleS_1_R.getDuration( ) > 0 ) )
             {
-                std::cout << RED << "multi_link_trajectory()：Linear trajectory planning fails,try to decrease given parameter [max_path_v] " << GREEN << std::endl;
+                PLOG_ERROR<<"Linear trajectory planning fails,try to decrease given parameter [max_path_v] " << GREEN << std::endl;
                 return -1;
             }
 

@@ -1106,30 +1106,47 @@ namespace rocos {
     }
 
     int Robot::MultiMoveL(const std::vector<KDL::Frame> &point, std::vector<double> bound_dist,
-                          std::vector<double> max_path_v, std::vector<double> max_path_a, bool asynchronous) {
+                          std::vector<double> max_path_v, std::vector<double> max_path_a, bool asynchronous , int max_running_count) {
 
         if (is_running_motion)  //最大一条任务异步执行
         {
-            PLOG_ERROR << RED << " Motion is still running and waiting for it to finish" << WHITE;
+            PLOG_ERROR << " Motion is still running and waiting for it to finish"  ;
             return -1;
         }
+
         if ( motion_thread_ ) { motion_thread_->join( );motion_thread_=nullptr; }
 
-
-        std::vector<KDL::Frame> traj_target;
-        std::vector<int> traj_index;
+        //** 变量初始化 **//
+        std::vector< KDL::Frame > traj_target;
+        std::vector< int > traj_index;
         KDL::Frame Cart_point = flange_;
-        std::vector<size_t> vector_size{point.size(), bound_dist.size(), max_path_v.size(), max_path_a.size()};
+        std::vector< size_t > vector_size{ point.size( ), bound_dist.size( ), max_path_v.size( ), max_path_a.size( ) };
+        std::vector< double > max_step;
+        KDL::JntArray q_init( jnt_num_ );
+        KDL::JntArray q_target( jnt_num_ );
+
+        //**-------------------------------**//
+
+        //** 程序初始化 **//
+        for (int i = 0; i < jnt_num_; i++) {
+            q_init(i) = pos_[i];
+            q_target(i) = q_init(i);
+            max_step.push_back(max_vel_[i] * 0.001);
+        }
+
 
         for (const auto &i: vector_size) {
             if (i != point.size()) {
-                std::cout << RED << "MultiMoveL(): All vectors must be the same size" << WHITE << std::endl;
+               PLOG_ERROR << "MultiMoveL(): All vectors must be the same size" ;
                 return -1;
             }
         }
+        //**-------------------------------**//
+
+        //** 规划 **//
 
         if (point.size() == 0) {
-            std::cout << RED << "MultiMoveL(): point size is at least one or more" << std::endl;
+           PLOG_ERROR << "MultiMoveL(): point size is at least one or more" ;
             return -1;
         }
             //一段轨迹不存在圆弧过渡处理
@@ -1186,53 +1203,151 @@ namespace rocos {
         }
         PLOG_INFO<< "***************规划全部完成***************" ;
 
-        std::vector<double> max_step;
-        KDL::JntArray q_init(jnt_num_);
-        KDL::JntArray q_target(jnt_num_);
-        int count{0};
-        int p = 0;  //表示当前正处理第几段轨迹
+        //**-------------------------------**//
 
-        traj_.clear();
+        //** 轨迹IK计算，计算失败，可以重新计算，有最大计算次数限制{max_running_count} **//
+        int ik_count{ 0 };
+        int CartToJnt_count{ 0 };//指示第几次逆解
+        int traj_current_pos  {0};  //表示当前正处理第几段轨迹
 
-        for (int i = 0; i < jnt_num_; i++) {
-            q_init(i) = pos_[i];
-            q_target(i) = q_init(i);
-            max_step.push_back(max_vel_[i] * 0.001);
-        }
-
-        //** IK计算 **//
-        for (const auto &pos_goal: traj_target) {
-            q_init = q_target;
-            if (kinematics_.CartToJnt(q_init, pos_goal, q_target) < 0) {
-                for (int i = 0; i < traj_index.size(); i++)
-                    p = count < traj_index[i] ? i + 1 : p;  //找到当前是第几段轨迹
-                std::cerr << RED << "MultiMoveL():CartToJnt failed on the " << p
-                          << "th trajectory，please chose other interpolate Points "
-                          << WHITE << std::endl;
-                return -1;
-            }
-            //** 防止奇异位置速度激增 **//
-            for ( int i = 0; i < jnt_num_; i++ )
+        for ( ; ik_count < max_running_count; ik_count++ )
+        {
+            try
             {
-                if ( abs( q_target( i ) - q_init( i ) ) > max_step[ i ] )
+                for ( int i = 0; i < jnt_num_; i++ )
                 {
-                    for ( int j = 0; j < traj_index.size( ); j++ )
-                        p = count < traj_index[ j ] ? ( j + 1 ) : p;  //找到当前是第几段轨迹
-                    // PLOG_ERROR << "count =" << count;
-                    PLOG_ERROR << "joint[" << i << "] speep is too  fast on the " << p
-                               << "th trajectory";
-                    PLOG_ERROR << "target speed = " << abs( q_target( i ) - q_init( i ) )
-                               << " and  max_step=" << max_step[ i ];
-                    PLOG_ERROR << "q_target( " << i << " )  = " << q_target( i ) * 180 / M_PI;
-                    PLOG_ERROR << "q_init( " << i << " ) =" << q_init( i ) * 180 / M_PI << WHITE;
-                    return -1;
+                    q_init( i ) = pos_[ i ];
+                }
+                traj_.clear( );
+                CartToJnt_count = 0;
+                traj_current_pos      = 0;
+                PLOG_INFO << "---------------------------------------";
+
+                for ( const auto& target : traj_target )
+                {
+                    if ( kinematics_.CartToJnt( q_init, target, q_target ) < 0 )
+                    {
+                        throw -1;
+                    }
+
+                    //*防止奇异位置速度激增
+                    for ( int i = 0; i < jnt_num_; i++ )
+                    {
+                        if ( abs( q_target( i ) - q_init( i ) ) > max_step[ i ] )
+                        {
+                            for ( int i = 0; i < traj_index.size( ); i++ )
+                            {
+                                if(CartToJnt_count<traj_index[ i ])
+                                {
+                                    traj_current_pos = i + 1;break;
+                                }
+                            }
+
+                            PLOG_ERROR << "joint[" << i << "] speep is too  fast on the " << traj_current_pos
+                                       << "TH trajectory";
+                            PLOG_ERROR << "target speed = " << abs( q_target( i ) - q_init( i ) )
+                                       << " and  max_step=" << max_step[ i ];
+                            PLOG_ERROR << "q_target( " << i << " )  = " << q_target( i ) * 180 / M_PI;
+                            PLOG_ERROR << "q_init( " << i << " ) =" << q_init( i ) * 180 / M_PI << WHITE;
+
+                            throw -2;
+                        }
+                    }
+                    //**-------------------------------**//
+                    
+                    q_init = q_target;
+                    traj_.push_back( q_target );
+
+                    CartToJnt_count++;
+                }
+                
+                break;//在此处时，代表规划成功
+            }
+
+            catch ( int flag_error )
+            {
+                switch ( flag_error )
+                {
+                    case -1: 
+                    {
+                        for ( int i = 0; i < traj_index.size( ); i++ )
+                        {
+                            if ( CartToJnt_count < traj_index[ i ] )
+                            {
+                                traj_current_pos = i + 1;
+                                break;
+                            }
+                        }
+                        PLOG_ERROR << "CartToJnt failed "
+                                   << "on the " << traj_current_pos
+                                   << "TH trajectory,please chose other interpolate Points ";
+
+                        break;
+                    }
+                    case -2: break;
+                    default:
+                        PLOG_ERROR << "Undefined error!";
+                        is_running_motion = false;
+                        return -1;
                 }
             }
-            //**-------------------------------**//
-            traj_.push_back(q_target);
-            count++;
+            catch ( ... )
+            {
+                PLOG_ERROR << "Undefined error!";
+                is_running_motion = false;
+                return -1;
+            }
         }
+
+
+        if ( ik_count == max_running_count )
+        {
+            PLOG_ERROR << "CartToJnt still failed even after " << max_running_count << " attempts";
+             is_running_motion =false;
+            return -1;
+        }
+
         //**-------------------------------**//
+
+
+        // //** IK计算 **//
+        // traj_.clear();
+        // int count{0};
+        // int p = 0;  //表示当前正处理第几段轨迹
+        // for (const auto &pos_goal: traj_target) {
+        //     q_init = q_target;
+        //     if (kinematics_.CartToJnt(q_init, pos_goal, q_target) < 0) {
+        //         for (int i = 0; i < traj_index.size(); i++)
+        //             p = count < traj_index[i] ? i + 1 : p;  //找到当前是第几段轨迹
+        //         std::cerr << RED << "MultiMoveL():CartToJnt failed on the " << p
+        //                   << "TH trajectory,please chose other interpolate Points "
+        //                   << WHITE << std::endl;
+        //         return -1;
+        //     }
+        //     //** 防止奇异位置速度激增 **//
+        //     for ( int i = 0; i < jnt_num_; i++ )
+        //     {
+        //         if ( abs( q_target( i ) - q_init( i ) ) > max_step[ i ] )
+        //         {
+        //             for ( int j = 0; j < traj_index.size( ); j++ )
+        //                 p = count < traj_index[ j ] ? ( j + 1 ) : p;  //找到当前是第几段轨迹
+        //             // PLOG_ERROR << "count =" << count;
+        //             PLOG_ERROR << "joint[" << i << "] speep is too  fast on the " << p
+        //                        << "th trajectory";
+        //             PLOG_ERROR << "target speed = " << abs( q_target( i ) - q_init( i ) )
+        //                        << " and  max_step=" << max_step[ i ];
+        //             PLOG_ERROR << "q_target( " << i << " )  = " << q_target( i ) * 180 / M_PI;
+        //             PLOG_ERROR << "q_init( " << i << " ) =" << q_init( i ) * 180 / M_PI << WHITE;
+                    
+                    
+        //             return -1;
+        //         }
+        //     }
+        //     //**-------------------------------**//
+        //     traj_.push_back(q_target);
+        //     count++;
+        // }
+        // //**-------------------------------**//
 
 
         if (asynchronous)  //异步执行
@@ -1671,6 +1786,8 @@ namespace rocos {
 
     void Robot::RunMultiMoveL( const std::vector< KDL::JntArray >& traj )
     {
+        std::cout << "No. of waypoints: " << traj.size() << std::endl;
+
         for ( const auto& waypoints : traj )
         {
             for ( int i = 0; i < jnt_num_; ++i )

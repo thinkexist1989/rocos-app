@@ -238,16 +238,15 @@ namespace rocos
                 f_p4 = f_p3 * KDL::Frame{ KDL::Vector{ -0.3, 0.0, 0.0 } };
                 f_p5 = f_p4 * KDL::Frame{ KDL::Vector{ 0.0, 0.15, 0.0 } };
 
+                
+
                 std::vector< KDL::Frame > points{ f_p1, f_p2, f_p3, f_p4, f_p5 };
-                std::vector< double > max_path_v{ 0.30, 0.30, 0.1, 0.30, 0.30 };
+                std::vector< double > max_path_v{ 0.30, 0.30, 0.6, 0.30, 0.30 };
                 std::vector< double > max_path_a{ 0.2, 0.2, 0.2, 0.2, 0.2 };
                 std::vector< double > bound_dist{ 0.05, 0.05, 0.05, 0.05, 0.0 };
 
-                for ( int i{ 0 }; i < 10; i++ )
-                {
-                    if ( MultiMoveL( points, bound_dist, max_path_v, max_path_a, false ) == 0 )
-                        break;
-                }
+
+                MultiMoveL( points, bound_dist, max_path_v, max_path_a, false );
 
                 f_p6 = f_p5 * KDL::Frame{ KDL::Vector{ 0.3, -0.3, 0.0 } };
                 MoveL( f_p6, 0.2, 0.2, 0, 0, false );
@@ -334,7 +333,7 @@ int main( int argc, char* argv[] )
     //** 等待主站清除共享内存,25后再启动APP **//
     std::cerr << "\033[32m"
               << "等待主站清除共享内存" << std::endl;
-    std::this_thread::sleep_for( std::chrono::duration< double >( 13 ) );
+    std::this_thread::sleep_for( std::chrono::duration< double >( 1 ) );
     //**-------------------------------**//
 
     boost::shared_ptr< HardwareInterface > hw = boost::make_shared< HardwareSim >( _joint_num );  // 仿真
