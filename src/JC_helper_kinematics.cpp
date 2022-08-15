@@ -284,7 +284,7 @@ namespace JC_helper
         return 0;
     }
 
-    int multilink_trajectory( std::vector< KDL::Frame >& traj, const KDL::Frame& f_start, const KDL::Frame& f_mid, const KDL::Frame& f_end, KDL::Frame& next_f_start, double current_path_start_v, double& next_path_start_v, double bound_dist, double max_path_v, double max_path_a, double next_max_path_v )
+    int multilink_trajectory( std::vector< KDL::Frame >& traj, const KDL::Frame& f_start, const KDL::Frame& f_mid, const KDL::Frame& f_end, KDL::Frame& next_f_start, double current_path_start_v, double& next_path_start_v, double s_bound_dist, double max_path_v, double max_path_a, double next_max_path_v )
     {
         using namespace KDL;
         //** 变量初始化 **//
@@ -298,6 +298,9 @@ namespace JC_helper
 
         double abdist = ab.Norm( );
         double bcdist = bc.Norm( );
+
+        // bound_dist不再支持绝对距离，使用相对距离更合适
+        double bound_dist = std::max( std::min( abs( s_bound_dist ), 1.0 ), 0.0 ) * std::min( abdist, bcdist );
         //**-------------------------------**//
 
         //** 数据有效性检查 **//
@@ -487,7 +490,8 @@ namespace JC_helper
         {
             T_cirlular = ( radius * alpha ) / next_path_start_v;
 
-            doubleS_2_R.planDoubleSProfile( 0, 0, 1, 0, 0, max_path_v / dedist, max_path_a / dedist, max_path_a * 2 / dedist );
+            PLOG_DEBUG << "( radius * alpha ) = " << ( radius * alpha );
+            doubleS_2_R.planDoubleSProfile( 0, 0, 1, 0, 0, max_path_v / ( radius * alpha ), max_path_a / ( radius * alpha ), max_path_a * 2 / ( radius * alpha ) );
             bool isplanned = doubleS_2_R.isValidMovement( );
             if ( !isplanned || !( doubleS_2_R.getDuration( ) > 0 ) )
             {

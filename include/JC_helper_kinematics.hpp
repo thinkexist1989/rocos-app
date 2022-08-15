@@ -119,13 +119,13 @@ namespace JC_helper
      * @param next_f_start 下一段运动应该开始的位姿
      * @param current_path_start_v 应该开始运动的线速度
      * @param next_path_start_v 下一段运动应该开始的线速度
-     * @param bound_dist 过渡半径
+     * @param s_bound_dist 过渡半径尺度[0-1]
      * @param max_path_v 最大线速度
      * @param max_path_a 最大线加速度
      * @param next_max_path_v 下一段的最大线速度（如果无下一段了，此参数无意义）
      * @return int
      */
-    int multilink_trajectory( std::vector< KDL::Frame >& traj, const KDL::Frame& f_start, const KDL::Frame& f_mid, const KDL::Frame& f_end, KDL::Frame& next_f_start, double current_path_start_v, double& next_path_start_v, double bound_dist, double max_path_v, double max_path_a, double next_max_path_v = 1 );
+    int multilink_trajectory( std::vector< KDL::Frame >& traj, const KDL::Frame& f_start, const KDL::Frame& f_mid, const KDL::Frame& f_end, KDL::Frame& next_f_start, double current_path_start_v, double& next_path_start_v, double s_bound_dist, double max_path_v, double max_path_a, double next_max_path_v = 1 );
 
     /**
      * @brief 给定三点，计算出圆心
