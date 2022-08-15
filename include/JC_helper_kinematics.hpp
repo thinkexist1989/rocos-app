@@ -96,7 +96,7 @@ namespace JC_helper
     KDL::Frame circle( const KDL::Frame& F_base_circlestart, const KDL::Frame& F_base_circleend, const KDL::Frame& F_base_circleCenter, double s_p, double s_r, double alpha, double& success );
 
     /**
-     * @brief 直线规划（使用doubleS速度曲线）
+     * @brief 求解直线指定S的位置和姿态
      *
      * @param start 起始位姿
      * @param end 终止位姿
