@@ -243,10 +243,10 @@ namespace rocos
                 std::vector< KDL::Frame > points{ f_p1, f_p2, f_p3, f_p4, f_p5 };
                 std::vector< double > max_path_v{ 0.30, 0.30, 0.6, 0.30, 0.30 };
                 std::vector< double > max_path_a{ 0.2, 0.2, 0.2, 0.2, 0.2 };
-                std::vector< double > bound_dist{ 0.2, 1, 1, 0.2, 0.2 };
+                std::vector< double > s_bound_dist{ 0.2, 1, 1, 0.2, 0.2 };
 
 
-                MultiMoveL( points, bound_dist, max_path_v, max_path_a, false );
+                MultiMoveL( points, s_bound_dist, max_path_v, max_path_a, false );
 
                 f_p6 = f_p5 * KDL::Frame{ KDL::Vector{ 0.3, -0.3, 0.0 } };
                 MoveL( f_p6, 0.2, 0.2, 0, 0, false );

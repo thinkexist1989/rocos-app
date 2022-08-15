@@ -571,17 +571,9 @@ namespace rocos {
 
     int Robot::MoveJ(JntArray q, double speed, double acceleration, double time,
                      double radius, bool asynchronous) {
-        if (radius) {
-            std::cerr << RED << " radius not supported yet" << WHITE << std::endl;
-            return -1;
-        }
-        if (time) {
-            std::cerr << RED << " time not supported yet" << WHITE << std::endl;
-            return -1;
-        }
 
         if (CheckBeforeMove(q, speed, acceleration, time, radius) < 0) {
-            std::cerr << RED << "MoveJ():given parameters is invalid" << WHITE << std::endl;
+            PLOG_ERROR<< "given parameters is invalid" ;
             return -1;
         }
 
@@ -632,16 +624,6 @@ namespace rocos {
     int Robot::MoveL( Frame pose, double speed, double acceleration, double time,
                       double radius, bool asynchronous ,int max_running_count)
     {
-        if ( radius )
-        {
-            PLOG_ERROR << " radius not supported yet";
-            return -1;
-        }
-        if ( time )
-        {
-            PLOG_ERROR << " time not supported yet";
-            return -1;
-        }
 
         if ( max_running_count < 1 )
         {
@@ -1578,39 +1560,55 @@ namespace rocos {
     int Robot::CheckBeforeMove(const JntArray &q, double speed, double acceleration,
                                double time, double radius) {
         //** 数据有效性检查  **//
-        for (int i = 0; i < jnt_num_; i++) {  //TODO 这里的速度、加速度目前只针对关节空间进行检查
+         //TODO 这里的速度、加速度目前只针对关节空间进行检查
+        for (int i = 0; i < jnt_num_; i++) { 
             //位置检查
             if (q(i) > joints_[i]->getMaxPosLimit() ||
                 q(i) < joints_[i]->getMinPosLimit()) {
-                std::cerr << RED << " CheckBeforeMove():  Pos command is out of range" << WHITE << std::endl;
+                PLOG_ERROR << "  Pos command is out of range";
                 return -1;
             }
             //速度检查
             if (speed > joints_[i]->getMaxVel() ||
                 speed < (-1) * joints_[i]->getMaxVel()) {
-                std::cerr << RED << "CheckBeforeMove():  Vel command is out of range" << WHITE << std::endl;
+                PLOG_ERROR << " Vel command is out of range" ;
                 return -1;
             }
             //加速度检查
             if (acceleration > joints_[i]->getMaxAcc() ||
                 acceleration < (-1) * joints_[i]->getMaxAcc()) {
-                std::cerr << RED << "CheckBeforeMove(): Acc command is out of range" << WHITE << std::endl;
+                PLOG_ERROR << " Acc command is out of range";
                 return -1;
             }
             //使能检查
-            if (joints_[i]->getDriveState() != DriveState::OperationEnabled) {
-                std::cerr << RED << "CheckBeforeMove():  joints[" << i << "]"
-                          << "is in OperationDisabled " << WHITE << std::endl;
+            if ( joints_[ i ]->getDriveState( ) != DriveState::OperationEnabled )
+            {
+                PLOG_ERROR << " joints[" << i << "]"
+                           << "is in OperationDisabled ";
                 return -1;
             }
         }
-        if (time < 0) {
-            std::cerr << RED << "CheckBeforeMove():  time is less than 0 invalidly" << WHITE << std::endl;
+        if ( time < 0 )
+        {
+            PLOG_ERROR<< "  time is less than 0 invalidly";
             return -1;
         }
 
-        if (radius < 0) {
-            std::cerr << RED << "CheckBeforeMove():  radius is less than 0 invalidly" << WHITE << std::endl;
+        if ( radius < 0 )
+        {
+            PLOG_ERROR << "  radius is less than 0 invalidly";
+            return -1;
+        }
+
+        if ( radius )
+        {
+            PLOG_ERROR << " radius not supported yet";
+            return -1;
+        }
+
+        if ( time )
+        {
+            PLOG_ERROR << " time not supported yet";
             return -1;
         }
 
@@ -1651,15 +1649,29 @@ namespace rocos {
         //总时间检查
         if ( time < 0 )
         {
-            std::cerr << RED << "CheckBeforeMove(): time is less than 0 invalidly" << WHITE << std::endl;
+            PLOG_ERROR << " time is less than 0 invalidly";
             return -1;
         }
         //过渡半径检查
         if ( radius < 0 )
         {
-            std::cerr << RED << "CheckBeforeMove(): radius is less than 0 invalidly" << WHITE << std::endl;
+            PLOG_ERROR << "radius is less than 0 invalidly" ;
             return -1;
         }
+
+
+        if ( radius )
+        {
+            PLOG_ERROR << " radius not supported yet";
+            return -1;
+        }
+
+        if ( time )
+        {
+            PLOG_ERROR << " time not supported yet";
+            return -1;
+        }
+
 
         //**-------------------------------**//
         return 0;
