@@ -93,8 +93,13 @@ namespace rocos
         std::ofstream out_joint_csv{ };
         std::string str;
         std::vector< std::string > str_vec;
-        out_joint_csv.open( "/home/think/rocos-app/debug/joints.csv" );
-        while ( !( *flag_turnoff ) && str.compare( "exit" ) )
+        out_joint_csv.open( "debug/joints_record.csv" );
+        if( out_joint_csv.isopen())
+        {PLOG_INFO<<"记录文件打开成功";}
+        else
+        {PLOG_ERROR<<"记录文件打开失败,退出";exit(0); }
+
+        while ( !( *flag_turnoff ) && str.compare( "exit" ) )//输入[eixt]可以退出记录线程
         {
             PLOG_DEBUG << " 输入“rem”并回车,命令格式:rem#movej#vel#acc;输入“exit”退出记录";
             std::cin >> str;
@@ -170,7 +175,7 @@ namespace rocos
         while ( input_csv.getline( tem, max_size ) )  //直接读取一行，以\n结束
         {
             PLOG_DEBUG << index;
-            std::cin >> str;
+            std::cin >> str;//为了记录线程方便精确定位到某一步
             if ( strcmp( tem, "" ) == 0 ) {
                 index++;continue;} //!跳过csv文件\n行
 
@@ -279,9 +284,7 @@ namespace rocos
             // thread_pos_bag.detach();
             //**-------------------------------**//
 
-            //** 开启TCP线程 **//
-            // std::thread {&JC_helper::TCP_server::RunServer ,& my_server  }.detach();
-            //**-------------------------------**//
+   
 
             //** 变量初始化 **//
             KDL::JntArray q_target( jnt_num_ );
@@ -294,7 +297,7 @@ namespace rocos
 #    if 0
 #        pragma region  //*第一个按键
 
-            if ( flag_csv_turnoff || csv_parse( "/home/think/rocos-app/debug/demo_1.csv" ) < 0 )
+            if ( flag_csv_turnoff || csv_parse( "debug/demo_1.csv" ) < 0 )
             {
                 PLOG_ERROR << "csv脚本执行失败";
                 flag_csv_turnoff = true;
@@ -303,7 +306,7 @@ namespace rocos
 #        pragma endregion
 
 #        pragma region  //*第二个按键
-            if ( flag_csv_turnoff || csv_parse( "/home/think/rocos-app/debug/demo_2.csv" ) < 0 )
+            if ( flag_csv_turnoff || csv_parse( "debug/demo_2.csv" ) < 0 )
             {
                 PLOG_ERROR << "csv脚本执行失败";
                 flag_csv_turnoff = true;
@@ -313,7 +316,7 @@ namespace rocos
 
 #        pragma region  //*第三个按键
 
-            if ( flag_csv_turnoff || csv_parse( "/home/think/rocos-app/debug/demo_3.csv" ) < 0 )
+            if ( flag_csv_turnoff || csv_parse( "debug/demo_3.csv" ) < 0 )
             {
                 PLOG_ERROR << "csv脚本执行失败";
                 flag_csv_turnoff = true;
@@ -323,7 +326,7 @@ namespace rocos
 
 #        pragma region  //*第4个按键
 
-            if ( flag_csv_turnoff || csv_parse( "/home/think/rocos-app/debug/demo_4.csv" ) < 0 )
+            if ( flag_csv_turnoff || csv_parse( "debug/demo_4.csv" ) < 0 )
             {
                 PLOG_ERROR << "csv脚本执行失败";
                 flag_csv_turnoff = true;
@@ -333,7 +336,7 @@ namespace rocos
 
 #        pragma region  //*第5个按键
 
-            if ( flag_csv_turnoff || csv_parse( "/home/think/rocos-app/debug/demo_5.csv" ) < 0 )
+            if ( flag_csv_turnoff || csv_parse( "debug/demo_5.csv" ) < 0 )
             {
                 PLOG_ERROR << "csv脚本执行失败";
                 flag_csv_turnoff = true;
@@ -343,7 +346,7 @@ namespace rocos
 
 #        pragma region  //* 第6个按键
 
-            if ( flag_csv_turnoff || csv_parse( "/home/think/rocos-app/debug/demo_6.csv" ) < 0 )
+            if ( flag_csv_turnoff || csv_parse( "debug/demo_6.csv" ) < 0 )
             {
                 PLOG_ERROR << "csv脚本执行失败";
                 flag_csv_turnoff = true;
@@ -353,7 +356,7 @@ namespace rocos
 
 #        pragma region  //* 第7个按键
 
-            if ( flag_csv_turnoff || csv_parse( "/home/think/rocos-app/debug/demo_7.csv" ) < 0 )
+            if ( flag_csv_turnoff || csv_parse( "debug/demo_7.csv" ) < 0 )
             {
                 PLOG_ERROR << "csv脚本执行失败";
                 flag_csv_turnoff = true;
@@ -363,7 +366,7 @@ namespace rocos
 
 #        pragma region  //* 第8个按键
 
-            if ( flag_csv_turnoff || csv_parse( "/home/think/rocos-app/debug/demo_8.csv" ) < 0 )
+            if ( flag_csv_turnoff || csv_parse( "debug/demo_8.csv" ) < 0 )
             {
                 PLOG_ERROR << "csv脚本执行失败";
                 flag_csv_turnoff = true;
@@ -373,7 +376,7 @@ namespace rocos
 
 #        pragma region  //*流程1
 
-            if ( flag_csv_turnoff || csv_parse( "/home/think/rocos-app/debug/demo_process_1.csv" ) < 0 )
+            if ( flag_csv_turnoff || csv_parse( "debug/demo_process_1.csv" ) < 0 )
             {
                 PLOG_ERROR << "csv脚本执行失败";
                 flag_csv_turnoff = true;
@@ -383,8 +386,8 @@ namespace rocos
 #    endif
 
 
-            // flag_record_turnoff = true;
-            // thread_pos_bag.join( );
+            // flag_record_turnoff = true;//这个感觉没必要，可以显示输入[exit]退出记录线程
+          
         }
 
         PLOG_INFO << "全部测试结束,goodbye!";
@@ -520,7 +523,7 @@ namespace rocos
 
         while ( input_csv.getline( tem, max_size ) )  //直接读取一行，以\n结束
         {
-            PLOG_DEBUG << index;
+           
 
             // std::cin >> str; //临时修改
 
@@ -530,7 +533,7 @@ namespace rocos
                 continue;
             }  //!跳过csv文件\n行
 
-
+            PLOG_DEBUG <<"当前正在执行第 " <<index<<"行指令";
             split( tem, tokens, "," );
             if ( tokens[ 0 ].find( "movej" ) != std::string::npos )
             {
@@ -607,7 +610,7 @@ namespace rocos
     {
         bool is_in_initPos{ true };
         sleep(2);
-        if ( abs( pos_[ 0 ] ) > 1e-2 )
+        if ( abs( pos_[ 0 ] ) > 0.23 )
         {
             PLOG_DEBUG << "1关节偏差:" << abs( pos_[ 0 ] );
             is_in_initPos = false;

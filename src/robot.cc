@@ -62,7 +62,7 @@ namespace rocos {
 //        kinematics_.initTechServo();
 
         static plog::ColorConsoleAppender< plog::TxtFormatter > consoleAppender;
-        static plog::RollingFileAppender<plog::CsvFormatter> log_Appender("log/log.csv", 10485760, 10000); //单文件最大 10M，最大10000个文件
+        static plog::RollingFileAppender<plog::CsvFormatter> log_Appender("debug/log.csv", 10485760, 10000); //单文件最大 10M，最大10000个文件
         plog::init< 0 >( plog::debug, &consoleAppender ).addAppender(&log_Appender);//终端显示并且写入log文件                                                                      // Initialize the logger.
 
                                                                         
