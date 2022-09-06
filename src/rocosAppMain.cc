@@ -541,8 +541,8 @@ namespace rocos
                 {
                     q_target( i ) = std::stod( tokens[ 3 + i ] );
                 }
-                //临时修改 新增速度和加速度
-                if ( MoveJ( q_target, 3 * std::stod( tokens[ 1 ] ), 3 * std::stod( tokens[ 2 ] ), 0, 0, false ) < 0 )
+                
+                if ( MoveJ( q_target, 1.5 * std::stod( tokens[ 1 ] ), 1.5 * std::stod( tokens[ 2 ] ), 0, 0, false ) < 0 )
                 {
                     PLOG_ERROR << "第" + std::to_string( index ) + "行指令执行失败";
                     flag_invalid_status = true;
@@ -560,8 +560,8 @@ namespace rocos
                     rpy[ i ] = std::stod( tokens[ 6 + i ] );
                 }
                 KDL::Frame frame_target{ KDL::Rotation::RPY( rpy[ 0 ], rpy[ 1 ], rpy[ 2 ] ), KDL::Vector{ xyz[ 0 ], xyz[ 1 ], xyz[ 2 ] } };
-                //临时修改  新增速度和加速度
-                if ( MoveL( frame_target, 3 *std::stod( tokens[ 1 ] ), 3 *std::stod( tokens[ 2 ] ), 0, 0, false ) < 0 )
+
+                if ( MoveL( frame_target, std::stod( tokens[ 1 ] ), std::stod( tokens[ 2 ] ), 0, 0, false ) < 0 )
                 {
                     PLOG_ERROR << "第" + std::to_string( index ) + "行指令执行失败";
                     flag_invalid_status = true;
@@ -571,14 +571,14 @@ namespace rocos
             }
             else if ( tokens[ 0 ].find( "gripper" ) != std::string::npos )
             {
-                //临时修改,屏蔽gripper,为了测试
-                // if ( my_gripper.send_command( tokens[ 1 ] + "#80#120" ) < 0 )
-                // {
-                //     PLOG_ERROR << "第" + std::to_string( index ) + "行指令执行失败";
-                //     flag_invalid_status = true;
-                //     break;
-                // }
-                // index++;
+              
+                if ( my_gripper.send_command( tokens[ 1 ] + "#80#120" ) < 0 )
+                {
+                    PLOG_ERROR << "第" + std::to_string( index ) + "行指令执行失败";
+                    flag_invalid_status = true;
+                    break;
+                }
+                index++;
             }
             else
             {
@@ -610,7 +610,7 @@ namespace rocos
     {
         bool is_in_initPos{ true };
         sleep(2);
-        if ( abs( pos_[ 0 ] ) > 0.23 )
+        if ( abs( pos_[ 0 ] ) > 1e-2 )
         {
             PLOG_DEBUG << "1关节偏差:" << abs( pos_[ 0 ] );
             is_in_initPos = false;
@@ -666,16 +666,15 @@ namespace rocos
         //**-------------------------------**//
 
         //** 程序初始化 **//
-        //临时修改
-        // if ( my_gripper.init( ) < 0 )  //夹抓初始化
-        //     return;
+
+        if ( my_gripper.init( ) < 0 )  //夹抓初始化
+            return;
 
         if ( my_server.init( ) < 0 )  // TCP服务器初始化
             return;
 
-        //临时修改
-        // if ( my_ft_sensor.init( flange_ ) < 0 )  // 6维力初始化
-        //     return;
+        if ( my_ft_sensor.init( flange_ ) < 0 )  // 6维力初始化
+            return;
 
         //**-------------------------------**//
 
@@ -798,11 +797,11 @@ int main( int argc, char* argv[] )
     //** 等待主站清除共享内存,25后再启动APP **//
     std::cerr << "\033[32m"
               << "等待主站清除共享内存" << std::endl;
-    std::this_thread::sleep_for( std::chrono::duration< double >( 10 ) );
+    std::this_thread::sleep_for( std::chrono::duration< double >( 17 ) );
     //**-------------------------------**//
 
-    boost::shared_ptr< HardwareInterface > hw = boost::make_shared< HardwareSim >( 7 );  // 仿真
-    // boost::shared_ptr< HardwareInterface > hw = boost::make_shared< Hardware >( );  //真实机械臂
+    // boost::shared_ptr< HardwareInterface > hw = boost::make_shared< HardwareSim >( 7 );  // 仿真
+    boost::shared_ptr< HardwareInterface > hw = boost::make_shared< Hardware >( );  //真实机械臂
 
     //** 判断主站ECM是否启动成功 **//
     //! 如果主站25S以内启动，既先主站清除内存，在hw与主站建立连接，那下面程序可以成功判断Ready 三次
