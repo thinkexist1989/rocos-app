@@ -1152,8 +1152,7 @@ namespace rocos {
                                                       motion_v_1, bound_dist[0], max_path_v[0], max_path_a[0],
                                                       max_path_v[1]);
             if (success < 0) {
-                std::cerr << RED << "MultiMoveL(): given parameters is invalid in the 1th planning "
-                          << WHITE << std::endl;
+                PLOG_ERROR<< " given parameters is invalid in the 1th planning ";
                 return -1;
             }
             traj_index.push_back(traj_target.size());
@@ -1164,8 +1163,7 @@ namespace rocos {
                                                           motion_frame_2, motion_v_1, motion_v_2, bound_dist[i],
                                                           max_path_v[i], max_path_a[i], max_path_v[i + 1]);
                 if (success < 0) {
-                    std::cerr << RED << "MultiMoveL(): given parameters is invalid in the " << i + 1 << "th planning "
-                              << WHITE << std::endl;
+                    PLOG_ERROR<< "given parameters is invalid in the " << i + 1 << "th planning ";
                     return -1;
                 }
                 motion_frame_1 = motion_frame_2;
@@ -1177,8 +1175,7 @@ namespace rocos {
             success = JC_helper::link_trajectory(traj_target, motion_frame_1, point.back(), motion_v_1, 0,
                                                  max_path_v.back(), max_path_a.back());
             if (success < 0) {
-                std::cerr << RED << "MultiMoveL(): given parameters is invalid in the last of planning "
-                          << WHITE << std::endl;
+               PLOG_ERROR << " given parameters is invalid in the last of planning ";
                 return -1;
             }
             traj_index.push_back(traj_target.size());

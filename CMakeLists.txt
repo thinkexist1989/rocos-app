@@ -22,7 +22,8 @@ email: luoyang@sia.cn
 ]]
 
 cmake_minimum_required(VERSION 3.10)
-project(rocos_app)
+project(rocos_app VERSION 1.9.1)
+
 
 set(CMAKE_PREFIX_PATH "/opt/grpc")
 include(cmake/common.cmake) # gRPC

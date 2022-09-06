@@ -38,13 +38,13 @@
         </collision>
     </link>
     <joint name="joint_1" type="continuous">
-        <origin xyz="0.0 0.0 0.34825" rpy="0 0 0"/>
+        <origin xyz="0.0 0.0 0.3393" rpy="0 0 0"/>
         <parent link="base_link"/>
         <child link="link_1"/>
         <axis xyz="0 0 1"/>
         <hardware id="0">
-            <limit lower="-2.98" upper="2.98" vel="1.0" acc="10.0" jerk="100.0" effort="30.0"/>
-            <transform ratio="1.0" offset_pos_cnt="473512" cnt_per_unit="156455.678" torque_per_unit="1.0" user_unit_name="rad"/>
+            <limit lower="-2.90" upper="2.90" vel="1.0" acc="10.0" jerk="100.0" effort="30.0"/>
+            <transform ratio="1.0" offset_pos_cnt="464970" cnt_per_unit="156455.675" torque_per_unit="1.0" user_unit_name="rad"/>
         </hardware>
     </joint>
     <link name="link_2">
@@ -77,8 +77,8 @@
         <child link="link_2"/>
         <axis xyz="0 0 1"/>
         <hardware id="1">
-            <limit lower="-2.39" upper="2.39" vel="1.0" acc="10.0" jerk="100.0" effort="30.0" />
-            <transform ratio="1.0" offset_pos_cnt="375902" cnt_per_unit="156455.678" torque_per_unit="1.0" user_unit_name="rad"/>
+            <limit lower="-2.20" upper="2.20" vel="1.0" acc="10.0" jerk="100.0" effort="30.0" />
+            <transform ratio="1.0" offset_pos_cnt="357678" cnt_per_unit="156455.675" torque_per_unit="1.0" user_unit_name="rad"/>
         </hardware>
     </joint>
     <link name="link_3">
@@ -106,13 +106,13 @@
         </collision>
     </link>
     <joint name="joint_3" type="continuous">
-        <origin xyz="0 0.41012 0" rpy="-1.5708 0 0"/>
+        <origin xyz="0 0.3977 0" rpy="-1.5708 0 0"/>
         <parent link="link_2"/>
         <child link="link_3"/>
         <axis xyz="0 0 1"/>
         <hardware id="2">
-            <limit lower="-2.97" upper="2.97" vel="1.0" acc="10.0" jerk="100.0" effort="30.0" />
-            <transform ratio="1.0" offset_pos_cnt="466363" cnt_per_unit="156455.678" torque_per_unit="1.0" user_unit_name="rad"/>
+            <limit lower="-2.90" upper="2.90" vel="1.0" acc="10.0" jerk="100.0" effort="30.0" />
+            <transform ratio="1.0" offset_pos_cnt="466748" cnt_per_unit="156455.675" torque_per_unit="1.0" user_unit_name="rad"/>
         </hardware>
     </joint>
     <link name="link_4">
@@ -146,8 +146,8 @@
         <child link="link_4"/>
         <axis xyz="0 0 1"/>
         <hardware id="3">
-            <limit lower="-2.39" upper="2.39" vel="1.0" acc="10.0" jerk="100.0" effort="30.0" />
-            <transform ratio="1.0" offset_pos_cnt="375411" cnt_per_unit="156455.678" torque_per_unit="1.0" user_unit_name="rad"/>
+            <limit lower="-2.23" upper="2.23" vel="1.0" acc="10.0" jerk="100.0" effort="30.0" />
+            <transform ratio="1.0" offset_pos_cnt="360991" cnt_per_unit="156455.675" torque_per_unit="1.0" user_unit_name="rad"/>
         </hardware>
     </joint>
     <link name="link_5">
@@ -175,13 +175,13 @@
         </collision>
     </link>
     <joint name="joint_5" type="continuous">
-        <origin xyz="0 0.40102 0" rpy="-1.5708 0 0"/>
+        <origin xyz="0 0.3925 0" rpy="-1.5708 0 0"/>
         <parent link="link_4"/>
         <child link="link_5"/>
         <axis xyz="0 0 1"/>
         <hardware id="4">
-            <limit lower="-2.97" upper="2.97" vel="1.0" acc="10.0" jerk="100.0" effort="30.0" />
-            <transform ratio="1.0" offset_pos_cnt="466212" cnt_per_unit="156455.678" torque_per_unit="1.0" user_unit_name="rad"/>
+            <limit lower="-2.91" upper="2.91" vel="1.0" acc="10.0" jerk="100.0" effort="30.0" />
+            <transform ratio="1.0" offset_pos_cnt="467510" cnt_per_unit="156455.675" torque_per_unit="1.0" user_unit_name="rad"/>
         </hardware>
     </joint>
     <link name="link_6">
@@ -214,8 +214,8 @@
         <child link="link_6"/>
         <axis xyz="0 0 1"/>
         <hardware id="5">
-            <limit lower="-2.41" upper="2.41" vel="1.0" acc="10.0" jerk="100.0" effort="30.0" />
-            <transform ratio="1.0" offset_pos_cnt="314587" cnt_per_unit="130379.73" torque_per_unit="1.0" user_unit_name="rad"/>
+            <limit lower="-2.09" upper="2.09" vel="1.0" acc="10.0" jerk="100.0" effort="30.0" />
+            <transform ratio="1.0" offset_pos_cnt="284016" cnt_per_unit="130379.729" torque_per_unit="1.0" user_unit_name="rad"/>
         </hardware>
     </joint>
     <link name="link_7">
@@ -243,13 +243,13 @@
         </collision>
     </link>
     <joint name="joint_7" type="continuous">
-        <origin xyz="0 0.22977 0" rpy="-1.5708 0 0"/>
+        <origin xyz="0 0.2145 0" rpy="-1.5708 0 0"/>
         <parent link="link_6"/>
         <child link="link_7"/>
         <axis xyz="0 0 1"/>
         <hardware id="6">
-            <limit lower="-2.97" upper="2.97" vel="1.0" acc="10.0" jerk="100.0" effort="30.0" />
-            <transform ratio="1.0" offset_pos_cnt="388354" cnt_per_unit="130379.73" torque_per_unit="1.0" user_unit_name="rad"/>
+            <limit lower="-2.90" upper="2.90" vel="1.0" acc="10.0" jerk="100.0" effort="30.0" />
+            <transform ratio="1.0" offset_pos_cnt="388331" cnt_per_unit="130379.729" torque_per_unit="1.0" user_unit_name="rad"/>
         </hardware>
     </joint>
 </robot>

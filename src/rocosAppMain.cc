@@ -83,47 +83,47 @@ namespace rocos
         //**-------------------------------**//
 
         //** 程序初始化 **//
-        // csv_null_motion.open( "./debug/null_motion.csv" );
-        // if ( !csv_null_motion.is_open( ) )
-        // {
-        //     PLOG_ERROR << "null_motion.csv 文件打开失败";
-        //     return;
-        // }
+        csv_null_motion.open( "./debug/7dof_null_motion_data.csv" );
+        if ( !csv_null_motion.is_open( ) )
+        {
+            PLOG_ERROR << "7dof_null_motion_data.csv 文件打开失败";
+            return;
+        }
 
-        // last_joints( 0 ) = 0.703272511855758;
-        // last_joints( 1 ) = 1.91187495520828;
-        // last_joints( 2 ) = -1.96062735121224;
-        // last_joints( 3 ) = 1.5707963267949;
-        // last_joints( 4 ) = -0.0136043315709147;
-        // last_joints( 5 ) = -0.802159421698021;
-        // last_joints( 6 ) = 2.09232533478197;
+        last_joints( 0 ) = 0.707233696463318;
+        last_joints( 1 ) = 1.92101781439896;
+        last_joints( 2 ) = -1.96069246176939;
+        last_joints( 3 ) = 1.5707963267949;
+        last_joints( 4 ) = -0.00800697316204158;
+        last_joints( 5 ) = -0.795252940741234;
+        last_joints( 6 ) = 2.09439372345304;
 
-        // while ( csv_null_motion.getline( tem, 2048 ) )
-        // {
-        //     if ( strcmp( tem, "" ) == 0 )
-        //     {
-        //         row_index++;
-        //         continue;
-        //     }  //排除空字符串
+        while ( csv_null_motion.getline( tem, 2048 ) )
+        {
+            if ( strcmp( tem, "" ) == 0 )
+            {
+                row_index++;
+                continue;
+            }  //排除空字符串
 
-        //     split( tem, tokens, "," );
-        //     // PLOG_DEBUG << row_index++ << ": :" << tem;
+            split( tem, tokens, "," );
 
-        //     for ( int i{ 0 }; i < _joint_num; i++ )
-        //     {
-        //         joints( i ) = std::stod( tokens[ i ] );
-        //         if ( abs( joints( i ) - last_joints( i ) ) > 0.0004 )
-        //         {
-        //             PLOG_ERROR << "joint [" << i << "] ::"
-        //                        << "速度过快 ,命令速度为: " << abs( joints( i ) - last_joints( i ) );
-        //             return;
-        //         }
-        //         else
-        //             last_joints( i ) = joints( i );
-        //     }
+            for ( int i{ 0 }; i < _joint_num; i++ )
+            {
+                joints( i ) = std::stod( tokens[ i ] );
+                if ( abs( joints( i ) - last_joints( i ) ) > 0.001 )
+                {
+                    PLOG_ERROR<<"行数："<<row_index;
+                    PLOG_ERROR << "joint [" << i << "] ::"
+                               << "速度过快 ,命令速度偏差为: " << abs( joints( i ) - last_joints( i ) );
+                    return;
+                }
+                else
+                    last_joints( i ) = joints( i );
+            }
 
-        //     servo_data.push_back( joints );
-        // }
+            servo_data.push_back( joints );
+        }
 
         auto t_start = std::chrono::high_resolution_clock::now( ); //记录程序启动时间
 
@@ -175,34 +175,34 @@ namespace rocos
             {
             
                 using namespace KDL;
-                KDL::JntArray q_target( 7 );
+                KDL::JntArray q_target( _joint_num );
 
                 // //** 零空间运动 **//
 
-                // q_target( 0 ) = 0.703272511855758;
-                // q_target( 1 ) = 1.91187495520828;
-                // q_target( 2 ) = -1.96062735121224;
+                q_target( 0 ) = 0.707233696463318;
+                q_target( 1 ) = 1.92101781439896;
+                q_target( 2 ) = -1.96069246176939;
+                q_target( 3 ) = 1.5707963267949;
+                q_target( 4 ) = -0.00800697316204158;
+                q_target( 5 ) = -0.795252940741234;
+                q_target( 6 ) = 2.09439372345304;
+
+                MoveJ( q_target, 0.6, 0.4, 0, 0, false );
+
+                for ( int i{ 0 }; i < servo_data.size( ); i++ )
+                {
+                    JC_helper::safety_servo( this, servo_data[ i ] );
+                }
+
+                // q_target( 0 ) = -0.707233697195877;
+                // q_target( 1 ) = 1.9210178127245;
+                // q_target( 2 ) = 1.96069245968374;
                 // q_target( 3 ) = 1.5707963267949;
-                // q_target( 4 ) = -0.0136043315709147;
-                // q_target( 5 ) = -0.802159421698021;
-                // q_target( 6 ) = 2.09232533478197;
+                // q_target( 4 ) = 0.00800697317391696;
+                // q_target( 5 ) = -0.795252940726547;
+                // q_target( 6 ) = -2.09439372088421;
 
-                // MoveJ( q_target, 0.3, 0.4, 0, 0, false );
-
-                // for ( int i{ 0 }; i < servo_data.size( ); i++ )
-                // {
-                //     JC_helper::safety_servo( this, servo_data[ i ] );
-                // }
-
-                // q_target( 0 ) = -0.703272512580289;
-                // q_target( 1 ) = 1.9118749535464;
-                // q_target( 2 ) = 1.96062734913244;
-                // q_target( 3 ) = 1.5707963267949;
-                // q_target( 4 ) = 0.0136043315908951;
-                // q_target( 5 ) = -0.802159421673025;
-                // q_target( 6 ) = -2.09232533222615;
-
-                // MoveJ( q_target, 0.3, 0.4, 0, 0, false );
+                // MoveJ( q_target, 0.6, 0.4, 0, 0, false );
 
                 // for ( int i{ servo_data.size( ) - 1 }; i >= 0; i-- )
                 // {
@@ -228,7 +228,7 @@ namespace rocos
                 q_target( 5 ) = -45 * M_PI / 180;
                 q_target( 6 ) = 0 * M_PI / 180;
 
-                MoveJ( q_target, 0.4, 0.2, 0, 0, false );
+                MoveJ( q_target, 0.6, 0.6, 0, 0, false );
 
 
                 kinematics_.JntToCart( q_target, f_p1 );
@@ -239,17 +239,15 @@ namespace rocos
                 f_p5 = f_p4 * KDL::Frame{ KDL::Vector{ 0.0, 0.15, 0.0 } };
 
                 
-
                 std::vector< KDL::Frame > points{ f_p1, f_p2, f_p3, f_p4, f_p5 };
-                std::vector< double > max_path_v{ 0.30, 0.30, 0.6, 0.30, 0.30 };
-                std::vector< double > max_path_a{ 0.2, 0.2, 0.2, 0.2, 0.2 };
-                std::vector< double > s_bound_dist{ 0.2, 1, 1, 0.2, 0.2 };
-
+                std::vector< double > max_path_v{ 0.2, 0.2, 0.2, 0.2, 0.2 };
+                std::vector< double > max_path_a{ 0.5, 0.5, 0.5, 0.5, 0.5 };
+                std::vector< double > s_bound_dist{ 0.1, 0.2, 0.2, 0.2, 0.1 };
 
                 MultiMoveL( points, s_bound_dist, max_path_v, max_path_a, false );
 
                 f_p6 = f_p5 * KDL::Frame{ KDL::Vector{ 0.3, -0.3, 0.0 } };
-                MoveL( f_p6, 0.2, 0.2, 0, 0, false );
+                MoveL( f_p6, 0.6, 0.4, 0, 0, false );
 
                 q_target( 0 ) = 0 * M_PI / 180;
                 q_target( 1 ) = 45 * M_PI / 180;
@@ -259,7 +257,7 @@ namespace rocos
                 q_target( 5 ) = 45 * M_PI / 180;
                 q_target( 6 ) = 0 * M_PI / 180;
 
-                MoveJ( q_target, 0.2, 0.2, 0, 0, false );
+                MoveJ( q_target, 0.8, 0.6, 0, 0, false );
 
                 KDL::Frame f_c_center;
                 KDL::Frame f_c_p0;
@@ -268,14 +266,14 @@ namespace rocos
 
                 f_c_center = f_c_p0 * KDL::Frame{ KDL::Vector{ -0.08, 0.0, 0 } };
 
-                MoveC( f_c_center, M_PI * 2, 2, 0.2, 0.2, 0, 0, Robot::OrientationMode::FIXED, false );
+                MoveC( f_c_center, M_PI * 2, 2, 0.35, 0.3, 0, 0, Robot::OrientationMode::FIXED, false );
                 //**-------------------------------**//
 
                 //** 回到起始位置 **//
 
                 for ( int i = 0; i < jnt_num_; i++ )
                     q_target( i ) = 0;
-                MoveJ( q_target, 0.3, 0.2, 0, 0, false );
+                MoveJ( q_target, 0.8, 0.6, 0, 0, false );
 
                 //**-------------------------------**//
 
@@ -333,11 +331,11 @@ int main( int argc, char* argv[] )
     //** 等待主站清除共享内存,25后再启动APP **//
     std::cerr << "\033[32m"
               << "等待主站清除共享内存" << std::endl;
-    std::this_thread::sleep_for( std::chrono::duration< double >( 1 ) );
+    std::this_thread::sleep_for( std::chrono::duration< double >( 10 ) );
     //**-------------------------------**//
 
-    boost::shared_ptr< HardwareInterface > hw = boost::make_shared< HardwareSim >( _joint_num );  // 仿真
-    // boost::shared_ptr< HardwareInterface > hw = boost::make_shared< Hardware >( );  //真实机械臂
+    // boost::shared_ptr< HardwareInterface > hw = boost::make_shared< HardwareSim >( _joint_num );  // 仿真
+    boost::shared_ptr< HardwareInterface > hw = boost::make_shared< Hardware >( );  //真实机械臂
 
     //** 判断主站ECM是否启动成功 **//
     //! 如果主站25S以内启动，既先主站清除内存，在hw与主站建立连接，那下面程序可以成功判断Ready 三次

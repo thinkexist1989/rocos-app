@@ -419,10 +419,11 @@ namespace JC_helper
 
         if ( s_bound_dist_1 <= eps )  //不存在圆弧，圆弧速度为0
             cirlular_v = 0;
-        else if ( ( 1 - s_bound_dist_1 ) <= eps ) //为啥不加abs呢？理由：s_bound_dist_1的范围为：[0-1),没有加的必要
-            cirlular_v = current_path_start_v ;  //不存在直线，圆弧速度为当前段运动速度
+        else if ( abs( 1 - s_bound_dist_1 ) <= eps )  //为啥不加abs呢？理由：s_bound_dist_1的范围为：[0-1),没有加的必要
+            cirlular_v = current_path_start_v;        //不存在直线，圆弧速度为当前段运动速度
         else
-            cirlular_v = s_bound_dist_1 * std::min( max_path_v, next_max_path_v );  //考虑当前和下次的运动，选取最小值（代表当前运动和下一段运动的约束下，最大可行速度）
+            // cirlular_v = s_bound_dist_1 * std::min( max_path_v, next_max_path_v );  //考虑当前和下次的运动，选取最小值（代表当前运动和下一段运动的约束下，最大可行速度）
+            cirlular_v = std::max( 0.0, std::min( s_bound_dist_1 * 5, 1.0 ) ) * std::min( max_path_v, next_max_path_v );  //考虑当前和下次的运动，选取最小值（代表当前运动和下一段运动的约束下，最大可行速度）
 
 #pragma region  // 第一段直线速度轨迹规划
 
@@ -490,7 +491,6 @@ namespace JC_helper
         {
             T_cirlular = ( radius * alpha ) / next_path_start_v;
 
-            PLOG_DEBUG << "( radius * alpha ) = " << ( radius * alpha );
             doubleS_2_R.planDoubleSProfile( 0, 0, 1, 0, 0, max_path_v / ( radius * alpha ), max_path_a / ( radius * alpha ), max_path_a * 2 / ( radius * alpha ) );
             bool isplanned = doubleS_2_R.isValidMovement( );
             if ( !isplanned || !( doubleS_2_R.getDuration( ) > 0 ) )
