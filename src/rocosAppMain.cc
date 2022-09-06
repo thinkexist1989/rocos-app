@@ -83,47 +83,47 @@ namespace rocos
         //**-------------------------------**//
 
         //** 程序初始化 **//
-        csv_null_motion.open( "./debug/7dof_null_motion_data.csv" );
-        if ( !csv_null_motion.is_open( ) )
-        {
-            PLOG_ERROR << "7dof_null_motion_data.csv 文件打开失败";
-            return;
-        }
+        // csv_null_motion.open( "./debug/7dof_null_motion_data.csv" );
+        // if ( !csv_null_motion.is_open( ) )
+        // {
+        //     PLOG_ERROR << "7dof_null_motion_data.csv 文件打开失败";
+        //     return;
+        // }
 
-        last_joints( 0 ) = 0.707233696463318;
-        last_joints( 1 ) = 1.92101781439896;
-        last_joints( 2 ) = -1.96069246176939;
-        last_joints( 3 ) = 1.5707963267949;
-        last_joints( 4 ) = -0.00800697316204158;
-        last_joints( 5 ) = -0.795252940741234;
-        last_joints( 6 ) = 2.09439372345304;
+        // last_joints( 0 ) = 0.707233696463318;
+        // last_joints( 1 ) = 1.92101781439896;
+        // last_joints( 2 ) = -1.96069246176939;
+        // last_joints( 3 ) = 1.5707963267949;
+        // last_joints( 4 ) = -0.00800697316204158;
+        // last_joints( 5 ) = -0.795252940741234;
+        // last_joints( 6 ) = 2.09439372345304;
 
-        while ( csv_null_motion.getline( tem, 2048 ) )
-        {
-            if ( strcmp( tem, "" ) == 0 )
-            {
-                row_index++;
-                continue;
-            }  //排除空字符串
+        // while ( csv_null_motion.getline( tem, 2048 ) )
+        // {
+        //     if ( strcmp( tem, "" ) == 0 )
+        //     {
+        //         row_index++;
+        //         continue;
+        //     }  //排除空字符串
 
-            split( tem, tokens, "," );
+        //     split( tem, tokens, "," );
 
-            for ( int i{ 0 }; i < _joint_num; i++ )
-            {
-                joints( i ) = std::stod( tokens[ i ] );
-                if ( abs( joints( i ) - last_joints( i ) ) > 0.001 )
-                {
-                    PLOG_ERROR<<"行数："<<row_index;
-                    PLOG_ERROR << "joint [" << i << "] ::"
-                               << "速度过快 ,命令速度偏差为: " << abs( joints( i ) - last_joints( i ) );
-                    return;
-                }
-                else
-                    last_joints( i ) = joints( i );
-            }
+        //     for ( int i{ 0 }; i < _joint_num; i++ )
+        //     {
+        //         joints( i ) = std::stod( tokens[ i ] );
+        //         if ( abs( joints( i ) - last_joints( i ) ) > 0.001 )
+        //         {
+        //             PLOG_ERROR<<"行数："<<row_index;
+        //             PLOG_ERROR << "joint [" << i << "] ::"
+        //                        << "速度过快 ,命令速度偏差为: " << abs( joints( i ) - last_joints( i ) );
+        //             return;
+        //         }
+        //         else
+        //             last_joints( i ) = joints( i );
+        //     }
 
-            servo_data.push_back( joints );
-        }
+        //     servo_data.push_back( joints );
+        // }
 
         auto t_start = std::chrono::high_resolution_clock::now( ); //记录程序启动时间
 
@@ -179,20 +179,20 @@ namespace rocos
 
                 // //** 零空间运动 **//
 
-                q_target( 0 ) = 0.707233696463318;
-                q_target( 1 ) = 1.92101781439896;
-                q_target( 2 ) = -1.96069246176939;
-                q_target( 3 ) = 1.5707963267949;
-                q_target( 4 ) = -0.00800697316204158;
-                q_target( 5 ) = -0.795252940741234;
-                q_target( 6 ) = 2.09439372345304;
+                // q_target( 0 ) = 0.707233696463318;
+                // q_target( 1 ) = 1.92101781439896;
+                // q_target( 2 ) = -1.96069246176939;
+                // q_target( 3 ) = 1.5707963267949;
+                // q_target( 4 ) = -0.00800697316204158;
+                // q_target( 5 ) = -0.795252940741234;
+                // q_target( 6 ) = 2.09439372345304;
 
-                MoveJ( q_target, 0.6, 0.4, 0, 0, false );
+                // MoveJ( q_target, 0.6, 0.4, 0, 0, false );
 
-                for ( int i{ 0 }; i < servo_data.size( ); i++ )
-                {
-                    JC_helper::safety_servo( this, servo_data[ i ] );
-                }
+                // for ( int i{ 0 }; i < servo_data.size( ); i++ )
+                // {
+                //     JC_helper::safety_servo( this, servo_data[ i ] );
+                // }
 
                 // q_target( 0 ) = -0.707233697195877;
                 // q_target( 1 ) = 1.9210178127245;
@@ -331,11 +331,11 @@ int main( int argc, char* argv[] )
     //** 等待主站清除共享内存,25后再启动APP **//
     std::cerr << "\033[32m"
               << "等待主站清除共享内存" << std::endl;
-    std::this_thread::sleep_for( std::chrono::duration< double >( 10 ) );
+    std::this_thread::sleep_for( std::chrono::duration< double >( 1 ) );
     //**-------------------------------**//
 
-    // boost::shared_ptr< HardwareInterface > hw = boost::make_shared< HardwareSim >( _joint_num );  // 仿真
-    boost::shared_ptr< HardwareInterface > hw = boost::make_shared< Hardware >( );  //真实机械臂
+    boost::shared_ptr< HardwareInterface > hw = boost::make_shared< HardwareSim >( _joint_num );  // 仿真
+    // boost::shared_ptr< HardwareInterface > hw = boost::make_shared< Hardware >( );  //真实机械臂
 
     //** 判断主站ECM是否启动成功 **//
     //! 如果主站25S以内启动，既先主站清除内存，在hw与主站建立连接，那下面程序可以成功判断Ready 三次

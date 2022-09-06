@@ -3043,47 +3043,103 @@ namespace JC_helper
 
     int safety_servo( rocos::Robot* robot_ptr, const std::array< double, _joint_num >& target_pos )
     {
-        double p{ 0 };
+        //** 伺服位置检查，无效则报错并程序终止 **//
+        bool flag_valid_status{ true };
+
         for ( int i = 0; i < _joint_num; ++i )
         {
-            p = std::max( std::min( target_pos[ i ], robot_ptr->joints_[ i ]->getMaxPosLimit( ) ), robot_ptr->joints_[ i ]->getMinPosLimit( ) );
-
-            robot_ptr->pos_[ i ] = p;
-            robot_ptr->joints_[ i ]->setPosition( p );
+            if ( target_pos[ i ] > robot_ptr->joints_[ i ]->getMaxPosLimit( ) || target_pos[ i ] < robot_ptr->joints_[ i ]->getMinPosLimit( ) )
+            {
+                flag_valid_status = false;
+                PLOG_WARNING << "joints [" << i << "]= " << target_pos[ i ] * 180 / M_PI << " is out of range ";
+            }
         }
 
+        if ( !flag_valid_status )
+        {
+            PLOG_ERROR << "something like error happen,please check it, and program will be turn off after 30 seconds!!";
+            std::this_thread::sleep_for( std::chrono::duration< double >( 30.0 ) );
+            exit( 0 );
+        }
+        //**-------------------------------**//
+
+        //** 位置伺服 **//
+        for ( int i = 0; i < _joint_num; ++i )
+        {
+            robot_ptr->pos_[ i ] = target_pos[ i ];
+            robot_ptr->joints_[ i ]->setPosition( target_pos[ i ] );
+        }
         robot_ptr->hw_interface_->waitForSignal( 0 );
 
+        //**-------------------------------**//
         return 0;
     }
 
     int safety_servo( rocos::Robot* robot_ptr, const std::vector< double >& target_pos )
     {
-        double p{ 0 };
+        //** 伺服位置检查，无效则报错并程序终止 **//
+        bool flag_valid_status{ true };
+
         for ( int i = 0; i < _joint_num; ++i )
         {
-            p = std::max( std::min( target_pos[ i ], robot_ptr->joints_[ i ]->getMaxPosLimit( ) ), robot_ptr->joints_[ i ]->getMinPosLimit( ) );
-
-            robot_ptr->pos_[ i ] = p;
-            robot_ptr->joints_[ i ]->setPosition( p );
+            if ( target_pos[ i ] > robot_ptr->joints_[ i ]->getMaxPosLimit( ) || target_pos[ i ] < robot_ptr->joints_[ i ]->getMinPosLimit( ) )
+            {
+                flag_valid_status = false;
+                PLOG_WARNING << "joints [" << i << "]= " << target_pos[ i ] * 180 / M_PI << " is out of range ";
+            }
         }
 
+        if ( !flag_valid_status )
+        {
+            PLOG_ERROR << "something like error happen,please check it, and program will be turn off after 30 seconds!!";
+            std::this_thread::sleep_for( std::chrono::duration< double >( 30.0 ) );
+            exit( 0 );
+        }
+        //**-------------------------------**//
+
+        //** 位置伺服 **//
+        for ( int i = 0; i < _joint_num; ++i )
+        {
+            robot_ptr->pos_[ i ] = target_pos[ i ];
+            robot_ptr->joints_[ i ]->setPosition( target_pos[ i ] );
+        }
         robot_ptr->hw_interface_->waitForSignal( 0 );
+
+        //**-------------------------------**//
         return 0;
     }
 
     int safety_servo( rocos::Robot* robot_ptr, const KDL::JntArray& target_pos )
     {
-        double p{ 0 };
+        //** 伺服位置检查，无效则报错并程序终止 **//
+        bool flag_valid_status{ true };
+
         for ( int i = 0; i < _joint_num; ++i )
         {
-            p = std::max( std::min( target_pos( i ), robot_ptr->joints_[ i ]->getMaxPosLimit( ) ), robot_ptr->joints_[ i ]->getMinPosLimit( ) );
-
-            robot_ptr->pos_[ i ] = p;
-            robot_ptr->joints_[ i ]->setPosition( p );
+            if ( target_pos( i ) > robot_ptr->joints_[ i ]->getMaxPosLimit( ) || target_pos( i ) < robot_ptr->joints_[ i ]->getMinPosLimit( ) )
+            {
+                flag_valid_status = false;
+                PLOG_WARNING << "joints [" << i << "]= " << target_pos( i ) * 180 / M_PI << " is out of range ";
+            }
         }
 
+        if ( !flag_valid_status )
+        {
+            PLOG_ERROR << "something like error happen,please check it, and program will be turn off after 30 seconds!!";
+            std::this_thread::sleep_for( std::chrono::duration< double >( 30.0 ) );
+            exit( 0 );
+        }
+        //**-------------------------------**//
+
+        //** 位置伺服 **//
+        for ( int i = 0; i < _joint_num; ++i )
+        {
+            robot_ptr->pos_[ i ] = target_pos( i );
+            robot_ptr->joints_[ i ]->setPosition( target_pos( i ) );
+        }
         robot_ptr->hw_interface_->waitForSignal( 0 );
+
+        //**-------------------------------**//
         return 0;
     }
 }  // namespace JC_helper

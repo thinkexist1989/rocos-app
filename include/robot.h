@@ -606,15 +606,14 @@ namespace rocos {
 
         friend class JC_helper::admittance ;
 
-        friend int JC_helper::safety_servo(rocos::Robot* robot_ptr,const std::array<double, _joint_num> & target_pos);
+        friend int JC_helper::safety_servo( rocos::Robot* robot_ptr, const std::array< double, _joint_num >& target_pos );
 
-        friend int JC_helper::safety_servo( rocos::Robot* robot_ptr, const std::vector< double > &target_pos );
+        friend int JC_helper::safety_servo( rocos::Robot* robot_ptr, const std::vector< double >& target_pos );
 
-        friend int JC_helper::safety_servo( rocos::Robot* robot_ptr, const KDL::JntArray &target_pos );
+        friend int JC_helper::safety_servo( rocos::Robot* robot_ptr, const KDL::JntArray& target_pos );
 
     private:
-            JC_helper::ft_sensor my_ft_sensor; //6维力传感器
-
+        JC_helper::ft_sensor my_ft_sensor;  // 6维力传感器
     };
 
 

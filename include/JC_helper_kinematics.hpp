@@ -412,31 +412,31 @@ namespace JC_helper
     int check_vel_acc( const KDL::JntArray& current_pos, const KDL::JntArray& last_pos, const KDL::JntArray& last_last_pos, const std::vector< double >& max_vel, const std::vector< double >& max_acc );
 
     /**
-     * @brief 带安全位置检查的伺服
+     * @brief 带安全位置检查的伺服,无效则报错并程序终止 
      *
      * @param robot_ptr
      * @param target_pos 目标位置
      * @return int
      */
-     int safety_servo(rocos::Robot* robot_ptr,const std::array<double, _joint_num> & target_pos);
+    int safety_servo( rocos::Robot* robot_ptr, const std::array< double, _joint_num >& target_pos );
 
-     /**
-     * @brief 带安全位置检查的伺服
+    /**
+     * @brief 带安全位置检查的伺服,无效则报错并程序终止
      *
      * @param robot_ptr
      * @param target_pos 目标位置
      * @return int
-     */   
-    int safety_servo( rocos::Robot* robot_ptr, const std::vector< double > &target_pos );
+     */
+    int safety_servo( rocos::Robot* robot_ptr, const std::vector< double >& target_pos );
 
-     /**
-     * @brief 带安全位置检查的伺服
+    /**
+     * @brief 带安全位置检查的伺服,无效则报错并程序终止
      *
      * @param robot_ptr
      * @param target_pos 目标位置
      * @return int
-     */   
-    int safety_servo( rocos::Robot* robot_ptr, const KDL::JntArray &target_pos );
+     */
+    int safety_servo( rocos::Robot* robot_ptr, const KDL::JntArray& target_pos );
 
 }  // namespace JC_helper
 
