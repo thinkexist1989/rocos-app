@@ -77,7 +77,7 @@ namespace JC_helper
 
             //去除毛刺，限制2N
             for ( int i{ 0 }; i < 3; i++ )
-                if ( abs( force_torque.force[ i ] ) < 4.5 )
+                if ( abs( force_torque.force[ i ] ) < 3  ||  abs( force_torque.force[ i ] ) > 6  )
                     force_torque.force[ i ] = 0;
         }
     }
@@ -363,8 +363,8 @@ namespace JC_helper
 
             if ( on_stop_trajectory ) break;
 
-
-            if ( check_vel_acc( _q_target, current_pos, last_pos, robot_ptr->max_vel_, robot_ptr->max_acc_ ) < 0 )
+            static std::vector< double > _my_max_acc( _joint_num, 2 );//临时修改,加速度不应太大
+            if ( check_vel_acc( _q_target, current_pos, last_pos, robot_ptr->max_vel_, _my_max_acc) < 0 )
             {
                 on_stop_trajectory = true;
                 break;
@@ -511,8 +511,8 @@ namespace JC_helper
 
             if ( on_stop_trajectory ) break;
 
-        
-            if ( check_vel_acc( _q_target, current_pos, last_pos, robot_ptr->max_vel_, robot_ptr->max_acc_ ) < 0 )
+            static std::vector< double > _my_max_acc( _joint_num, 2 );  //临时修改,加速度不应太大
+            if ( check_vel_acc( _q_target, current_pos, last_pos, robot_ptr->max_vel_, _my_max_acc ) < 0 )
             {
                 on_stop_trajectory = true;
                 break;
