@@ -27,7 +27,9 @@ def tcpServer(var):
 
     host = "127.0.0.1"
     port = 5000
-    s = socket.socket()
+    s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+    s.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEPORT, 1)
+    s.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1) 
     s.bind((host, port))
     s.listen(10)  # 只能同时连接一个
 

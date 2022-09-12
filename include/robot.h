@@ -523,6 +523,8 @@ namespace rocos {
         void csv_record(bool* flag_turnoff );//为了方便记录数据
         int csv_parse(const char * path,size_t max_size =2048,int start=1);//为了方便记录数据
         int check_init_pos(); //上电初始位置检查
+        void csv_helper();//执行+记录的全面CSV帮助函数
+        void waitting_for_exit( );//后台记录exit,从而电机抱闸
 
     private:
         // TODO： 测试用MoveJ，阻塞运行，需要改为private
