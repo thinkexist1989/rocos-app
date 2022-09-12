@@ -5,7 +5,7 @@
 <robot name="sia_robot">
     <link name="base_link">
         <visual>
-            <origin xyz="0 0 0" rpy="0 0 0"/>
+            <origin xyz="0 0 0" rpy="0 0 3.141592"/>
             <geometry>
                 <mesh filename="package://taike_robot arm_urdf/meshes/base_link.STL"/>
             </geometry>
@@ -14,7 +14,7 @@
             </material>
         </visual>
         <collision>
-            <origin xyz="0 0 0" rpy="0 0 0"/>
+            <origin xyz="0 0 0" rpy="0 0 3.141592"/>
             <geometry>
                 <mesh filename="package://taike_robot arm_urdf/meshes/base_link.STL"/>
             </geometry>
@@ -22,7 +22,7 @@
     </link>
     <link name="link_1">
         <visual>
-            <origin xyz="0 0 0" rpy="0 0 0"/>
+            <origin xyz="0 0 0" rpy="0 0 3.141592"/>
             <geometry>
                 <mesh filename="package://taike_robot arm_urdf/meshes/link_1.STL"/>
             </geometry>
@@ -31,7 +31,7 @@
             </material>
         </visual>
         <collision>
-            <origin xyz="0 0 0" rpy="0 0 0"/>
+            <origin xyz="0 0 0" rpy="0 0 3.141592"/>
             <geometry>
                 <mesh filename="package://taike_robot arm_urdf/meshes/link_1.STL"/>
             </geometry>
@@ -56,7 +56,7 @@
                      izz="0.037222"/>
         </inertial>
         <visual>
-            <origin xyz="0 0 0" rpy="0 0 0"/>
+            <origin xyz="0 0 0" rpy="0 0 3.141592 "/>
             <geometry>
                 <mesh filename="package://taike_robot arm_urdf/meshes/link_2.STL"/>
             </geometry>
@@ -65,14 +65,14 @@
             </material>
         </visual>
         <collision>
-            <origin xyz="0 0 0" rpy="0 0 0"/>
+            <origin xyz="0 0 0" rpy="0 0 3.141592 "/>
             <geometry>
                 <mesh filename="package://taike_robot arm_urdf/meshes/link_2.STL"/>
             </geometry>
         </collision>
     </link>
     <joint name="joint_2" type="continuous">
-        <origin xyz="0 0 0" rpy="1.5708 0 0"/>
+        <origin xyz="0 0 0" rpy="-1.5708 0 0"/>
         <parent link="link_1"/>
         <child link="link_2"/>
         <axis xyz="0 0 1"/>
@@ -90,7 +90,7 @@
                      izz="0.014642955242962"/>
         </inertial>
         <visual>
-            <origin xyz="0 0 0" rpy="0 0 0"/>
+            <origin xyz="0 0 0" rpy="0 0 3.141592"/>
             <geometry>
                 <mesh filename="package://taike_robot arm_urdf/meshes/link_3.STL"/>
             </geometry>
@@ -99,14 +99,14 @@
             </material>
         </visual>
         <collision>
-            <origin xyz="0 0 0" rpy="0 0 0"/>
+            <origin xyz="0 0 0" rpy="0 0 3.141592"/>
             <geometry>
                 <mesh filename="package://taike_robot arm_urdf/meshes/link_3.STL"/>
             </geometry>
         </collision>
     </link>
     <joint name="joint_3" type="continuous">
-        <origin xyz="0 0.3977 0" rpy="-1.5708 0 0"/>
+        <origin xyz="0.0  -0.3977  0.0" rpy="1.5708  0.0  0.0"/>
         <parent link="link_2"/>
         <child link="link_3"/>
         <axis xyz="0 0 1"/>
@@ -124,7 +124,7 @@
                      izz="0.00057068"/>
         </inertial>
         <visual>
-            <origin xyz="0 0 0" rpy="0 0 0"/>
+            <origin xyz="0 0 0" rpy="0 0 3.141592"/>
             <geometry>
                 <mesh filename="package://taike_robot arm_urdf/meshes/link_4.STL"/>
             </geometry>
@@ -134,14 +134,14 @@
         </visual>
         <collision>
             <origin xyz="0 0 0"
-                    rpy="0 0 0"/>
+                    rpy="0 0 3.141592"/>
             <geometry>
                 <mesh filename="package://taike_robot arm_urdf/meshes/link_4.STL"/>
             </geometry>
         </collision>
     </link>
     <joint name="joint_4" type="continuous">
-        <origin xyz="0 0 0" rpy="1.5708 0 0"/>
+        <origin xyz="0 0 0" rpy="-1.5708 0 0"/>
         <parent link="link_3"/>
         <child link="link_4"/>
         <axis xyz="0 0 1"/>
@@ -159,7 +159,7 @@
                      izz="0.0005707"/>
         </inertial>
         <visual>
-            <origin xyz="0 0 0" rpy="0 0 0"/>
+            <origin xyz="0 0 0" rpy="0 0 3.141592"/>
             <geometry>
                 <mesh filename="package://taike_robot arm_urdf/meshes/link_5.STL"/>
             </geometry>
@@ -168,14 +168,14 @@
             </material>
         </visual>
         <collision>
-            <origin xyz="0 0 0" rpy="0 0 0"/>
+            <origin xyz="0 0 0" rpy="0 0 3.141592"/>
             <geometry>
                 <mesh filename="package://taike_robot arm_urdf/meshes/link_5.STL"/>
             </geometry>
         </collision>
     </link>
     <joint name="joint_5" type="continuous">
-        <origin xyz="0 0.3925 0" rpy="-1.5708 0 0"/>
+        <origin xyz="0 -0.3925 0" rpy="1.5708 0 0"/>
         <parent link="link_4"/>
         <child link="link_5"/>
         <axis xyz="0 0 1"/>
@@ -193,7 +193,7 @@
                      izz="6.3255E-05"/>
         </inertial>
         <visual>
-            <origin xyz="0 0 0" rpy="0 0 0"/>
+            <origin xyz="0 0 0" rpy="0 0 3.141592"/>
             <geometry>
                 <mesh filename="package://taike_robot arm_urdf/meshes/link_6.STL"/>
             </geometry>
@@ -202,14 +202,14 @@
             </material>
         </visual>
         <collision>
-            <origin xyz="0 0 0" rpy="0 0 0"/>
+            <origin xyz="0 0 0" rpy="0 0 3.141592"/>
             <geometry>
                 <mesh filename="package://taike_robot arm_urdf/meshes/link_6.STL"/>
             </geometry>
         </collision>
     </link>
     <joint name="joint_6" type="continuous">
-        <origin xyz="0 0 0" rpy="1.5708 0 0"/>
+        <origin xyz="0 0 0" rpy="-1.5708 0 0"/>
         <parent link="link_5"/>
         <child link="link_6"/>
         <axis xyz="0 0 1"/>
@@ -243,7 +243,7 @@
         </collision>
     </link>
     <joint name="joint_7" type="continuous">
-        <origin xyz="0 0.2145 0" rpy="-1.5708 0 0"/>
+        <origin xyz="0 -0.2145 0" rpy="1.5708 0 0"/>
         <parent link="link_6"/>
         <child link="link_7"/>
         <axis xyz="0 0 1"/>
