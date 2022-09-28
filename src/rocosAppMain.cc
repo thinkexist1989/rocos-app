@@ -240,7 +240,7 @@ namespace rocos
 
                 
                 std::vector< KDL::Frame > points{ f_p1, f_p2, f_p3, f_p4, f_p5 };
-                std::vector< double > max_path_v{ 0.2, 0.2, 0.2, 0.2, 0.2 };
+                std::vector< double > max_path_v{ 0.1, 0.1, 0.1, 0.1, 0.1 };
                 std::vector< double > max_path_a{ 0.5, 0.5, 0.5, 0.5, 0.5 };
                 std::vector< double > s_bound_dist{ 0.1, 0.2, 0.2, 0.2, 0.1 };
 

@@ -449,7 +449,7 @@ namespace JC_helper
             bool isplanned = doubleS_1_P.isValidMovement( );
             if ( !isplanned || !( doubleS_1_P.getDuration( ) > 0 ) )
             {
-                PLOG_ERROR<<"Linear trajectory planning fails,try to decrease given parameter [max_path_v] ";
+                PLOG_ERROR << "Linear trajectory planning fails,try to decrease given parameter [max_path_v] ";
                 return -1;
             }
 
@@ -457,7 +457,7 @@ namespace JC_helper
             isplanned = doubleS_1_R.isValidMovement( );
             if ( !isplanned || !( doubleS_1_R.getDuration( ) > 0 ) )
             {
-                PLOG_ERROR<<"Linear trajectory planning fails,try to decrease given parameter [max_path_v] ";
+                PLOG_ERROR << "Linear trajectory planning fails,try to decrease given parameter [max_path_v] ";
                 return -1;
             }
 
@@ -466,7 +466,7 @@ namespace JC_helper
                 doubleS_1_R.JC_scaleToDuration( doubleS_1_P.getDuration( ) );
             }
 
-            T_link       = doubleS_1_P.getDuration( );
+            T_link = doubleS_1_P.getDuration( );
         }
 #pragma endregion
 
@@ -514,9 +514,9 @@ namespace JC_helper
         KDL::Frame circular_target{ };
         bool circule_success{ true };
 
-        std::cout << "T  = " << ( T_link + T_cirlular ) << std::endl;
-        std::cout << "T_cirlular= " << ( T_cirlular ) << std::endl;
-        std::cout << "T_link= " << ( T_link ) << std::endl;
+
+        bool flag_print{ true };
+
         //** 轨迹计算 **//
         while ( t_total >= 0 && t_total <= ( T_link + T_cirlular ) )
         {
@@ -535,6 +535,15 @@ namespace JC_helper
             }
             else
             {
+                if(flag_print)
+                {
+                    PLOG_DEBUG<< "t_total = "<<t_total;
+                    PLOG_DEBUG<< "T_link = "<<T_link;
+
+                    PLOG_DEBUG<< " t_total - T_link = "<<( t_total - T_link );
+                    PLOG_DEBUG<< " s_p = "<<( t_total - T_link ) / T_cirlular;
+                    flag_print=false;
+                }
                 s_p = ( t_total - T_link ) / T_cirlular;
                 s_r = doubleS_2_R.pos( t_total - T_link );
 
@@ -557,30 +566,30 @@ namespace JC_helper
     {
         const double eps = 1E-7;
         using namespace KDL;
-        Vector v1 = f_p2.p - f_p1.p;
-        Vector v2 = f_p3.p - f_p1.p;
+        KDL::Vector v1 = f_p2.p - f_p1.p;
+        KDL::Vector v2 = f_p3.p - f_p1.p;
 
         if ( v1.Normalize( ) < eps )
         {
-            std::cout << RED << "circle_center():f_p1不能等于f_p2" << std::endl;
+            PLOG_ERROR<<"f_p1不能等于f_p2" << std::endl;
             return -1;
         }
         if ( v2.Normalize( ) < eps )
         {
-            std::cout << RED << "circle_center():f_p1不能等于f_p3" << std::endl;
+            PLOG_ERROR<<"f_p1不能等于f_p3" << std::endl;
             return -1;
         }
 
-        Vector axis_z{ v2 * v1 };
+        KDL::Vector axis_z{ v2 * v1 };
 
         if ( axis_z.Normalize( ) < eps )
         {
-            std::cout << RED << "circle_center():三点不能共线或过于趋向直线" << std::endl;
+             PLOG_ERROR<<"三点不能共线或过于趋向直线" << std::endl;
             return -1;
         }
 
-        Vector axis_x{ v1 };
-        Vector axis_y{ axis_z * axis_x };
+        KDL::Vector axis_x{ v1 };
+        KDL::Vector axis_y{ axis_z * axis_x };
         axis_y.Normalize( );
 
         v1 = f_p2.p - f_p1.p;
@@ -605,11 +614,11 @@ namespace JC_helper
     {
         using namespace KDL;
         const double epsilon = 1e-6;
-        Frame center;
+        KDL::Frame center;
 
         if ( circle_center( center, f_p1, f_p2, f_p3 ) < 0 )  //找到圆心的位置
         {
-            std::cout << RED << "circle_trajectory():unable to calculate center of circle" << std::endl;
+            PLOG_ERROR<< "unable to calculate center of circle" ;
             return -1;
         }
 
@@ -620,32 +629,28 @@ namespace JC_helper
         KDL::Vector axis_tem = f_p2.p - center.p;  //第二直线段上的半径段
         axis_tem.Normalize( );
 
-        Vector axis_z( axis_x * axis_tem );  //向上的Z轴
+        KDL::Vector axis_z( axis_x * axis_tem );  //向上的Z轴
         if ( axis_z.Normalize( ) < epsilon )
         {
             std::cout << RED << "circle_trajectory():axis_x and axis_tem  cannot be parallel" << std::endl;
             return -1;
         }
 
-        Vector axis_y{ ( axis_z * axis_x ) };
+        KDL::Vector axis_y{ ( axis_z * axis_x ) };
         axis_y.Normalize( );
 
         KDL::Frame center_( KDL::Rotation{ axis_x, axis_y, axis_z }, center.p );  //确定圆心的方向
 
         //** 计算旋转角度 **//
-        Vector f_p2_   = center_.Inverse( ) * f_p2.p;
-        Vector f_p3_   = center_.Inverse( ) * f_p3.p;
-        double theta12 = 0;
+        KDL::Vector f_p2_   = center_.Inverse( ) * f_p2.p;//变换f_p2.p从基座标系到圆心坐标系
+        KDL::Vector f_p3_   = center_.Inverse( ) * f_p3.p;//变换f_p3.p从基座标系到圆心坐标系
         double theta13 = 0;
-        if ( f_p2_( 1 ) < 0 )
-            theta12 = atan2( f_p2_( 1 ), f_p2_( 0 ) ) + 2 * M_PI;
-        else
-            theta12 = atan2( f_p2_( 1 ), f_p2_( 0 ) );
-        if ( f_p3_( 1 ) < 0 )
+
+        if ( f_p3_( 1 ) < 0 ) //变换f_p3从-180>180到 0>360_
             theta13 = atan2( f_p3_( 1 ), f_p3_( 0 ) ) + 2 * M_PI;
         else
             theta13 = atan2( f_p3_( 1 ), f_p3_( 0 ) );
-        std::cout << BLUE << "theta13= " << theta13 * 180 / M_PI << GREEN << std::endl;
+        PLOG_INFO << "theta13= " << theta13 * 180 / M_PI;
         //**-------------------------------**//
 
         ::rocos::DoubleS doubleS;
@@ -661,7 +666,7 @@ namespace JC_helper
         std::cout << BLUE << "T_total = " << T_total << GREEN << std::endl;
 
         KDL::Rotation R_w_p1 = f_p1.M;
-        Vector Rotation_axis = R_w_p1.Inverse( ) * axis_z;
+        KDL::Vector Rotation_axis = R_w_p1.Inverse( ) * axis_z;
 
         //** 轨迹规划 **//
         double dt{ 0.0 };
@@ -670,9 +675,9 @@ namespace JC_helper
         {
             s = doubleS.pos( dt );
             if ( fixed_rotation )
-                traj.push_back( KDL::Frame( R_w_p1, center_ * Vector{ radius * cos( s * theta13 ), radius * sin( s * theta13 ), 0 } ) );
+                traj.push_back( KDL::Frame( R_w_p1, center_ * KDL::Vector{ radius * cos( s * theta13 ), radius * sin( s * theta13 ), 0 } ) );
             else
-                traj.push_back( KDL::Frame( R_w_p1 * KDL::Rotation::Rot2( Rotation_axis, theta13 * s ), center_ * Vector{ radius * cos( s * theta13 ), radius * sin( s * theta13 ), 0 } ) );
+                traj.push_back( KDL::Frame( R_w_p1 * KDL::Rotation::Rot2( Rotation_axis, theta13 * s ), center_ * KDL::Vector{ radius * cos( s * theta13 ), radius * sin( s * theta13 ), 0 } ) );
             dt += 0.001;
         }
         return 0;
