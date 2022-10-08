@@ -571,7 +571,7 @@ namespace rocos {
 
         ProfileType profile_type_{trapezoid};
 
-        int jnt_num_;
+        int jnt_num_{constants::_robot_num };
 
         double least_motion_time_{0.0};
 

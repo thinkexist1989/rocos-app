@@ -22,25 +22,27 @@
 #include <kdl_parser/kdl_parser.hpp> // 用于将urdf文件解析为KDL::Tree
 
 namespace rocos {
-    Robot::Robot(boost::shared_ptr<HardwareInterface> hw) : hw_interface_(hw),pos_(_joint_num),vel_(_joint_num),acc_(_joint_num) {
+    Robot::Robot(boost::shared_ptr<HardwareInterface> hw) : hw_interface_(hw),pos_(constants::_slave_num),vel_(constants::_slave_num),acc_(constants::_slave_num) {
         
-        parseUrdf("robot.urdf", "base_link", "link_"+std::to_string(_joint_num));
+        parseUrdf("robot.urdf", "base_link", "link_"+std::to_string( constants::_robot_num ));
 
 //        addAllJoints( ); // TODO: 这个应该直接加到参数解析里面，解析之后加入关节，顺序和主站顺序可能不一样
 
-        target_positions_.resize(jnt_num_);
-        target_positions_prev_.resize(jnt_num_);
-        target_velocities_.resize(jnt_num_);
-        target_torques_.resize(jnt_num_);
-        // pos_.resize(jnt_num_);
-        // vel_.resize(jnt_num_);
-        // acc_.resize(jnt_num_);
-        max_vel_.resize(jnt_num_);
-        max_acc_.resize(jnt_num_);
-        max_jerk_.resize(jnt_num_);
-        interp_.resize(jnt_num_);
+        target_positions_.resize(constants::_slave_num);
+        target_positions_prev_.resize(constants::_slave_num);
+        target_velocities_.resize(constants::_slave_num);
+        target_torques_.resize(constants::_slave_num);
+        // pos_.resize(constants::_slave_num);
+        // vel_.resize(constants::_slave_num);
+        // acc_.resize(constants::_slave_num);
+        max_vel_.resize(constants::_slave_num);
+        max_acc_.resize(constants::_slave_num);
+        max_jerk_.resize(constants::_slave_num);
+        interp_.resize(constants::_slave_num);
+        need_plan_.resize(constants::_slave_num, false);
 
-        for (int i = 0; i < jnt_num_; ++i) {
+
+        for (int i = 0; i < constants::_slave_num; ++i) {
             pos_[i] = joints_[i]->getPosition();
             target_positions_[i] = pos_[i];
             target_positions_prev_[i] = pos_[i];
@@ -60,7 +62,7 @@ namespace rocos {
                 interp_[i] = new DoubleS;
             }
         }
-//        kinematics_.initTechServo();
+
 
         static plog::ColorConsoleAppender< plog::TxtFormatter > consoleAppender;
         plog::init< 0 >( plog::debug, &consoleAppender );//终端显示                                                                      // Initialize the logger.
@@ -83,7 +85,7 @@ namespace rocos {
             std::cerr << "[ERROR][rocos::robot] Could not extract urdf to kdl tree!" << std::endl;
             return false;
         }
-
+//MY_TODO 这里base_link和tip要选择机械臂对应的关节名称
         if (!kinematics_.setChain(tree, base_link, tip)) {
             std::cerr << "[ERROR][rocos::robot] Could not set kinematic chain!" << std::endl;
             return false;
@@ -94,15 +96,17 @@ namespace rocos {
             return false;
         }
 
-        KDL::JntArray q_min(joints_.size());
-        KDL::JntArray q_max(joints_.size());
 
-        for (int i = 0; i < joints_.size(); ++i) {
+        KDL::JntArray q_min(constants::_robot_num);
+        KDL::JntArray q_max(constants::_robot_num);
+
+        for (int i = 0; i < constants::_robot_num; ++i) {
             q_min(i) = joints_[i]->getMinPosLimit();
             q_max(i) = joints_[i]->getMaxPosLimit();
         }
 
         kinematics_.setPosLimits(q_min, q_max);
+
         kinematics_.Initialize(); //初始化，构建IK solver;
 
         return true;
@@ -112,15 +116,35 @@ namespace rocos {
     //! \param urdf_file_path urdf文件路径
     //! \return
     bool Robot::parseDriveParamsFromUrdf(const string &urdf_file_path) {
-        jnt_num_ = hw_interface_->getSlaveNumber();
 
-        if (kinematics_.getChain().getNrOfJoints() > jnt_num_) {
+        // MY_TODO hw_interface_取自 共享内存，kinematics_只在乎6个关节
+        //!  jnt_num_这个初始化时以指定代表机械臂关节数量了
+        // jnt_num_ = hw_interface_->getSlaveNumber();
+
+        if (kinematics_.getChain().getNrOfJoints() > hw_interface_->getSlaveNumber()) {
             // if the number of joints in urdf is LESS than that in hardware, just warning but it's fine
-            std::cout << "[WARNING][rocos::robot] the hardware slave number is more than joint number." << std::endl;
+            std::cout << "[WARNING][rocos::robot] the arm  joint number is more than EntherCAT joint number." << std::endl;
+            std::cout << "arm  joint number  =" << kinematics_.getChain( ).getNrOfJoints( ) << std::endl;
+            std::cout << " EntherCAT joint number  =" << hw_interface_->getSlaveNumber( ) << std::endl;
+
             return false;
-        } else if (kinematics_.getChain().getNrOfJoints() < jnt_num_) {
-            // if the number of joints in urdf is GREATER than that in hardware, error occured and return
-            std::cerr << "[ERROR][rocos::robot] the hardware slave number is less than joint number." << std::endl;
+        }
+
+        if (kinematics_.getChain().getNrOfJoints() != constants::_robot_num) {
+            // if the number of joints in urdf is LESS than that in hardware, just warning but it's fine
+            std::cout << "[WARNING][rocos::robot] the arm  joint number is not equal to constants::_robot_num" << std::endl;
+            std::cout << "arm  joint number  =" << kinematics_.getChain( ).getNrOfJoints( ) << std::endl;
+            std::cout << " constants::_robot_num  =" << constants::_robot_num << std::endl;
+
+            return false;
+        }
+
+        if ( hw_interface_->getSlaveNumber()  != constants::_slave_num) {
+            // if the number of joints in urdf is LESS than that in hardware, just warning but it's fine
+            std::cout << "[WARNING][rocos::robot] the EntherCAT  joint number is not equal to constants::_slave_num" << std::endl;
+            std::cout << "EntherCAT  joint number  =" << hw_interface_->getSlaveNumber( ) << std::endl;
+            std::cout << " constants::_slave_num  =" << constants::_slave_num << std::endl;
+
             return false;
         }
 
@@ -131,76 +155,80 @@ namespace rocos {
 
         auto robot = xml_doc.FirstChildElement("robot");
 
-        for (auto element = robot->FirstChildElement("joint"); element; element = element->NextSiblingElement(
-                "joint")) {
-            for (int i = 0; i < jnt_num_; ++i) {
-                if (element->Attribute("name") == kinematics_.getChain().getSegment(i).getJoint().getName()) {
-                    std::cout << "Joint" << std::endl
-                              << "- name: " << element->Attribute("name") << "\n";
+        for ( auto element = robot->FirstChildElement( "joint" ); element; element = element->NextSiblingElement(
+                                                                               "joint" ) )
+        {
+            // if (element->Attribute("name") == kinematics_.getChain().getSegment(i).getJoint().getName()) {
 
-                    auto hw = element->FirstChildElement("hardware");
+            std::cout << "Joint" << std::endl
+                      << "- name: " << element->Attribute( "name" ) << "\n";
 
-                    auto id = hw->IntAttribute("id", -1); // 对应的硬件ID，若没指定默认为-1
-                    std::cout << "- id: " << id << std::endl;
+            auto hw = element->FirstChildElement( "hardware" );
 
-                    auto jnt_ptr = boost::make_shared<Drive>(hw_interface_, id); //获取相应硬件指针
+            auto id = hw->IntAttribute( "id", -1 );  // 对应的硬件ID，若没指定默认为-1
+            std::cout << "- id: " << id << std::endl;
 
-                    jnt_ptr->setName(element->Attribute("name")); //设置驱动器名称
-                    jnt_ptr->setMode(ModeOfOperation::CyclicSynchronousPositionMode); //驱动器模式设置为CSP
+            // MY_TODO 这里意味着URDF前7个joint必需是机械臂，ID为实际主站的序号，比如joint_0 对应主站序号ID 3
+            auto jnt_ptr = boost::make_shared< Drive >( hw_interface_, id );  //获取相应硬件指针
 
-                    auto limit = hw->FirstChildElement("limit");
+            jnt_ptr->setName( element->Attribute( "name" ) );                    //设置驱动器名称
+            jnt_ptr->setMode( ModeOfOperation::CyclicSynchronousPositionMode );  //驱动器模式设置为CSP
 
-                    jnt_ptr->setMinPosLimit(limit->FloatAttribute("lower", -M_PI));
-                    jnt_ptr->setMaxPosLimit(limit->FloatAttribute("upper", M_PI));
-                    jnt_ptr->setMaxVel(limit->FloatAttribute("vel", 1.0));
-                    jnt_ptr->setMaxAcc(limit->FloatAttribute("acc", 10.0));
-                    jnt_ptr->setMaxJerk(limit->FloatAttribute("jerk", 100.0));
+            auto limit = hw->FirstChildElement( "limit" );
 
-                    std::cout << "- limits: \n"
-                              << "----- lower: " << limit->FloatAttribute("lower", -M_PI) << std::endl
-                              << "----- upper: " << limit->FloatAttribute("upper", M_PI) << std::endl
-                              << "----- vel: " << limit->FloatAttribute("vel", 1.0) << std::endl
-                              << "----- acc: " << limit->FloatAttribute("acc", 10.0) << std::endl
-                              << "----- jerk: " << limit->FloatAttribute("jerk", 100.0) << std::endl;
+            jnt_ptr->setMinPosLimit( limit->FloatAttribute( "lower", -M_PI ) );
+            jnt_ptr->setMaxPosLimit( limit->FloatAttribute( "upper", M_PI ) );
+            jnt_ptr->setMaxVel( limit->FloatAttribute( "vel", 1.0 ) );
+            jnt_ptr->setMaxAcc( limit->FloatAttribute( "acc", 10.0 ) );
+            jnt_ptr->setMaxJerk( limit->FloatAttribute( "jerk", 100.0 ) );
 
-                    auto trans = hw->FirstChildElement("transform");
+            std::cout << "- limits: \n"
+                      << "----- lower: " << limit->FloatAttribute( "lower", -M_PI ) << std::endl
+                      << "----- upper: " << limit->FloatAttribute( "upper", M_PI ) << std::endl
+                      << "----- vel: " << limit->FloatAttribute( "vel", 1.0 ) << std::endl
+                      << "----- acc: " << limit->FloatAttribute( "acc", 10.0 ) << std::endl
+                      << "----- jerk: " << limit->FloatAttribute( "jerk", 100.0 ) << std::endl;
 
-                    jnt_ptr->setRatio(trans->FloatAttribute("ratio", 1.0));
-                    jnt_ptr->setPosZeroOffset(trans->IntAttribute("offset_pos_cnt", 0));
-                    jnt_ptr->setCntPerUnit(trans->FloatAttribute("cnt_per_unit", 1.0));
-                    jnt_ptr->setTorquePerUnit(trans->FloatAttribute("torque_per_unit", 1.0));
+            auto trans = hw->FirstChildElement( "transform" );
 
-                    std::cout << "- transform: \n"
-                              << "----- ratio: " << trans->FloatAttribute("ratio", 1.0) << std::endl
-                              << "----- offset_pos_cnt: " << trans->IntAttribute("offset_pos_cnt", 0) << std::endl
-                              << "----- cnt_per_unit: " << trans->FloatAttribute("cnt_per_unit", 1.0) << std::endl
-                              << "----- torque_per_unit: " << trans->FloatAttribute("torque_per_unit", 1.0)
-                              << std::endl;
-                    if (trans->Attribute("user_unit_name")) {
-                        jnt_ptr->setUserUnitName(trans->Attribute("user_unit_name"));
-                        std::cout << "----- user_unit_name: " << trans->Attribute("user_unit_name") << std::endl;
-                    } else {
-                        jnt_ptr->setUserUnitName(trans->Attribute("rad"));
-                        std::cout << "----- user_unit_name: " << "rad" << std::endl;
-                    }
+            jnt_ptr->setRatio( trans->FloatAttribute( "ratio", 1.0 ) );
+            jnt_ptr->setPosZeroOffset( trans->IntAttribute( "offset_pos_cnt", 0 ) );
+            jnt_ptr->setCntPerUnit( trans->FloatAttribute( "cnt_per_unit", 1.0 ) );
+            jnt_ptr->setTorquePerUnit( trans->FloatAttribute( "torque_per_unit", 1.0 ) );
 
-                    joints_.push_back(jnt_ptr); // 将对应ID的hardware放入joints数组
-                }
+            std::cout << "- transform: \n"
+                      << "----- ratio: " << trans->FloatAttribute( "ratio", 1.0 ) << std::endl
+                      << "----- offset_pos_cnt: " << trans->IntAttribute( "offset_pos_cnt", 0 ) << std::endl
+                      << "----- cnt_per_unit: " << trans->FloatAttribute( "cnt_per_unit", 1.0 ) << std::endl
+                      << "----- torque_per_unit: " << trans->FloatAttribute( "torque_per_unit", 1.0 )
+                      << std::endl;
+            if ( trans->Attribute( "user_unit_name" ) )
+            {
+                jnt_ptr->setUserUnitName( trans->Attribute( "user_unit_name" ) );
+                std::cout << "----- user_unit_name: " << trans->Attribute( "user_unit_name" ) << std::endl;
             }
+            else
+            {
+                jnt_ptr->setUserUnitName( trans->Attribute( "rad" ) );
+                std::cout << "----- user_unit_name: "
+                          << "rad" << std::endl;
+            }
+            // MY_TODO 这里意味这joints_存储着全部关节信息
+            joints_.push_back( jnt_ptr );  // 将对应ID的hardware放入joints数组
         }
 
         return true;
     }
 
 
-    void Robot::addAllJoints() {
-        jnt_num_ = hw_interface_->getSlaveNumber();
-        joints_.clear();
-        for (int i = 0; i < jnt_num_; i++) {
-            joints_.push_back(boost::make_shared<Drive>(hw_interface_, i));
-            joints_[i]->setMode(ModeOfOperation::CyclicSynchronousPositionMode);
-        }
-    }
+    // void Robot::addAllJoints() {
+    //     jnt_num_ = hw_interface_->getSlaveNumber();
+    //     joints_.clear();
+    //     for (int i = 0; i < jnt_num_; i++) {
+    //         joints_.push_back(boost::make_shared<Drive>(hw_interface_, i));
+    //         joints_[i]->setMode(ModeOfOperation::CyclicSynchronousPositionMode);
+    //     }
+    // }
 
     // TODO: 切换HW指针
     bool Robot::switchHW(boost::shared_ptr<HardwareInterface> hw) { return false; }
@@ -308,139 +336,16 @@ namespace rocos {
         otg_motion_thread_->join();  //等待运动线程结束
     }
 
-    void Robot::motionThreadHandler() {
+    void Robot::motionThreadHandler( )
+    {
         std::cout << "Motion thread is running on thread "
-                  << boost::this_thread::get_id() << std::endl;
-        //** vector 数组大小初始化 **//
-        target_positions_.resize(jnt_num_);
-        target_positions_prev_.resize(jnt_num_);
-        target_velocities_.resize(jnt_num_);
-        target_torques_.resize(jnt_num_);
-        // pos_.resize(jnt_num_);
-        // vel_.resize(jnt_num_);
-        // acc_.resize(jnt_num_);
-        max_vel_.resize(jnt_num_);
-        max_acc_.resize(jnt_num_);
-        max_jerk_.resize(jnt_num_);
-        interp_.resize(jnt_num_);
-        need_plan_.resize(jnt_num_, false);
-        //**-------------------------------**//
-        //** vector 数组数值初始化 **//
-        for (int i = 0; i < jnt_num_; ++i) {
-            pos_[i] = joints_[i]->getPosition();
-            target_positions_[i] = pos_[i];
-            target_positions_prev_[i] = pos_[i];
+                  << boost::this_thread::get_id( ) << std::endl;
 
-            vel_[i] = joints_[i]->getVelocity();
-            target_velocities_[i] = vel_[i];
-
-            target_torques_[i] = joints_[i]->getTorque();
-
-            if (profile_type_ == trapezoid) {
-                interp_[i] = new Trapezoid;
-            } else if (profile_type_ == doubleS) {
-                interp_[i] = new DoubleS;
-            }
-        }
-        //**-------------------------------**//
-
-        // std::vector< double > dt( jnt_num_, 0.0 );  // delta T
-        // double max_time = 0.0;
-
-        while (is_running_) {  // while start
-
-            hw_interface_->waitForSignal(9);
-
+        while ( is_running_ )
+        { 
+            hw_interface_->waitForSignal( 9 );
             //!< Update Flange State
-            updateCartesianInfo();
-
-            //     //! 屏蔽开始
-            //    //!< Trajectory generating......
-            //    max_time = 0.0;
-            //    //** 轨迹生成 **//
-            //    for (int i = 0; i < jnt_num_; ++i) {
-            //      if (joints_[i]->getDriveState() != DriveState::OperationEnabled) {
-            //        target_positions_[i] = joints_[i]->getPosition();
-            //        //                    target_positions_prev_[i] = target_positions_[i];
-            //
-            //        continue;  // Disabled, ignore
-            //      }
-            //
-            //      if (fabs(target_positions_[i] != target_positions_prev_[i]) ||
-            //          need_plan_[i]) {  // need update
-            //        target_positions_prev_[i] =
-            //            target_positions_[i];  // assign to current target position
-            //
-            //        interp_[i]->planProfile(0,                          // t
-            //                                pos_[i],                    // p0
-            //                                target_positions_prev_[i],  // pf
-            //                                vel_[i],                    // v0
-            //                                target_velocities_[i],      // vf
-            //                                max_vel_[i], max_acc_[i], max_jerk_[i]);
-            //
-            //        dt[i] = 0.0;  // once regenerate, dt = 0.0
-            //        // consider at least execute time
-            //        if (interp_[i]->getDuration() < least_motion_time_) {
-            //          interp_[i]->scaleToDuration(least_motion_time_);
-            //        }
-            //        // record max_time
-            //        max_time =
-            //            max(max_time, interp_[i]->getDuration());  // get max duration time
-            //
-            //        need_plan_[i] = false;
-            //      }
-            //    }
-            //    //**-------------------------------**//
-            //
-            //    //!< Sync scaling....
-            //    //各关节时间同步
-            //    if (sync_ == SYNC_TIME) {
-            //      for_each(interp_.begin(), interp_.end(),
-            //               [=](R_INTERP_BASE* p) { p->scaleToDuration(max_time); });
-            //    }
-            //    //各关节无需同步
-            //    else if (sync_ == SYNC_NONE) {
-            //    }
-            //    //各关节相位同步
-            //    else if (sync_ == SYNC_PHASE) {
-            //      std::cout
-            //          << "[WARNING] Phase sync has not implemented...instead of time sync."
-            //          << std::endl;
-            //      for_each(interp_.begin(), interp_.end(),
-            //               [=](R_INTERP_BASE* p) { p->scaleToDuration(max_time); });
-            //    }
-            //
-            //    //!< Start moving....
-            //    for (int i = 0; i < jnt_num_; ++i) {
-            //      if (joints_[i]->getDriveState() != DriveState::OperationEnabled) {
-            //        continue;  // Disabled, ignore
-            //      }
-            //
-            //      if (interp_[i]->isValidMovement()) {
-            //        dt[i] += 0.001;
-            //        pos_[i] = interp_[i]->pos(dt[i]);  //当前位置更新
-            //        vel_[i] = interp_[i]->vel((dt[i]));
-            //        acc_[i] = interp_[i]->acc(dt[i]);
-            //
-            //        switch (joints_[i]->getMode()) {
-            //          case ModeOfOperation::CyclicSynchronousPositionMode:
-            //            joints_[i]->setPosition(pos_[i]);
-            //            break;
-            //          case ModeOfOperation::CyclicSynchronousVelocityMode:
-            //            joints_[i]->setVelocity(vel_[i]);
-            //            break;
-            //          default:
-            //            std::cout << "Only Supported CSP and CSV" << std::endl;
-            //        }
-            //      } else {
-            //        vel_[i] = 0.0;
-            //      }
-            ////      std::cout << " pos_[" << i << "]  = " << pos_[i] << std::endl;
-            //    }
-            //
-            //    //! 屏蔽结束
-
-            ////    std::cout << "----------------------" << std::endl;
+            updateCartesianInfo( );
         }
 
         // process before exit:

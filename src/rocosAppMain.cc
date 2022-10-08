@@ -279,6 +279,10 @@ namespace rocos
 
                 //**-------------------------------**//
 
+                PLOG_DEBUG << "slaved joint  number = " << joints_.size( );
+                PLOG_DEBUG << " kinematics_.getChain().getNrOfJoints() = "<<kinematics_.getChain().getNrOfJoints();
+
+
 
 
             }
@@ -333,11 +337,11 @@ int main( int argc, char* argv[] )
     //** 等待主站清除共享内存,25后再启动APP **//
     std::cerr << "\033[32m"
               << "等待主站清除共享内存" << std::endl;
-    std::this_thread::sleep_for( std::chrono::duration< double >( 15 ) );
+    // std::this_thread::sleep_for( std::chrono::duration< double >( 15 ) );
     //**-------------------------------**//
 
-    // boost::shared_ptr< HardwareInterface > hw = boost::make_shared< HardwareSim >( _joint_num );  // 仿真
-    boost::shared_ptr< HardwareInterface > hw = boost::make_shared< Hardware >( );  //真实机械臂
+    boost::shared_ptr< HardwareInterface > hw = boost::make_shared< HardwareSim >( constants::_slave_num );  // 仿真
+    // boost::shared_ptr< HardwareInterface > hw = boost::make_shared< Hardware >( );  //真实机械臂
 
     //** 判断主站ECM是否启动成功 **//
     //! 如果主站25S以内启动，既先主站清除内存，在hw与主站建立连接，那下面程序可以成功判断Ready 三次

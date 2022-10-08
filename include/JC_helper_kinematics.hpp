@@ -18,6 +18,7 @@
 #include <ruckig/ruckig.hpp>
 #include <trac_ik/trac_ik.hpp>
 #include <vector>
+#include <constants.hpp>
 
 #define RESET "\033[0m"
 
@@ -56,8 +57,8 @@
 //示例
 // std::cout << BLUE << " hello world " << std::endl;
 
-constexpr size_t _joint_num{ 7 };
 
+constexpr size_t  _joint_num = constants::_robot_num;
 
 
 namespace rocos
