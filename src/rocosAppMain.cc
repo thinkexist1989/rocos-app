@@ -221,50 +221,52 @@ namespace rocos
                 KDL::Frame f_p6;
 
                 q_target( 0 ) = 0 * M_PI / 180;
-                q_target( 1 ) = 45 * M_PI / 180;
+                q_target( 1 ) = -45 * M_PI / 180;
                 q_target( 2 ) = 0 * M_PI / 180;
-                q_target( 3 ) = 90 * M_PI / 180;
+                q_target( 3 ) = -90 * M_PI / 180;
                 q_target( 4 ) = 0 * M_PI / 180;
-                q_target( 5 ) = -45 * M_PI / 180;
+                q_target( 5 ) = 45 * M_PI / 180;
                 q_target( 6 ) = 0 * M_PI / 180;
 
                 MoveJ( q_target, 0.6, 0.6, 0, 0, false );
 
 
                 kinematics_.JntToCart( q_target, f_p1 );
-                f_p1 = f_p1 * KDL::Frame{ KDL::Vector{ 0.0, 0.15, 0.0 } };
-                f_p2 = f_p1 * KDL::Frame{ KDL::Vector{ 0.3, 0.0, 0.0 } };
-                f_p3 = f_p2 * KDL::Frame{ KDL::Vector{ 0.0, -0.3, 0.0 } };
-                f_p4 = f_p3 * KDL::Frame{ KDL::Vector{ -0.3, 0.0, 0.0 } };
-                f_p5 = f_p4 * KDL::Frame{ KDL::Vector{ 0.0, 0.15, 0.0 } };
+                f_p1 = f_p1 * KDL::Frame{ KDL::Vector{ 0.0, -0.15, 0.0 } };
+                f_p2 = f_p1 * KDL::Frame{ KDL::Vector{ -0.3, 0.0, 0.0 } };
+                f_p3 = f_p2 * KDL::Frame{ KDL::Vector{ 0.0, 0.3, 0.0 } };
+                f_p4 = f_p3 * KDL::Frame{ KDL::Vector{ 0.3, 0.0, 0.0 } };
+                f_p5 = f_p4 * KDL::Frame{ KDL::Vector{ 0.0, -0.15, 0.0 } };
 
                 
                 std::vector< KDL::Frame > points{ f_p1, f_p2, f_p3, f_p4, f_p5 };
-                std::vector< double > max_path_v{ 0.1, 0.1, 0.1, 0.1, 0.1 };
-                std::vector< double > max_path_a{ 0.5, 0.5, 0.5, 0.5, 0.5 };
+                std::vector< double > max_path_v{ 0.2, 0.2, 0.1, 0.2, 0.2 };
+                std::vector< double > max_path_a{ 0.4, 0.4, 0.4, 0.4, 0.4 };
                 std::vector< double > s_bound_dist{ 0.1, 0.2, 0.2, 0.2, 0.1 };
 
                 MultiMoveL( points, s_bound_dist, max_path_v, max_path_a, false );
 
-                f_p6 = f_p5 * KDL::Frame{ KDL::Vector{ 0.3, -0.3, 0.0 } };
-                MoveL( f_p6, 0.6, 0.4, 0, 0, false );
+                f_p6 = f_p5 * KDL::Frame{ KDL::Vector{ -0.2, 0.2, 0.0 } };
+                MoveL( f_p6, 0.2, 0.4, 0, 0, false );
 
                 q_target( 0 ) = 0 * M_PI / 180;
-                q_target( 1 ) = 45 * M_PI / 180;
+                q_target( 1 ) = -45 * M_PI / 180;
                 q_target( 2 ) = 0 * M_PI / 180;
-                q_target( 3 ) = 90 * M_PI / 180;
+                q_target( 3 ) = -90 * M_PI / 180;
                 q_target( 4 ) = 0 * M_PI / 180;
-                q_target( 5 ) = 45 * M_PI / 180;
+                q_target( 5 ) = -45 * M_PI / 180;
                 q_target( 6 ) = 0 * M_PI / 180;
 
                 MoveJ( q_target, 0.8, 0.6, 0, 0, false );
+
+
 
                 KDL::Frame f_c_center;
                 KDL::Frame f_c_p0;
 
                 kinematics_.JntToCart( q_target, f_c_p0 );
 
-                f_c_center = f_c_p0 * KDL::Frame{ KDL::Vector{ -0.08, 0.0, 0 } };
+                f_c_center = f_c_p0 * KDL::Frame{ KDL::Vector{ 0.08, 0.0, 0 } };
 
                 MoveC( f_c_center, M_PI * 2, 2, 0.35, 0.3, 0, 0, Robot::OrientationMode::FIXED, false );
                 //**-------------------------------**//
@@ -331,11 +333,11 @@ int main( int argc, char* argv[] )
     //** 等待主站清除共享内存,25后再启动APP **//
     std::cerr << "\033[32m"
               << "等待主站清除共享内存" << std::endl;
-    std::this_thread::sleep_for( std::chrono::duration< double >( 1 ) );
+    std::this_thread::sleep_for( std::chrono::duration< double >( 15 ) );
     //**-------------------------------**//
 
-    boost::shared_ptr< HardwareInterface > hw = boost::make_shared< HardwareSim >( _joint_num );  // 仿真
-    // boost::shared_ptr< HardwareInterface > hw = boost::make_shared< Hardware >( );  //真实机械臂
+    // boost::shared_ptr< HardwareInterface > hw = boost::make_shared< HardwareSim >( _joint_num );  // 仿真
+    boost::shared_ptr< HardwareInterface > hw = boost::make_shared< Hardware >( );  //真实机械臂
 
     //** 判断主站ECM是否启动成功 **//
     //! 如果主站25S以内启动，既先主站清除内存，在hw与主站建立连接，那下面程序可以成功判断Ready 三次

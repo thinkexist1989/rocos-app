@@ -1278,11 +1278,10 @@ namespace rocos {
             }
         }
 
-
         if ( ik_count == max_running_count )
         {
-            PLOG_ERROR << "CartToJnt still failed even after " << max_running_count << " attempts";
-             is_running_motion =false;
+            PLOG_ERROR << "\n\nCartToJnt still failed even after " << max_running_count << " attempts";
+            is_running_motion = false;
             return -1;
         }
 

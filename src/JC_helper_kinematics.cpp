@@ -514,9 +514,10 @@ namespace JC_helper
         KDL::Frame circular_target{ };
         bool circule_success{ true };
 
-
-        bool flag_print{ true };
-
+        std::cout << "T  = " << ( T_link + T_cirlular ) << std::endl;
+        std::cout << "T_cirlular= " << ( T_cirlular ) << std::endl;
+        std::cout << "T_link= " << ( T_link ) << std::endl;
+        
         //** 轨迹计算 **//
         while ( t_total >= 0 && t_total <= ( T_link + T_cirlular ) )
         {
@@ -535,15 +536,6 @@ namespace JC_helper
             }
             else
             {
-                if(flag_print)
-                {
-                    PLOG_DEBUG<< "t_total = "<<t_total;
-                    PLOG_DEBUG<< "T_link = "<<T_link;
-
-                    PLOG_DEBUG<< " t_total - T_link = "<<( t_total - T_link );
-                    PLOG_DEBUG<< " s_p = "<<( t_total - T_link ) / T_cirlular;
-                    flag_print=false;
-                }
                 s_p = ( t_total - T_link ) / T_cirlular;
                 s_r = doubleS_2_R.pos( t_total - T_link );
 
