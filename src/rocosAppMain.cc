@@ -94,13 +94,12 @@ namespace rocos
 
         if ( str == std::string_view{ "run" } )
         {
-            std::cout << "参考位置为：";
-            std::cin >> str;
 
-            // double ref_pos = std::stod( str );
-            // 166.47
             // double ref_pos = 15.74;
-            double ref_pos = 2.91;
+
+            int  same_torque_and_pos {-1} ; //!力传感器大小方向与关节轴向相同为1 ，不同为-1
+            double ref_pos = 2.91;//! 竖直位置
+
             double gravity_torque = 0;
             double zero_drift = 0;
             size_t time_torque{ 0 };//计数器
@@ -147,150 +146,6 @@ namespace rocos
 #endif
 
 
-
-
-#if 0  //** 连杆质心处的重力计算 **//
-
-            {
-                //** 滤波器初始化 **//
-                Iir::Butterworth::LowPass< 3 > filter;              // NOTE： here order should replaced by a int number!
-                const float samplingrate     = 200;                // Hz
-                const float cutoff_frequency = 5;                   // Hz
-                filter.setup( 3, samplingrate, cutoff_frequency );  // NOTE： here order should replaced by a int number!
-                //**-------------------------------**//
-
-                q_target( 0 ) = ref_pos;
-                MoveJ( q_target, 0.3, 1, 0, 0, false );
-
-                while ( time_torque < 5000 )
-                {
-                    zero_drift = filter.filter( joints_[ 0 ]->getLoadTorque( ) );  // 竖立情况下测量，得到零漂
-                    hw_interface_->waitForSignal( 0 );
-                    time_torque++;
-                }
-                PLOG_INFO << "零漂  = " << zero_drift;
-
-                time_torque   = 0;
-                q_target( 0 ) = ref_pos - 90 * KDL::deg2rad;
-                MoveJ( q_target, 0.3, 1, 0, 0, false );
-
-                while ( time_torque < 5000 )
-                {
-                    gravity_torque = filter.filter( joints_[ 0 ]->getLoadTorque( ) ) - zero_drift;  //水平情况下测量,得到负载重力
-                    hw_interface_->waitForSignal( 0 );
-                    time_torque++;
-                }
-                PLOG_INFO << "负载重力引起的力矩  = " << gravity_torque;
-                gravity_torque = abs( gravity_torque );
-                //零漂 =    60;
-                //!  gravity = −116.49
-            }
-#endif
-
-#if 0 //** 重力补偿检查 **//
-            {
-                double angle                    = 0;
-                double gravity_torque_component = 0;
-
-                // init filter
-                Iir::Butterworth::LowPass< 3 > filter;              // NOTE： here order should replaced by a int number!
-                const float samplingrate     = 200;                 // Hz
-                const float cutoff_frequency = 5;                   // Hz
-                filter.setup( 3, samplingrate, cutoff_frequency );  // NOTE： here order should replaced by a int number!
-
-                for ( int i = 0; i < 61; i = i + 10 )
-                {
-                    q_target( 0 ) = ref_pos + i * KDL::deg2rad;
-                    MoveJ( q_target, 0.3, 1, 0, 0, false );
-
-                    time_torque = 0;
-                    while ( time_torque < 2000 )
-                    {
-                        filter.filter( joints_[ 0 ]->getLoadTorque( ) );
-                        hw_interface_->waitForSignal( 0 );
-                        time_torque++;
-                    }
-
-                    angle                    = joints_[ 0 ]->getPosition( ) - ref_pos;
-                    gravity_torque_component = gravity_torque * sin( angle );
-                    PLOG_DEBUG << "  误差 =  " << filter.filter( joints_[ 0 ]->getLoadTorque( ) ) - zero_drift - gravity_torque_component;
-                }
-            }
-
-#endif
-
-#if 0 //** 阻抗实验 **//
-
-            {
-                std::cout.setf( ios::scientific );
-
-                double pos{ 0 };
-                double last_pos{ 0 };
-                double vel{ 0 };
-                double target_torque{ 0 };
-                double sensor_torque{ 0 };
-                double offset_torque{ 0 };
-                double last_offset_torque{ 0 };
-                double vel_torque{ 0 };
-                double command_torque{ 0 };
-
-                double gravity_torque_component = 0;
-
-                // init filter
-                Iir::Butterworth::LowPass< 3 > filter_1;              // NOTE： here order should replaced by a int number!
-                const float samplingrate     = 200;                   // Hz
-                const float cutoff_frequency = 5;                     // Hz
-                filter_1.setup( 3, samplingrate, cutoff_frequency );  // NOTE： here order should replaced by a int number!
-
-                q_target( 0 ) = ref_pos;
-                MoveJ( q_target, 0.3, 1, 0, 0, false );
-
-                joints_[ 0 ]->setMode( ModeOfOperation::CyclicSynchronousTorqueMode );
-
-                time_torque = 0;
-                while ( time_torque < 120000 )
-                {
-                    pos = joints_[ 0 ]->getPosition( ) - ref_pos;
-                    vel = ( pos - last_pos ) / 0.001;
-
-                    gravity_torque_component = gravity_torque * sin( pos );
-
-                    target_torque = -( pos * 180 + vel * 10 );
-
-                    sensor_torque = filter_1.filter( joints_[ 0 ]->getLoadTorque( ) ) - zero_drift - gravity_torque_component;
-
-                    offset_torque = target_torque - ( -sensor_torque );
-
-                    vel_torque = ( offset_torque - last_offset_torque );
-
-                    command_torque = target_torque + ( 5 * offset_torque + 3.5 * vel_torque );
-
-                    if ( std::abs( command_torque ) > 240 )
-                        command_torque = KDL::sign( command_torque ) * 240;
-
-                    joints_[ 0 ]->setTorque( command_torque );
-
-                    if ( time_torque % 200 == 0 )
-                    {
-                        PLOG_INFO << "target_torque =" << target_torque;
-                        PLOG_WARNING << "sensor_torque = " << -sensor_torque;
-                        PLOG_DEBUG << "command_torque = " << command_torque;
-                    }
-
-                    time_torque += 1;
-                    last_pos           = pos;
-                    last_offset_torque = offset_torque;
-                    hw_interface_->waitForSignal( 0 );
-                }
-
-                joints_[ 0 ]->setTorque( 0 );
-                hw_interface_->waitForSignal( 0 );
-            }
-
-#endif
-
-
-
 #if 1  //** 连杆质心处的重力计算 **//
 
             {
@@ -313,17 +168,22 @@ namespace rocos
                 PLOG_INFO << "零漂  = " << zero_drift;
 
                 time_torque   = 0;
-                q_target( 0 ) = ref_pos + 90 * KDL::deg2rad;
+                double gravity_torque_test_pos = 90 * KDL::deg2rad;
+                q_target( 0 ) = ref_pos +gravity_torque_test_pos ;
                 MoveJ( q_target, 0.3, 1, 0, 0, false );
 
-                while ( time_torque < 5000 )
+                while ( time_torque < 3000 )
                 {
                     gravity_torque = filter.filter( joints_[ 0 ]->getLoadTorque( ) ) - zero_drift;  //水平情况下测量,得到负载重力
+                    gravity_torque = gravity_torque * KDL::sign(gravity_torque_test_pos);
                     hw_interface_->waitForSignal( 0 );
                     time_torque++;
                 }
+
                 PLOG_INFO << "负载重力引起的力矩  = " << gravity_torque;
-                // gravity_torque = abs( gravity_torque );
+
+
+
                 //零漂 =    60;
                 //!  gravity = −116.49
             }
@@ -401,7 +261,7 @@ namespace rocos
 
                     sensor_torque = filter_1.filter( joints_[ 0 ]->getLoadTorque( ) ) - zero_drift - gravity_torque_component;
 
-                    offset_torque = target_torque - ( sensor_torque );
+                    offset_torque = target_torque - ( -1 * same_torque_and_pos * sensor_torque );
 
                     vel_torque = ( offset_torque - last_offset_torque );
 
@@ -409,6 +269,7 @@ namespace rocos
 
                     if ( std::abs( command_torque ) > 240 )
                         command_torque = KDL::sign( command_torque ) * 240;
+
 
                     joints_[ 0 ]->setTorque( command_torque );
 
