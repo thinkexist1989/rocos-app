@@ -56,7 +56,7 @@ add_subdirectory(3rdparty/kdl_parser)
 add_subdirectory(3rdparty/ruckig)
 add_subdirectory(3rdparty/plog)
 add_subdirectory(3rdparty/gripper)
-
+add_subdirectory(3rdparty/filter_iir)
 
 ###########
 ## Build ##
@@ -151,6 +151,8 @@ target_link_libraries(robot
         rocos::kinematics
         plog::plog
         JC_helper::gripper
+        JC_helper::filter_iir
+
         )
 add_library(rocos::robot ALIAS robot)
 

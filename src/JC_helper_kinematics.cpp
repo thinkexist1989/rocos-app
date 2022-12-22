@@ -794,6 +794,7 @@ namespace JC_helper
             input.max_jerk[ i ]         = max_j;
         }
 
+        debug_joint1_csv.open("./debug/debug_joint_1.csv");
         PLOG_INFO << "smart servo init succesed";
     }
 
@@ -824,8 +825,11 @@ namespace JC_helper
                 ( *external_finished_flag_ptr ) = true;   //这次smart servo已结束，等待下一次smart servo
                 robot_ptr->is_running_motion    = false;  //机械臂运动已结束，可以执行其他离线类运动
                 on_stop_trajectory              = false;  //这个必须设为false,因为新线程仍然使用同一个对象数据成员
+                debug_joint1_csv.close( );
+
                 PLOG_INFO << "smart servo has finished";
                 break;
+
             }
             else if ( res == ruckig::Result::Working )
             {
@@ -842,6 +846,10 @@ namespace JC_helper
                 input_lock.unlock( );
 
                 robot_ptr->hw_interface_->waitForSignal( 0 );
+
+                debug_joint1_csv<<p[0]<<"\t,";
+                debug_joint1_csv<< robot_ptr->joints_[0]->getPosition()<<"\n";
+
             }
             else  //计算失败，紧急停止
             {

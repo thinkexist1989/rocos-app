@@ -177,7 +177,7 @@ namespace JC_helper
          */
         int rotation_trajectory( std::vector< KDL::Frame >& traj, const KDL::Vector& f_p, const KDL::Rotation& f_r1, const KDL::Rotation& f_r2, double max_path_v = 0.01, double max_path_a = 0.01, double equivalent_radius = 0.01 );
 
-    constexpr size_t _joint_num{ 7 };
+    constexpr size_t _joint_num{ 1 };
 
     class SmartServo_Joint
     {
@@ -191,6 +191,8 @@ namespace JC_helper
 
         std::atomic< bool > on_stop_trajectory{ false };
         std::atomic< bool >* external_finished_flag_ptr;
+        std::ofstream debug_joint1_csv{ };
+
 
     public:
         SmartServo_Joint( std::atomic< bool >* finished_flag_ptr );
@@ -278,7 +280,6 @@ namespace JC_helper
 
         KDL::ChainFkSolverPos_recursive   FK_slover;  //!因为flang_.M一直在刷新，实时读取有问题，暂时这么处理
         KDL::Frame current_flange{ };  
-
 
         //**-------------------------------**//
     public:

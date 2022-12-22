@@ -32,6 +32,7 @@
 #include <kdl_parser/kdl_parser.hpp> //!< 解析URDF文件
 #include <gripper.hpp>
 #include <JC_helper_TCP.hpp>
+#include "iir_filters/Iir.h"
 
 namespace rocos {
     //! Class Robot

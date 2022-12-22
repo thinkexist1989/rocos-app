@@ -23,7 +23,7 @@
 
 namespace rocos {
     Robot::Robot(boost::shared_ptr<HardwareInterface> hw) : hw_interface_(hw) {
-        parseUrdf("robot.urdf", "base_link", "link_7");
+        parseUrdf("robot.urdf", "base_link", "link_1");
 
 //        addAllJoints( ); // TODO: 这个应该直接加到参数解析里面，解析之后加入关节，顺序和主站顺序可能不一样
 
@@ -140,7 +140,7 @@ namespace rocos {
                     auto jnt_ptr = boost::make_shared<Drive>(hw_interface_, id); //获取相应硬件指针
 
                     jnt_ptr->setName(element->Attribute("name")); //设置驱动器名称
-                    jnt_ptr->setMode(ModeOfOperation::CyclicSynchronousPositionMode); //驱动器模式设置为CSP
+                    jnt_ptr->setMode(ModeOfOperation::CyclicSynchronousTorqueMode); //驱动器模式设置为CSP
 
                     auto limit = hw->FirstChildElement("limit");
 
@@ -1346,7 +1346,7 @@ namespace rocos {
                 _thread_planning->join( );
                 _thread_planning = nullptr;
             }
-            _SmartServo_Joint.init( pos_, vel_, acc_, max_speed, max_acceleration, 2 * max_acceleration );
+            _SmartServo_Joint.init( pos_, vel_, acc_, max_speed, max_acceleration*2, 4* max_acceleration );
             _thread_planning.reset( new boost::thread{ &JC_helper::SmartServo_Joint::RunSmartServo, &_SmartServo_Joint, this } );
         }
         //笛卡尔空间点动指令
