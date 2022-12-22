@@ -140,7 +140,7 @@ namespace rocos {
                     auto jnt_ptr = boost::make_shared<Drive>(hw_interface_, id); //获取相应硬件指针
 
                     jnt_ptr->setName(element->Attribute("name")); //设置驱动器名称
-                    jnt_ptr->setMode(ModeOfOperation::CyclicSynchronousTorqueMode); //驱动器模式设置为CSP
+                    jnt_ptr->setMode(ModeOfOperation::CyclicSynchronousPositionMode); //驱动器模式设置为CSP
 
                     auto limit = hw->FirstChildElement("limit");
 
