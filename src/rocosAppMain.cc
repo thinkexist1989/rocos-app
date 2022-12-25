@@ -97,8 +97,8 @@ namespace rocos
 
             // double ref_pos = 15.74;
 
-            int  same_torque_and_pos {-1} ; //!力传感器大小方向与关节轴向相同为1 ，不同为-1
-            double ref_pos = 2.91;//! 竖直位置
+            int  same_torque_and_pos {-1} ; //![不同关节，此参数不同]    力传感器大小方向与关节轴向相同为1 ，不同为-1
+            double ref_pos = 2.91;//![不同关节，此参数不同]    竖直位置
 
             double gravity_torque = 0;
             double zero_drift = 0;
@@ -250,14 +250,14 @@ namespace rocos
                 joints_[ 0 ]->setMode( ModeOfOperation::CyclicSynchronousTorqueMode );
 
                 time_torque = 0;
-                while ( time_torque < 120000 )
+                while ( time_torque < 300000 )
                 {
                     pos = joints_[ 0 ]->getPosition( ) - ref_pos;
                     vel = ( pos - last_pos ) / 0.001;
 
                     gravity_torque_component = gravity_torque * sin( pos );
 
-                    target_torque = -( pos * 160 + vel * 10 );
+                    target_torque = -( pos * 70 + vel * 5 );
 
                     sensor_torque = filter_1.filter( joints_[ 0 ]->getLoadTorque( ) ) - zero_drift - gravity_torque_component;
 
@@ -265,10 +265,10 @@ namespace rocos
 
                     vel_torque = ( offset_torque - last_offset_torque );
 
-                    command_torque = target_torque + ( 5 * offset_torque + 3.5 * vel_torque );
+                    command_torque = target_torque + ( 5 * offset_torque + 3.5 * vel_torque )  ;
 
-                    if ( std::abs( command_torque ) > 240 )
-                        command_torque = KDL::sign( command_torque ) * 240;
+                    if ( std::abs( command_torque ) > 400 )
+                        command_torque = KDL::sign( command_torque ) * 400;
 
 
                     joints_[ 0 ]->setTorque( command_torque );
