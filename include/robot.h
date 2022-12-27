@@ -350,7 +350,7 @@ namespace rocos {
         }
 
     public:
-        //! \brief 关节运动
+        //! \brief 关节运动（支持位置和速度模式）
         //! \param q 各个关节位置
         //! \param speed 关节速度限制（leading axis）
         //! \param acceleration 关节加速度限制
@@ -373,7 +373,7 @@ namespace rocos {
                      double time = 0.0, double radius = 0.0,
                      bool asynchronous = false);
 
-        //! \brief 直线运动到指定位姿
+        //! \brief 直线运动到指定位姿（支持位置和速度模式）
         //! \param pose 位姿
         //! \param speed 笛卡尔速度限制（leading axis）
         //! \param acceleration 笛卡尔加速度限制
@@ -384,6 +384,12 @@ namespace rocos {
         //! \return 错误标志位,成功返回0
         int MoveL(Frame pose, double speed = 1.05, double acceleration = 1.4,
                   double time = 0.0, double radius = 0.0, bool asynchronous = false,int max_running_count = 10);
+
+        int MoveL_pos( Frame pose, double speed = 1.05, double acceleration = 1.4,
+                       double time = 0.0, double radius = 0.0, bool asynchronous = false, int max_running_count = 10 );
+
+        int MoveL_vel( Frame pose, double speed = 1.05, double acceleration = 1.4,
+                       double time = 0.0, double radius = 0.0, bool asynchronous = false, int max_running_count = 10 );
 
         //! \brief 直线运动到关节空间指定位置
         //! \param q 关节位置
@@ -397,7 +403,7 @@ namespace rocos {
                      double time = 0.0, double radius = 0.0,
                      bool asynchronous = false);
 
-        //! \brief 圆弧运动
+        //! \brief 圆弧运动（支持位置和速度模式）
         //! \param pose_via 中间点,姿态给定无效，内部会自动计算
         //! \param pose_to 目标点,姿态给定无效，内部会自动计算
         //! \param speed 笛卡尔空间速度限制（leading axis）
@@ -408,11 +414,20 @@ namespace rocos {
         //! \param asynchronous 是否异步运行
         //! \param max_running_count MoveC规划失败重新尝试规划的最大次数
         //! \return 错误标志位,成功返回0
+
         int MoveC(Frame pose_via, Frame pose_to, double speed = 0.25,
                   double acceleration = 1.2, double time = 0.0, double radius = 0.0,
                   OrientationMode mode = UNCONSTRAINED, bool asynchronous = false,int max_running_count =10);
 
-        //! \brief 圆弧运动
+        int MoveC_pos(Frame pose_via, Frame pose_to, double speed = 0.25,
+                  double acceleration = 1.2, double time = 0.0, double radius = 0.0,
+                  OrientationMode mode = UNCONSTRAINED, bool asynchronous = false,int max_running_count =10);
+
+        int MoveC_vel(Frame pose_via, Frame pose_to, double speed = 0.25,
+                  double acceleration = 1.2, double time = 0.0, double radius = 0.0,
+                  OrientationMode mode = UNCONSTRAINED, bool asynchronous = false,int max_running_count =10);
+
+        //! \brief 圆弧运动（支持位置和速度模式）
         //! \param center 圆弧圆心位姿
         //! \param theta 圆弧旋转角度
         //! \param axiz   绕圆心位姿的哪个轴转（0-X、1-Y、2-Z）
@@ -424,9 +439,18 @@ namespace rocos {
         //! \param asynchronous 是否异步运行
         //! \param max_running_count MoveC规划失败重新尝试规划的最大次数
         //! \return 错误标志位,成功返回0
-        int MoveC( const KDL::Frame& center, double theta, int axiz =2  , double speed = 0.25,
-                  double acceleration = 1.2, double time = 0.0, double radius = 0.0,
-                  OrientationMode mode = UNCONSTRAINED, bool asynchronous = false,int max_running_count =10 );
+
+        int MoveC( const KDL::Frame& center, double theta, int axiz = 2, double speed = 0.25,
+                   double acceleration = 1.2, double time = 0.0, double radius = 0.0,
+                   OrientationMode mode = UNCONSTRAINED, bool asynchronous = false, int max_running_count = 10 );
+
+        int MoveC_pos( const KDL::Frame& center, double theta, int axiz = 2, double speed = 0.25,
+                       double acceleration = 1.2, double time = 0.0, double radius = 0.0,
+                       OrientationMode mode = UNCONSTRAINED, bool asynchronous = false, int max_running_count = 10 );
+
+        int MoveC_vel( const KDL::Frame& center, double theta, int axiz = 2, double speed = 0.25,
+                       double acceleration = 1.2, double time = 0.0, double radius = 0.0,
+                       OrientationMode mode = UNCONSTRAINED, bool asynchronous = false, int max_running_count = 10 );
 
         //! \brief TODO: 什么是MoveP?
         //! \param pose 位姿
@@ -437,8 +461,8 @@ namespace rocos {
         //! \param mode 姿态运行模式, UNCONSTRAINED姿态随动
         //! \param asynchronous 是否异步运行
         //! \return 错误标志位,成功返回0
-        int MoveP(Frame pose, double speed = 1.05, double acceleration = 1.4,
-                  double time = 0.0, double radius = 0.0, bool asynchronous = false);
+        int MoveP( Frame pose, double speed = 1.05, double acceleration = 1.4,
+                   double time = 0.0, double radius = 0.0, bool asynchronous = false );
 
         //! \brief 沿指定路径运动
         //! \param path 路径

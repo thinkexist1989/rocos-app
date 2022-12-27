@@ -103,11 +103,18 @@ namespace JC_helper
      * @param success 计算是否成功标识位 (false 为不成功)
      * @return 指定s对应的位姿
      */
-    KDL::Frame link( const KDL::Frame& start, const KDL::Frame& end, double s_p, double s_r, double& success );
+    int link_pos( const KDL::Frame& start, const KDL::Frame& end, double s_p, double s_r, KDL::Frame& Cartesian_pos );
+
+    int link_vel( const KDL::Frame& start, const KDL::Frame& end, double v_p, double v_r, KDL::Twist& Cartesian_vel );
+
 
     int link_trajectory( std::vector< KDL::Frame >& traj, const KDL::Frame& start, const KDL::Frame& end, double v_start, double v_end, double max_path_v, double max_path_a );
 
     int link_trajectory( std::vector< KDL::Frame >& traj, const KDL::Frame& start, const KDL::Frame& end, double max_path_v, double max_path_a );
+    
+    int link_trajectory( std::vector< KDL::Twist >& traj, const KDL::Frame& start, const KDL::Frame& end, double max_path_v, double max_path_a );
+
+
 
     /**
      * @brief
@@ -166,6 +173,11 @@ namespace JC_helper
      * @return int
      */
     int circle_trajectory( std::vector< KDL::Frame >& traj, const KDL::Frame& f_p1, const KDL::Frame& center, double theta13, int axiz, double max_path_v, double max_path_a, bool fixed_rotation );
+  
+
+    int circle_trajectory( std::vector< KDL::Twist >& traj_vel, const KDL::Frame& f_p1, const KDL::Frame& f_p2, const KDL::Frame& f_p3, double max_path_v, double max_path_a, bool fixed_rotation );
+    int circle_trajectory( std::vector< KDL::Twist >& traj_vel, const KDL::Frame& f_p1, const KDL::Frame& center, double theta13, int axiz, double max_path_v, double max_path_a, bool fixed_rotation );
+
 
         /**
          * @brief 位置保持，只旋转姿态

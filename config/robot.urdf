@@ -5,7 +5,7 @@
 <robot name="sia_robot">
     <link name="base_link">
         <visual>
-            <origin xyz="0 0 0" rpy="0 0 3.141592"/>
+            <origin xyz="0 0 0" rpy="0 0 0"/>
             <geometry>
                 <mesh filename="package://taike_robot arm_urdf/meshes/base_link.STL"/>
             </geometry>
@@ -14,7 +14,7 @@
             </material>
         </visual>
         <collision>
-            <origin xyz="0 0 0" rpy="0 0 3.141592"/>
+            <origin xyz="0 0 0" rpy="0 0 0"/>
             <geometry>
                 <mesh filename="package://taike_robot arm_urdf/meshes/base_link.STL"/>
             </geometry>
@@ -22,7 +22,7 @@
     </link>
     <link name="link_1">
         <visual>
-            <origin xyz="0 0 0" rpy="0 0 3.141592"/>
+            <origin xyz="0 0 0" rpy="0 0 0"/>
             <geometry>
                 <mesh filename="package://taike_robot arm_urdf/meshes/link_1.STL"/>
             </geometry>
@@ -31,7 +31,7 @@
             </material>
         </visual>
         <collision>
-            <origin xyz="0 0 0" rpy="0 0 3.141592"/>
+            <origin xyz="0 0 0" rpy="0 0 0"/>
             <geometry>
                 <mesh filename="package://taike_robot arm_urdf/meshes/link_1.STL"/>
             </geometry>
@@ -43,8 +43,9 @@
         <child link="link_1"/>
         <axis xyz="0 0 1"/>
         <hardware id="0">
-            <limit lower="-2.90" upper="2.90" vel="1.0" acc="10.0" jerk="100.0" effort="30.0"/>
-            <transform ratio="1.0" offset_pos_cnt="464970" cnt_per_unit="156455.675" torque_per_unit="1.0" user_unit_name="rad"/>
+            <limit lower="-2.99" upper="2.99" vel="1.0" acc="10.0" jerk="100.0" effort="30.0"/>
+            <transform ratio="1.0" offset_pos_cnt="486058" cnt_per_unit="156455.678" torque_per_unit="1.0"
+                       user_unit_name="rad"/>
         </hardware>
     </joint>
     <link name="link_2">
@@ -56,7 +57,7 @@
                      izz="0.037222"/>
         </inertial>
         <visual>
-            <origin xyz="0 0 0" rpy="0 0 3.141592 "/>
+            <origin xyz="0 0 0" rpy="0 0 0"/>
             <geometry>
                 <mesh filename="package://taike_robot arm_urdf/meshes/link_2.STL"/>
             </geometry>
@@ -65,20 +66,20 @@
             </material>
         </visual>
         <collision>
-            <origin xyz="0 0 0" rpy="0 0 3.141592 "/>
+            <origin xyz="0 0 0" rpy="0 0 0"/>
             <geometry>
                 <mesh filename="package://taike_robot arm_urdf/meshes/link_2.STL"/>
             </geometry>
         </collision>
     </link>
     <joint name="joint_2" type="continuous">
-        <origin xyz="0 0 0" rpy="-1.5708 0 0"/>
+        <origin xyz="0 0 0" rpy="1.5708 0 0"/>
         <parent link="link_1"/>
         <child link="link_2"/>
         <axis xyz="0 0 1"/>
         <hardware id="1">
-            <limit lower="-2.20" upper="2.20" vel="1.0" acc="10.0" jerk="100.0" effort="30.0" />
-            <transform ratio="1.0" offset_pos_cnt="357678" cnt_per_unit="156455.675" torque_per_unit="1.0" user_unit_name="rad"/>
+            <limit lower="-2.22" upper="2.22" vel="1.0" acc="10.0" jerk="100.0" effort="30.0" />
+            <transform ratio="1.0" offset_pos_cnt="361813" cnt_per_unit="156455.678" torque_per_unit="1.0" user_unit_name="rad"/>
         </hardware>
     </joint>
     <link name="link_3">
@@ -90,7 +91,7 @@
                      izz="0.014642955242962"/>
         </inertial>
         <visual>
-            <origin xyz="0 0 0" rpy="0 0 3.141592"/>
+            <origin xyz="0 0 0" rpy="0 0 0"/>
             <geometry>
                 <mesh filename="package://taike_robot arm_urdf/meshes/link_3.STL"/>
             </geometry>
@@ -99,20 +100,20 @@
             </material>
         </visual>
         <collision>
-            <origin xyz="0 0 0" rpy="0 0 3.141592"/>
+            <origin xyz="0 0 0" rpy="0 0 0"/>
             <geometry>
                 <mesh filename="package://taike_robot arm_urdf/meshes/link_3.STL"/>
             </geometry>
         </collision>
     </link>
     <joint name="joint_3" type="continuous">
-        <origin xyz="0.0  -0.3977  0.0" rpy="1.5708  0.0  0.0"/>
+        <origin xyz="0 0.3977 0" rpy="-1.5708 0 0"/>
         <parent link="link_2"/>
         <child link="link_3"/>
         <axis xyz="0 0 1"/>
         <hardware id="2">
-            <limit lower="-2.90" upper="2.90" vel="1.0" acc="10.0" jerk="100.0" effort="30.0" />
-            <transform ratio="1.0" offset_pos_cnt="466748" cnt_per_unit="156455.675" torque_per_unit="1.0" user_unit_name="rad"/>
+            <limit lower="-2.89" upper="2.89" vel="1.0" acc="10.0" jerk="100.0" effort="30.0" />
+            <transform ratio="1.0" offset_pos_cnt="461483" cnt_per_unit="156455.678" torque_per_unit="1.0" user_unit_name="rad"/>
         </hardware>
     </joint>
     <link name="link_4">
@@ -124,7 +125,7 @@
                      izz="0.00057068"/>
         </inertial>
         <visual>
-            <origin xyz="0 0 0" rpy="0 0 3.141592"/>
+            <origin xyz="0 0 0" rpy="0 0 0"/>
             <geometry>
                 <mesh filename="package://taike_robot arm_urdf/meshes/link_4.STL"/>
             </geometry>
@@ -134,20 +135,20 @@
         </visual>
         <collision>
             <origin xyz="0 0 0"
-                    rpy="0 0 3.141592"/>
+                    rpy="0 0 0"/>
             <geometry>
                 <mesh filename="package://taike_robot arm_urdf/meshes/link_4.STL"/>
             </geometry>
         </collision>
     </link>
     <joint name="joint_4" type="continuous">
-        <origin xyz="0 0 0" rpy="-1.5708 0 0"/>
+        <origin xyz="0 0 0" rpy="1.5708 0 0"/>
         <parent link="link_3"/>
         <child link="link_4"/>
         <axis xyz="0 0 1"/>
         <hardware id="3">
             <limit lower="-2.23" upper="2.23" vel="1.0" acc="10.0" jerk="100.0" effort="30.0" />
-            <transform ratio="1.0" offset_pos_cnt="360991" cnt_per_unit="156455.675" torque_per_unit="1.0" user_unit_name="rad"/>
+            <transform ratio="1.0" offset_pos_cnt="361811" cnt_per_unit="156455.678" torque_per_unit="1.0" user_unit_name="rad"/>
         </hardware>
     </joint>
     <link name="link_5">
@@ -159,7 +160,7 @@
                      izz="0.0005707"/>
         </inertial>
         <visual>
-            <origin xyz="0 0 0" rpy="0 0 3.141592"/>
+            <origin xyz="0 0 0" rpy="0 0 0"/>
             <geometry>
                 <mesh filename="package://taike_robot arm_urdf/meshes/link_5.STL"/>
             </geometry>
@@ -168,20 +169,20 @@
             </material>
         </visual>
         <collision>
-            <origin xyz="0 0 0" rpy="0 0 3.141592"/>
+            <origin xyz="0 0 0" rpy="0 0 0"/>
             <geometry>
                 <mesh filename="package://taike_robot arm_urdf/meshes/link_5.STL"/>
             </geometry>
         </collision>
     </link>
     <joint name="joint_5" type="continuous">
-        <origin xyz="0 -0.3925 0" rpy="1.5708 0 0"/>
+        <origin xyz="0 0.3925 0" rpy="-1.5708 0 0"/>
         <parent link="link_4"/>
         <child link="link_5"/>
         <axis xyz="0 0 1"/>
         <hardware id="4">
-            <limit lower="-2.91" upper="2.91" vel="1.0" acc="10.0" jerk="100.0" effort="30.0" />
-            <transform ratio="1.0" offset_pos_cnt="467510" cnt_per_unit="156455.675" torque_per_unit="1.0" user_unit_name="rad"/>
+            <limit lower="-2.71" upper="2.71" vel="1.0" acc="10.0" jerk="100.0" effort="30.0" />
+            <transform ratio="1.0" offset_pos_cnt="483328" cnt_per_unit="156455.678" torque_per_unit="1.0" user_unit_name="rad"/>
         </hardware>
     </joint>
     <link name="link_6">
@@ -193,7 +194,7 @@
                      izz="6.3255E-05"/>
         </inertial>
         <visual>
-            <origin xyz="0 0 0" rpy="0 0 3.141592"/>
+            <origin xyz="0 0 0" rpy="0 0 0"/>
             <geometry>
                 <mesh filename="package://taike_robot arm_urdf/meshes/link_6.STL"/>
             </geometry>
@@ -202,20 +203,20 @@
             </material>
         </visual>
         <collision>
-            <origin xyz="0 0 0" rpy="0 0 3.141592"/>
+            <origin xyz="0 0 0" rpy="0 0 0"/>
             <geometry>
                 <mesh filename="package://taike_robot arm_urdf/meshes/link_6.STL"/>
             </geometry>
         </collision>
     </link>
     <joint name="joint_6" type="continuous">
-        <origin xyz="0 0 0" rpy="-1.5708 0 0"/>
+        <origin xyz="0 0 0" rpy="1.5708 0 0"/>
         <parent link="link_5"/>
         <child link="link_6"/>
         <axis xyz="0 0 1"/>
         <hardware id="5">
-            <limit lower="-2.09" upper="2.09" vel="1.0" acc="10.0" jerk="100.0" effort="30.0" />
-            <transform ratio="1.0" offset_pos_cnt="284016" cnt_per_unit="130379.729" torque_per_unit="1.0" user_unit_name="rad"/>
+            <limit lower="-2.11" upper="2.11" vel="1.0" acc="10.0" jerk="100.0" effort="30.0" />
+            <transform ratio="1.0" offset_pos_cnt="283307" cnt_per_unit="130379.73" torque_per_unit="1.0" user_unit_name="rad"/>
         </hardware>
     </joint>
     <link name="link_7">
@@ -243,13 +244,13 @@
         </collision>
     </link>
     <joint name="joint_7" type="continuous">
-        <origin xyz="0 -0.2145 0" rpy="1.5708 0 0"/>
+        <origin xyz="0 0.2145 0" rpy="-1.5708 0 0"/>
         <parent link="link_6"/>
         <child link="link_7"/>
         <axis xyz="0 0 1"/>
         <hardware id="6">
-            <limit lower="-2.90" upper="2.90" vel="1.0" acc="10.0" jerk="100.0" effort="30.0" />
-            <transform ratio="1.0" offset_pos_cnt="388331" cnt_per_unit="130379.729" torque_per_unit="1.0" user_unit_name="rad"/>
+            <limit lower="-2.86" upper="2.86" vel="1.0" acc="10.0" jerk="100.0" effort="30.0" />
+            <transform ratio="1.0" offset_pos_cnt="384569" cnt_per_unit="130379.73" torque_per_unit="1.0" user_unit_name="rad"/>
         </hardware>
     </joint>
 </robot>

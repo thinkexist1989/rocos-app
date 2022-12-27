@@ -177,108 +177,106 @@ namespace rocos
                 using namespace KDL;
                 KDL::JntArray q_target( _joint_num );
 
-                // //** 零空间运动 **//
-
-                // q_target( 0 ) = 0.707233696463318;
-                // q_target( 1 ) = 1.92101781439896;
-                // q_target( 2 ) = -1.96069246176939;
-                // q_target( 3 ) = 1.5707963267949;
-                // q_target( 4 ) = -0.00800697316204158;
-                // q_target( 5 ) = -0.795252940741234;
-                // q_target( 6 ) = 2.09439372345304;
-
-                // MoveJ( q_target, 0.6, 0.4, 0, 0, false );
-
-                // for ( int i{ 0 }; i < servo_data.size( ); i++ )
-                // {
-                //     JC_helper::safety_servo( this, servo_data[ i ] );
-                // }
-
-                // q_target( 0 ) = -0.707233697195877;
-                // q_target( 1 ) = 1.9210178127245;
-                // q_target( 2 ) = 1.96069245968374;
-                // q_target( 3 ) = 1.5707963267949;
-                // q_target( 4 ) = 0.00800697317391696;
-                // q_target( 5 ) = -0.795252940726547;
-                // q_target( 6 ) = -2.09439372088421;
-
-                // MoveJ( q_target, 0.6, 0.4, 0, 0, false );
-
-                // for ( int i{ servo_data.size( ) - 1 }; i >= 0; i-- )
-                // {
-                //     JC_helper::safety_servo( this, servo_data[ i ] );
-                // }
-
-                // //**-------------------------------**//
 
                 //** 正方形+ 直线+moveJ+圆弧 **//
 
-                KDL::Frame f_p1;
-                KDL::Frame f_p2;
-                KDL::Frame f_p3;
-                KDL::Frame f_p4;
-                KDL::Frame f_p5;
-                KDL::Frame f_p6;
+                // KDL::Frame f_p0;
+                // KDL::Frame f_p1;
+                // KDL::Frame f_p2;
+                // KDL::Frame f_p3;
+                // KDL::Frame f_p4;
+                // KDL::Frame f_p5;
+                // KDL::Frame f_p6;
 
-                q_target( 0 ) = 0 * M_PI / 180;
-                q_target( 1 ) = 45 * M_PI / 180;
-                q_target( 2 ) = 0 * M_PI / 180;
-                q_target( 3 ) = 90 * M_PI / 180;
-                q_target( 4 ) = 0 * M_PI / 180;
-                q_target( 5 ) = -45 * M_PI / 180;
-                q_target( 6 ) = 0 * M_PI / 180;
+                // for ( int i = 0; i < 7; i++ )
+                //     joints_[ i ]->setMode( ModeOfOperation::CyclicSynchronousPositionMode );
 
-                MoveJ( q_target, 0.6, 0.6, 0, 0, false );
+                // q_target( 0 ) = 0 * M_PI / 180;
+                // q_target( 1 ) = -45 * M_PI / 180;
+                // q_target( 2 ) = 0 * M_PI / 180;
+                // q_target( 3 ) = -90 * M_PI / 180;
+                // q_target( 4 ) = 0 * M_PI / 180;
+                // q_target( 5 ) = 45 * M_PI / 180;
+                // q_target( 6 ) = 0 * M_PI / 180;
+
+                // MoveJ( q_target, 0.3, 1, 0, 0, false );
+
+                // kinematics_.JntToCart( q_target, f_p0 );
 
 
-                kinematics_.JntToCart( q_target, f_p1 );
-                f_p1 = f_p1 * KDL::Frame{ KDL::Vector{ 0.0, 0.15, 0.0 } };
-                f_p2 = f_p1 * KDL::Frame{ KDL::Vector{ 0.3, 0.0, 0.0 } };
-                f_p3 = f_p2 * KDL::Frame{ KDL::Vector{ 0.0, -0.3, 0.0 } };
-                f_p4 = f_p3 * KDL::Frame{ KDL::Vector{ -0.3, 0.0, 0.0 } };
-                f_p5 = f_p4 * KDL::Frame{ KDL::Vector{ 0.0, 0.15, 0.0 } };
+                // f_p1 = f_p0 * KDL::Frame{ KDL::Vector{ 0.0, -0.15, 0.0 } };
+                // MoveL( f_p1, 0.07, 0.2, 0, 0, false );
 
-                
-                std::vector< KDL::Frame > points{ f_p1, f_p2, f_p3, f_p4, f_p5 };
-                std::vector< double > max_path_v{ 0.2, 0.2, 0.2, 0.2, 0.2 };
-                std::vector< double > max_path_a{ 0.5, 0.5, 0.5, 0.5, 0.5 };
-                std::vector< double > s_bound_dist{ 0.1, 0.2, 0.2, 0.2, 0.1 };
 
-                MultiMoveL( points, s_bound_dist, max_path_v, max_path_a, false );
 
-                f_p6 = f_p5 * KDL::Frame{ KDL::Vector{ 0.3, -0.3, 0.0 } };
-                MoveL( f_p6, 0.6, 0.4, 0, 0, false );
+                // KDL::Frame f_c_p1 = f_p0 * KDL::Frame{ KDL::Vector{ -0.15, 0.0, 0.0 } };
+                // KDL::Frame f_c_p2 = f_p0 * KDL::Frame{ KDL::Vector{ 0.0, 0.15, 0.0 } };
+                // MoveC( f_c_p1, f_c_p2, 0.04, 0.3, 0, 0, Robot::OrientationMode::UNCONSTRAINED, false );
 
-                q_target( 0 ) = 0 * M_PI / 180;
-                q_target( 1 ) = 45 * M_PI / 180;
-                q_target( 2 ) = 0 * M_PI / 180;
-                q_target( 3 ) = 90 * M_PI / 180;
-                q_target( 4 ) = 0 * M_PI / 180;
-                q_target( 5 ) = 45 * M_PI / 180;
-                q_target( 6 ) = 0 * M_PI / 180;
+                // MoveC( f_p0, M_PI, 2, 0.04, 0.3, 0, 0, Robot::OrientationMode::UNCONSTRAINED, false );
 
-                MoveJ( q_target, 0.8, 0.6, 0, 0, false );
+                // PLOG_INFO << "开始速度模式";
+                // std::cin >> str;
 
-                KDL::Frame f_c_center;
-                KDL::Frame f_c_p0;
+                // for ( int i = 0; i < 7; i++ )
+                //     joints_[ i ]->setMode( ModeOfOperation::CyclicSynchronousVelocityMode );
 
-                kinematics_.JntToCart( q_target, f_c_p0 );
+                // MoveJ( q_target, 0.1, 1, 0, 0, false );
 
-                f_c_center = f_c_p0 * KDL::Frame{ KDL::Vector{ -0.08, 0.0, 0 } };
+                // MoveL( f_p1, 0.07, 0.2, 0, 0, false );
 
-                MoveC( f_c_center, M_PI * 2, 2, 0.35, 0.3, 0, 0, Robot::OrientationMode::FIXED, false );
+                // MoveC( f_c_p1, f_c_p2, 0.04, 0.3, 0, 0, Robot::OrientationMode::UNCONSTRAINED, false );
+
+                // MoveC( f_p0, M_PI, 2, 0.04, 0.3, 0, 0, Robot::OrientationMode::UNCONSTRAINED, false );
+
                 //**-------------------------------**//
 
                 //** 回到起始位置 **//
 
-                for ( int i = 0; i < jnt_num_; i++ )
-                    q_target( i ) = 0;
-                MoveJ( q_target, 0.8, 0.6, 0, 0, false );
+                // for ( int i = 0; i < jnt_num_; i++ )
+                //     q_target( i ) = 0;
+                // MoveJ( q_target, 0.4, 0.6, 0, 0, false );
 
                 //**-------------------------------**//
 
+                q_target( 0 ) = 0 * M_PI / 180;
+                q_target( 1 ) = -45 * M_PI / 180;
+                q_target( 2 ) = 0 * M_PI / 180;
+                q_target( 3 ) = -90 * M_PI / 180;
+                q_target( 4 ) = 0 * M_PI / 180;
+                q_target( 5 ) = 45 * M_PI / 180;
+                q_target( 6 ) = 0 * M_PI / 180;
 
+                for ( int i = 0; i < 7; i++ )
+                    joints_[ i ]->setMode( ModeOfOperation::CyclicSynchronousPositionMode );
 
+                MoveJ( q_target, 0.3, 1, 0, 0, false );
+
+                PLOG_INFO << "切换速度模式";
+                // std::cin >> str;
+
+                for ( int i = 0; i < 7; i++ )
+                    joints_[ i ]->setMode( ModeOfOperation::CyclicSynchronousVelocityMode );
+
+                q_target( 5 ) = 0;
+
+                MoveJ( q_target, 0.3, 1, 0, 0, false );
+
+                PLOG_INFO << "切换位置模式，危险";
+                // std::cin >> str;
+
+                for ( int i = 0; i < 7; i++ )
+                    joints_[ i ]->setMode( ModeOfOperation::CyclicSynchronousPositionMode );
+
+                q_target( 5 ) = 45 * M_PI / 180;
+                MoveJ( q_target, 0.3, 1, 0, 0, false );
+
+                for ( int i = 0; i < 7; i++ )
+                    joints_[ i ]->setMode( ModeOfOperation::CyclicSynchronousVelocityMode );
+
+                for ( int i = 0; i < jnt_num_; i++ )
+                    q_target( i ) = 0;
+                MoveJ( q_target, 0.4, 0.6, 0, 0, false );
             }
             else
             {
@@ -331,11 +329,11 @@ int main( int argc, char* argv[] )
     //** 等待主站清除共享内存,25后再启动APP **//
     std::cerr << "\033[32m"
               << "等待主站清除共享内存" << std::endl;
-    std::this_thread::sleep_for( std::chrono::duration< double >( 1 ) );
+    std::this_thread::sleep_for( std::chrono::duration< double >( 15 ) );
     //**-------------------------------**//
 
-    boost::shared_ptr< HardwareInterface > hw = boost::make_shared< HardwareSim >( _joint_num );  // 仿真
-    // boost::shared_ptr< HardwareInterface > hw = boost::make_shared< Hardware >( );  //真实机械臂
+    // boost::shared_ptr< HardwareInterface > hw = boost::make_shared< HardwareSim >( _joint_num );  // 仿真
+    boost::shared_ptr< HardwareInterface > hw = boost::make_shared< Hardware >( );  //真实机械臂
 
     //** 判断主站ECM是否启动成功 **//
     //! 如果主站25S以内启动，既先主站清除内存，在hw与主站建立连接，那下面程序可以成功判断Ready 三次
