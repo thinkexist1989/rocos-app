@@ -214,7 +214,7 @@
         <child link="link_6"/>
         <axis xyz="0 0 1"/>
         <hardware id="5">
-            <limit lower="-2.09" upper="2.09" vel="1.0" acc="10.0" jerk="100.0" effort="30.0" />
+            <limit lower="-2.11" upper="2.11" vel="1.0" acc="10.0" jerk="100.0" effort="30.0" />
             <transform ratio="1.0" offset_pos_cnt="284016" cnt_per_unit="130379.729" torque_per_unit="1.0" user_unit_name="rad"/>
         </hardware>
     </joint>
