@@ -744,6 +744,7 @@ namespace rocos {
                 {
                     if ( kinematics_.CartToJnt( q_init, target, q_target ) < 0 )
                     {
+                        PLOG_ERROR << " CartToJnt failed on the "<<ik_count<<" times";
                         throw -1;
                     }
                     //*防止奇异位置速度激增
@@ -754,8 +755,6 @@ namespace rocos {
                             PLOG_ERROR << "joint[" << i << "] speep is too  fast";
                             PLOG_ERROR << "target speed = " << abs( q_target( i ) - q_init( i ) )
                                        << " and  max_step=" << max_step[ i ];
-                            PLOG_ERROR << "q_target( " << i << " )  = " << q_target( i ) * 180 / M_PI;
-                            PLOG_ERROR << "q_init( " << i << " ) =" << q_init( i ) * 180 / M_PI;
                             throw -2;
                         }
                     }
@@ -772,15 +771,15 @@ namespace rocos {
             {
                 switch ( flag_error )
                 {
-                    case -1: PLOG_ERROR << " CartToJnt failed on the "<<ik_count<<" times"; break;
-                    case -2: PLOG_ERROR << " joint speep is too  fast "; break;
+                    case -1: break;
+                    case -2: break;
                     default: PLOG_ERROR << "Undefined error!";  is_running_motion =false; return -1;
                 }
             }
             catch ( ... )
             {
                 PLOG_ERROR << "Undefined error!";
-                 is_running_motion =false;
+                is_running_motion =false;
                 return -1;
             }
        
@@ -789,7 +788,7 @@ namespace rocos {
         if ( ik_count == max_running_count )
         {
             PLOG_ERROR << "CartToJnt still failed even after " << max_running_count << " attempts";
-             is_running_motion =false;
+            is_running_motion =false;
             return -1;
         }
 
@@ -813,9 +812,7 @@ namespace rocos {
 
     int Robot::MoveL_vel( Frame pose, double speed, double acceleration, double time,
                       double radius, bool asynchronous ,int max_running_count)
-    {
-        PLOG_DEBUG<< "速度模式";
-        
+    {        
         for ( int i{ 0 }; i < _joint_num; i++ )
         {
             if ( joints_[ i ]->getMode( ) != ModeOfOperation::CyclicSynchronousVelocityMode )
@@ -922,7 +919,7 @@ namespace rocos {
                         if ( q_init( i ) > joints_[ i ]->getMaxPosLimit( ) ||
                              q_init( i ) < joints_[ i ]->getMinPosLimit( ) )
                         {
-                            PLOG_ERROR << "关节[" << i << "] 临近关节限位，求解失败";
+                            PLOG_ERROR << "关节[" << i << "] 超过关节限位，求解失败";
                             throw -3;
                         }
                     }
@@ -948,7 +945,7 @@ namespace rocos {
             catch ( ... )
             {
                 PLOG_ERROR << "Undefined error!";
-                 is_running_motion =false;
+                is_running_motion =false;
                 return -1;
             }
        
@@ -957,7 +954,7 @@ namespace rocos {
         if ( ik_count == max_running_count )
         {
             PLOG_ERROR << "CartToJnt still failed even after " << max_running_count << " attempts";
-             is_running_motion =false;
+            is_running_motion =false;
             return -1;
         }
 
@@ -1117,7 +1114,7 @@ namespace rocos {
                                            orientation_fixed ) < 0 )
         {
             PLOG_ERROR << "circle trajectory planning fail ";
-             is_running_motion =false;
+            is_running_motion =false;
             return -1;
         }
 
@@ -1139,7 +1136,6 @@ namespace rocos {
                 {
                     if ( kinematics_.CartToJnt( q_init, target, q_target ) < 0 )
                     {
-                
                         throw -1;
                     }
                     //** 防止奇异位置速度激增 **//
@@ -1150,9 +1146,6 @@ namespace rocos {
                             PLOG_ERROR << "joint[" << i << "] speep is too  fast";
                             PLOG_ERROR << "target speed = " << abs( q_target( i ) - q_init( i ) )
                                        << " and  max_step=" << max_step[ i ];
-                            PLOG_ERROR << "q_target( " << i << " )  = " << q_target( i ) * 180 / M_PI;
-                            PLOG_ERROR << "q_init( " << i << " ) =" << q_init( i ) * 180 / M_PI;
-                    
                             throw -2;
                         }
                     }
@@ -1169,14 +1162,14 @@ namespace rocos {
                 switch ( flag_error )
                 {
                     case -1: PLOG_ERROR << " CartToJnt failed on the " << ik_count << " times"; break;
-                    case -2: PLOG_ERROR << " joint speep is too  fast "; break;
+                    case -2: break;
                     default: PLOG_ERROR << "Undefined error!";  is_running_motion =false;return -1;
                 }
             }
             catch ( ... )
             {
                 PLOG_ERROR << "Undefined error!";
-                 is_running_motion =false;
+                is_running_motion =false;
                 return -1;
             }
         }
@@ -1184,7 +1177,7 @@ namespace rocos {
         if ( ik_count == max_running_count )
         {
             PLOG_ERROR << "CartToJnt still failed even after " << max_running_count << " attempts";
-             is_running_motion =false;
+            is_running_motion =false;
             return -1;
         }
 
@@ -1276,7 +1269,7 @@ namespace rocos {
                                            orientation_fixed ) < 0 )
         {
             PLOG_ERROR << "circle trajectory planning fail ";
-             is_running_motion =false;
+            is_running_motion =false;
             return -1;
         }
 
@@ -1298,7 +1291,6 @@ namespace rocos {
                 {
                     if ( kinematics_.CartToJnt( q_init, target, q_target ) < 0 )
                     {
-                
                         throw -1;
                     }
                     //** 防止奇异位置速度激增 **//
@@ -1309,9 +1301,6 @@ namespace rocos {
                             PLOG_ERROR << "joint[" << i << "] speep is too  fast";
                             PLOG_ERROR << "target speed = " << abs( q_target( i ) - q_init( i ) )
                                        << " and  max_step=" << max_step[ i ];
-                            PLOG_ERROR << "q_target( " << i << " )  = " << q_target( i ) * 180 / M_PI;
-                            PLOG_ERROR << "q_init( " << i << " ) =" << q_init( i ) * 180 / M_PI;
-                    
                             throw -2;
                         }
                     }
@@ -1328,14 +1317,14 @@ namespace rocos {
                 switch ( flag_error )
                 {
                     case -1: PLOG_ERROR << " CartToJnt failed on the " << ik_count << " times"; break;
-                    case -2: PLOG_ERROR << " joint speep is too  fast "; break;
+                    case -2: break;
                     default: PLOG_ERROR << "Undefined error!";  is_running_motion =false;return -1;
                 }
             }
             catch ( ... )
             {
                 PLOG_ERROR << "Undefined error!";
-                 is_running_motion =false;
+                is_running_motion =false;
                 return -1;
             }
         }
@@ -1343,7 +1332,7 @@ namespace rocos {
         if ( ik_count == max_running_count )
         {
             PLOG_ERROR << "CartToJnt still failed even after " << max_running_count << " attempts";
-             is_running_motion =false;
+            is_running_motion =false;
             return -1;
         }
 
@@ -1370,8 +1359,6 @@ namespace rocos {
                       double acceleration, double time, double radius,
                       Robot::OrientationMode mode, bool asynchronous, int max_running_count )
     {
-        PLOG_DEBUG<< "速度模式";
-
         for ( int i{ 0 }; i < _joint_num; i++ )
         {
             if ( joints_[ i ]->getMode( ) != ModeOfOperation::CyclicSynchronousVelocityMode )
@@ -1434,7 +1421,7 @@ namespace rocos {
                                            orientation_fixed ) < 0 )
         {
             PLOG_ERROR << "circle trajectory planning fail ";
-             is_running_motion =false;
+            is_running_motion =false;
             return -1;
         }
 
@@ -1482,7 +1469,7 @@ namespace rocos {
                         if ( q_init( i ) > joints_[ i ]->getMaxPosLimit( ) ||
                              q_init( i ) < joints_[ i ]->getMinPosLimit( ) )
                         {
-                            PLOG_ERROR << "关节[" << i << "] 临近关节限位，求解失败";
+                            PLOG_ERROR << "关节[" << i << "] 超过关节限位，求解失败";
                             throw -3;
                         }
                     }
@@ -1507,7 +1494,7 @@ namespace rocos {
             catch ( ... )
             {
                 PLOG_ERROR << "Undefined error!";
-                 is_running_motion =false;
+                is_running_motion =false;
                 return -1;
             }
         }
@@ -1515,7 +1502,7 @@ namespace rocos {
         if ( ik_count == max_running_count )
         {
             PLOG_ERROR << "CartToJnt still failed even after " << max_running_count << " attempts";
-             is_running_motion =false;
+            is_running_motion =false;
             return -1;
         }
 
@@ -1543,8 +1530,6 @@ namespace rocos {
                       double acceleration, double time, double radius,
                       Robot::OrientationMode mode, bool asynchronous, int max_running_count )
     {
-        PLOG_DEBUG<< "速度模式";
-
         for ( int i{ 0 }; i < _joint_num; i++ )
         {
             if ( joints_[ i ]->getMode( ) != ModeOfOperation::CyclicSynchronousVelocityMode )
@@ -1603,7 +1588,7 @@ namespace rocos {
                                            orientation_fixed ) < 0 )
         {
             PLOG_ERROR << "circle trajectory planning fail ";
-             is_running_motion =false;
+            is_running_motion =false;
             return -1;
         }
 
@@ -1651,7 +1636,7 @@ namespace rocos {
                         if ( q_init( i ) > joints_[ i ]->getMaxPosLimit( ) ||
                              q_init( i ) < joints_[ i ]->getMinPosLimit( ) )
                         {
-                            PLOG_ERROR << "关节[" << i << "] 临近关节限位，求解失败";
+                            PLOG_ERROR << "关节[" << i << "] 超过关节限位，求解失败";
                             throw -3;
                         }
                     }
@@ -1676,7 +1661,7 @@ namespace rocos {
             catch ( ... )
             {
                 PLOG_ERROR << "Undefined error!";
-                 is_running_motion =false;
+                is_running_motion =false;
                 return -1;
             }
         }
@@ -1684,7 +1669,7 @@ namespace rocos {
         if ( ik_count == max_running_count )
         {
             PLOG_ERROR << "CartToJnt still failed even after " << max_running_count << " attempts";
-             is_running_motion =false;
+            is_running_motion =false;
             return -1;
         }
 
@@ -2404,19 +2389,10 @@ namespace rocos {
                 if ( !need_plan_[ i ] )
                     continue;
 
-                if ( joints_[ i ]->getMode( ) == ModeOfOperation::CyclicSynchronousPositionMode )
-                {
-                    pos_[ i ] = interp[ i ]->pos( dt );  //! 需要更新一下实时位置
-                    vel_[ i ] = interp[ i ]->vel( dt );
-                    joints_[ i ]->setPosition( pos_[ i ] );
-                }
-                else if ( joints_[ i ]->getMode( ) == ModeOfOperation::CyclicSynchronousVelocityMode )
-                {
-                    pos_[ i ] = interp[ i ]->pos( dt );
-                    vel_[ i ] = interp[ i ]->vel( dt );
-                    joints_[ i ]->setVelocity( vel_[ i ] );
-                }
-   
+                pos_[ i ] = interp[ i ]->pos( dt );
+                vel_[ i ] = interp[ i ]->vel( dt );
+                joints_[ i ]->setPosition( pos_[ i ] );//!都设置，自动根据模式选取位置或者速度伺服
+                joints_[ i ]->setVelocity( vel_[ i ] );//!
             }
             dt += 0.001;
 
@@ -2444,11 +2420,12 @@ namespace rocos {
                 {
                     vel_[ i ] = waypoints( i );
                     pos_[ i ] = pos_[ i ] + vel_[ i ] * 0.001;
-                    joints_[ i ]->setVelocity( waypoints( i ) );
+                    joints_[ i ]->setVelocity( vel_[ i ] );
+                    joints_[ i ]->setPosition( pos_[ i ] );
                 }
                 else
                 {
-                    PLOG_ERROR << "关节[" << i << "] 不支持模式 :"<< static_cast<int> (joints_[i]->getMode()) ;
+                    PLOG_ERROR << "关节[" << i << "] 不支持此模式 :"<< static_cast<int> (joints_[i]->getMode()) ;
                     is_running_motion = false;
                     return;
                 }
