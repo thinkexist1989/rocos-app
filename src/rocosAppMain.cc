@@ -21,11 +21,11 @@
 #include <cstdio>
 #include <cstdlib>
 
-//#include <QtCore>
-//#include <QProcess>
-//#include <QString>
-//#include <QDebug>
-//#include <QFile>
+// #include <QtCore>
+// #include <QProcess>
+// #include <QString>
+// #include <QDebug>
+// #include <QFile>
 
 #include <drive.h>
 #include <ethercat/hardware.h>
@@ -39,9 +39,9 @@ bool isRuning = true;
 
 /// \brief 处理终端的Ctrl-C信号
 /// \param signo
-void signalHandler(int signo)
+void signalHandler( int signo )
 {
-    if (signo == SIGINT)
+    if ( signo == SIGINT )
     {
         std::cout << "\033[1;31m"
                   << "[!!SIGNAL!!]"
@@ -49,44 +49,43 @@ void signalHandler(int signo)
                   << "\033[0m" << std::endl;
 
         isRuning = false;
-        exit(0);
+        exit( 0 );
     }
 }
 
-#pragma region //*测试9  上电保护程序
+#pragma region  //*测试9  上电保护程序
 
 namespace rocos
 {
 
-    void Robot::test()
+    void Robot::test( )
     {
         //**变量初始化 **//
-        std::string str{""};
-        KDL::JntArray q_target( JC_helper::_joint_num);
+        std::string str{ "" };
+        KDL::JntArray q_target( JC_helper::_joint_num );
         //**-------------------------------**//
 
+#pragma region  //*电机使能检查
 
-#pragma region //*电机使能检查
-
-        for (int i{0}; i < jnt_num_; i++)
+        for ( int i{ 0 }; i < jnt_num_; i++ )
         {
-            if (joints_[i]->getDriveState() != DriveState::OperationEnabled)
+            if ( joints_[ i ]->getDriveState( ) != DriveState::OperationEnabled )
             {
-                for (int j{0}; j < 1; j++)
+                for ( int j{ 0 }; j < 1; j++ )
                 {
                     PLOG_ERROR << "电机[" << i << "] 未使能，确定主站已初始化完成了？,输入y确认";
                     std::cin >> str;
-                    if (str != std::string_view{"y"})
+                    if ( str != std::string_view{ "y" } )
                     {
                         PLOG_ERROR << "未输入y, 判断主站 {未} 初始化完成,程序关闭";
 
-                        exit(0);
+                        exit( 0 );
                     }
                 }
             }
         }
 
-        setEnabled();
+        setEnabled( );
 #pragma endregion
 
         PLOG_INFO << "当前环境是否安全,如果是,输入run开始执行程序";
@@ -94,15 +93,14 @@ namespace rocos
 
         if ( str == std::string_view{ "run" } )
         {
-
             // double ref_pos = 15.74;
 
-            int  same_torque_and_pos {-1} ; //![不同关节，此参数不同]    力传感器大小方向与关节轴向相同为1 ，不同为-1
-            double ref_pos = 2.91;//![不同关节，此参数不同]    竖直位置
+            int same_torque_and_pos{ -1 };  //! 力传感器大小方向与关节轴向相同为1 ，不同为-1[必填参数]
+            double ref_pos = 2.91;          //! 竖直位置[必填参数]
 
             double gravity_torque = 0;
-            double zero_drift = 0;
-            size_t time_torque{ 0 };//计数器
+            double zero_drift     = 0;
+            size_t time_torque{ 0 };  // 计数器
 
 #if 0  //** 方向测试 **//
 
@@ -142,16 +140,14 @@ namespace rocos
                 std::this_thread::sleep_for( std::chrono::duration< double >( 5 ) );
                 joints_[ 0 ]->setTorque( 0 );
 
-
 #endif
-
 
 #if 1  //** 连杆质心处的重力计算 **//
 
             {
                 //** 滤波器初始化 **//
                 Iir::Butterworth::LowPass< 3 > filter;              // NOTE： here order should replaced by a int number!
-                const float samplingrate     = 200;                // Hz
+                const float samplingrate     = 200;                 // Hz
                 const float cutoff_frequency = 5;                   // Hz
                 filter.setup( 3, samplingrate, cutoff_frequency );  // NOTE： here order should replaced by a int number!
                 //**-------------------------------**//
@@ -167,29 +163,27 @@ namespace rocos
                 }
                 PLOG_INFO << "零漂  = " << zero_drift;
 
-                time_torque   = 0;
+                time_torque                    = 0;
                 double gravity_torque_test_pos = 90 * KDL::deg2rad;
-                q_target( 0 ) = ref_pos +gravity_torque_test_pos ;
+                q_target( 0 )                  = ref_pos + gravity_torque_test_pos;
                 MoveJ( q_target, 0.3, 1, 0, 0, false );
 
                 while ( time_torque < 3000 )
                 {
-                    gravity_torque = filter.filter( joints_[ 0 ]->getLoadTorque( ) ) - zero_drift;  //水平情况下测量,得到负载重力
-                    gravity_torque = gravity_torque * KDL::sign(gravity_torque_test_pos);
+                    gravity_torque = filter.filter( joints_[ 0 ]->getLoadTorque( ) ) - zero_drift;  // 水平情况下测量,得到负载重力
+                    gravity_torque = gravity_torque * KDL::sign( gravity_torque_test_pos );
                     hw_interface_->waitForSignal( 0 );
                     time_torque++;
                 }
 
                 PLOG_INFO << "负载重力引起的力矩  = " << gravity_torque;
 
-
-
-                //零漂 =    60;
+                // 零漂 =    60;
                 //!  gravity = −116.49
             }
 #endif
 
-#if 1 //** 重力补偿检查 **//
+#if 1  //** 重力补偿检查 **//
             {
                 double angle                    = 0;
                 double gravity_torque_component = 0;
@@ -221,7 +215,7 @@ namespace rocos
 
 #endif
 
-#if 1 //** 阻抗实验 **//
+#if 1  //** 阻抗实验 **//
 
             {
                 std::cout.setf( ios::scientific );
@@ -265,11 +259,10 @@ namespace rocos
 
                     vel_torque = ( offset_torque - last_offset_torque );
 
-                    command_torque = target_torque + ( 5 * offset_torque + 3.5 * vel_torque )  ;
+                    command_torque = target_torque + ( 5 * offset_torque + 3.5 * vel_torque );
 
                     if ( std::abs( command_torque ) > 400 )
                         command_torque = KDL::sign( command_torque ) * 400;
-
 
                     joints_[ 0 ]->setTorque( command_torque );
 
@@ -291,28 +284,22 @@ namespace rocos
             }
 
 #endif
-
-
-
-
-
         }
         else
         {
             PLOG_ERROR << "不安全环境,电机抱闸";
-            setDisabled();
+            setDisabled( );
         }
-
 
         PLOG_INFO << "全部测试结束,goodbye!";
     }
-} // namespace rocos
+}  // namespace rocos
 
 #pragma endregion
 
-int main(int argc, char *argv[])
+int main( int argc, char* argv[] )
 {
-    if (signal(SIGINT, signalHandler) == SIG_ERR)
+    if ( signal( SIGINT, signalHandler ) == SIG_ERR )
     {
         std::cout << "\033[1;31m"
                   << "Can not catch SIGINT"
@@ -324,26 +311,26 @@ int main(int argc, char *argv[])
     //** 等待主站清除共享内存,25后再启动APP **//
     std::cerr << "\033[32m"
               << "等待主站清除共享内存" << std::endl;
-    std::this_thread::sleep_for(std::chrono::duration<double>(5));
+    std::this_thread::sleep_for( std::chrono::duration< double >( 5 ) );
     //**-------------------------------**//
 
     // boost::shared_ptr< HardwareInterface > hw = boost::make_shared< HardwareSim >( 1 );  // 仿真
-    boost::shared_ptr<HardwareInterface> hw = boost::make_shared<Hardware>(); //真实机械臂
+    boost::shared_ptr< HardwareInterface > hw = boost::make_shared< Hardware >( );  // 真实机械臂
 
     //** 判断主站ECM是否启动成功 **//
     //! 如果主站25S以内启动，既先主站清除内存，在hw与主站建立连接，那下面程序可以成功判断Ready 三次
     //! 如果主站25S以外启动，既先初始化HW，再主站清除内存，那么在hw与主站就建立不了连接，那下面程序三次判断Not Ready
     //! 主站不启动和25S以外一样，建立不了连接
-    //!小结：主站必需25s以内启动，并且连续三次判断主站处于Ready状态，其余情况统统退出程序
+    //! 小结：主站必需25s以内启动，并且连续三次判断主站处于Ready状态，其余情况统统退出程序
 
-    int Ready_count{0};
-    for (int i{0}; i < 3; i++)
+    int Ready_count{ 0 };
+    for ( int i{ 0 }; i < 3; i++ )
     {
-        hw->setHardwareState(HardwareInterface::HWState::UNKNOWN);
+        hw->setHardwareState( HardwareInterface::HWState::UNKNOWN );
 
-        std::this_thread::sleep_for(std::chrono::duration<double>(0.1));
+        std::this_thread::sleep_for( std::chrono::duration< double >( 0.1 ) );
 
-        if (hw->getHardwareState() == HardwareInterface::HWState::READY)
+        if ( hw->getHardwareState( ) == HardwareInterface::HWState::READY )
         {
             Ready_count++;
             std::cerr << "\033[32m"
@@ -357,7 +344,7 @@ int main(int argc, char *argv[])
         }
     }
 
-    if (Ready_count == 3)
+    if ( Ready_count == 3 )
     {
         std::cerr << "\033[32m"
                   << "HardWare准备好,开始程序" << std::endl;
@@ -366,19 +353,19 @@ int main(int argc, char *argv[])
     {
         std::cerr << "\033[1;31m"
                   << "HardWare未准备好,程序退出" << std::endl;
-        exit(0);
+        exit( 0 );
     }
     //**-------------------------------**//
 
-    Robot robot(hw);
+    Robot robot( hw );
 
-    auto robotService = RobotServiceImpl::getInstance(&robot);
+    auto robotService = RobotServiceImpl::getInstance( &robot );
 
-    std::thread thread_test{&rocos::Robot::test, &robot};
+    std::thread thread_test{ &rocos::Robot::test, &robot };
 
     //------------------------wait----------------------------------
-    robotService->runServer();
+    robotService->runServer( );
 
-    thread_test.join();
+    thread_test.join( );
     return 0;
 }
