@@ -554,6 +554,7 @@ namespace rocos {
         void RunMultiMoveL(const std::vector<KDL::JntArray> &traj);
 
         int admittance_teaching( );
+        int stop_admittance_teaching( );
 
         int admittance_link(KDL::Frame frame_target, double speed, double acceleration );
 
@@ -638,6 +639,7 @@ namespace rocos {
 
     private:
         JC_helper::ft_sensor my_ft_sensor;  // 6维力传感器
+        bool flag_admittance_turnoff {false}; //导纳开关
     };
 
 

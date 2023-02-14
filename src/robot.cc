@@ -2477,30 +2477,30 @@ namespace rocos {
         std::shared_ptr< std::thread > _thread_ft_sensor{ nullptr };
         _thread_ft_sensor.reset( new std::thread{ &JC_helper::admittance::sensor_update, &admittance_control, this } );
 
-        bool flag_turnoff{false};
+        flag_admittance_turnoff = false;
 
         std::shared_ptr< std::thread > _thread_admittance_teaching{ nullptr };
-        _thread_admittance_teaching.reset( new std::thread{ &JC_helper::admittance::Runteaching, &admittance_control,this, flange_,&flag_turnoff} );
+        _thread_admittance_teaching.reset( new std::thread{ &JC_helper::admittance::Runteaching, &admittance_control,this, flange_,&flag_admittance_turnoff} );
 
-            PLOG_INFO << " starting  teaching";
+            PLOG_INFO << "开始示教";
 
             //** 等待关闭指令 **//
-            std::string str;
-            while ( str.compare( "break" ) != 0 )
-            {
-                PLOG_INFO << " enter 'break' to turnoff teaching function:";
-                std::cin >> str;
-            }
+            while ( !flag_admittance_turnoff )
+            std::this_thread::sleep_for( std::chrono::duration< double >( 0.002 ) );
             //**-------------------------------**//
-
-            flag_turnoff = true;
 
             _thread_admittance_teaching->join( );
             _thread_ft_sensor->join( );
 
-            PLOG_INFO << "admittance  全部结束";
+            PLOG_INFO << "结束示教";
 
             is_running_motion = false;
+            return 0;
+    }
+
+    int Robot::stop_admittance_teaching( )
+    {
+            flag_admittance_turnoff = true;
             return 0;
     }
 
@@ -2530,12 +2530,12 @@ namespace rocos {
         std::shared_ptr< std::thread > _thread_admittance_link{ nullptr };
         _thread_admittance_link.reset( new std::thread{ &JC_helper::admittance::RunLink, &admittance_control, this, frame_target,speed,acceleration} );
 
-        PLOG_INFO << " starting  admittance motion";
+        PLOG_INFO << "开启导纳运动";
 
         _thread_admittance_link->join( );
         _thread_ft_sensor->join( );
 
-        PLOG_INFO << "admittance  全部结束";
+        PLOG_INFO << "结束导纳运动";
 
         is_running_motion = false;
         return 0;
