@@ -53,33 +53,29 @@ namespace JC_helper
 
     void ft_sensor::getting_data( KDL::Frame flange_pos )
     {
-        SendCommand( &socketHandle, COMMAND_START, 100 );
-        for ( int i = 0; i < 100; i++ )
+        SendCommand( &socketHandle, COMMAND_START, 2 );//请求2个数据
+
+        for ( int i = 0; i < 2; i++ )
         {
             res = Receive( &socketHandle );
-
-            force_torque.force[ 0 ]  = res.fx / FORCE_DIV + 0.2;
-            force_torque.force[ 1 ]  = res.fy / FORCE_DIV - 2.3;
-            force_torque.force[ 2 ]  = res.fz / FORCE_DIV + 5.1;
-            force_torque.torque[ 0 ] = res.tx / TORQUE_DIV + 0.05;
-            force_torque.torque[ 1 ] = res.ty / TORQUE_DIV - 0.04;
-            force_torque.torque[ 2 ] = res.tz / TORQUE_DIV - 0.09;
+        }
 
             //收到的力信息转换到base系
-            force_torque.force = ( flange_pos * KDL::Frame{ KDL::Rotation::RPY( 0, 0, M_PI ), KDL::Vector( 0, 0, 0.035 ) } ) * force_torque.force;
+            KDL::Vector  force_temp = ( flange_pos * KDL::Frame{ KDL::Rotation::RPY( 0, 0, M_PI ), KDL::Vector( 0, 0, 0.035 ) } ) * KDL::Vector{res.fx / FORCE_DIV + 0.2, res.fy / FORCE_DIV - 2.3,res.fz / FORCE_DIV + 5.1 };
 
             // 重力补偿
-            force_torque.force = force_torque.force - init_force_torque.force;
+            force_temp = force_temp - init_force_torque.force;
 
-            // TODO 处理力矩
+            // 限制大小
             for ( int i{ 0 }; i < 3; i++ )
-                force_torque.torque[ i ] = 0;
+            if ( abs( force_temp( i ) ) < 3 || abs( force_temp( i ) ) > 6 )
+                force_torque.force[ i ] = 0;
+            else
+                force_torque.force[ i ] = force_temp( i );
 
-            //去除毛刺，限制2N
+            // TODO 力矩未用上，屏蔽
             for ( int i{ 0 }; i < 3; i++ )
-                if ( abs( force_torque.force[ i ] ) < 3  ||  abs( force_torque.force[ i ] ) > 6  )
-                    force_torque.force[ i ] = 0;
-        }
+            force_torque.torque[ i ] = 0;
     }
 
     int ft_sensor::debug( KDL::Frame flange_pos )
@@ -559,9 +555,12 @@ namespace JC_helper
 
     void admittance::sensor_update( rocos::Robot* robot_ptr )
     {
-        // 6维力信息刷新
+        // 6维力信息刷新，频率设置1000hz(需根据传感器设置)
         while ( !FinishRunPlanningIK )
+        {
             my_ft_sensor_ptr->getting_data( robot_ptr->flange_ );
+            std::this_thread::sleep_for( std::chrono::duration< double >( 0.001 ) );
+        }
     }
 
 #pragma endregion
