@@ -821,11 +821,7 @@ namespace rocos {
                 return -1;
             }
         }
-        if ( radius )
-        {
-            PLOG_ERROR << " radius not supported yet";
-            return -1;
-        }
+   
         if ( time )
         {
             PLOG_ERROR << " time not supported yet";
@@ -1053,12 +1049,7 @@ namespace rocos {
                 return -1;
             }
         }
-
-        if ( radius )
-        {
-            PLOG_ERROR << " radius not supported yet";
-            return -1;
-        }
+   
         if ( time )
         {
             PLOG_ERROR << " time not supported yet";
@@ -1212,12 +1203,7 @@ namespace rocos {
                 return -1;
             }
         }
-
-        if ( radius )
-        {
-            PLOG_ERROR << " radius not supported yet";
-            return -1;
-        }
+  
         if ( time )
         {
             PLOG_ERROR << " time not supported yet";
@@ -1368,11 +1354,6 @@ namespace rocos {
             }
         }
 
-        if ( radius )
-        {
-            PLOG_ERROR << " radius not supported yet";
-            return -1;
-        }
         if ( time )
         {
             PLOG_ERROR << " time not supported yet";
@@ -1539,11 +1520,6 @@ namespace rocos {
             }
         }
 
-        if ( radius )
-        {
-            PLOG_ERROR << " radius not supported yet";
-            return -1;
-        }
         if ( time )
         {
             PLOG_ERROR << " time not supported yet";
@@ -2216,18 +2192,6 @@ namespace rocos {
             return -1;
         }
 
-        if ( radius < 0 )
-        {
-            PLOG_ERROR << "  radius is less than 0 invalidly";
-            return -1;
-        }
-
-        if ( radius )
-        {
-            PLOG_ERROR << " radius not supported yet";
-            return -1;
-        }
-
         if ( time )
         {
             PLOG_ERROR << " time not supported yet";
@@ -2272,19 +2236,6 @@ namespace rocos {
         if ( time < 0 )
         {
             PLOG_ERROR << " time is less than 0 invalidly";
-            return -1;
-        }
-        //过渡半径检查
-        if ( radius < 0 )
-        {
-            PLOG_ERROR << "radius is less than 0 invalidly" ;
-            return -1;
-        }
-
-
-        if ( radius )
-        {
-            PLOG_ERROR << " radius not supported yet";
             return -1;
         }
 
@@ -2456,7 +2407,7 @@ namespace rocos {
 
     int Robot::admittance_teaching( )
     {
-        if ( is_running_motion )  //最大一条任务异步执行
+        if ( is_running_motion )  // 最大一条任务异步执行
         {
             PLOG_ERROR << " Motion is still running and waiting for it to finish";
             return -1;
@@ -2464,7 +2415,7 @@ namespace rocos {
         else
             is_running_motion = true;
 
-        JC_helper::admittance admittance_control{ this,&my_ft_sensor};
+        JC_helper::admittance admittance_control{ this, &my_ft_sensor };
 
         if ( admittance_control.init( flange_ ) < 0 )
         {
@@ -2472,7 +2423,7 @@ namespace rocos {
             return -1;
         }
 
-        admittance_control.smd.set_k( 0 );//临时修改,为了拖动
+        admittance_control.smd.set_k( 0 );  // 临时修改,为了拖动
 
         std::shared_ptr< std::thread > _thread_ft_sensor{ nullptr };
         _thread_ft_sensor.reset( new std::thread{ &JC_helper::admittance::sensor_update, &admittance_control, this } );
@@ -2480,33 +2431,33 @@ namespace rocos {
         flag_admittance_turnoff = false;
 
         std::shared_ptr< std::thread > _thread_admittance_teaching{ nullptr };
-        _thread_admittance_teaching.reset( new std::thread{ &JC_helper::admittance::Runteaching, &admittance_control,this, flange_,&flag_admittance_turnoff} );
+        _thread_admittance_teaching.reset( new std::thread{ &JC_helper::admittance::Runteaching, &admittance_control, this, flange_, &flag_admittance_turnoff } );
 
-            PLOG_INFO << "开始示教";
+        PLOG_INFO << "开始示教";
 
-            //** 等待关闭指令 **//
-            while ( !flag_admittance_turnoff )
+        //** 等待关闭指令 **//
+        while ( !flag_admittance_turnoff )
             std::this_thread::sleep_for( std::chrono::duration< double >( 0.002 ) );
-            //**-------------------------------**//
+        //**-------------------------------**//
 
-            _thread_admittance_teaching->join( );
-            _thread_ft_sensor->join( );
+        _thread_admittance_teaching->join( );
+        _thread_ft_sensor->join( );
 
-            PLOG_INFO << "结束示教";
+        PLOG_INFO << "结束示教";
 
-            is_running_motion = false;
-            return 0;
+        is_running_motion = false;
+        return 0;
     }
 
     int Robot::stop_admittance_teaching( )
     {
-            flag_admittance_turnoff = true;
-            return 0;
+        flag_admittance_turnoff = true;
+        return 0;
     }
 
-    int Robot::admittance_link(KDL::Frame frame_target, double speed, double acceleration )
+    int Robot::admittance_link( KDL::Frame frame_target, double speed, double acceleration )
     {
-        if ( is_running_motion )  //最大一条任务异步执行
+        if ( is_running_motion )  // 最大一条任务异步执行
         {
             PLOG_ERROR << " Motion is still running and waiting for it to finish";
             return -1;
@@ -2514,7 +2465,7 @@ namespace rocos {
         else
             is_running_motion = true;
 
-        JC_helper::admittance admittance_control{ this,&my_ft_sensor};
+        JC_helper::admittance admittance_control{ this, &my_ft_sensor };
 
         // admittance类里自带传感器类，需要初始化才能用
         if ( admittance_control.init( flange_ ) < 0 )
@@ -2526,9 +2477,8 @@ namespace rocos {
         std::shared_ptr< std::thread > _thread_ft_sensor{ nullptr };
         _thread_ft_sensor.reset( new std::thread{ &JC_helper::admittance::sensor_update, &admittance_control, this } );
 
-
         std::shared_ptr< std::thread > _thread_admittance_link{ nullptr };
-        _thread_admittance_link.reset( new std::thread{ &JC_helper::admittance::RunLink, &admittance_control, this, frame_target,speed,acceleration} );
+        _thread_admittance_link.reset( new std::thread{ &JC_helper::admittance::RunLink, &admittance_control, this, frame_target, speed, acceleration } );
 
         PLOG_INFO << "开启导纳运动";
 
@@ -2541,9 +2491,45 @@ namespace rocos {
         return 0;
     }
 
+    int Robot::servoJ( const KDL::JntArray& target_pos )
+    {
+        //** 位置检查 **//
+        for ( int i = 0; i < _joint_num; ++i )
+            if ( target_pos( i ) > joints_[ i ]->getMaxPosLimit( ) || target_pos( i ) < joints_[ i ]->getMinPosLimit( ) )
+            {
+                PLOG_ERROR << "target pos [" << i << "]= " << target_pos( i ) * KDL::rad2deg << " is out of range ";
+                return -1;
+            }
+        //**-------------------------------**//
+        //** 速度检查 **//
+        Eigen::Matrix< double, _joint_num, 1 > joint_offset = ( target_pos.data - JC_helper::vector_2_JntArray( pos_ ).data ).cwiseAbs( );
+        for ( int i = 0; i < _joint_num; ++i )
+            if ( joint_offset( i ) > joints_[ i ]->getMaxVel( ) * 0.001 )
+            {
+                PLOG_ERROR << "target vel [" << i << "]= " << joint_offset( i ) * KDL::rad2deg * 1000 << " is out of range ";
+                return -1;
+            }
+        //**-------------------------------**//
+        //** 位置伺服 **//
+        for ( int i = 0; i < _joint_num; ++i )
+        {
+            pos_[ i ] = target_pos( i );
+            joints_[ i ]->setPosition( target_pos( i ) );
+        }
+        hw_interface_->waitForSignal( 0 );
+        //**-------------------------------**//
+        return 0;
+    }
 
-
-
-
-
+    int Robot::servoL( const KDL::Frame& target_frame )
+    {
+        KDL::JntArray joint_out( _joint_num );
+        if ( kinematics_.CartToJnt( JC_helper::vector_2_JntArray( pos_ ), target_frame, joint_out ) < 0 )
+        {
+            PLOG_ERROR << "逆解失败";
+            return -1;
+        }
+        else
+            return servoJ( joint_out );
+    }
 }  // namespace rocos

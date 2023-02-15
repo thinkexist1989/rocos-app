@@ -400,10 +400,10 @@ namespace JC_helper
 
     /**
      * @brief 紧急停止，注意此函数不关心任何标志位，因此调用着需要保证函数执行期间，没有其他运动并行执行
-     * @note joints_acc = (joints_vel - joints_last_vel) /dt
-     * @param robot_ptr
-     * @param traj_joint 存储关节的轨迹
-     * @param traj_joint_count =101代表0-100的关节都已经执行
+     * @param robot_ptr robot类指针
+     * @param current_pos 当前关节值
+     * @param last_pos 上次关节值
+     * @param last_last_pos 上上次关节值
      */
     void Joint_stop( rocos::Robot* robot_ptr, const KDL::JntArray& current_pos, const KDL::JntArray& last_pos, const KDL::JntArray& last_last_pos );
 

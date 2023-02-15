@@ -552,15 +552,27 @@ namespace rocos {
 
         //实际multimovel执行线程
         void RunMultiMoveL(const std::vector<KDL::JntArray> &traj);
-
         int admittance_teaching( );
         int stop_admittance_teaching( );
-
         int admittance_link( KDL::Frame frame_target, double speed, double acceleration );
-        int servoJ( );
+
+        /**
+         * @brief 1000hz关节伺服接口
+         *
+         * @param target_pos 目标位置
+         * @return int
+         */
+        int servoJ( const KDL::JntArray& target_pos );
+        /**
+         * @brief 1000hz位姿伺服接口
+         *
+         * @param target_frame 目标位置
+         * @return int
+         */
+        int servoL( const KDL::Frame& target_frame );
 
     public:
-        void test(); //为了测试
+        void test( );  // 为了测试
 
     private:
         // TODO： 测试用MoveJ，阻塞运行，需要改为private
