@@ -2979,7 +2979,6 @@ namespace JC_helper
         KDL::SetToZero( joint_vel );
         KDL::Twist Cartesian_vel{ };
 
-
         res = otg.update( input, output );
 
         if ( res != ruckig::Result::Working && res != ruckig::Result::Finished )
@@ -3001,10 +3000,8 @@ namespace JC_helper
 
         if ( _reference_frame.compare( "flange" ) == 0 )
         {  //** 转变速度矢量的参考系，由flange系变为base系，但没有改变参考点（还是flange） **//
-            {
                 FK_slover.JntToCart( vector_2_JntArray( robot_ptr->pos_ ), current_flange );
                 Cartesian_vel = current_flange.M * Cartesian_vel;
-            }
         }
 
         output.pass_to_input( input );
@@ -3017,14 +3014,10 @@ namespace JC_helper
         }
 
         if ( res == ruckig::Result::Working )
-        {
             return 1;
-        }
         else
-        {
             // PLOG_INFO << "完成！";
             return 0;
-        }
     }
 
     void SmartServo_Cartesian::RunMotion( rocos::Robot* robot_ptr )
@@ -3081,7 +3074,7 @@ namespace JC_helper
                 //! 急停状态下不用速度检查，因为会和笛卡尔急停冲突（笛卡尔急停会使得关节加速度超大，必触发关节急停保护）
                 if ( !flag_stop && check_vel_acc( joint_target, joint_current, joint_last_pos, robot_ptr->max_vel_, _max_acc ) < 0 )
                 {
-                    //关节空间急停
+                    // 关节空间急停
                     flag_stop = true;
                     Joint_stop( robot_ptr, joint_current, joint_last_pos, joint_last_last_pos );
                     sleep( 2 );
@@ -3091,18 +3084,15 @@ namespace JC_helper
                 joint_last_last_pos = joint_last_pos;
                 joint_last_pos      = joint_current;
                 joint_current       = joint_target;
-
                 //**-------------------------------**//
 
-                //** 位置伺服 **//
+                //** 安全位置伺服,防止关节超限 **//
                 safety_servo(robot_ptr,joint_target);
-
                 //**-------------------------------**//
 
                 if ( res == 0 && flag_stop )  // finished 状态
                 {
                     PLOG_INFO << "笛卡尔空间急停已完成";
-
                     break;
                 }
             }
@@ -3184,13 +3174,8 @@ namespace JC_helper
             for ( int i = 0; i < _joint_num; i++ )
             {
                 input.current_position[ i ] = robot_ptr->pos_[ i ];
-                //防止速度和加速度估计不准
-                //速度不可能超过50度
-                //加速度不可能超过80度
                 input.current_velocity[ i ]     = KDL::sign( current_vel( i ) ) * std::min( abs( current_vel( i ) ), robot_ptr->max_vel_[ i ] );
                 input.current_acceleration[ i ] = KDL::sign( current_acc( i ) ) * std::min( abs( current_acc( i ) ), robot_ptr->max_acc_[ i ] );
-
-                printf( "pos(%d)=  %f, vel(%d)= %f , last vel(%d)= %f , acc(%d)= %f \n", i, input.current_position[ i ] * 180 / M_PI, i, input.current_velocity[ i ] * 180 / M_PI, i, last_vel( i ) * 180 / M_PI, i, input.current_acceleration[ i ] * 180 / M_PI );
 
                 input.target_position[ i ]     = input.current_position[ i ];
                 input.target_velocity[ i ]     = 0;
@@ -3209,11 +3194,9 @@ namespace JC_helper
 
             if ( res != ruckig::Result::Finished )
             {
-                PLOG_ERROR << "OTG 计算失败,直接停止";
+                PLOG_ERROR << "OTG 计算失败,停止运动";
                 for ( int i = 0; i < _joint_num; ++i )
-                {
                     robot_ptr->joints_[ i ]->setPosition( robot_ptr->pos_[ i ] );
-                }
             }
             else
                 PLOG_INFO << "关节空间急停已完成";
@@ -3222,21 +3205,17 @@ namespace JC_helper
         {
             PLOG_ERROR << e.what( );
             for ( int i = 0; i < _joint_num; ++i )
-            {
                 robot_ptr->joints_[ i ]->setPosition( robot_ptr->pos_[ i ] );
-            }
         }
         catch ( ... )
         {
             PLOG_ERROR << "未知错误";
             for ( int i = 0; i < _joint_num; ++i )
-            {
                 robot_ptr->joints_[ i ]->setPosition( robot_ptr->pos_[ i ] );
-            }
         }
     }
 
-    int check_vel_acc( const KDL::JntArray& current_pos, const KDL::JntArray& last_pos, const KDL::JntArray& last_last_pos, const std::vector< double >& max_vel, const std::vector< double >& max_acc )
+    int check_vel_acc( const KDL::JntArray& current_pos, const KDL::JntArray& last_pos, const KDL::JntArray& last_last_pos, const std::vector<double>& max_vel, const std::vector<double>& max_acc )
     {
         KDL::JntArray current_vel( _joint_num );
         KDL::JntArray last_vel( _joint_num );
@@ -3256,19 +3235,16 @@ namespace JC_helper
             if ( abs( current_vel( i ) ) > max_vel[ i ] )
             {
                 PLOG_ERROR << "joint[" << i << "] velocity is too  fast";
-                PLOG_ERROR << "target velocity = " << current_vel( i ) * 180 / M_PI
-                           << " and  max velocity=" << max_vel[ i ] * 180 / M_PI;
-                PLOG_ERROR << "last_pos[" << i << "] =" << last_pos( i ) * 180 / M_PI;
-                PLOG_ERROR << "current_pos[" << i << "] =" << current_pos( i ) * 180 / M_PI;
-
+                PLOG_ERROR << "target velocity = " << current_vel( i ) * KDL::rad2deg;
+                PLOG_ERROR << "max velocity=" << max_vel[ i ] * KDL::rad2deg;
                 return -1;
             }
 
             if ( abs( current_acc( i ) ) > max_acc[ i ] )
             {
                 PLOG_ERROR << "joint[" << i << "] acceleration is too  fast";
-                PLOG_ERROR << "target acceleration = " << current_acc( i ) * 180 / M_PI
-                           << " and  max acceleration=" << max_acc[ i ] * 180 / M_PI;
+                PLOG_ERROR << "target acceleration = " << current_acc( i ) * KDL::rad2deg;
+                PLOG_ERROR << "max acceleration=" << max_acc[ i ] * KDL::rad2deg;
                 return -1;
             }
         }
@@ -3278,22 +3254,15 @@ namespace JC_helper
     int safety_servo( rocos::Robot* robot_ptr, const std::array< double, _joint_num >& target_pos )
     {
         //** 伺服位置检查，无效则报错并程序终止 **//
-        bool flag_valid_status{ true };
-
         for ( int i = 0; i < _joint_num; ++i )
         {
             if ( target_pos[ i ] > robot_ptr->joints_[ i ]->getMaxPosLimit( ) || target_pos[ i ] < robot_ptr->joints_[ i ]->getMinPosLimit( ) )
             {
-                flag_valid_status = false;
-                PLOG_WARNING << "joints [" << i << "]= " << target_pos[ i ] * 180 / M_PI << " is out of range ";
+                PLOG_ERROR << "target pos [" << i << "]= " << target_pos[ i ] * KDL::rad2deg << " is out of range ";
+                PLOG_ERROR << "program will be turn off after 4 seconds!!";
+                std::this_thread::sleep_for( std::chrono::duration< double >( 4 ) );
+                exit( -1 );
             }
-        }
-
-        if ( !flag_valid_status )
-        {
-            PLOG_ERROR << "something like error happen,please check it, and program will be turn off after 30 seconds!!";
-            std::this_thread::sleep_for( std::chrono::duration< double >( 30.0 ) );
-            exit( 0 );
         }
         //**-------------------------------**//
 
@@ -3304,7 +3273,6 @@ namespace JC_helper
             robot_ptr->joints_[ i ]->setPosition( target_pos[ i ] );
         }
         robot_ptr->hw_interface_->waitForSignal( 0 );
-
         //**-------------------------------**//
         return 0;
     }
@@ -3312,22 +3280,15 @@ namespace JC_helper
     int safety_servo( rocos::Robot* robot_ptr, const std::vector< double >& target_pos )
     {
         //** 伺服位置检查，无效则报错并程序终止 **//
-        bool flag_valid_status{ true };
-
         for ( int i = 0; i < _joint_num; ++i )
         {
             if ( target_pos[ i ] > robot_ptr->joints_[ i ]->getMaxPosLimit( ) || target_pos[ i ] < robot_ptr->joints_[ i ]->getMinPosLimit( ) )
             {
-                flag_valid_status = false;
-                PLOG_WARNING << "joints [" << i << "]= " << target_pos[ i ] * 180 / M_PI << " is out of range ";
+                PLOG_ERROR << "target pos [" << i << "]= " << target_pos[ i ] * KDL::rad2deg << " is out of range ";
+                PLOG_ERROR << "program will be turn off after 4 seconds!!";
+                std::this_thread::sleep_for( std::chrono::duration< double >( 4 ) );
+                exit( -1 );
             }
-        }
-
-        if ( !flag_valid_status )
-        {
-            PLOG_ERROR << "something like error happen,please check it, and program will be turn off after 30 seconds!!";
-            std::this_thread::sleep_for( std::chrono::duration< double >( 30.0 ) );
-            exit( 0 );
         }
         //**-------------------------------**//
 
@@ -3338,7 +3299,6 @@ namespace JC_helper
             robot_ptr->joints_[ i ]->setPosition( target_pos[ i ] );
         }
         robot_ptr->hw_interface_->waitForSignal( 0 );
-
         //**-------------------------------**//
         return 0;
     }
@@ -3346,22 +3306,15 @@ namespace JC_helper
     int safety_servo( rocos::Robot* robot_ptr, const KDL::JntArray& target_pos )
     {
         //** 伺服位置检查，无效则报错并程序终止 **//
-        bool flag_valid_status{ true };
-
         for ( int i = 0; i < _joint_num; ++i )
         {
             if ( target_pos( i ) > robot_ptr->joints_[ i ]->getMaxPosLimit( ) || target_pos( i ) < robot_ptr->joints_[ i ]->getMinPosLimit( ) )
             {
-                flag_valid_status = false;
-                PLOG_WARNING << "joints [" << i << "]= " << target_pos( i ) * 180 / M_PI << " is out of range ";
+                PLOG_ERROR << "target pos [" << i << "]= " << target_pos( i ) * KDL::rad2deg << " is out of range ";
+                PLOG_ERROR << "program will be turn off after 4 seconds!!";
+                std::this_thread::sleep_for( std::chrono::duration< double >( 4 ) );
+                exit( -1 );
             }
-        }
-
-        if ( !flag_valid_status )
-        {
-            PLOG_ERROR << "something like error happen,please check it, and program will be turn off after 30 seconds!!";
-            std::this_thread::sleep_for( std::chrono::duration< double >( 30.0 ) );
-            exit( 0 );
         }
         //**-------------------------------**//
 
@@ -3372,7 +3325,6 @@ namespace JC_helper
             robot_ptr->joints_[ i ]->setPosition( target_pos( i ) );
         }
         robot_ptr->hw_interface_->waitForSignal( 0 );
-
         //**-------------------------------**//
         return 0;
     }

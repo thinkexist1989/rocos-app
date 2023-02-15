@@ -556,12 +556,10 @@ namespace rocos {
         int admittance_teaching( );
         int stop_admittance_teaching( );
 
-        int admittance_link(KDL::Frame frame_target, double speed, double acceleration );
+        int admittance_link( KDL::Frame frame_target, double speed, double acceleration );
+        int servoJ( );
 
-        //停止运动
-        void StopMotion();
-
-    public: 
+    public:
         void test(); //为了测试
 
     private:

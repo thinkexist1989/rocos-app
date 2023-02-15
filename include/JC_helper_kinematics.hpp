@@ -286,7 +286,7 @@ namespace JC_helper
         KDL::JntArray joint_last_pos{ };
         KDL::JntArray joint_last_last_pos{ };
 
-        int _Cartesian_vel_index{ 0 };
+        int _Cartesian_vel_index{ 0 };//+-1对应x轴,+-2对应y轴,+-3对应z轴
         std::atomic< bool >* external_finished_flag_ptr;
 
         std::string  _reference_frame {""};
@@ -306,12 +306,8 @@ namespace JC_helper
         /**
          * @brief  只有OTG正常计算，且不在奇异位置，joint_vel才会为有效值，其余情况通通为0
          * @return  otg失败 = -1；雅克比在奇异位置 = -1;working = 1;finished  = 0
-         * @param joints 当前位置
-         * @param Cartesian_vel  目标速度矢量
-         * @param index  速度矢量的哪个方向，移动或者旋转
          * @param joint_vel  结果输出
          */
-
         int update( KDL::JntArray& joint_vel, rocos::Robot* robot_ptr );
 
         void RunMotion( rocos::Robot* robot_ptr );
