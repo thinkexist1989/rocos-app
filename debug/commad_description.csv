@@ -1,0 +1,13 @@
+go,movej,0.1,0.2, 0 , 0 ,0 ,0 ,0, 0, 0
+go,movel,0.3,0.3,1,1,1,1,1,1
+go,gripper,120
+
+
+rem,gripper,120
+
+
+##### MOVE jjjjjj  ####
+rem,movej,0.1,0.2
+
+##### MOVE llllll  ####
+rem,movel,0.05,0.1
