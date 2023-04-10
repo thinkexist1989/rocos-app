@@ -20,16 +20,16 @@
 #ifndef ROCOS_APP_DRIVE_H
 #define ROCOS_APP_DRIVE_H
 
-#include <include/hardware_interface.h>
+#include "hardware_interface.h"
 
 #include <boost/shared_ptr.hpp>
 #include <boost/thread.hpp>
 #include <boost/thread/lock_guard.hpp>
 #include <boost/thread/recursive_mutex.hpp>
 
-#include <drive_guard.h>
+#include "drive_guard.h"
 
-#include <interpolate.h>
+#include "interpolate.h"
 
 namespace rocos {
 

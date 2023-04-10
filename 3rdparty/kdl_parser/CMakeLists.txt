@@ -53,14 +53,19 @@ add_executable(test_kdl_parser src/test_kdl_parser.cpp )
 target_link_libraries(test_kdl_parser  PRIVATE ${PROJECT_NAME})
 
 
+# Add support for installation
+include(GNUInstallDirs)
+include(CMakePackageConfigHelpers)
 
+# Install headers
+install(DIRECTORY include/${PROJECT_NAME} DESTINATION ${CMAKE_INSTALL_INCLUDEDIR})
 
   install(TARGETS ${PROJECT_NAME}  test_kdl_parser
           LIBRARY DESTINATION lib
           ARCHIVE DESTINATION lib
           RUNTIME DESTINATION bin
           )
-  install(DIRECTORY include/${PROJECT_NAME}/
-          DESTINATION include)
+#  install(DIRECTORY include/${PROJECT_NAME}/
+#          DESTINATION include)
 
 

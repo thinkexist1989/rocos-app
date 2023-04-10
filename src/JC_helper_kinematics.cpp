@@ -1,5 +1,5 @@
-#include "JC_helper_kinematics.hpp"
-#include "robot.h"
+#include <rocos_app/JC_helper_kinematics.hpp>
+#include <rocos_app/robot.h>
 
 namespace JC_helper
 {

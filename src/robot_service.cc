@@ -17,10 +17,10 @@
 // Shenyang Institute of Automation, Chinese Academy of Sciences.
 // email: luoyang@sia.cn
 
-#include "robot_service.h"
+#include <rocos_app/robot_service.h>
 
 #include <google/protobuf/util/time_util.h>
-#include <robot.h>
+#include <rocos_app/robot.h>
 
 #include <utility>
 

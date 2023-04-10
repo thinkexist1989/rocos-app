@@ -27,12 +27,11 @@
 #ifndef ROCOS_APP_HARDWARE_INTERFACE_H
 #define ROCOS_APP_HARDWARE_INTERFACE_H
 
-#include <ethercat/command.h>
-#include <ethercat/control_word.h>
-#include <ethercat/drive_state.h>
-#include <ethercat/status_word.h>
-#include <ethercat/mode_of_operation.h>
-//#include <ethercat/ecat_config.hpp>
+#include "ethercat/command.h"
+#include "ethercat/control_word.h"
+#include "ethercat/drive_state.h"
+#include "ethercat/status_word.h"
+#include "ethercat/mode_of_operation.h"
 
 #include <string>
 #include <mutex>

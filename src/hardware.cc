@@ -17,7 +17,7 @@
 // Shenyang Institute of Automation, Chinese Academy of Sciences.
 // email: luoyang@sia.cn
 
-#include <ethercat/hardware.h>
+#include <rocos_app/ethercat/hardware.h>
 
 
 namespace rocos {

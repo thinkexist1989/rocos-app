@@ -23,12 +23,12 @@
 #include <urdf_parser/urdf_parser.h>
 #include <urdf_model/model.h>
 
-#include <kdl/frames.hpp>
-#include <kdl/frames_io.hpp>
-#include <kdl/chain.hpp>
-#include <kdl/tree.hpp>
+#include "kdl/frames.hpp"
+#include "kdl/frames_io.hpp"
+#include "kdl/chain.hpp"
+#include "kdl/tree.hpp"
 
-#include <trac_ik/trac_ik.hpp> //逆运动学处理
+#include "trac_ik/trac_ik.hpp" //逆运动学处理
 
 namespace rocos {
     using namespace KDL;

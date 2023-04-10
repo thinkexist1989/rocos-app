@@ -27,7 +27,7 @@
 #include <iostream>
 #include <string>
 
-#include "ethercat/drive_state.h"
+#include "drive_state.h"
 
 namespace rocos {
 

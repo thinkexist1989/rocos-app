@@ -20,7 +20,7 @@
  * Modified: Yang Luo, luoyang@sia.cn
  */
 
-#include <ethercat/status_word.h>
+#include <rocos_app/ethercat/status_word.h>
 
 namespace rocos {
 

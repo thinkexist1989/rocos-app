@@ -81,8 +81,6 @@ add_subdirectory(3rdparty/gripper)
 
 include_directories(
         include
-        include/${PROJECT_NAME}
-        include/sdk
 )
 
 link_directories(
@@ -118,11 +116,16 @@ add_library(hardware
         src/hardware_interface.cc
         src/hardware_sim.cc
         )
+target_include_directories(hardware
+        PUBLIC
+        $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>
+        $<INSTALL_INTERFACE:include>
+        )
 target_link_libraries(hardware
         PUBLIC
 #        ${DEP_LIBS}
         Boost::thread
-        rocos::ecat_config
+        $<BUILD_INTERFACE:rocos::ecat_config>
         )
 add_library(rocos::hardware ALIAS hardware)
 
@@ -134,6 +137,11 @@ add_library(drive
         src/drive_guard.cc
         src/interpolate.cc
         src/robotMath.cc
+        )
+target_include_directories(drive
+        PUBLIC
+        $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>
+        $<INSTALL_INTERFACE:include>
         )
 target_link_libraries(drive
         PUBLIC
@@ -155,10 +163,10 @@ target_include_directories(kinematics
 target_link_libraries(kinematics
         PUBLIC
         Eigen3::Eigen
-        nlopt
-        orocos-kdl
+        $<BUILD_INTERFACE:nlopt>
+        $<BUILD_INTERFACE:orocos-kdl>
         $<BUILD_INTERFACE:trac_ik>
-        ruckig::ruckig
+        $<BUILD_INTERFACE:ruckig::ruckig>
         )
 add_library(rocos::kinematics ALIAS kinematics)
 
@@ -169,6 +177,11 @@ add_library(robot
         src/JC_helper_kinematics.cpp
         src/JC_helper_dynamics.cpp
         src/JC_helper_authenticate.cpp
+        )
+target_include_directories(robot
+        PUBLIC
+        $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>
+        $<INSTALL_INTERFACE:include>
         )
 target_link_libraries(robot
         PUBLIC
@@ -299,6 +312,14 @@ install(FILES ${CMAKE_BINARY_DIR}/ver.h
         DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}/rocos_app
         )
 
+install(FILES include/tinyfsm.hpp
+        DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}
+        )
+
+install(DIRECTORY include/rocos_app
+        DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}
+        )
+
 # Install hardware library
 install(TARGETS hardware
         EXPORT hardware-targets
@@ -326,18 +347,18 @@ install(TARGETS kinematics
         PUBLIC_HEADER DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}  # 头文件安装路径
         )
 
-# Install protocol library
-install(TARGETS protocol
-        EXPORT protocol-targets
+# Install robot library
+install(TARGETS robot
+        EXPORT robot-targets
         LIBRARY DESTINATION ${CMAKE_INSTALL_LIBDIR}  # 动态库安装路径
         ARCHIVE DESTINATION ${CMAKE_INSTALL_LIBDIR}  # 静态库安装路径
         RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR}  # 可执行文件安装路径
         PUBLIC_HEADER DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}  # 头文件安装路径
         )
 
-# Install robot library
-install(TARGETS robot
-        EXPORT robot-targets
+# Install protocol library
+install(TARGETS protocol
+        EXPORT protocol-targets
         LIBRARY DESTINATION ${CMAKE_INSTALL_LIBDIR}  # 动态库安装路径
         ARCHIVE DESTINATION ${CMAKE_INSTALL_LIBDIR}  # 静态库安装路径
         RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR}  # 可执行文件安装路径
@@ -375,14 +396,14 @@ install(EXPORT kinematics-targets
         DESTINATION ${${PROJECT_NAME}_INSTALL_CMAKEDIR}
         )
 
-install(EXPORT protocol-targets
-        FILE protocol-targets.cmake
+install(EXPORT robot-targets
+        FILE robot-targets.cmake
         NAMESPACE rocos::
         DESTINATION ${${PROJECT_NAME}_INSTALL_CMAKEDIR}
         )
 
-install(EXPORT robot-targets
-        FILE robot-targets.cmake
+install(EXPORT protocol-targets
+        FILE protocol-targets.cmake
         NAMESPACE rocos::
         DESTINATION ${${PROJECT_NAME}_INSTALL_CMAKEDIR}
         )
@@ -392,6 +413,17 @@ install(EXPORT rocos_app-targets
         NAMESPACE rocos::
         DESTINATION ${${PROJECT_NAME}_INSTALL_CMAKEDIR}
         )
+
+# Install grpc common.cmake files
+install(FILES cmake/common.cmake
+        DESTINATION ${${PROJECT_NAME}_INSTALL_CMAKEDIR}
+        )
+
+FILE(GLOB PROTO_FILE ${CMAKE_BINARY_DIR}/*.pb.h)
+install(FILES ${PROTO_FILE}
+        DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}/rocos_app
+        )
+
 
 configure_package_config_file(
         cmake/rocos_app-config.cmake.in

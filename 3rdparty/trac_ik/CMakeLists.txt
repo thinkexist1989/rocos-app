@@ -1,6 +1,7 @@
 cmake_minimum_required(VERSION 3.5)
 project(trac_ik_lib)
 
+include(GNUInstallDirs)
 
 find_package(Eigen3 QUIET)
 if(NOT EIGEN3_FOUND)
@@ -32,7 +33,12 @@ target_include_directories(trac_ik
   PUBLIC ${PROJECT_SOURCE_DIR}/include
   PRIVATE ${EIGEN3_INCLUDE_DIR}
   )
-  
+
+# Add support for installation
+include(CMakePackageConfigHelpers)
+
+# Install headers
+install(DIRECTORY include/trac_ik DESTINATION ${CMAKE_INSTALL_INCLUDEDIR})
 
 install(DIRECTORY 
   DESTINATION ${CATKIN_GLOBAL_INCLUDE_DESTINATION}

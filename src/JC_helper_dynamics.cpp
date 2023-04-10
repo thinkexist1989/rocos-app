@@ -1,5 +1,5 @@
-#include "JC_helper_dynamics.hpp"
-#include "robot.h"
+#include <rocos_app/JC_helper_dynamics.hpp>
+#include <rocos_app/robot.h>
 /** 待处理问题：
  * 2. dragging 笛卡尔空间版 加入
  * 3. drggging 关节空间改进，允许给笛卡尔位姿

@@ -17,8 +17,8 @@
 // Shenyang Institute of Automation, Chinese Academy of Sciences.
 // email: luoyang@sia.cn
 
-#include "robot.h"
-#include "JC_helper_authenticate.hpp"
+#include <rocos_app/robot.h>
+#include <rocos_app/JC_helper_authenticate.hpp>
 #include <kdl_parser/kdl_parser.hpp> // 用于将urdf文件解析为KDL::Tree
 
 namespace rocos {

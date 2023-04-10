@@ -27,13 +27,13 @@
 //#include <QDebug>
 //#include <QFile>
 
-#include <drive.h>
+#include "include/rocos_app/drive.h"
 #include <ethercat/hardware.h>
 #include <ethercat/hardware_sim.h>
 #include <fstream>
 #include <iostream>
-#include <robot.h>
-#include <robot_service.h>
+#include "include/rocos_app/robot.h"
+#include "include/rocos_app/robot_service.h"
 #include <string>
 bool isRuning = true;
 

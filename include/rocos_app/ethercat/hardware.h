@@ -20,16 +20,16 @@
 #ifndef ROCOS_APP_HARDWARE_H
 #define ROCOS_APP_HARDWARE_H
 
-#include <ethercat/command.h>
-#include <ethercat/control_word.h>
-#include <ethercat/drive_state.h>
-#include <ethercat/status_word.h>
-#include <ethercat/mode_of_operation.h>
+#include "command.h"
+#include "control_word.h"
+#include "drive_state.h"
+#include "status_word.h"
+#include "mode_of_operation.h"
 
 //#include <ethercat/ecat_config.hpp>
 #include <rocos_ecm/ecat_config.h>
 
-#include <hardware_interface.h>
+#include "../hardware_interface.h"
 
 
 #include <boost/smart_ptr.hpp>

@@ -2,7 +2,7 @@
 //#pragma once
 
 #include <cstdio>
-#include "interpolate.h"
+#include <rocos_app/interpolate.h>
 
 namespace rocos {
 
