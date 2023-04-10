@@ -1,0 +1,13 @@
+//
+// Created by think on 3/28/23.
+//
+
+#ifndef ROCOS_APP_VER_H
+#define ROCOS_APP_VER_H
+
+#define ROCOS_APP_VERSION_MAJOR @rocos_app_VERSION_MAJOR@
+#define ROCOS_APP_VERSION_MINOR @rocos_app_VERSION_MINOR@
+#define ROCOS_APP_VERSION_PATCH @rocos_app_VERSION_PATCH@
+#define ROCOS_APP_VERSION       "@rocos_app_VERSION@"
+
+#endif //ROCOS_APP_VER_H

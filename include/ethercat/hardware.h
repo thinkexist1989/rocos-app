@@ -26,7 +26,8 @@
 #include <ethercat/status_word.h>
 #include <ethercat/mode_of_operation.h>
 
-#include <ethercat/ecat_config.hpp>
+//#include <ethercat/ecat_config.hpp>
+#include <rocos_ecm/ecat_config.h>
 
 #include <hardware_interface.h>
 
