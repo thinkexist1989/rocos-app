@@ -248,6 +248,7 @@ add_library(protocol
         ${PROTO_HDRS}
         ${GRPC_SRCS}
         ${GRPC_HRDS}
+        include/rocos_app/robot_service.h
         src/robot_service.cc
         )
 target_link_libraries(protocol
@@ -264,11 +265,11 @@ add_library(rocos_app
         INTERFACE)
 target_link_libraries(rocos_app
         INTERFACE
-        rocos::hardware
-        rocos::drive
-        rocos::kinematics
-        rocos::robot
-        rocos::protocol
+        $<BUILD_INTERFACE:rocos::hardware>
+        $<BUILD_INTERFACE:rocos::drive>
+        $<BUILD_INTERFACE:rocos::kinematics>
+        $<BUILD_INTERFACE:rocos::robot>
+        $<BUILD_INTERFACE:rocos::protocol>
         )
 add_library(rocos::rocos_app ALIAS rocos_app)
 

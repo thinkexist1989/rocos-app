@@ -23,11 +23,6 @@
 #include <boost/smart_ptr.hpp>
 #include <boost/thread.hpp>
 
-#include <grpcpp/grpcpp.h>
-#include <grpcpp/health_check_service_interface.h>
-#include <grpcpp/ext/proto_server_reflection_plugin.h>
-
-//#include <cmake-build-release-remote-host-advantech/robot_service.grpc.pb.h>
 #include "robot_service.grpc.pb.h"
 
 namespace rocos {

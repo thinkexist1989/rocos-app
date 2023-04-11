@@ -24,6 +24,10 @@
 
 #include <utility>
 
+#include <grpcpp/grpcpp.h>
+#include <grpcpp/health_check_service_interface.h>
+#include <grpcpp/ext/proto_server_reflection_plugin.h>
+
 namespace rocos {
     using namespace google::protobuf::util;  //使用命名空间
 
