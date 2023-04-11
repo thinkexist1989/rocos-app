@@ -57,6 +57,9 @@ target_link_libraries(test_kdl_parser  PRIVATE ${PROJECT_NAME})
 include(GNUInstallDirs)
 include(CMakePackageConfigHelpers)
 
+set(${PROJECT_NAME}_INSTALL_CONFIGDIR ${CMAKE_INSTALL_PREFIX}/config)
+set(${PROJECT_NAME}_INSTALL_CMAKEDIR ${CMAKE_INSTALL_LIBDIR}/cmake/${PROJECT_NAME})
+
 # Install headers
 install(DIRECTORY include/${PROJECT_NAME} DESTINATION ${CMAKE_INSTALL_INCLUDEDIR})
 
@@ -65,7 +68,18 @@ install(DIRECTORY include/${PROJECT_NAME} DESTINATION ${CMAKE_INSTALL_INCLUDEDIR
           ARCHIVE DESTINATION lib
           RUNTIME DESTINATION bin
           )
-#  install(DIRECTORY include/${PROJECT_NAME}/
-#          DESTINATION include)
+  install(DIRECTORY include/${PROJECT_NAME}/
+          DESTINATION include)
 
-
+#install(TARGETS kdl_parser
+#        EXPORT kdl_parser-targets
+#        LIBRARY DESTINATION ${CMAKE_INSTALL_LIBDIR}  # 动态库安装路径
+#        ARCHIVE DESTINATION ${CMAKE_INSTALL_LIBDIR}  # 静态库安装路径
+#        RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR}  # 可执行文件安装路径
+#        PUBLIC_HEADER DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}  # 头文件安装路径
+#        )
+#
+#install(EXPORT kdl_parser-targets
+#        FILE kdl_parser-targets.cmake
+#        NAMESPACE kdl_parser::
+#        DESTINATION ${${PROJECT_NAME}_INSTALL_CMAKEDIR})

@@ -100,3 +100,5 @@ INSTALL(TARGETS orocos-kdl
 )
 
 INSTALL(FILES ${UTIL_HPPS} DESTINATION include/kdl/utilities)
+
+INSTALL(FILES ${KDL_HPPS} DESTINATION include/kdl)

@@ -63,10 +63,12 @@ find_package(OpenSSL REQUIRED)
 
 find_package(rocos_ecm REQUIRED)
 
+find_package(orocos_kdl REQUIRED)
+
 ##################
 ##   3rdparty   ##
 ##################
-add_subdirectory(3rdparty/kdl)
+#add_subdirectory(3rdparty/kdl)
 add_subdirectory(3rdparty/nlopt)
 add_subdirectory(3rdparty/trac_ik)
 add_subdirectory(3rdparty/kdl_parser)
@@ -116,16 +118,11 @@ add_library(hardware
         src/hardware_interface.cc
         src/hardware_sim.cc
         )
-target_include_directories(hardware
-        PUBLIC
-        $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>
-        $<INSTALL_INTERFACE:include>
-        )
 target_link_libraries(hardware
         PUBLIC
 #        ${DEP_LIBS}
         Boost::thread
-        $<BUILD_INTERFACE:rocos::ecat_config>
+        rocos::ecat_config
         )
 add_library(rocos::hardware ALIAS hardware)
 
@@ -138,14 +135,9 @@ add_library(drive
         src/interpolate.cc
         src/robotMath.cc
         )
-target_include_directories(drive
-        PUBLIC
-        $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>
-        $<INSTALL_INTERFACE:include>
-        )
 target_link_libraries(drive
         PUBLIC
-        rocos::hardware
+        $<BUILD_INTERFACE:rocos::hardware>
         )
 add_library(rocos::drive ALIAS drive)
 
@@ -159,12 +151,12 @@ target_include_directories(kinematics
         $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>
         $<INSTALL_INTERFACE:include>
         )
-
 target_link_libraries(kinematics
         PUBLIC
         Eigen3::Eigen
+        orocos-kdl
         $<BUILD_INTERFACE:nlopt>
-        $<BUILD_INTERFACE:orocos-kdl>
+#        $<BUILD_INTERFACE:orocos-kdl>
         $<BUILD_INTERFACE:trac_ik>
         $<BUILD_INTERFACE:ruckig::ruckig>
         )
@@ -185,9 +177,9 @@ target_include_directories(robot
         )
 target_link_libraries(robot
         PUBLIC
-        rocos::hardware
-        rocos::drive
-        rocos::kinematics
+        $<BUILD_INTERFACE:rocos::hardware>
+        $<BUILD_INTERFACE:rocos::drive>
+        $<BUILD_INTERFACE:rocos::kinematics>
         $<BUILD_INTERFACE:plog::plog>
         $<BUILD_INTERFACE:JC_helper::gripper>
         OpenSSL::SSL
@@ -263,7 +255,7 @@ target_link_libraries(protocol
         ${_REFLECTION}
         ${_GRPC_GRPCPP}
         ${_PROTOBUF_LIBPROTOBUF}
-        rocos::robot
+        $<BUILD_INTERFACE:rocos::robot>
         )
 add_library(rocos::protocol ALIAS protocol)
 
@@ -274,9 +266,9 @@ target_link_libraries(rocos_app
         INTERFACE
         rocos::hardware
         rocos::drive
-        rocos::protocol
         rocos::kinematics
         rocos::robot
+        rocos::protocol
         )
 add_library(rocos::rocos_app ALIAS rocos_app)
 
@@ -320,52 +312,52 @@ install(DIRECTORY include/rocos_app
         DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}
         )
 
-# Install hardware library
-install(TARGETS hardware
-        EXPORT hardware-targets
-        LIBRARY DESTINATION ${CMAKE_INSTALL_LIBDIR}  # 动态库安装路径
-        ARCHIVE DESTINATION ${CMAKE_INSTALL_LIBDIR}  # 静态库安装路径
-        RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR}  # 可执行文件安装路径
-        PUBLIC_HEADER DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}  # 头文件安装路径
-        )
+## Install hardware library
+#install(TARGETS hardware
+#        EXPORT hardware-targets
+#        LIBRARY DESTINATION ${CMAKE_INSTALL_LIBDIR}  # 动态库安装路径
+#        ARCHIVE DESTINATION ${CMAKE_INSTALL_LIBDIR}  # 静态库安装路径
+#        RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR}  # 可执行文件安装路径
+#        PUBLIC_HEADER DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}  # 头文件安装路径
+#        )
+#
+## Install drive library
+#install(TARGETS drive
+#        EXPORT drive-targets
+#        LIBRARY DESTINATION ${CMAKE_INSTALL_LIBDIR}  # 动态库安装路径
+#        ARCHIVE DESTINATION ${CMAKE_INSTALL_LIBDIR}  # 静态库安装路径
+#        RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR}  # 可执行文件安装路径
+#        PUBLIC_HEADER DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}  # 头文件安装路径
+#        )
+#
+## Install kinematics library
+#install(TARGETS kinematics
+#        EXPORT kinematics-targets
+#        LIBRARY DESTINATION ${CMAKE_INSTALL_LIBDIR}  # 动态库安装路径
+#        ARCHIVE DESTINATION ${CMAKE_INSTALL_LIBDIR}  # 静态库安装路径
+#        RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR}  # 可执行文件安装路径
+#        PUBLIC_HEADER DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}  # 头文件安装路径
+#        )
+#
+## Install robot library
+#install(TARGETS robot
+#        EXPORT robot-targets
+#        LIBRARY DESTINATION ${CMAKE_INSTALL_LIBDIR}  # 动态库安装路径
+#        ARCHIVE DESTINATION ${CMAKE_INSTALL_LIBDIR}  # 静态库安装路径
+#        RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR}  # 可执行文件安装路径
+#        PUBLIC_HEADER DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}  # 头文件安装路径
+#        )
+#
+## Install protocol library
+#install(TARGETS protocol
+#        EXPORT protocol-targets
+#        LIBRARY DESTINATION ${CMAKE_INSTALL_LIBDIR}  # 动态库安装路径
+#        ARCHIVE DESTINATION ${CMAKE_INSTALL_LIBDIR}  # 静态库安装路径
+#        RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR}  # 可执行文件安装路径
+#        PUBLIC_HEADER DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}  # 头文件安装路径
+#        )
 
-# Install drive library
-install(TARGETS drive
-        EXPORT drive-targets
-        LIBRARY DESTINATION ${CMAKE_INSTALL_LIBDIR}  # 动态库安装路径
-        ARCHIVE DESTINATION ${CMAKE_INSTALL_LIBDIR}  # 静态库安装路径
-        RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR}  # 可执行文件安装路径
-        PUBLIC_HEADER DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}  # 头文件安装路径
-        )
-
-# Install kinematics library
-install(TARGETS kinematics
-        EXPORT kinematics-targets
-        LIBRARY DESTINATION ${CMAKE_INSTALL_LIBDIR}  # 动态库安装路径
-        ARCHIVE DESTINATION ${CMAKE_INSTALL_LIBDIR}  # 静态库安装路径
-        RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR}  # 可执行文件安装路径
-        PUBLIC_HEADER DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}  # 头文件安装路径
-        )
-
-# Install robot library
-install(TARGETS robot
-        EXPORT robot-targets
-        LIBRARY DESTINATION ${CMAKE_INSTALL_LIBDIR}  # 动态库安装路径
-        ARCHIVE DESTINATION ${CMAKE_INSTALL_LIBDIR}  # 静态库安装路径
-        RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR}  # 可执行文件安装路径
-        PUBLIC_HEADER DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}  # 头文件安装路径
-        )
-
-# Install protocol library
-install(TARGETS protocol
-        EXPORT protocol-targets
-        LIBRARY DESTINATION ${CMAKE_INSTALL_LIBDIR}  # 动态库安装路径
-        ARCHIVE DESTINATION ${CMAKE_INSTALL_LIBDIR}  # 静态库安装路径
-        RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR}  # 可执行文件安装路径
-        PUBLIC_HEADER DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}  # 头文件安装路径
-        )
-
-install(TARGETS rocos_app
+install(TARGETS hardware drive kinematics robot protocol rocos_app
         EXPORT rocos_app-targets
         LIBRARY DESTINATION ${CMAKE_INSTALL_LIBDIR}  # 动态库安装路径
         ARCHIVE DESTINATION ${CMAKE_INSTALL_LIBDIR}  # 静态库安装路径
@@ -378,35 +370,35 @@ install(FILES ${CONFIG_FILE}
         DESTINATION ${${PROJECT_NAME}_INSTALL_CONFIGDIR}
         )
 
-install(EXPORT hardware-targets
-        FILE hardware-targets.cmake
-        NAMESPACE rocos::
-        DESTINATION ${${PROJECT_NAME}_INSTALL_CMAKEDIR}
-        )
-
-install(EXPORT drive-targets
-        FILE drive-targets.cmake
-        NAMESPACE rocos::
-        DESTINATION ${${PROJECT_NAME}_INSTALL_CMAKEDIR}
-        )
-
-install(EXPORT kinematics-targets
-        FILE kinematics-targets.cmake
-        NAMESPACE rocos::
-        DESTINATION ${${PROJECT_NAME}_INSTALL_CMAKEDIR}
-        )
-
-install(EXPORT robot-targets
-        FILE robot-targets.cmake
-        NAMESPACE rocos::
-        DESTINATION ${${PROJECT_NAME}_INSTALL_CMAKEDIR}
-        )
-
-install(EXPORT protocol-targets
-        FILE protocol-targets.cmake
-        NAMESPACE rocos::
-        DESTINATION ${${PROJECT_NAME}_INSTALL_CMAKEDIR}
-        )
+#install(EXPORT hardware-targets
+#        FILE hardware-targets.cmake
+#        NAMESPACE rocos::
+#        DESTINATION ${${PROJECT_NAME}_INSTALL_CMAKEDIR}
+#        )
+#
+#install(EXPORT drive-targets
+#        FILE drive-targets.cmake
+#        NAMESPACE rocos::
+#        DESTINATION ${${PROJECT_NAME}_INSTALL_CMAKEDIR}
+#        )
+#
+#install(EXPORT kinematics-targets
+#        FILE kinematics-targets.cmake
+#        NAMESPACE rocos::
+#        DESTINATION ${${PROJECT_NAME}_INSTALL_CMAKEDIR}
+#        )
+#
+#install(EXPORT robot-targets
+#        FILE robot-targets.cmake
+#        NAMESPACE rocos::
+#        DESTINATION ${${PROJECT_NAME}_INSTALL_CMAKEDIR}
+#        )
+#
+#install(EXPORT protocol-targets
+#        FILE protocol-targets.cmake
+#        NAMESPACE rocos::
+#        DESTINATION ${${PROJECT_NAME}_INSTALL_CMAKEDIR}
+#        )
 
 install(EXPORT rocos_app-targets
         FILE rocos_app-targets.cmake
@@ -452,19 +444,19 @@ enable_testing()
 add_executable(unit_test test/unit_test.cc)
 target_link_libraries(unit_test
         PRIVATE
-        rocos::hardware
-        rocos::drive
-        rocos::protocol
-        rocos::kinematics
-        rocos::robot
+        hardware
+        drive
+        kinematics
+        robot
+        protocol
         )
 add_executable(main_test test/main_test.cc)
 target_link_libraries(main_test
         PRIVATE
-        rocos::hardware
-        rocos::drive
-        rocos::protocol
-        rocos::kinematics
-        rocos::robot
+        hardware
+        drive
+        protocol
+        kinematics
+        robot
         )
 add_test(NAME unit_test COMMAND unit_test)
