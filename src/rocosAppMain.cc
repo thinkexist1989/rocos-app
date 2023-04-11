@@ -21,19 +21,13 @@
 #include <cstdio>
 #include <cstdlib>
 
-//#include <QtCore>
-//#include <QProcess>
-//#include <QString>
-//#include <QDebug>
-//#include <QFile>
-
-#include "include/rocos_app/drive.h"
-#include <ethercat/hardware.h>
-#include <ethercat/hardware_sim.h>
+#include <rocos_app/drive.h>
+#include <rocos_app/ethercat/hardware.h>
+#include <rocos_app/ethercat/hardware_sim.h>
 #include <fstream>
 #include <iostream>
-#include "include/rocos_app/robot.h"
-#include "include/rocos_app/robot_service.h"
+#include <rocos_app/robot.h>
+#include <rocos_app/robot_service.h>
 #include <string>
 bool isRuning = true;
 

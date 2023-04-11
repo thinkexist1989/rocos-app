@@ -265,29 +265,29 @@ add_library(rocos_app
         INTERFACE)
 target_link_libraries(rocos_app
         INTERFACE
-        $<BUILD_INTERFACE:rocos::hardware>
-        $<BUILD_INTERFACE:rocos::drive>
-        $<BUILD_INTERFACE:rocos::kinematics>
-        $<BUILD_INTERFACE:rocos::robot>
-        $<BUILD_INTERFACE:rocos::protocol>
+        hardware
+        drive
+        kinematics
+        robot
+        protocol
         )
 add_library(rocos::rocos_app ALIAS rocos_app)
 
 ########## Executable RocosAppMain ################
 # move rocosAppMain to test. Due to rocos_app is a robot library.
-#add_executable(${PROJECT_NAME}
-#        src/rocosAppMain.cc
-#        )
-#
-### Specify libraries to link a library or executable target against
-#target_link_libraries(${PROJECT_NAME}
-#        PRIVATE
-#        rocos::hardware
-#        rocos::drive
-#        rocos::protocol
-#        rocos::kinematics
-#        rocos::robot
-#        )
+add_executable(rocosAppMain
+        src/rocosAppMain.cc
+        )
+
+## Specify libraries to link a library or executable target against
+target_link_libraries(rocosAppMain
+        PRIVATE
+        hardware
+        drive
+        protocol
+        kinematics
+        robot
+        )
 
 configure_file(include/ver.h.in ver.h) # Version Definition
 
@@ -358,7 +358,7 @@ install(DIRECTORY include/rocos_app
 #        PUBLIC_HEADER DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}  # 头文件安装路径
 #        )
 
-install(TARGETS hardware drive kinematics robot protocol rocos_app
+install(TARGETS hardware drive kinematics robot protocol rocos_app rocosAppMain
         EXPORT rocos_app-targets
         LIBRARY DESTINATION ${CMAKE_INSTALL_LIBDIR}  # 动态库安装路径
         ARCHIVE DESTINATION ${CMAKE_INSTALL_LIBDIR}  # 静态库安装路径
