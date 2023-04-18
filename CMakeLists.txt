@@ -75,6 +75,7 @@ add_subdirectory(3rdparty/kdl_parser)
 add_subdirectory(3rdparty/ruckig)
 add_subdirectory(3rdparty/plog)
 add_subdirectory(3rdparty/gripper)
+add_subdirectory(3rdparty/gflags)
 
 
 ###########
@@ -287,7 +288,26 @@ target_link_libraries(rocosAppMain
         protocol
         kinematics
         robot
+        gflags::gflags
         )
+
+# move rocosAppMain to test. Due to rocos_app is a robot library.
+add_executable(rocosAppSim
+        src/rocosAppSim.cc
+        src/hardware_interface.cc
+        src/hardware_sim.cc
+        )
+
+## Specify libraries to link a library or executable target against
+target_link_libraries(rocosAppSim
+        PRIVATE
+        drive
+        protocol
+        kinematics
+        robot
+        gflags::gflags
+        )
+
 
 configure_file(include/ver.h.in ver.h) # Version Definition
 
@@ -358,7 +378,7 @@ install(DIRECTORY include/rocos_app
 #        PUBLIC_HEADER DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}  # 头文件安装路径
 #        )
 
-install(TARGETS hardware drive kinematics robot protocol rocos_app rocosAppMain
+install(TARGETS hardware drive kinematics robot protocol rocos_app rocosAppMain rocosAppSim
         EXPORT rocos_app-targets
         LIBRARY DESTINATION ${CMAKE_INSTALL_LIBDIR}  # 动态库安装路径
         ARCHIVE DESTINATION ${CMAKE_INSTALL_LIBDIR}  # 静态库安装路径

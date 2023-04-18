@@ -30,6 +30,7 @@
 #include <rocos_app/robot_service.h>
 #include <string>
 #include <gflags/gflags.h>
+#include <ver.h>
 
 DEFINE_string(urdf, "robot.urdf", "Urdf file path");
 DEFINE_string(base, "base_link", "Base link name");
@@ -324,13 +325,13 @@ int main( int argc, char* argv[] )
                   << "\033[0m" << std::endl;
     }
 
+    gflags::ParseCommandLineFlags(&argc, &argv, true);
+
+
     using namespace rocos;
 
-    gflags::ParseCommandLineFlags(&argc, &argv, true);
-    //**-------------------------------**//
-
-//    boost::shared_ptr< HardwareInterface > hw = boost::make_shared< HardwareSim >( _joint_num );  // 仿真
-     boost::shared_ptr< HardwareInterface > hw = boost::make_shared< Hardware >( );  //真实机械臂
+    boost::shared_ptr< HardwareInterface > hw = boost::make_shared< HardwareSim >( _joint_num );  // 仿真
+    // boost::shared_ptr< HardwareInterface > hw = boost::make_shared< Hardware >( );  //真实机械臂
 
 
     Robot robot(hw, FLAGS_urdf, FLAGS_base, FLAGS_tip);

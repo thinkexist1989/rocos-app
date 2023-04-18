@@ -22,9 +22,12 @@
 #include <kdl_parser/kdl_parser.hpp> // 用于将urdf文件解析为KDL::Tree
 
 namespace rocos {
-    Robot::Robot(boost::shared_ptr<HardwareInterface> hw) : hw_interface_(hw),pos_(_joint_num),vel_(_joint_num),acc_(_joint_num) {
+    Robot::Robot(boost::shared_ptr<HardwareInterface> hw,
+                 const std::string &urdf_file_path,
+                 const std::string &base_link,
+                 const std::string &tip) : hw_interface_(hw),pos_(_joint_num),vel_(_joint_num),acc_(_joint_num) {
         
-        parseUrdf("robot.urdf", "base_link", "link_"+std::to_string(_joint_num));
+        parseUrdf(urdf_file_path, base_link, tip);
 
 //        addAllJoints( ); // TODO: 这个应该直接加到参数解析里面，解析之后加入关节，顺序和主站顺序可能不一样
 

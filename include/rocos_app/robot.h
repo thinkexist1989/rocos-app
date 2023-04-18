@@ -72,7 +72,10 @@ namespace rocos {
             FIXED
         };
 
-        explicit Robot(boost::shared_ptr<HardwareInterface> hw);
+        explicit Robot(boost::shared_ptr<HardwareInterface> hw,
+                       const std::string &urdf_file_path = "robot.urdf",
+                       const std::string &base_link = "base_link",
+                       const std::string &tip = "link7");
 
         bool parseUrdf(const std::string &urdf_file_path,
                        const std::string &base_link,
