@@ -65,10 +65,10 @@ namespace rocos {
         static plog::ColorConsoleAppender< plog::TxtFormatter > consoleAppender;
         plog::init< 0 >( plog::debug, &consoleAppender );//终端显示                                                                      // Initialize the logger.
 
-        if ( JC_helper::authentication( ) < 0 )
-        {
-            exit( 0 );
-        }
+        // if ( JC_helper::authentication( ) < 0 )
+        // {
+        //     exit( 0 );
+        // }
 
         startMotionThread( );
     }
@@ -1981,7 +1981,7 @@ namespace rocos {
         }
         else  //当前命令类型为笛卡尔空间
         {
-            //只检查速度、加速度,笛卡尔指令这里不检查，由planningIK()检查
+            //只检查速度、加速度,笛卡尔指令不检查
             if ( CheckBeforeMove( flange_, max_speed, max_acceleration, 0, 0 ) < 0 )
             {
                 PLOG_ERROR << "given parameters is invalid";
@@ -2015,9 +2015,7 @@ namespace rocos {
         //** _dragging_finished_flag的作用：保证dragging 多次调用时，只初始化一次**//
         if ( _dragging_finished_flag && is_running_motion )
         {
-            PLOG_DEBUG << "_dragging_finished_flag = " << _dragging_finished_flag;
-            PLOG_DEBUG << "is_running_motion = " << is_running_motion;
-            PLOG_ERROR << "offline Motion is still running and waiting for it to finish" << WHITE;
+            PLOG_ERROR << "其他运动仍在运行，不允许执行点动功能";
             return -1;
         }
         else if ( _dragging_finished_flag && !is_running_motion )
@@ -2050,7 +2048,7 @@ namespace rocos {
                 _thread_planning->join( );
                 _thread_planning = nullptr;
             }
-            _SmartServo_Joint.init( pos_, vel_, acc_, max_speed, max_acceleration, 2 * max_acceleration );
+            _SmartServo_Joint.init( pos_, vel_, acc_, max_speed, max_acceleration, 4 * max_acceleration );
             _thread_planning.reset( new boost::thread{ &JC_helper::SmartServo_Joint::RunSmartServo, &_SmartServo_Joint, this } );
         }
         //笛卡尔空间点动指令
@@ -2063,11 +2061,13 @@ namespace rocos {
             }
 
             if ( index % 10 <= 2 )
+                // 笛卡尔空间位置点动
                 _SmartServo_Cartesian.init( this, max_speed * 0.15 );
             else
-                _SmartServo_Cartesian.init( this, max_speed * 0.5);
+                // 笛卡尔空间姿态点动
+                _SmartServo_Cartesian.init( this, max_speed * 0.5 );
 
-                _thread_planning.reset( new boost::thread{ &JC_helper::SmartServo_Cartesian::RunMotion, &_SmartServo_Cartesian, this } );
+            _thread_planning.reset( new boost::thread{ &JC_helper::SmartServo_Cartesian::RunMotion, &_SmartServo_Cartesian, this } );
         }
         //**-------------------------------**//
 
@@ -2084,7 +2084,7 @@ namespace rocos {
 
                 for ( int i = 0; i < jnt_num_; i++ )
                     target_joint( i ) = pos_[ i ];
-                target_joint( index ) = std::min( target_joint( index ) + static_cast< double >( dir ) * max_speed * 0.1, joints_[ index ]->getMaxPosLimit( ) );  //取最大速度的10%
+                target_joint( index ) = std::min( target_joint( index ) + static_cast< double >( dir ) * max_speed * 1.5, joints_[ index ]->getMaxPosLimit( ) );  //! 取最大速度1.5倍作为目标距离,不要太小
                 target_joint( index ) = std::max( target_joint( index ), joints_[ index ]->getMinPosLimit( ) );
                 _SmartServo_Joint.command( target_joint );
 

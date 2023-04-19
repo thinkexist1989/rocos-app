@@ -1090,7 +1090,7 @@ namespace JC_helper
             }
             else  //计算失败，紧急停止
             {
-                PLOG_ERROR << "otg computation failed";
+                PLOG_ERROR << "otg 计算失败！";
                 on_stop_trajectory = true;
                 input_lock.lock( );
                 input.control_interface = ruckig::ControlInterface::Velocity;
@@ -1106,6 +1106,7 @@ namespace JC_helper
                 }
                 input_lock.unlock( );
             }
+
             //** 100ms进行一次心跳检查,紧急停止时不需要检查 **//
             if ( ( ( ++count ) > 100 ) && !on_stop_trajectory )
             {
@@ -1117,7 +1118,7 @@ namespace JC_helper
                 }
                 else
                 {
-                    PLOG_ERROR << "Some errors such as disconnecting from the controller";
+                    PLOG_WARNING << "点动指令时间间隔超过100ms,停止";
 
                     on_stop_trajectory = true;
                     input_lock.lock( );
@@ -3044,7 +3045,7 @@ namespace JC_helper
                     _tick_count = robot_ptr->tick_count;
                 else
                 {
-                    PLOG_ERROR << "心跳超时，停止！";
+                    PLOG_WARNING << "点动指令时间间隔超过100ms,停止";
                     Cartesian_stop( );  //速度目标设置为0
                 }
             }
@@ -3062,21 +3063,17 @@ namespace JC_helper
             }
             else  // working 或者finished状态
             {
-                KDL::Add( joint_last_vel, joint_vel, joint_vel );
-                KDL::Multiply( joint_vel, 0.5, joint_vel );
-                joint_last_vel = joint_vel;
-
                 KDL::Multiply( joint_vel, servo_dt, joint_vel );
                 KDL::Add( joint_current, joint_vel, joint_target );
 
                 //** 速度和加速度保护 **//
                 static std::vector< double > _max_acc( _joint_num, 2 );//临时修改 ,因为10的加速度实在太大了
-                //! 急停状态下不用速度检查，因为会和笛卡尔急停冲突（笛卡尔急停会使得关节加速度超大，必触发关节急停保护）
+                    
                 if ( !flag_stop && check_vel_acc( joint_target, joint_current, joint_last_pos, robot_ptr->max_vel_, _max_acc ) < 0 )
                 {
-                    // 关节空间急停
+                    //! 急停状态下不用速度检查，因为会和笛卡尔急停冲突（笛卡尔急停会使得关节加速度超大，必触发关节急停保护）
                     flag_stop = true;
-                    Joint_stop( robot_ptr, joint_current, joint_last_pos, joint_last_last_pos );
+                    Joint_stop( robot_ptr, joint_current, joint_last_pos, joint_last_last_pos );// 关节空间急停
                     sleep( 2 );
                     break;
                 }
@@ -3090,17 +3087,24 @@ namespace JC_helper
                 safety_servo(robot_ptr,joint_target);
                 //**-------------------------------**//
 
-                if ( res == 0 && flag_stop )  // finished 状态
+                if ( res == 0 )
                 {
-                    PLOG_INFO << "笛卡尔空间急停已完成";
-                    break;
+                    if ( !flag_stop )
+                    {
+                        PLOG_INFO << "笛卡尔空间点动已完成";  //! 这种情况说明最大速度、加速度太大，而目标位置太小，导致100ms以内就完成了，这种情况不应该发生
+                        break;
+                    }
+                    else
+                    {
+                        PLOG_INFO << "笛卡尔空间急停已完成";
+                        break;
+                    }
                 }
             }
         }
 
-        ( *external_finished_flag_ptr ) = true;   //这次smart servo已结束，等待下一次smart servo
-        robot_ptr->is_running_motion    = false;  //机械臂运动已结束，可以执行其他离线类运动
-        PLOG_INFO << "笛卡尔空间点动全部结束";
+        ( *external_finished_flag_ptr ) = true;   // 这次smart servo已结束，等待下一次smart servo
+        robot_ptr->is_running_motion    = false;  // 机械臂运动已结束，可以执行其他离线类运动
     }
 
     void SmartServo_Cartesian::command( int Cartesian_vel_index, const char* reference_frame )

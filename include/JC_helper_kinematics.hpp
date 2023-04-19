@@ -281,7 +281,6 @@ namespace JC_helper
         KDL::JntArray joint_current{ };
         KDL::JntArray joint_target{ };
         KDL::JntArray joint_vel{ };
-        KDL::JntArray joint_last_vel{ };
 
         KDL::JntArray joint_last_pos{ };
         KDL::JntArray joint_last_last_pos{ };
@@ -300,7 +299,7 @@ namespace JC_helper
 
         SmartServo_Cartesian(  std::atomic< bool >* , const KDL::Chain& robot_chain ) ;
 
-        void init( rocos::Robot* robot_ptr  , double target_vel, double max_vel = 0.3, double max_acc = 1, double max_jerk = 1 );
+        void init( rocos::Robot* robot_ptr  , double target_vel, double max_vel = 0.3, double max_acc = 0.6, double max_jerk = 1 );
       
       
         /**
