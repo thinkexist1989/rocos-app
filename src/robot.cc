@@ -65,10 +65,11 @@ namespace rocos {
         static plog::ColorConsoleAppender< plog::TxtFormatter > consoleAppender;
         plog::init< 0 >( plog::debug, &consoleAppender );//终端显示                                                                      // Initialize the logger.
 
-        // if ( JC_helper::authentication( ) < 0 )
-        // {
-        //     exit( 0 );
-        // }
+        // 实现密匙加密
+        //  if ( JC_helper::authentication( ) < 0 )
+        //  {
+        //      exit( 0 );
+        //  }
 
         startMotionThread( );
     }
