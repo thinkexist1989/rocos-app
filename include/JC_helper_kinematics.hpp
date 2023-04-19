@@ -299,7 +299,7 @@ namespace JC_helper
 
         SmartServo_Cartesian(  std::atomic< bool >* , const KDL::Chain& robot_chain ) ;
 
-        void init( rocos::Robot* robot_ptr  , double target_vel, double max_vel = 0.3, double max_acc = 0.6, double max_jerk = 1 );
+        void init( rocos::Robot* robot_ptr  , double target_vel, double max_vel = 5, double max_acc = 20, double max_jerk = 60 );
       
       
         /**
@@ -313,7 +313,7 @@ namespace JC_helper
 
         void command( int Cartesian_vel_index ,const char * reference_frame);
 
-        void Cartesian_stop( double max_vel=1, double max_acc =30 , double max_jerk=200 );
+        void Cartesian_stop( double max_vel=10, double max_acc =50 , double max_jerk=180 );
 
 #if 0
 
@@ -416,7 +416,7 @@ namespace JC_helper
      * @param max_acc 最大加速度
      * @return int
      */
-    int check_vel_acc( const KDL::JntArray& current_pos, const KDL::JntArray& last_pos, const KDL::JntArray& last_last_pos, const std::vector< double >& max_vel, const std::vector< double >& max_acc );
+    int check_vel_acc( const KDL::JntArray& current_pos, const KDL::JntArray& last_pos, const KDL::JntArray& last_last_pos, const double max_vel, const double max_acc );
 
     /**
      * @brief 带安全位置检查的伺服,无效则报错并程序终止 

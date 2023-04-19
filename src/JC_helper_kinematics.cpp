@@ -1107,7 +1107,7 @@ namespace JC_helper
                 input_lock.unlock( );
             }
 
-            //** 100ms进行一次心跳检查,紧急停止时不需要检查 **//
+            //** 50ms进行一次心跳检查,紧急停止时不需要检查 **//
             if ( ( ( ++count ) > 100 ) && !on_stop_trajectory )
             {
                 count = 0;
@@ -1118,7 +1118,7 @@ namespace JC_helper
                 }
                 else
                 {
-                    PLOG_WARNING << "点动指令时间间隔超过100ms,停止";
+                    PLOG_WARNING << "点动指令时间间隔过长,停止";
 
                     on_stop_trajectory = true;
                     input_lock.lock( );
@@ -2929,7 +2929,6 @@ namespace JC_helper
         joint_current.resize( _joint_num );
         joint_target.resize( _joint_num );
         joint_vel.resize( _joint_num );
-        joint_last_vel.resize( _joint_num );
         joint_last_pos.resize( _joint_num );
         joint_last_last_pos.resize( _joint_num );
         external_finished_flag_ptr = finished_flag_ptr;
@@ -2941,22 +2940,20 @@ namespace JC_helper
         input.current_velocity[ 0 ]     = 0;
         input.current_acceleration[ 0 ] = 0;
 
-        input.target_position[ 0 ]     = 0;
-        input.target_velocity[ 0 ]     = target_vel;
+        input.target_position[ 0 ]     = target_vel;
+        input.target_velocity[ 0 ]     = 0;
         input.target_acceleration[ 0 ] = 0;
 
         input.max_velocity[ 0 ]     = max_vel;
         input.max_acceleration[ 0 ] = max_acc;
         input.max_jerk[ 0 ]         = max_jerk;
 
-        input.control_interface = ruckig::ControlInterface::Velocity;
+        input.control_interface = ruckig::ControlInterface::Position;
         input.synchronization   = ruckig::Synchronization::None;
 
         flag_stop = false;
 
-
         KDL::SetToZero( joint_vel );
-        KDL::SetToZero( joint_last_vel );
 
         for ( int i{ 0 }; i < _joint_num; i++ )
         {
@@ -2988,7 +2985,7 @@ namespace JC_helper
             return -1;
         }
 
-        const auto& res_vel = output.new_velocity;
+        const auto& res_vel = output.new_position;
 
         if ( abs( _Cartesian_vel_index ) <= 3 )  //移动
         {
@@ -3001,8 +2998,8 @@ namespace JC_helper
 
         if ( _reference_frame.compare( "flange" ) == 0 )
         {  //** 转变速度矢量的参考系，由flange系变为base系，但没有改变参考点（还是flange） **//
-                FK_slover.JntToCart( vector_2_JntArray( robot_ptr->pos_ ), current_flange );
-                Cartesian_vel = current_flange.M * Cartesian_vel;
+            FK_slover.JntToCart( vector_2_JntArray( robot_ptr->pos_ ), current_flange );
+            Cartesian_vel = current_flange.M * Cartesian_vel;
         }
 
         output.pass_to_input( input );
@@ -3038,14 +3035,14 @@ namespace JC_helper
             if ( !flag_stop )
                 t_count++;
 
-            if ( t_count > 100 )
+            if ( t_count > 100 ) //50毫秒保持一次通信
             {
                 t_count = 0;
                 if ( _tick_count != robot_ptr->tick_count )
                     _tick_count = robot_ptr->tick_count;
                 else
                 {
-                    PLOG_WARNING << "点动指令时间间隔超过100ms,停止";
+                    PLOG_WARNING << "点动指令时间间隔过长,停止";
                     Cartesian_stop( );  //速度目标设置为0
                 }
             }
@@ -3067,9 +3064,7 @@ namespace JC_helper
                 KDL::Add( joint_current, joint_vel, joint_target );
 
                 //** 速度和加速度保护 **//
-                static std::vector< double > _max_acc( _joint_num, 2 );//临时修改 ,因为10的加速度实在太大了
-                    
-                if ( !flag_stop && check_vel_acc( joint_target, joint_current, joint_last_pos, robot_ptr->max_vel_, _max_acc ) < 0 )
+                if ( !flag_stop && check_vel_acc( joint_target, joint_current, joint_last_pos, 1, 5 ) < 0 )
                 {
                     //! 急停状态下不用速度检查，因为会和笛卡尔急停冲突（笛卡尔急停会使得关节加速度超大，必触发关节急停保护）
                     flag_stop = true;
@@ -3087,18 +3082,10 @@ namespace JC_helper
                 safety_servo(robot_ptr,joint_target);
                 //**-------------------------------**//
 
-                if ( res == 0 )
+                if ( res == 0 && flag_stop )
                 {
-                    if ( !flag_stop )
-                    {
-                        PLOG_INFO << "笛卡尔空间点动已完成";  //! 这种情况说明最大速度、加速度太大，而目标位置太小，导致100ms以内就完成了，这种情况不应该发生
-                        break;
-                    }
-                    else
-                    {
-                        PLOG_INFO << "笛卡尔空间急停已完成";
-                        break;
-                    }
+                    PLOG_INFO << "笛卡尔空间急停已完成";
+                    break;
                 }
             }
         }
@@ -3131,7 +3118,7 @@ namespace JC_helper
                 *external_finished_flag_ptr = false;
         }
         else
-            PLOG_ERROR << "紧急停止中,不允许修改目标";
+            PLOG_WARNING << "紧急停止中,不允许修改目标";
     }
 
     void SmartServo_Cartesian::Cartesian_stop( double max_vel, double max_acc, double max_jerk )
@@ -3219,7 +3206,7 @@ namespace JC_helper
         }
     }
 
-    int check_vel_acc( const KDL::JntArray& current_pos, const KDL::JntArray& last_pos, const KDL::JntArray& last_last_pos, const std::vector<double>& max_vel, const std::vector<double>& max_acc )
+    int check_vel_acc( const KDL::JntArray& current_pos, const KDL::JntArray& last_pos, const KDL::JntArray& last_last_pos, const double max_vel, const double max_acc )
     {
         KDL::JntArray current_vel( _joint_num );
         KDL::JntArray last_vel( _joint_num );
@@ -3236,19 +3223,19 @@ namespace JC_helper
 
         for ( int i{ 0 }; i < _joint_num; i++ )
         {
-            if ( abs( current_vel( i ) ) > max_vel[ i ] )
+            if ( abs( current_vel( i ) ) > max_vel)
             {
                 PLOG_ERROR << "joint[" << i << "] velocity is too  fast";
                 PLOG_ERROR << "target velocity = " << current_vel( i ) * KDL::rad2deg;
-                PLOG_ERROR << "max velocity=" << max_vel[ i ] * KDL::rad2deg;
+                PLOG_ERROR << "max velocity=" << max_vel* KDL::rad2deg;
                 return -1;
             }
 
-            if ( abs( current_acc( i ) ) > max_acc[ i ] )
+            if ( abs( current_acc( i ) ) > max_acc)
             {
                 PLOG_ERROR << "joint[" << i << "] acceleration is too  fast";
                 PLOG_ERROR << "target acceleration = " << current_acc( i ) * KDL::rad2deg;
-                PLOG_ERROR << "max acceleration=" << max_acc[ i ] * KDL::rad2deg;
+                PLOG_ERROR << "max acceleration=" << max_acc* KDL::rad2deg;
                 return -1;
             }
         }

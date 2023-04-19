@@ -359,8 +359,7 @@ namespace JC_helper
 
             if ( on_stop_trajectory ) break;
 
-            static std::vector< double > _my_max_acc( _joint_num, 2 );//临时修改,加速度不应太大
-            if ( check_vel_acc( _q_target, current_pos, last_pos, robot_ptr->max_vel_, _my_max_acc) < 0 )
+            if ( check_vel_acc( _q_target, current_pos, last_pos, 1, 2) < 0 )
             {
                 on_stop_trajectory = true;
                 break;
@@ -507,8 +506,7 @@ namespace JC_helper
 
             if ( on_stop_trajectory ) break;
 
-            static std::vector< double > _my_max_acc( _joint_num, 2 );  //临时修改,加速度不应太大
-            if ( check_vel_acc( _q_target, current_pos, last_pos, robot_ptr->max_vel_, _my_max_acc ) < 0 )
+            if ( check_vel_acc( _q_target, current_pos, last_pos, 1, 2 ) < 0 )
             {
                 on_stop_trajectory = true;
                 break;
