@@ -20,13 +20,6 @@
 #include <csignal>
 #include <cstdio>
 #include <cstdlib>
-
-// #include <QtCore>
-// #include <QProcess>
-// #include <QString>
-// #include <QDebug>
-// #include <QFile>
-
 #include <drive.h>
 #include <ethercat/hardware.h>
 #include <ethercat/hardware_sim.h>
@@ -93,52 +86,43 @@ namespace rocos
 
         if ( str == std::string_view{ "run" } )
         {
-            // double ref_pos = 15.74;
+            //这里演示的是一个关节
+            std::array< double, 1 >same_torque_and_pos{1};//! 力传感器大小方向与关节轴向相同为1 ，不同为-1[必填参数]
+            std::array< double, 1 > ref_pos{ 0 };//! 竖直位置弧度[必填参数]
 
-            int same_torque_and_pos{ -1 };  //! 力传感器大小方向与关节轴向相同为1 ，不同为-1[必填参数]
-            double ref_pos = 2.91;          //! 竖直位置[必填参数]
-
-            double gravity_torque = 0;
-            double zero_drift     = 0;
+            
+            std::array< double, 1 > gravity_torque{ 0 }; //!相当于重力乘长度（G*L）
+            std::array< double, 1 > zero_drift{ 0};//!零漂
             size_t time_torque{ 0 };  // 计数器
 
-#if 0  //** 方向测试 **//
+#if 1  //** 方向测试 **//
 
-// 位置方向测试
+            // 力矩传感器方向确认
 
-            q_target( 0 ) = ref_pos + 30 * KDL::deg2rad;
-            MoveJ( q_target, 0.3, 1, 0, 0, false );
+            //** 滤波器初始化 **//
 
-// 力矩传感器方向确认
+            std::array< Iir::Butterworth::LowPass< 3 >, 1 > filter_array{ };
+            const float samplingrate     = 200;                            // Hz
+            const float cutoff_frequency = 5;                              // Hz
+            filter_array[ 0 ].setup( 3, samplingrate, cutoff_frequency );  // NOTE： here order should replaced by a int number!
 
-                //** 滤波器初始化 **//
-                Iir::Butterworth::LowPass< 3 > filter;              // NOTE： here order should replaced by a int number!
-                const float samplingrate     = 200;                // Hz
-                const float cutoff_frequency = 5;                   // Hz
-                filter.setup( 3, samplingrate, cutoff_frequency );  // NOTE： here order should replaced by a int number!
-                //**-------------------------------**//
+            //**-------------------------------**//
 
-                time_torque = 0;
-                while ( time_torque < 20000 )
+            time_torque = 0;
+            while ( time_torque < 60000 )
+            {
+                if ( time_torque % 200 == 0 )
                 {
-                    if ( time_torque % 200 == 0 )
-                    {
-                        PLOG_INFO << "sensor_torque =" << filter.filter( joints_[ 0 ]->getLoadTorque( ) );
-                    }
-                    else
-                        filter.filter( joints_[ 0 ]->getLoadTorque( ) );  // 竖立情况下测量，得到零漂
-                    hw_interface_->waitForSignal( 0 );
-                    time_torque++;
+                    PLOG_INFO << "sensor_torque[0] =" << filter_array[ 0 ].filter( joints_[ 0 ]->getLoadTorque( ) );
+                    PLOG_INFO << "-------------------------------------";
                 }
-
-        
-//力矩实验
-
-                joints_[ 0 ]->setMode( ModeOfOperation::CyclicSynchronousTorqueMode );
+                else
+                {
+                    filter_array[ 0 ].filter( joints_[ 0 ]->getLoadTorque( ) );
+                }
                 hw_interface_->waitForSignal( 0 );
-                joints_[ 0 ]->setTorque( 50 );
-                std::this_thread::sleep_for( std::chrono::duration< double >( 5 ) );
-                joints_[ 0 ]->setTorque( 0 );
+                time_torque++;
+            }
 
 #endif
 
@@ -146,40 +130,46 @@ namespace rocos
 
             {
                 //** 滤波器初始化 **//
-                Iir::Butterworth::LowPass< 3 > filter;              // NOTE： here order should replaced by a int number!
-                const float samplingrate     = 200;                 // Hz
-                const float cutoff_frequency = 5;                   // Hz
-                filter.setup( 3, samplingrate, cutoff_frequency );  // NOTE： here order should replaced by a int number!
+                std::array< Iir::Butterworth::LowPass< 3 >, 1 > filter_array{ };
+                const float samplingrate     = 200;                            // Hz
+                const float cutoff_frequency = 5;                              // Hz
+                filter_array[ 0 ].setup( 3, samplingrate, cutoff_frequency );  // NOTE： here order should replaced by a int number!
+
                 //**-------------------------------**//
 
-                q_target( 0 ) = ref_pos;
+                q_target( 0 ) = ref_pos[0];
                 MoveJ( q_target, 0.3, 1, 0, 0, false );
 
+                time_torque = 0;
                 while ( time_torque < 5000 )
                 {
-                    zero_drift = filter.filter( joints_[ 0 ]->getLoadTorque( ) );  // 竖立情况下测量，得到零漂
+                    zero_drift[ 0 ] = filter_array[ 0 ].filter( joints_[ 0 ]->getLoadTorque( ) );  // 竖立情况下测量，得到零漂
                     hw_interface_->waitForSignal( 0 );
                     time_torque++;
                 }
-                PLOG_INFO << "零漂  = " << zero_drift;
+
+                PLOG_INFO << "零漂[0]  = " << zero_drift[0];
 
                 time_torque                    = 0;
-                double gravity_torque_test_pos = 90 * KDL::deg2rad;
-                q_target( 0 )                  = ref_pos + gravity_torque_test_pos;
+                double gravity_torque_test_pos = 30 * KDL::deg2rad;
+                q_target( 0 )                  = ref_pos[ 0 ] + gravity_torque_test_pos;
                 MoveJ( q_target, 0.3, 1, 0, 0, false );
 
                 while ( time_torque < 3000 )
                 {
-                    gravity_torque = filter.filter( joints_[ 0 ]->getLoadTorque( ) ) - zero_drift;  // 水平情况下测量,得到负载重力
-                    gravity_torque = gravity_torque * KDL::sign( gravity_torque_test_pos );
+                    gravity_torque[0] = filter_array[0].filter( joints_[ 0 ]->getLoadTorque( ) ) - zero_drift[0];  // 水平情况下测量,得到负载重力
+                    gravity_torque[0] = same_torque_and_pos[0]*gravity_torque[0] / KDL::sign( gravity_torque_test_pos );
                     hw_interface_->waitForSignal( 0 );
                     time_torque++;
                 }
 
-                PLOG_INFO << "负载重力引起的力矩  = " << gravity_torque;
+                PLOG_INFO << "负载引起额外力矩[0]  = " << gravity_torque[0] ;
 
-                // 零漂 =    60;
-                //!  gravity = −116.49
+
+                // 零漂_1 =    -6.01295;
+                // 零漂_2 =    26.6135;
+                //!  gravity_torque_1 =-6.61275
+                //!  gravity_torque_2 =-6.77272
             }
 #endif
 
@@ -188,29 +178,35 @@ namespace rocos
                 double angle                    = 0;
                 double gravity_torque_component = 0;
 
-                // init filter
-                Iir::Butterworth::LowPass< 3 > filter;              // NOTE： here order should replaced by a int number!
-                const float samplingrate     = 200;                 // Hz
-                const float cutoff_frequency = 5;                   // Hz
-                filter.setup( 3, samplingrate, cutoff_frequency );  // NOTE： here order should replaced by a int number!
 
-                for ( int i = 0; i < 61; i = i + 10 )
+
+                //** 滤波器初始化 **//
+                std::array< Iir::Butterworth::LowPass< 3 >, 1 > filter_array{ };
+                const float samplingrate     = 200;                            // Hz
+                const float cutoff_frequency = 5;                              // Hz
+                filter_array[ 0 ].setup( 3, samplingrate, cutoff_frequency );  // NOTE： here order should replaced by a int number!
+                //**-------------------------------**//
+
+
+                for ( int i = 0; i < 51; i = i + 10 )
                 {
-                    q_target( 0 ) = ref_pos + i * KDL::deg2rad;
+                    q_target( 0 ) = ref_pos[0] + i * KDL::deg2rad;
                     MoveJ( q_target, 0.3, 1, 0, 0, false );
 
                     time_torque = 0;
-                    while ( time_torque < 2000 )
+                    while ( time_torque < 1200 )
                     {
-                        filter.filter( joints_[ 0 ]->getLoadTorque( ) );
+                        filter_array[0].filter( joints_[ 0 ]->getLoadTorque( ) );
                         hw_interface_->waitForSignal( 0 );
                         time_torque++;
                     }
 
-                    angle                    = joints_[ 0 ]->getPosition( ) - ref_pos;
-                    gravity_torque_component = gravity_torque * sin( angle );
-                    PLOG_DEBUG << "  误差 =  " << filter.filter( joints_[ 0 ]->getLoadTorque( ) ) - zero_drift - gravity_torque_component;
+                    angle                    = joints_[ 0 ]->getPosition( ) - ref_pos[ 0 ];
+                    gravity_torque_component = gravity_torque[ 0 ] * sin( angle );
+                    PLOG_DEBUG << "  误差[0] =  " << filter_array[ 0 ].filter( joints_[ 0 ]->getLoadTorque( ) ) - zero_drift[ 0 ] - gravity_torque_component * same_torque_and_pos[ 0 ];
                 }
+
+
             }
 
 #endif
@@ -220,62 +216,69 @@ namespace rocos
             {
                 std::cout.setf( ios::scientific );
 
-                double pos{ 0 };
-                double last_pos{ 0 };
-                double vel{ 0 };
-                double target_torque{ 0 };
-                double sensor_torque{ 0 };
-                double offset_torque{ 0 };
-                double last_offset_torque{ 0 };
-                double vel_torque{ 0 };
-                double command_torque{ 0 };
 
-                double gravity_torque_component = 0;
+                std::array< double, 1 > pos{ 0 };
+                std::array< double, 1 > last_pos{ 0 };
+                std::array< double, 1 > vel{ 0 };
+                std::array< double, 1 > target_torque{ 0 };
+                std::array< double, 1 > sensor_torque{ 0 };
+                std::array< double, 1 > offset_torque{ 0 };
+                std::array< double, 1 > last_offset_torque{ 0 };
+                std::array< double, 1 > vel_torque{ 0 };
+                std::array< double, 1 > command_torque{ 0 };
+                std::array< double, 1 > gravity_torque_component{ 0 };
 
-                // init filter
-                Iir::Butterworth::LowPass< 3 > filter_1;              // NOTE： here order should replaced by a int number!
-                const float samplingrate     = 200;                   // Hz
-                const float cutoff_frequency = 5;                     // Hz
-                filter_1.setup( 3, samplingrate, cutoff_frequency );  // NOTE： here order should replaced by a int number!
+                //** 滤波器初始化 **//
+                std::array< Iir::Butterworth::LowPass< 3 >, 1 > filter_array{ };
+                const float samplingrate     = 200;                            // Hz
+                const float cutoff_frequency = 5;                              // Hz
+                filter_array[ 0 ].setup( 3, samplingrate, cutoff_frequency );  // NOTE： here order should replaced by a int number!
+                //**-------------------------------**//
 
-                q_target( 0 ) = ref_pos;
+                q_target( 0 ) = ref_pos[ 0 ];
                 MoveJ( q_target, 0.3, 1, 0, 0, false );
 
                 joints_[ 0 ]->setMode( ModeOfOperation::CyclicSynchronousTorqueMode );
 
                 time_torque = 0;
-                while ( time_torque < 300000 )
+                // while ( time_torque < 300000 )
+                while ( 1 )
                 {
-                    pos = joints_[ 0 ]->getPosition( ) - ref_pos;
-                    vel = ( pos - last_pos ) / 0.001;
-
-                    gravity_torque_component = gravity_torque * sin( pos );
-
-                    target_torque = -( pos * 70 + vel * 5 );
-
-                    sensor_torque = filter_1.filter( joints_[ 0 ]->getLoadTorque( ) ) - zero_drift - gravity_torque_component;
-
-                    offset_torque = target_torque - ( -1 * same_torque_and_pos * sensor_torque );
-
-                    vel_torque = ( offset_torque - last_offset_torque );
-
-                    command_torque = target_torque + ( 5 * offset_torque + 3.5 * vel_torque );
-
-                    if ( std::abs( command_torque ) > 400 )
-                        command_torque = KDL::sign( command_torque ) * 400;
-
-                    joints_[ 0 ]->setTorque( command_torque );
-
-                    if ( time_torque % 200 == 0 )
+                    for ( int i = 0; i < 1; i++ )
                     {
-                        PLOG_INFO << "target_torque =" << target_torque;
-                        PLOG_WARNING << "sensor_torque = " << sensor_torque;
-                        PLOG_DEBUG << "command_torque = " << command_torque;
+                        pos[ i ] = joints_[ i ]->getPosition( ) - ref_pos[ i ];
+                        vel[ i ] = ( pos[ i ] - last_pos[ i ] ) / 0.001;
+
+                        gravity_torque_component[ i ] = gravity_torque[ i ] * sin( pos[ i ] );
+
+                        target_torque[ i ] = -( pos[ i ] * 120 + vel[ i ] * 5 );
+
+                        sensor_torque[ i ] = filter_array[ i ].filter( joints_[ i ]->getLoadTorque( ) ) - zero_drift[ i ] - gravity_torque_component[ i ] * same_torque_and_pos[ i ];
+
+                        offset_torque[ i ] = target_torque[ i ] - ( -1 * same_torque_and_pos[ i ] * sensor_torque[ i ] );  //-1代表将力矩传感器受到的力转换为关节实际输出的力
+
+                        vel_torque[ i ] = ( offset_torque[ i ] - last_offset_torque[ i ] );
+
+                        command_torque[ i ] = target_torque[ i ] + ( 10 * offset_torque[ i ] + 6.5 * vel_torque[ i ] );
+
+                        if ( std::abs( command_torque[ i ] ) > 400 )
+                            command_torque[ i ] = KDL::sign( command_torque[ i ] ) * 400;
+
+                        joints_[ i ]->setTorque( command_torque[ i ] );
+
+                        if ( time_torque % 200 == 0 )
+                        {
+                            PLOG_INFO << "target_torque[" << i << "] =" << target_torque[ i ];
+                            PLOG_WARNING << "sensor_torque[" << i << "] =" << sensor_torque[ i ];
+                            PLOG_DEBUG << "command_torque [" << i << "] =" << command_torque[ i ];
+                            PLOG_DEBUG << "--------------------------------------";
+                        }
+
+                        last_pos[ i ]           = pos[ i ];
+                        last_offset_torque[ i ] = offset_torque[ i ];
                     }
 
                     time_torque += 1;
-                    last_pos           = pos;
-                    last_offset_torque = offset_torque;
                     hw_interface_->waitForSignal( 0 );
                 }
 
@@ -314,7 +317,7 @@ int main( int argc, char* argv[] )
     std::this_thread::sleep_for( std::chrono::duration< double >( 5 ) );
     //**-------------------------------**//
 
-    // boost::shared_ptr< HardwareInterface > hw = boost::make_shared< HardwareSim >( 1 );  // 仿真
+    // boost::shared_ptr< HardwareInterface > hw = boost::make_shared< HardwareSim >( 2 );  // 仿真
     boost::shared_ptr< HardwareInterface > hw = boost::make_shared< Hardware >( );  // 真实机械臂
 
     //** 判断主站ECM是否启动成功 **//
@@ -323,38 +326,38 @@ int main( int argc, char* argv[] )
     //! 主站不启动和25S以外一样，建立不了连接
     //! 小结：主站必需25s以内启动，并且连续三次判断主站处于Ready状态，其余情况统统退出程序
 
-    int Ready_count{ 0 };
-    for ( int i{ 0 }; i < 3; i++ )
-    {
-        hw->setHardwareState( HardwareInterface::HWState::UNKNOWN );
+    // int Ready_count{ 0 };
+    // for ( int i{ 0 }; i < 3; i++ )
+    // {
+    //     hw->setHardwareState( HardwareInterface::HWState::UNKNOWN );
 
-        std::this_thread::sleep_for( std::chrono::duration< double >( 0.1 ) );
+    //     std::this_thread::sleep_for( std::chrono::duration< double >( 0.1 ) );
 
-        if ( hw->getHardwareState( ) == HardwareInterface::HWState::READY )
-        {
-            Ready_count++;
-            std::cerr << "\033[32m"
-                      << "Ready" << std::endl;
-        }
-        else
-        {
-            Ready_count = 0;
-            std::cerr << "\033[1;31m"
-                      << "Not Ready" << std::endl;
-        }
-    }
+    //     if ( hw->getHardwareState( ) == HardwareInterface::HWState::READY )
+    //     {
+    //         Ready_count++;
+    //         std::cerr << "\033[32m"
+    //                   << "Ready" << std::endl;
+    //     }
+    //     else
+    //     {
+    //         Ready_count = 0;
+    //         std::cerr << "\033[1;31m"
+    //                   << "Not Ready" << std::endl;
+    //     }
+    // }
 
-    if ( Ready_count == 3 )
-    {
-        std::cerr << "\033[32m"
-                  << "HardWare准备好,开始程序" << std::endl;
-    }
-    else
-    {
-        std::cerr << "\033[1;31m"
-                  << "HardWare未准备好,程序退出" << std::endl;
-        exit( 0 );
-    }
+    // if ( Ready_count == 3 )
+    // {
+    //     std::cerr << "\033[32m"
+    //               << "HardWare准备好,开始程序" << std::endl;
+    // }
+    // else
+    // {
+    //     std::cerr << "\033[1;31m"
+    //               << "HardWare未准备好,程序退出" << std::endl;
+    //     exit( 0 );
+    // }
     //**-------------------------------**//
 
     Robot robot( hw );
