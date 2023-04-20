@@ -20,13 +20,6 @@
 #include <csignal>
 #include <cstdio>
 #include <cstdlib>
-
-//#include <QtCore>
-//#include <QProcess>
-//#include <QString>
-//#include <QDebug>
-//#include <QFile>
-
 #include <drive.h>
 #include <ethercat/hardware.h>
 #include <ethercat/hardware_sim.h>
@@ -36,7 +29,6 @@
 #include <robot_service.h>
 #include <string>
 bool isRuning = true;
-
 
 #pragma region  //*测试9  完整上电保护程序
 
@@ -315,8 +307,66 @@ void signalHandler( int signo )
     }
 }
 
+/**
+ * @brief 设置指定线程为最高优先级
+ *
+ * @param this_thread 线程号
+ * @return int -1失败，0成功
+ */
+int set_priority_max( pthread_t this_thread )
+{
+    const int max_thread_priority = sched_get_priority_max( SCHED_FIFO );
+    if ( max_thread_priority != -1 )
+    {
+        // We'll operate on the currently running thread.
+        // pthread_t this_thread = pthread_self( );
+
+        // struct sched_param is used to store the scheduling priority
+        struct sched_param params;
+
+        // We'll set the priority to the maximum.
+        params.sched_priority = max_thread_priority;
+
+        int ret = pthread_setschedparam( this_thread, SCHED_FIFO, &params );
+        if ( ret != 0 )
+        {
+            std::cerr << RED << "Unsuccessful in setting main thread realtime priority. Error code: " << GREEN << std::endl;
+            return -1;
+        }
+        // Now verify the change in thread priority
+        int policy = 0;
+        ret        = pthread_getschedparam( this_thread, &policy, &params );
+        if ( ret != 0 )
+        {
+            std::cerr << RED << "Couldn't retrieve real-time scheduling paramers" << GREEN << std::endl;
+            return -1;
+        }
+
+        // Check the correct policy was applied
+        if ( policy != SCHED_FIFO )
+        {
+            std::cerr << RED << "Main thread: Scheduling is NOT SCHED_FIFO!" << GREEN << std::endl;
+            return -1;
+        }
+        else
+        {
+            std::cout << GREEN << "Main thread: SCHED_FIFO OK" << std::endl;
+        }
+
+        // Print thread scheduling priority
+        std::cout << GREEN << "Main thread priority is " << params.sched_priority << std::endl;
+        return 0;
+    }
+    else
+    {
+        std::cerr << RED << "Could not get maximum thread priority for main thread" << GREEN << std::endl;
+        return -1;
+    }
+}
+
 int main( int argc, char* argv[] )
 {
+
     if ( signal( SIGINT, signalHandler ) == SIG_ERR )
     {
         std::cout << "\033[1;31m"
@@ -324,10 +374,16 @@ int main( int argc, char* argv[] )
                   << "\033[0m" << std::endl;
     }
 
+    if ( set_priority_max( pthread_self( ) ) < 0 )
+    {
+        std::cerr << RED << "Can not set priority max" << std::endl;
+        exit( -1 );
+    }
+
     using namespace rocos;
 
     //** 等待主站清除共享内存,25后再启动APP **//
-    std::cerr << "\033[32m"
+    std::cerr << GREEN
               << "等待主站清除共享内存" << std::endl;
     std::this_thread::sleep_for( std::chrono::duration< double >( 10 ) );
     //**-------------------------------**//
