@@ -1056,6 +1056,10 @@ namespace JC_helper
         ruckig::Result res;
         int count{ 0 };
         int _tick_count{ robot_ptr->tick_count };
+        auto t_start = std::chrono::high_resolution_clock::now( );
+        auto t_stop  = t_start;
+        std::chrono::duration< double > duration;
+
         //**-------------------------------**//
 
         //第一次启动需要等待command()
@@ -1067,6 +1071,8 @@ namespace JC_helper
 
         while ( 1 )
         {
+            t_start = std::chrono::high_resolution_clock::now( );
+
             input_lock.lock( );
             res = otg.update( input, output );
             input_lock.unlock( );
@@ -1137,6 +1143,12 @@ namespace JC_helper
                 }
             }
             //**-------------------------------**//
+            t_stop   = std::chrono::high_resolution_clock::now( );
+            duration = ( t_stop - t_start );
+            if ( duration.count( ) > 0.0015 )
+            {
+                PLOG_WARNING << "计算时间超时：" << duration.count( ) << "s" << std::endl;
+            }
         }
     }
 
@@ -3022,7 +3034,10 @@ namespace JC_helper
     {
         int t_count = 0;  //时间计数
         int _tick_count{ robot_ptr->tick_count };
-
+        auto t_start = std::chrono::high_resolution_clock::now( );
+        auto t_stop =t_start;
+        std::chrono::duration<double> duration;
+        
         //! 由init()保证成立，由command()来打破
         while ( *external_finished_flag_ptr )
         {
@@ -3031,6 +3046,8 @@ namespace JC_helper
 
         while ( 1 )
         {
+            t_start = std::chrono::high_resolution_clock::now( );
+
             //** 心跳检查 **//
             if ( !flag_stop )
                 t_count++;
@@ -3087,6 +3104,12 @@ namespace JC_helper
                     PLOG_INFO << "笛卡尔空间急停已完成";
                     break;
                 }
+            }
+            t_stop   = std::chrono::high_resolution_clock::now( );
+            duration = ( t_stop - t_start );
+            if ( duration.count( ) > 0.0015 )
+            {
+                PLOG_WARNING << "计算时间超时：" << duration.count( ) << "s" << std::endl;
             }
         }
 

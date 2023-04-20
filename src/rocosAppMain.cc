@@ -430,7 +430,7 @@ int main( int argc, char* argv[] )
     //** 等待主站清除共享内存,25后再启动APP **//
     std::cerr << GREEN
               << "等待主站清除共享内存" << std::endl;
-    std::this_thread::sleep_for( std::chrono::duration< double >( 10 ) );
+    // std::this_thread::sleep_for( std::chrono::duration< double >( 10 ) );
     //**-------------------------------**//
 
     boost::shared_ptr< HardwareInterface > hw = boost::make_shared< HardwareSim >( _joint_num );  // 仿真
@@ -486,6 +486,7 @@ int main( int argc, char* argv[] )
     robotService->runServer( );
 
     thread_test.join( );
+
 
     return 0;
 }
