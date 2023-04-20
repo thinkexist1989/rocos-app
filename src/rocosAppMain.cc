@@ -313,7 +313,7 @@ void signalHandler( int signo )
  * @param this_thread 线程号
  * @return int -1失败，0成功
  */
-int set_priority_max( pthread_t this_thread )
+int set_thread_priority_max( pthread_t this_thread )
 {
     const int max_thread_priority = sched_get_priority_max( SCHED_FIFO );
     if ( max_thread_priority != -1 )
@@ -330,7 +330,7 @@ int set_priority_max( pthread_t this_thread )
         int ret = pthread_setschedparam( this_thread, SCHED_FIFO, &params );
         if ( ret != 0 )
         {
-            std::cerr << RED << "Unsuccessful in setting main thread realtime priority. Error code: " << GREEN << std::endl;
+            std::cerr << RED << "Unsuccessful in setting main thread realtime priority. Error code: " << ret << GREEN << std::endl;
             return -1;
         }
         // Now verify the change in thread priority
@@ -364,6 +364,51 @@ int set_priority_max( pthread_t this_thread )
     }
 }
 
+/**
+ * @brief 设置指定进程为最高优先级
+ *
+ * @param this_thread 线程号
+ * @return int -1失败，0成功
+ */
+int set_process_priority_max( pid_t pid )
+{
+    const int max_thread_priority = sched_get_priority_max( SCHED_FIFO );
+    if ( max_thread_priority != -1 )
+    {
+        // We'll operate on the currently running thread.
+        // pthread_t this_thread = pthread_self( );
+
+        // struct sched_param is used to store the scheduling priority
+        struct sched_param params;
+
+        // We'll set the priority to the maximum.
+        params.sched_priority = max_thread_priority;
+
+        int ret = sched_setscheduler( pid, SCHED_FIFO, &params );
+        if ( ret != 0 )
+        {
+            std::cerr << RED << "Unsuccessful in setting main process realtime priority. Error code: " << ret << GREEN << std::endl;
+            return -1;
+        }
+        // Now verify the change in thread priority
+        ret = sched_getparam( pid, &params );
+        if ( ret != 0 )
+        {
+            std::cerr << RED << "Couldn't retrieve real-time scheduling paramers" << GREEN << std::endl;
+            return -1;
+        }
+
+        // Print thread scheduling priority
+        std::cout << GREEN << "Main process : [" << pid << "] priority is " << params.sched_priority << std::endl;
+        return 0;
+    }
+    else
+    {
+        std::cerr << RED << "Could not get maximum thread priority for main process" << GREEN << std::endl;
+        return -1;
+    }
+}
+
 int main( int argc, char* argv[] )
 {
 
@@ -374,9 +419,9 @@ int main( int argc, char* argv[] )
                   << "\033[0m" << std::endl;
     }
 
-    if ( set_priority_max( pthread_self( ) ) < 0 )
+    if ( set_process_priority_max( getpid( ) ) < 0 )
     {
-        std::cerr << RED << "Can not set priority max" << std::endl;
+        std::cerr << RED << "Can not set priority max for rocos-app process" << std::endl;
         exit( -1 );
     }
 
