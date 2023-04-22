@@ -86,6 +86,10 @@ namespace rocos {
 
         int16_t getLoadTorqueInCnt();
 
+        int32_t getSecondaryPositionInCnt();
+
+        int32_t getSecondaryVelocityInCnt();
+
         double getPosition();
 
         double getVelocity();

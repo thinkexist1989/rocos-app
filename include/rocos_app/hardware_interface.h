@@ -107,6 +107,10 @@ namespace rocos {
 
         virtual int16_t getLoadTorqueRaw(int id);
 
+        virtual int32_t getSecondaryPositionRaw(int id);
+
+        virtual int32_t getSecondaryVelocityRaw(int id);
+
         virtual uint16_t getStatuswordRaw(int id);
 
 

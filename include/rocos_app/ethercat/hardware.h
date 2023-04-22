@@ -65,6 +65,10 @@ namespace rocos {
 
         int16_t getLoadTorqueRaw(int id) override;
 
+        int32_t getSecondaryPositionRaw(int id) override;
+
+        int32_t getSecondaryVelocityRaw(int id) override;
+
         uint16_t getStatuswordRaw(int id) override;
 
         std::string getSlaveName(int id) override;

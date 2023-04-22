@@ -395,6 +395,14 @@ namespace rocos {
         return hw_interface_->getLoadTorqueRaw(id_);
     }
 
+    int32_t Drive::getSecondaryPositionInCnt() {
+        return hw_interface_->getSecondaryPositionRaw(id_);
+    }
+
+    int32_t Drive::getSecondaryVelocityInCnt() {
+        return hw_interface_->getSecondaryVelocityRaw(id_);
+    }
+
     void Drive::moveToPositionInCnt(int32_t pos, double max_vel, double max_acc, double max_jerk, ProfileType type) {
         auto p0 = hw_interface_->getActualPositionRaw(id_);
         R_INTERP_BASE *interp;

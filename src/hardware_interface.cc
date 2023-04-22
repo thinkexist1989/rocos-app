@@ -142,5 +142,13 @@ namespace rocos {
     void HardwareInterface::setHardwareState(HardwareInterface::HWState state) {
     }
 
+    int32_t HardwareInterface::getSecondaryPositionRaw(int id) {
+        return 0;
+    }
+
+    int32_t HardwareInterface::getSecondaryVelocityRaw(int id) {
+        return 0;
+    }
+
 }
 

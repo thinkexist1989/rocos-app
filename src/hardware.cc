@@ -130,4 +130,12 @@ namespace rocos {
         ecPtr->ecatInfo->ecatState = static_cast<EcatInfo::EcatState>(state);
     }
 
+    int32_t Hardware::getSecondaryPositionRaw(int id) {
+        return ecPtr->getSecondaryPositionEC(id);
+    }
+
+    int32_t Hardware::getSecondaryVelocityRaw(int id) {
+        return ecPtr->getSecondaryVelocityEC(id);
+    }
+
 }
