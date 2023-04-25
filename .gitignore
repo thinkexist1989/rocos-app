@@ -1,6 +1,5 @@
 cmake-build-*/
 .idea/
-
 devel/
 logs/
 build/
@@ -60,3 +59,6 @@ CATKIN_IGNORE
 #log
 **/command_log.csv
 **/log
+
+**/example/*
+!**/example/CMakeLists.txt

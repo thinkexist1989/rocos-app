@@ -10,3 +10,10 @@ target_include_directories(gripper
     $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/gripper_client_cpp>
 )
 add_library(JC_helper::gripper ALIAS gripper)
+
+
+
+install(
+    DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}/gripper_client_cpp/
+    DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}/${PROJECT_NAME}
+)

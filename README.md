@@ -17,6 +17,32 @@
 ROCOS-App is the application of robotics, which is designed as the robot controller for ROCOS. 
 
 
+## Usage
+
+```bash
+
+mkdir -p build
+pushd build
+cmake   -DCMAKE_BUILD_TYPE=Release ..
+make -j`nproc`
+make install
+popd
+
+
+cd example
+
+mkdir -p build
+pushd build
+cmake   -DCMAKE_BUILD_TYPE=Release ..
+make -j`nproc`
+pushd bin
+./rocos_app
+```
+
+
+
+
+
 
 ## Dependencies
 

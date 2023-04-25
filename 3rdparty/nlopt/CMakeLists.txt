@@ -19,7 +19,7 @@ if (NOT DEFINED CMAKE_BUILD_TYPE)
 endif ()
 
 project (nlopt)
-set(CMAKE_INSTALL_PREFIX /home/abc418/nlopt/output)
+
 #==============================================================================
 # version
 set (NLOPT_MAJOR_VERSION "2")
@@ -237,7 +237,7 @@ if (NLOPT_CXX11)
   src/algs/ags/local_optimizer.hpp src/algs/ags/local_optimizer.cc src/algs/ags/ags.h src/algs/ags/ags.cc)
 endif ()
 
-install (FILES ${NLOPT_HEADERS} DESTINATION ${RELATIVE_INSTALL_INCLUDE_DIR})
+install (DIRECTORY include/nlopt DESTINATION ${CMAKE_INSTALL_INCLUDEDIR})
 
 set (nlopt_lib nlopt)
 add_library (${nlopt_lib} ${NLOPT_SOURCES})
