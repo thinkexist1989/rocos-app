@@ -134,59 +134,7 @@ add_library(rocos::robot ALIAS robot)
 ##################################################
 
 
-# ##############################################################################
-# gRPC    ##
-# ##############################################################################
-file(GLOB PROTO_FILES protos/*.proto) # protobuf
-file(GLOB GRPC_FILES protos/*_service.proto) # gRPC
 
-foreach(PFIL ${PROTO_FILES}) # protobuf gen
-  # Proto file
-  get_filename_component(PROTO_ABS ${PFIL} ABSOLUTE)
-  get_filename_component(PROTO_PATH ${PFIL} PATH)
-  get_filename_component(PROTO_NAME ${PFIL} NAME_WE)
-
-  # Generated sources
-  set(PROTO_SRC "${CMAKE_CURRENT_SOURCE_DIR}/include/${PROTO_NAME}.pb.cc")
-  set(PROTO_HDR "${CMAKE_CURRENT_SOURCE_DIR}/include/${PROTO_NAME}.pb.h")
-  add_custom_command(
-    OUTPUT "${PROTO_SRC}" "${PROTO_HDR}"
-    COMMAND ${_PROTOBUF_PROTOC} ARGS --cpp_out "${CMAKE_CURRENT_SOURCE_DIR}/include/" -I
-    "${PROTO_PATH}" "${PROTO_ABS}"
-    DEPENDS "${PROTO_ABS}")
-  list(APPEND PROTO_SRCS ${PROTO_SRC})
-  list(APPEND PROTO_HDRS ${PROTO_HDR})
-endforeach()
-
-foreach(GFIL ${GRPC_FILES}) # grpc gen
-  # Proto file
-  get_filename_component(GRPC_ABS ${GFIL} ABSOLUTE)
-  get_filename_component(GRPC_PATH ${GFIL} PATH)
-  get_filename_component(GRPC_NAME ${GFIL} NAME_WE)
-
-  # Generated sources
-  set(GRPC_SRC "${CMAKE_CURRENT_SOURCE_DIR}/include/${GRPC_NAME}.grpc.pb.cc")
-  set(GRPC_HDR "${CMAKE_CURRENT_SOURCE_DIR}/include/${GRPC_NAME}.grpc.pb.h")
-  add_custom_command(
-    OUTPUT "${GRPC_SRC}" "${GRPC_HDR}"
-    COMMAND
-    ${_PROTOBUF_PROTOC} ARGS --grpc_out "${CMAKE_CURRENT_SOURCE_DIR}/include/" -I
-    "${GRPC_PATH}" --plugin=protoc-gen-grpc="${_GRPC_CPP_PLUGIN_EXECUTABLE}"
-    "${GRPC_ABS}"
-    DEPENDS "${GRPC_ABS}")
-  list(APPEND GRPC_SRCS ${GRPC_SRC})
-  list(APPEND GRPC_HDRS ${GRPC_HDR})
-endforeach()
-
-# include_directories("${CMAKE_CURRENT_BINARY_DIR}")
-
-# ######### Library protocol #################
-add_library(protocol SHARED ${PROTO_SRCS} ${PROTO_HDRS} ${GRPC_SRCS}
-  ${GRPC_HRDS} src/robot_service.cc)
-target_link_libraries(protocol PUBLIC ${_REFLECTION} ${_GRPC_GRPCPP}
-  ${_PROTOBUF_LIBPROTOBUF} rocos::robot)
-add_library(rocos::protocol ALIAS protocol)
-##################################################
 
 
 # ##############################################################################
@@ -219,7 +167,6 @@ install(
   trac_ik
   orocos-kdl
   kdl_parser
-  protocol
   ruckig
   nlopt
   EXPORT robot_export-target
@@ -257,6 +204,15 @@ install(FILES
 install(FILES "${CMAKE_CURRENT_SOURCE_DIR}/cmake/common.cmake"
   DESTINATION ${robot_INSTALL_CONFIGDIR}/../)
 
+
+# 安装protos
+install(DIRECTORY protos/ DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}/../protos)
+
+# 安装可用的main.cc
+install(FILES
+  "${CMAKE_CURRENT_SOURCE_DIR}/src/rocosAppMain.cc"
+  "${CMAKE_CURRENT_SOURCE_DIR}/src/robot_service.cc"
+  DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}/../src)
 
 
 # [make package]将导出的所有include lib config的压缩包

@@ -61,5 +61,6 @@ CATKIN_IGNORE
 **/log
 
 **/example/*
+!**/example/src/robot_service.cc
+!**/example/src/rocosAppMain.cc
 !**/example/CMakeLists.txt
-!**/example/rocosAppMain.cc
