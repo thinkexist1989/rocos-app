@@ -23,7 +23,7 @@
 // nlopt.hpp is AUTOMATICALLY GENERATED from nlopt-in.hpp - edit the latter!
 #ifndef NLOPT_HPP
 #define NLOPT_HPP
-#include <nlopt.h>
+#include <nlopt/nlopt.h>
 #include <vector>
 #include <stdexcept>
 #include <new>

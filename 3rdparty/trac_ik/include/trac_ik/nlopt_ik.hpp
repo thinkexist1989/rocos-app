@@ -32,7 +32,7 @@ OF THE POSSIBILITY OF SUCH DAMAGE.
 #define NLOPT_IK_HPP
 
 #include <trac_ik/kdl_tl.hpp>
-#include <nlopt.hpp>
+#include <nlopt/nlopt.hpp>
 
 
 namespace NLOPT_IK
