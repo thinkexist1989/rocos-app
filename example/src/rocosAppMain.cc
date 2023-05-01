@@ -239,36 +239,16 @@ namespace rocos
                 q_target( 5 ) = 45 * M_PI / 180;
                 q_target( 6 ) = 0 * M_PI / 180;
 
-                for ( int i = 0; i < 7; i++ )
-                    joints_[ i ]->setMode( ModeOfOperation::CyclicSynchronousPositionMode );
+                MoveJ( q_target, 0.8, 0.6, 0, 0, false );
 
-                MoveJ( q_target, 0.3, 1, 0, 0, false );
+                DRAGGING_FLAG flag       = DRAGGING_FLAG::NULLSPACE;
+                DRAGGING_DIRRECTION dir = DRAGGING_DIRRECTION::POSITION;
 
-                PLOG_INFO << "切换速度模式";
-                // std::cin >> str;
-
-                for ( int i = 0; i < 7; i++ )
-                    joints_[ i ]->setMode( ModeOfOperation::CyclicSynchronousVelocityMode );
-
-                q_target( 5 ) = 0;
-
-                MoveJ( q_target, 0.3, 1, 0, 0, false );
-
-                PLOG_INFO << "切换位置模式，危险";
-                // std::cin >> str;
-
-                for ( int i = 0; i < 7; i++ )
-                    joints_[ i ]->setMode( ModeOfOperation::CyclicSynchronousPositionMode );
-
-                q_target( 5 ) = 45 * M_PI / 180;
-                MoveJ( q_target, 0.3, 1, 0, 0, false );
-
-                for ( int i = 0; i < 7; i++ )
-                    joints_[ i ]->setMode( ModeOfOperation::CyclicSynchronousVelocityMode );
-
-                for ( int i = 0; i < jnt_num_; i++ )
-                    q_target( i ) = 0;
-                MoveJ( q_target, 0.4, 0.6, 0, 0, false );
+                for ( int i = 0; i < 500000; i++ )
+                {
+                    Dragging( flag, dir, 1, 1 );
+                    std::this_thread::sleep_for( std::chrono::duration< double >( 0.004 ) );
+                }
             }
             else
             {
@@ -276,9 +256,6 @@ namespace rocos
                 setDisabled( );
                 return ;
             }
-     
-     
-     
         }
 
         PLOG_INFO << "全部测试结束,goodbye!";

@@ -124,9 +124,9 @@ add_library(rocos::kinematics ALIAS kinematics)
 add_library(
   robot SHARED src/robot.cc src/JC_helper_kinematics.cpp
   src/JC_helper_dynamics.cpp src/JC_helper_authenticate.cpp)
-target_link_libraries(robot PUBLIC rocos::kinematics  ${DEP_LIBS})
+target_link_libraries(robot PUBLIC rocos::kinematics  )
 target_include_directories(robot
-  INTERFACE
+PUBLIC
   $<INSTALL_INTERFACE:${CMAKE_INSTALL_INCLUDEDIR}>
   $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>
 )
@@ -135,24 +135,14 @@ add_library(rocos::robot ALIAS robot)
 
 
 
-
-
 # ##############################################################################
 # Install ##
 # ##############################################################################
-
-# 拷贝urdf配置文件
-file(GLOB_RECURSE CONFIG_FILE config/*.urdf config/public.key config/license)
-file(COPY ${CONFIG_FILE} DESTINATION ${CMAKE_BINARY_DIR}/bin)
-
 
 include(CMakePackageConfigHelpers)
 
 # 安装头文件
 install(DIRECTORY include/ DESTINATION ${CMAKE_INSTALL_INCLUDEDIR})
-
-# 安装urdf
-install(DIRECTORY config/ DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}/../config)
 
 
 # 导出所有依赖的目标
@@ -173,7 +163,8 @@ install(
   ARCHIVE DESTINATION ${CMAKE_INSTALL_LIBDIR}
   LIBRARY DESTINATION ${CMAKE_INSTALL_LIBDIR}
   RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR}
-  PUBLIC_HEADER DESTINATION include/kdl)
+  PUBLIC_HEADER DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}
+  )
 
 # 依赖文件存在位置
 set(robot_INSTALL_CONFIGDIR ${CMAKE_INSTALL_LIBDIR}/cmake/robot_export)
@@ -200,19 +191,6 @@ install(FILES
   "${CMAKE_CURRENT_BINARY_DIR}/robot_export-config-version.cmake"
   DESTINATION ${robot_INSTALL_CONFIGDIR})
 
-# 将生成gprc所需的cmake配置文件移动到指定位置
-install(FILES "${CMAKE_CURRENT_SOURCE_DIR}/cmake/common.cmake"
-  DESTINATION ${robot_INSTALL_CONFIGDIR}/../)
-
-
-# 安装protos
-install(DIRECTORY protos/ DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}/../protos)
-
-# 安装可用的main.cc
-install(FILES
-  "${CMAKE_CURRENT_SOURCE_DIR}/src/rocosAppMain.cc"
-  "${CMAKE_CURRENT_SOURCE_DIR}/src/robot_service.cc"
-  DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}/../src)
 
 
 # [make package]将导出的所有include lib config的压缩包

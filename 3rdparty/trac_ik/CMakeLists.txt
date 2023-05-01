@@ -15,15 +15,14 @@ target_link_libraries(trac_ik PUBLIC ${Boost_LIBRARIES} ${EIGEN3_LIBRARIES}
                                      nlopt orocos-kdl kdl_parser)
 
 # target_include_directories(
-#   trac_ik
-#   PUBLIC ${PROJECT_SOURCE_DIR}/include
-#   PRIVATE ${EIGEN3_INCLUDE_DIR})
-
+# trac_ik
+# PUBLIC ${PROJECT_SOURCE_DIR}/include
+# PRIVATE ${EIGEN3_INCLUDE_DIR})
 target_include_directories(
   trac_ik
-   PUBLIC $<BUILD_INTERFACE:${PROJECT_SOURCE_DIR}/include>
-   PRIVATE $<BUILD_INTERFACE:${EIGEN3_INCLUDE_DIR}>
-                 $<INSTALL_INTERFACE:${CMAKE_INSTALL_INCLUDEDIR}>)
+  PUBLIC $<BUILD_INTERFACE:${PROJECT_SOURCE_DIR}/include>
+  PRIVATE $<BUILD_INTERFACE:${EIGEN3_INCLUDE_DIR}>
+  $<INSTALL_INTERFACE:${CMAKE_INSTALL_INCLUDEDIR}>)
 
 install(DIRECTORY include/trac_ik
 DESTINATION ${CMAKE_INSTALL_INCLUDEDIR})

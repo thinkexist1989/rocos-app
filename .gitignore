@@ -44,7 +44,7 @@ qtcreator-*
 /planning/docs
 /planning/src
 
-*~
+# *~
 
 # Emacs
 .#*
@@ -60,7 +60,9 @@ CATKIN_IGNORE
 **/command_log.csv
 **/log
 
-**/example/*
-!**/example/src/robot_service.cc
-!**/example/src/rocosAppMain.cc
-!**/example/CMakeLists.txt
+
+#example
+example/lib
+example/include
+example/share
+
