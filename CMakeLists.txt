@@ -24,16 +24,13 @@ email: luoyang@sia.cn
 cmake_minimum_required(VERSION 3.10)
 project(rocos_app VERSION 1.9.2)
 
-set(CMAKE_PREFIX_PATH "/opt/grpc")
-include(cmake/common.cmake) # gRPC
 
-# add_compile_options(-std=c++11)
 set(CMAKE_CXX_STANDARD 11)
 set(CMAKE_INCLUDE_CURRENT_DIR ON)
 set(CMAKE_RUNTIME_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/bin)
 set(CMAKE_INSTALL_PREFIX ${CMAKE_CURRENT_SOURCE_DIR}/example)
 
-
+#把动态库的路径写入应用程序中
 set(CMAKE_INSTALL_RPATH "../../lib")
 set(CMAKE_INSTALL_RPATH_USE_LINK_PATH TRUE)
 set(CMAKE_BUILD_TYPE Release)
