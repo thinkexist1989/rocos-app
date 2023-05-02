@@ -11,6 +11,7 @@
 #include <kdl/chainiksolvervel_pinv.hpp>
 #include <kdl/frames.hpp>
 #include <kdl/jntarray.hpp>
+#include <kdl/utilities/svd_eigen_HH.hpp>
 #include <mutex>
 #include <plog/Appenders/ColorConsoleAppender.h>
 #include <plog/Initializers/RollingFileInitializer.h>
@@ -379,6 +380,55 @@ namespace JC_helper
         KDL::Rotation ratation_trajectory( const KDL::Rotation& start, const KDL::Rotation& end, double s_r, bool flag_big_angle = false );
 
 #endif
+    };
+
+    class SmartServo_Nullsapace
+    {
+    private:
+        //** 变量初始化 **//
+        ruckig::Ruckig< 1 > otg{ 0.001 };
+        ruckig::InputParameter< 1 > input;
+        ruckig::OutputParameter< 1 > output;
+        ruckig::Result otg_res;
+        KDL::ChainJntToJacSolver jnt2jac;
+        const double servo_dt = 0.001;
+        std::atomic< bool > flag_stop{ false };
+
+        KDL::JntArray joint_current{ };
+        KDL::JntArray joint_target{ };
+        KDL::JntArray joint_vel{ };
+
+        KDL::JntArray joint_last_pos{ };
+        KDL::JntArray joint_last_last_pos{ };
+
+        int _Direction{ 0 };//+1表示正转，-1表是负转，0表示无
+        std::atomic< bool >* external_finished_flag_ptr;
+
+        KDL::Jacobian jac;
+
+        Eigen::MatrixXd U;
+        Eigen::VectorXd S;
+        Eigen::VectorXd Sinv;
+        Eigen::MatrixXd V;
+        Eigen::VectorXd tmp;
+
+        Eigen::Matrix< double, _joint_num, _joint_num > null_space_jac;
+        int _max_jac_cul_index = -1;  // 表示对角矩阵中系数最大的列，也是指示控制哪个关节
+
+        //**-------------------------------**//
+
+    public:
+        SmartServo_Nullsapace( std::atomic< bool >*, const KDL::Chain& robot_chain );
+
+        void init( rocos::Robot* robot_ptr, double target_vel, double max_vel = 2, double max_acc = 2, double max_jerk = 4 );
+
+        int update( KDL::JntArray& joint_vel );
+
+        void RunMotion( rocos::Robot* robot_ptr );
+
+        void command( int Direction );
+
+        void nullspace_stop( double max_vel = 10, double max_acc = 50, double max_jerk = 180 );
     };
 
     inline KDL::JntArray vector_2_JntArray( const std::vector< std::atomic<double> > & pos )

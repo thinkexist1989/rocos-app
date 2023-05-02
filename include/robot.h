@@ -509,11 +509,19 @@ namespace rocos {
             TOOL_X = 100, TOOL_Y = 101, TOOL_Z = 102, TOOL_ROLL = 103, TOOL_PITCH= 104, TOOL_YAW = 105,
             FLANGE_X = 200, FLANGE_Y = 201, FLANGE_Z = 202,FLANGE_ROLL = 203, FLANGE_PITCH = 204, FLANGE_YAW = 205,
             OBJECT_X = 300, OBJECT_Y = 301, OBJECT_Z = 302,OBJECT_ROLL= 303, OBJECT_PITCH = 304, OBJECT_YAW = 305,
-            BASE_X = 400, BASE_Y = 401, BASE_Z = 402, BASE_ROLL= 403, BASE_PITCH = 404, BASE_YAW = 405
+            BASE_X = 400, BASE_Y = 401, BASE_Z = 402, BASE_ROLL= 403, BASE_PITCH = 404, BASE_YAW = 405,
+            NULLSPACE = 500
         };
 
         enum class DRAGGING_DIRRECTION :int{
             NONE = 0, POSITION = 1, NEGATIVE = -1
+        };
+
+        enum class DRAGGING_TYPE : int
+        {
+            JOINT     = 0,
+            CARTESIAN = 1,
+            NULLSPACE = 2
         };
 
         /**
@@ -636,6 +644,8 @@ namespace rocos {
         friend void JC_helper::SmartServo_Joint::RunSmartServo(rocos::Robot *);
 
         friend class JC_helper::SmartServo_Cartesian ;
+
+        friend class JC_helper::SmartServo_Nullsapace ;
 
         friend void JC_helper::Joint_stop( rocos::Robot* robot_ptr, const KDL::JntArray& current_pos, const KDL::JntArray& last_pos, const KDL::JntArray& last_last_pos );
 
