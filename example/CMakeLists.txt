@@ -4,6 +4,7 @@ project(rocos_app VERSION 1.0)
 set(CMAKE_RUNTIME_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/bin)
 set(CMAKE_PREFIX_PATH "/opt/grpc")
 set(CMAKE_CXX_STANDARD 17)
+set(CMAKE_BUILD_TYPE Release)
 
 
 include(lib/cmake/common.cmake) # gRPC

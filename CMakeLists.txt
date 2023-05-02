@@ -36,6 +36,7 @@ set(CMAKE_INSTALL_PREFIX ${CMAKE_CURRENT_SOURCE_DIR}/example)
 
 set(CMAKE_INSTALL_RPATH "../../lib")
 set(CMAKE_INSTALL_RPATH_USE_LINK_PATH TRUE)
+set(CMAKE_BUILD_TYPE Release)
 
 
 # ##############################################################################
