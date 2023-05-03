@@ -3165,7 +3165,8 @@ namespace JC_helper
                                                                                                                             S( Eigen::VectorXd::Zero( _joint_num ) ),
                                                                                                                             Sinv( Eigen::VectorXd::Zero( _joint_num ) ),
                                                                                                                             V( Eigen::MatrixXd::Zero( _joint_num, _joint_num ) ),
-                                                                                                                            tmp( Eigen::VectorXd::Zero( _joint_num ) )
+                                                                                                                            tmp( Eigen::VectorXd::Zero( _joint_num ) ),
+                                                                                                                            fk_slover(robot_chain)
                                                                                                                             
     {
         joint_current.resize( _joint_num );
@@ -3199,15 +3200,15 @@ namespace JC_helper
 
         for ( int i{ 0 }; i < _joint_num; i++ )
         {
-            joint_current( i ) = robot_ptr->pos_[ i ];
-            joint_target( i )  = joint_current( i );
+            joint_current( i )       = robot_ptr->pos_[ i ];
+            joint_target( i )        = joint_current( i );
             joint_last_pos( i )      = joint_current( i );
             joint_last_last_pos( i ) = joint_current( i );
         }
 
-        _Direction         = 0;   // 0代表无方向
+        _jogging_Direction = 0;   // 0代表无方向
         _max_jac_cul_index = -1;  //-1代表无指定控制哪个关节
-
+        _command_Direction = 0;   // 0表示未知命令方向与臂角方向是否一致
         PLOG_INFO << "零空间点动初始化完成";
     }
 
@@ -3239,7 +3240,10 @@ namespace JC_helper
 
         //** 找到哪个关节运动范围最大 **//
         if ( _max_jac_cul_index == -1 )
+        {
             null_space_jac.diagonal( ).maxCoeff( &_max_jac_cul_index );
+            is_same_on_direction( null_space_jac.col( _max_jac_cul_index ));
+        }
         //**-------------------------------**//
 
         //** 判断当前位置下，能否进行零空间点动 **//
@@ -3247,10 +3251,7 @@ namespace JC_helper
         for ( ; joint_index < _joint_num; joint_index++ )
         {
             if ( !null_space_jac.col( joint_index ).isZero( 1e-13 ) )
-            {
-                // PLOG_INFO << "列[" << i << "]不是零向量";
                 break;
-            }
         }
         if ( joint_index == _joint_num )
         {
@@ -3270,7 +3271,7 @@ namespace JC_helper
         const auto& otg_pos = output.new_position;
 
         tmp.setZero( );
-        tmp( _max_jac_cul_index ) = _Direction * otg_pos[ 0 ];
+        tmp( _max_jac_cul_index ) = _command_Direction* otg_pos[ 0 ];
 
         joint_vel.data = null_space_jac * tmp;
 
@@ -3370,14 +3371,14 @@ namespace JC_helper
         robot_ptr->is_running_motion    = false;  // 机械臂运动已结束，可以执行其他离线类运动
     }
 
-    void SmartServo_Nullsapace::command( int Direction )
+    void SmartServo_Nullsapace::command( int jogging_Direction )
     {
-        if ( _Direction == 0 )
-            _Direction = Direction;
+        if ( _jogging_Direction == 0 )
+            _jogging_Direction = jogging_Direction;
 
         if ( !flag_stop )
         {
-            if ( _Direction != Direction )
+            if ( _jogging_Direction != jogging_Direction )
             {
                 PLOG_ERROR << "方向变换，停止！";
                 nullspace_stop( );
@@ -3401,9 +3402,56 @@ namespace JC_helper
         input.max_jerk[ 0 ]         = max_jerk;
     }
 
+    bool SmartServo_Nullsapace::is_same_on_direction( const Eigen::Block<Eigen::Matrix<double, _joint_num, _joint_num>, _joint_num, 1, true> &joint_vel )
+    {
+        KDL::JntArray joint_target(_joint_num);
+        for(int i =0;i<_joint_num;i++)
+        {
+            joint_target( i ) = joint_vel( i ) * servo_dt + joint_current( i );
+        }
+
+        KDL::Frame frame_joint_4;
+        KDL::Frame frame_joint_4_target;
+        fk_slover.JntToCart( joint_current, frame_joint_4, 4 );
+        fk_slover.JntToCart( joint_target, frame_joint_4_target, 4 );
+
+        KDL::Rotation R_start_end = frame_joint_4.M.Inverse( ) * frame_joint_4_target.M;
+        KDL::Vector axis;
+        double angle = R_start_end.GetRotAngle( axis );
+        axis         = frame_joint_4.M * axis;
+
+        KDL::Frame shoulder;
+        KDL::Frame wrist;
+        fk_slover.JntToCart( joint_current, shoulder, 2 );
+        fk_slover.JntToCart( joint_current, wrist, 6 );
+        KDL::Vector SW = wrist.p - shoulder.p;;
+
+        for ( int i = 0; i < 3; i++ )
+            if ( std::abs( SW( i ) ) > 0.001 && KDL::sign( SW( i ) ) != KDL::sign( axis( i ) ) )
+            {
+                // GetRotAngle()计算的轴不是由1关节指向6关节
+                angle = -1 * angle;
+                break;
+            }
+
+        // PLOG_DEBUG << "SW = " << SW;
+        // PLOG_DEBUG << "axis = " << axis;
+        // PLOG_DEBUG << "angle = " << angle;
+        // PLOG_DEBUG << "_jogging_Direction" << _jogging_Direction;
+
+        if ( KDL::sign( angle ) == _jogging_Direction )
+        {
+            _command_Direction = 1;
+            return true;
+        }
+        else
+        {
+            _command_Direction = -1;
+            return false;
+        }
+    }
+
 #pragma endregion
-
-
 
     void Joint_stop( rocos::Robot* robot_ptr, const KDL::JntArray& current_pos, const KDL::JntArray& last_pos, const KDL::JntArray& last_last_pos )
     {

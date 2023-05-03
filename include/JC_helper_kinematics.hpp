@@ -401,7 +401,8 @@ namespace JC_helper
         KDL::JntArray joint_last_pos{ };
         KDL::JntArray joint_last_last_pos{ };
 
-        int _Direction{ 0 };//+1表示正转，-1表是负转，0表示无
+        int _jogging_Direction{ 0 };//+1表示正转，-1表是负转，0表示无
+        int _command_Direction{ 0 };//用于保证臂角方向与_jogging_Direction方向一致
         std::atomic< bool >* external_finished_flag_ptr;
 
         KDL::Jacobian jac;
@@ -414,6 +415,7 @@ namespace JC_helper
 
         Eigen::Matrix< double, _joint_num, _joint_num > null_space_jac;
         int _max_jac_cul_index = -1;  // 表示对角矩阵中系数最大的列，也是指示控制哪个关节
+        KDL::ChainFkSolverPos_recursive fk_slover;
 
         //**-------------------------------**//
 
@@ -429,6 +431,8 @@ namespace JC_helper
         void command( int Direction );
 
         void nullspace_stop( double max_vel = 10, double max_acc = 50, double max_jerk = 180 );
+
+        bool is_same_on_direction( const Eigen::Block<Eigen::Matrix<double, _joint_num, _joint_num>, _joint_num, 1, true> &);
     };
 
     inline KDL::JntArray vector_2_JntArray( const std::vector< std::atomic<double> > & pos )
