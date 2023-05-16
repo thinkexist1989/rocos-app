@@ -631,6 +631,7 @@ namespace rocos {
         boost::shared_ptr<boost::thread> motion_thread_{nullptr};  // 执行motion线程
 
         Kinematics kinematics_;
+        JC_helper::inverse_special_to_SRS SRS_kinematics_;
 
 
         Frame flange_;  //!< 法兰位置姿态

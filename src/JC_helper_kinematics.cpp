@@ -3453,6 +3453,454 @@ namespace JC_helper
 
 #pragma endregion
 
+#pragma region  //*逆解
+
+    namespace slover_thet2
+    {
+        JC_double m( JC_double l_se, JC_double l_ew, JC_double thet_4 )
+        {
+            return ( l_se ) + ( l_ew )*cos( thet_4 );
+        }
+
+        JC_double n( JC_double l_ew, JC_double thet_4 )
+        {
+            return ( l_ew )*sin( thet_4 );
+        }
+
+        JC_double f_thet2( JC_double l_se, JC_double l_ew, JC_double thet_4, JC_double x_sw_z )
+        {
+            return atan2( m( l_se, l_ew, thet_4 ), n( l_ew, thet_4 ) ) - atan2( x_sw_z, sqrt( pow( m( l_se, l_ew, thet_4 ), 2 ) + pow( n( l_ew, thet_4 ), 2 ) - pow( x_sw_z, 2 ) ) );
+        }
+
+        JC_double f_thet2_2( JC_double l_se, JC_double l_ew, JC_double thet_4, JC_double x_sw_z )
+        {
+            return atan2( m( l_se, l_ew, thet_4 ), n( l_ew, thet_4 ) ) - atan2( x_sw_z, -sqrt( pow( m( l_se, l_ew, thet_4 ), 2 ) + pow( n( l_ew, thet_4 ), 2 ) - pow( x_sw_z, 2 ) ) );
+        }
+    }  // namespace slover_thet2
+
+    namespace slover_thet1
+    {
+
+        JC_double o( JC_double thet_2, JC_double l_se, JC_double l_ew, JC_double thet_4 )
+        {
+            return sin( thet_2 ) * ( ( l_se ) + ( l_ew )*cos( thet_4 ) );
+        }
+
+        JC_double p( JC_double l_ew, JC_double thet_4, JC_double thet_2 )
+        {
+            return ( l_ew )*sin( thet_4 ) * cos( thet_2 );
+        }
+
+        JC_double sin_thet1( JC_double thet_2, JC_double l_se, JC_double l_ew, JC_double thet_4, JC_double x_sw_y )
+        {
+            return x_sw_y * ( o( thet_2, l_se, l_ew, thet_4 ) + p( l_ew, thet_4, thet_2 ) );
+        }
+        JC_double cos_thet1( JC_double thet_2, JC_double l_se, JC_double l_ew, JC_double thet_4, JC_double x_sw_x )
+        {
+            return x_sw_x * ( o( thet_2, l_se, l_ew, thet_4 ) + p( l_ew, thet_4, thet_2 ) );
+        }
+
+        JC_double f_thet1( JC_double thet_2, JC_double l_se, JC_double l_ew, JC_double thet_4, JC_double x_sw_x, JC_double x_sw_y )
+        {
+            return atan2( sin_thet1( thet_2, l_se, l_ew, thet_4, x_sw_y ), cos_thet1( thet_2, l_se, l_ew, thet_4, x_sw_x ) );
+        }
+
+    }  // namespace slover_thet1
+
+    namespace slover_utility
+    {
+        // %* 旋转矩阵求解,参考冗余书籍p51
+        Eigen::Matrix3d rot_matrix( JC_double thet, JC_double alpha )
+        {
+            Eigen::Matrix3d tem;
+            tem << cos( thet ), -sin( thet ) * cos( alpha ), sin( thet ) * sin( alpha ),
+                sin( thet ), cos( thet ) * cos( alpha ), -cos( thet ) * sin( alpha ),
+                0, sin( alpha ), cos( alpha );
+
+            return tem;
+        }
+        // % *-------------------------------
+
+        // % *向量转斜对称矩阵
+        Eigen::Matrix3d ssm( JC_double x, JC_double y, JC_double z )
+        {
+            Eigen::Matrix3d tem;
+
+            tem << 0, -z, y,
+                z, 0, -x,
+                -y, x, 0;
+
+            return tem;
+        }
+        // % *------------------------------------------
+        
+        // % *+-360转+-180
+        JC_double my_convert( JC_double x )
+        {
+            if ( x > KDL::PI )
+                return x - 2 * KDL::PI;
+            else if ( x < -KDL::PI )
+                return 2 * KDL::PI + x;
+            else if ( x == 2 * KDL::PI )
+                return 0;
+            else if ( x == -2 * KDL::PI )
+                return 0;
+            else
+                return x;
+        }
+        // % *------------------------------------------
+       
+        // % *+-360转+-180
+        std::array< JC_double, 7 >& my_convert( std::array< JC_double, 7 >&& arg )
+        {
+            for ( int i = 0; i < arg.size( ); i++ )
+            {
+                if ( arg[ i ] > KDL::PI )
+                    arg[ i ] = arg[ i ] - 2 * KDL::PI;
+                else if ( arg[ i ] < -KDL::PI )
+                    arg[ i ] = 2 * KDL::PI + arg[ i ];
+            }
+
+            return arg;
+        }
+        // % *------------------------------------------
+
+        // % *+KDL::rotaion转Eigen::Matrix3d
+        Eigen::Matrix3d rot_to_matrix( const KDL::Rotation& arg )
+        {
+            Eigen::Matrix3d tem;
+
+            for ( int row = 0; row < 3; row++ )
+                for ( int cul = 0; cul < 3; cul++ )
+                    tem( row, cul ) = arg( row, cul );
+
+            return tem;
+        }
+        // % *------------------------------------------
+
+        // % *裁剪浮点数至指定位数
+        JC_double roundn( const JC_double& arg, unsigned int precision )
+        {
+            // thet2 thet4 thet6 在等于0度时，计算结果为0.9999999999999998,因此需要截取
+            std::stringstream ss;
+            ss << std::setprecision( precision ) << arg;
+
+            return std::stod( ss.str( ) );
+            // return arg;
+        }
+        // % *------------------------------------------
+
+    }  // namespace slover_utility
+
+    void inverse_special_to_SRS::init( const KDL::Chain& dof_7_robot )
+    {
+        double RPY[ 3 ];
+        dof_7_robot.getSegment( 1 ).getFrameToTip( ).M.GetRPY( RPY[ 0 ], RPY[ 1 ], RPY[ 2 ] );
+        joint_1_inverse = -1 * sin( RPY[ 0 ] );
+        dof_7_robot.getSegment( 3 ).getFrameToTip( ).M.GetRPY( RPY[ 0 ], RPY[ 1 ], RPY[ 2 ] );
+        joint_3_inverse = -1 * sin( RPY[ 0 ] );
+        dof_7_robot.getSegment( 5 ).getFrameToTip( ).M.GetRPY( RPY[ 0 ], RPY[ 1 ], RPY[ 2 ] );
+        joint_5_inverse = -1 * sin( RPY[ 0 ] );
+
+        d_bs   = std::abs( dof_7_robot.getSegment( 0 ).getFrameToTip( ).p[ 2 ] );  //%base系到shoulder的长度
+        l_0_bs = { 0, 0, d_bs };
+        d_se   = std::abs( dof_7_robot.getSegment( 2 ).getFrameToTip( ).p[ 1 ] );
+        d_ew   = std::abs( dof_7_robot.getSegment( 4 ).getFrameToTip( ).p[ 1 ] );
+        d_wt   = std::abs( dof_7_robot.getSegment( 6 ).getFrameToTip( ).p[ 1 ] );
+        l_7_wt = { 0, 0, d_wt };
+    }
+
+    int inverse_special_to_SRS::JC_cartesian_to_joint( KDL::Frame inter_T, JC_double inter_joint_3, const KDL::JntArray& last_joint, KDL::JntArray& joint_out )
+    {
+        // * 仿真环境设置
+        //** 将DH坐标系转换为预定的标准DH **//
+        KDL::JntArray _last_joint{ last_joint };
+        _last_joint( 1 ) = joint_1_inverse * last_joint( 1 );
+        _last_joint( 3 ) = joint_3_inverse * last_joint( 3 );
+        _last_joint( 5 ) = joint_5_inverse * last_joint( 5 );
+        //**-------------------------------**//
+
+        std::vector< std::array< JC_double, 7 > > res_thet;  // 32组结果
+        std::vector< double > joint_offset;                  // 32组位置差
+        //**-------------------------------**//
+
+        try
+        {
+            KDL::Vector x_0_7   = inter_T.p;
+            KDL::Rotation r_0_7 = inter_T.M;
+
+            KDL::Vector x_0_sw = x_0_7 - l_0_bs - r_0_7 * l_7_wt;
+
+            //! 腕部中心点在1关节轴线上奇异处理：
+            if ( x_0_sw( 0 ) == 0 && x_0_sw( 1 ) == 0 )
+                throw JC_exception{ "腕部中心点在1关节轴线上奇异", -3 };
+
+            JC_double thet_4_tem = acos( slover_utility::roundn( ( pow( x_0_sw.Norm( ), 2 ) - pow( d_se, 2 ) - pow( d_ew, 2 ) ) / ( 2 * d_se * d_ew ), 14 ) );
+
+            //! 4关节奇异处理：thet4接近0时->acos(>1)->thet_4_tem=nan
+            if ( std::isnan( thet_4_tem ) )
+                throw JC_exception{ "关节4奇异", -1 };
+
+            for ( int reference_index = 0; reference_index < ( 2 + 2 * !( thet_4_tem == 0 ) ); reference_index++ )
+            {
+                JC_double thet_4   = 0;
+                JC_double thet_r_2 = 0;
+
+                switch ( reference_index )
+                {
+                    case 0:
+                        thet_4   = thet_4_tem;
+                        thet_r_2 = slover_thet2::f_thet2( d_se, d_ew, thet_4, x_0_sw( 2 ) );
+                        break;
+
+                    case 1:
+                        thet_4   = thet_4_tem;
+                        thet_r_2 = slover_thet2::f_thet2_2( d_se, d_ew, thet_4, x_0_sw( 2 ) );
+                        break;
+
+                    case 2:
+                        thet_4   = -thet_4_tem;
+                        thet_r_2 = slover_thet2::f_thet2( d_se, d_ew, thet_4, x_0_sw( 2 ) );
+                        break;
+
+                    case 3:
+
+                        thet_4   = -thet_4_tem;
+                        thet_r_2 = slover_thet2::f_thet2_2( d_se, d_ew, thet_4, x_0_sw( 2 ) );
+                        break;
+
+                    default:
+                        throw JC_exception{ "switch 异常", -2 };
+                        break;
+                }
+
+                JC_double thet_r_1 = slover_thet1::f_thet1( thet_r_2, d_se, d_ew, thet_4, x_0_sw( 0 ), x_0_sw( 1 ) );
+
+                Eigen::Matrix3d ref_r_0_3 = slover_utility::rot_matrix( thet_r_1, -KDL::PI_2 ) * slover_utility::rot_matrix( thet_r_2, KDL::PI_2 ) * slover_utility::rot_matrix( 0, -KDL::PI_2 );
+
+                KDL::Vector u_0_sw;
+                JC_double vct_len = x_0_sw.Norm( );
+                if ( vct_len < 1e-6 )
+                    throw JC_exception{ "腕部点与肘部点太接近", -8 };
+                else
+                    u_0_sw = x_0_sw / vct_len;
+
+                Eigen::Matrix3d ssm_u_0_sw = slover_utility::ssm( u_0_sw( 0 ), u_0_sw( 1 ), u_0_sw( 2 ) );
+
+                Eigen::Matrix3d As = ssm_u_0_sw * ref_r_0_3;
+                Eigen::Matrix3d Bs = -1 * ssm_u_0_sw * As;
+                Eigen::Matrix3d Cs = ( Eigen::Vector3d{ u_0_sw( 0 ), u_0_sw( 1 ), u_0_sw( 2 ) } * Eigen::RowVector3d{ u_0_sw( 0 ), u_0_sw( 1 ), u_0_sw( 2 ) } ) * ref_r_0_3;
+
+                Eigen::Matrix3d r_3_4_transpose = slover_utility::rot_matrix( thet_4, KDL::PI_2 ).transpose( );
+                Eigen::Matrix3d matrix_r_0_7    = slover_utility::rot_to_matrix( r_0_7 );
+
+                Eigen::Matrix3d Aw = r_3_4_transpose * As.transpose( ) * matrix_r_0_7;
+                Eigen::Matrix3d Bw = r_3_4_transpose * Bs.transpose( ) * matrix_r_0_7;
+                Eigen::Matrix3d Cw = r_3_4_transpose * Cs.transpose( ) * matrix_r_0_7;
+
+                std::array< JC_double, 2 > arm_angle{ 0, 0 };
+                {
+                    JC_double a_n = As( 2, 2 );
+                    JC_double b_n = Bs( 2, 2 );
+                    JC_double c_n = Cs( 2, 2 );
+                    JC_double a_d = -As( 2, 0 );
+                    JC_double b_d = -Bs( 2, 0 );
+                    JC_double c_d = -Cs( 2, 0 );
+
+                    JC_double b    = tan( inter_joint_3 ) * a_d - a_n;
+                    JC_double a    = tan( inter_joint_3 ) * b_d - b_n;
+                    JC_double c    = c_n - tan( inter_joint_3 ) * c_d;
+                    arm_angle[ 0 ] = 2 * atan2( ( b + sqrt( pow( b, 2 ) + pow( a, 2 ) - pow( c, 2 ) ) ), ( a + c ) );
+                    arm_angle[ 1 ] = 2 * atan2( ( b - sqrt( pow( b, 2 ) + pow( a, 2 ) - pow( c, 2 ) ) ), ( a + c ) );
+                }
+
+                JC_double invert_123 = 0;
+                JC_double invert_567 = 0;
+                JC_double thet1      = 0;
+                JC_double thet1_tem  = 0;
+                JC_double thet2      = 0;
+                JC_double thet2_tem  = 0;
+                JC_double thet3      = 0;
+                JC_double thet3_tem  = 0;
+                JC_double thet4      = 0;
+                JC_double thet4_tem  = 0;
+                JC_double thet5      = 0;
+                JC_double thet5_tem  = 0;
+                JC_double thet6      = 0;
+                JC_double thet6_tem  = 0;
+                JC_double thet7      = 0;
+                JC_double thet7_tem  = 0;
+
+                for ( const auto& interp_arm_angle : arm_angle )
+                {
+                    for ( int inverst_index = 0; inverst_index < 4; inverst_index++ )
+                    {
+                        switch ( inverst_index )
+                        {
+                            case 0:
+                                invert_123 = 0;
+                                invert_567 = 0;
+                                break;
+
+                            case 1:
+                                invert_123 = 0;
+                                invert_567 = 1;
+                                break;
+
+                            case 2:
+                                invert_123 = 1;
+                                invert_567 = 0;
+                                break;
+
+                            case 3:
+                                invert_123 = 1;
+                                invert_567 = 1;
+                                break;
+
+                            default:
+                                throw JC_exception{ "switch 异常", -2 };
+                                break;
+                        }
+
+                        if ( invert_123 )
+                            thet2 = -1 * thet2_tem;
+                        else
+                        {
+                            JC_double sin_tem = slover_utility::roundn( -As( 2, 1 ) * sin( interp_arm_angle ) - Bs( 2, 1 ) * cos( interp_arm_angle ) - Cs( 2, 1 ), 14 );
+                            thet2             = acos( sin_tem );
+                            thet2_tem         = thet2;
+                        }
+
+                        //! 2关节奇异处理
+                        if ( thet2 == 0 )
+                            throw JC_exception{ "2关节奇异", -4 };
+
+                        if ( invert_123 )
+                            thet1 = thet1_tem + KDL::PI;
+                        else
+                        {
+                            JC_double sin_tem = -As( 1, 1 ) * sin( interp_arm_angle ) - Bs( 1, 1 ) * cos( interp_arm_angle ) - Cs( 1, 1 );
+                            JC_double cos_tem = -As( 0, 1 ) * sin( interp_arm_angle ) - Bs( 0, 1 ) * cos( interp_arm_angle ) - Cs( 0, 1 );
+                            thet1             = atan2( sin_tem * sin( thet2 ), cos_tem * sin( thet2 ) );
+                            thet1_tem         = thet1;
+                        }
+
+                        if ( invert_123 )
+                            thet3 = thet3_tem + KDL::PI;
+                        else
+                        {
+                            JC_double sin_tem = As( 2, 2 ) * sin( interp_arm_angle ) + Bs( 2, 2 ) * cos( interp_arm_angle ) + Cs( 2, 2 );
+                            JC_double cos_tem = -As( 2, 0 ) * sin( interp_arm_angle ) - Bs( 2, 0 ) * cos( interp_arm_angle ) - Cs( 2, 0 );
+                            thet3             = atan2( sin_tem * sin( thet2 ), cos_tem * sin( thet2 ) );
+                            thet3_tem         = thet3;
+                        }
+
+                        if ( std::abs( slover_utility::my_convert( thet3 ) - inter_joint_3 ) > 1e-5 )
+                            continue;
+
+                        if ( invert_567 )
+                            thet6 = -1 * thet6_tem;
+                        else
+                        {
+                            JC_double sin_tem = slover_utility::roundn( Aw( 2, 2 ) * sin( interp_arm_angle ) + Bw( 2, 2 ) * cos( interp_arm_angle ) + Cw( 2, 2 ), 14 );
+                            thet6             = acos( sin_tem );
+                            thet6_tem         = thet6;
+                        }
+
+                        //! 6关节奇异处理
+                        if ( thet6 == 0 )
+                            throw JC_exception{ "6关节奇异", -5 };
+
+                        if ( invert_567 )
+                            thet5 = thet5_tem + KDL::PI;
+                        else
+                        {
+                            JC_double sin_tem = Aw( 1, 2 ) * sin( interp_arm_angle ) + Bw( 1, 2 ) * cos( interp_arm_angle ) + Cw( 1, 2 );
+                            JC_double cos_tem = Aw( 0, 2 ) * sin( interp_arm_angle ) + Bw( 0, 2 ) * cos( interp_arm_angle ) + Cw( 0, 2 );
+                            thet5             = atan2( sin_tem * sin( thet6 ), cos_tem * sin( thet6 ) );
+                            thet5_tem         = thet5;
+                        }
+
+                        if ( invert_567 )
+                            thet7 = thet7_tem + KDL::PI;
+                        else
+                        {
+                            JC_double sin_tem = Aw( 2, 1 ) * sin( interp_arm_angle ) + Bw( 2, 1 ) * cos( interp_arm_angle ) + Cw( 2, 1 );
+                            JC_double cos_tem = -Aw( 2, 0 ) * sin( interp_arm_angle ) - Bw( 2, 0 ) * cos( interp_arm_angle ) - Cw( 2, 0 );
+                            thet7             = atan2( sin_tem * sin( thet6 ), cos_tem * sin( thet6 ) );
+                            thet7_tem         = thet7;
+                        }
+
+                        res_thet.emplace_back( slover_utility::my_convert( std::array< JC_double, 7 >{ thet1, thet2, thet3, thet_4, thet5, thet6, thet7 } ) );
+
+                        //! 最终检查,32组全检查
+                        for ( int i = 0; i < 7; i++ )
+                        {
+                            if ( std::isnan( res_thet.back( )[ i ] ) )
+                            {
+                                std::stringstream string;
+                                string << "关节[" << i << "]=Nan,结果无效";
+                                throw JC_exception{ string.str( ).c_str( ), -6 };
+                            }
+                            else if ( isinf( res_thet.back( )[ i ] ) )
+                            {
+                                std::stringstream string;
+                                string << "关节[" << i << "]=Inf,结果无效";
+                                throw JC_exception{ string.str( ).c_str( ), -7 };
+                            }
+                        }
+                    }
+                }
+            }
+
+            // PLOG_DEBUG << "res_thet 的size = " << res_thet.size( );
+
+            //** 找到所有结果中最小位移的那一组 **//
+
+            constexpr std::array< JC_double, 7 > K_p{ 0.7, 0.7, 0.7, 0.7, 0.3, 0.3, 0.3 };
+
+            for ( const auto& iot : res_thet )
+            {
+                JC_double sum = 0;
+                for ( int joint_index = 0; joint_index < 7; joint_index++ )
+                {
+                    sum += K_p[ joint_index ] * std::abs( iot[ joint_index ] - _last_joint( joint_index ) );
+                }
+                joint_offset.emplace_back( sum );
+            }
+
+            //**-------------------------------**//
+
+            //** 路径数组存储最小位移的那一组 **//
+            std::pair< std::vector< JC_double >::iterator, std::vector< JC_double >::iterator > min_offset_index = std::minmax_element( joint_offset.begin( ), joint_offset.end( ) );
+            int index_offset                                                                                     = min_offset_index.first - joint_offset.begin( );
+
+            for ( int i = 0; i < 7; i++ )
+                joint_out( i ) = res_thet[ index_offset ][ i ];
+            //**-------------------------------**//
+
+            //** 将DH坐标系还原 **//
+            joint_out( 1 ) = joint_1_inverse * joint_out( 1 );
+            joint_out( 3 ) = joint_3_inverse * joint_out( 3 );
+            joint_out( 5 ) = joint_5_inverse * joint_out( 5 );
+            //**-------------------------------**//
+
+            return 0;
+        }
+        catch ( const JC_exception& error )
+        {
+            PLOG_ERROR << error.error_str << ", 错误号：" << error.error_code;
+            return error.error_code;
+        }
+        catch ( ... )
+        {
+            PLOG_ERROR << "未知错误";
+            return -10;
+        }
+    }
+
+#pragma endregion
+
     void Joint_stop( rocos::Robot* robot_ptr, const KDL::JntArray& current_pos, const KDL::JntArray& last_pos, const KDL::JntArray& last_last_pos )
     {
         //** 变量初始化 **//

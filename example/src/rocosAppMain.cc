@@ -164,7 +164,7 @@ namespace rocos
             if ( str == std::string_view{ "run" } )
             {
             
-                using namespace KDL;
+               /*  using namespace KDL;
                 KDL::JntArray q_target( _joint_num );
 
                 q_target( 0 ) = 0 * M_PI / 180;
@@ -207,7 +207,60 @@ namespace rocos
                     }
                     time_count++;
                     std::this_thread::sleep_for( std::chrono::duration< double >( 0.002 ) );
+                } */
+
+
+
+
+
+using namespace KDL;
+
+                //** movej **//
+                KDL::JntArray q_target( _joint_num );
+                q_target( 0 ) = 0 * M_PI / 180;
+                q_target( 1 ) = 45 * M_PI / 180;
+                q_target( 2 ) = 30 * M_PI / 180;
+                q_target( 3 ) = 90 * M_PI / 180;
+                q_target( 4 ) = 0 * M_PI / 180;
+                q_target( 5 ) = -45 * M_PI / 180;
+                q_target( 6 ) = 0 * M_PI / 180;
+
+                MoveJ( q_target, 0.8, 0.6, 0, 0, false );
+
+                KDL::Frame f_p0;
+                kinematics_.JntToCart( q_target, f_p0 );
+                //** servoL **//
+                KDL::Frame f_p5;
+                f_p5     = f_p0;
+                double i = 0;
+                while ( i < KDL::PI )
+                {
+                    f_p5.p( 2 ) = f_p0.p( 2 ) +  0.1*sin( 3*i  );
+                    servoL( f_p5 );
+                    i = i + 0.001;
                 }
+
+                //**-------------------------------**//
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
             }
             else
             {

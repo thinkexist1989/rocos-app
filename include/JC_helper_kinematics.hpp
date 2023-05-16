@@ -57,6 +57,8 @@
 //示例
 // std::cout << BLUE << " hello world " << std::endl;
 
+
+//** 显式指定关节数量 **//
 constexpr size_t _joint_num{ 7 };
 
 
@@ -286,23 +288,20 @@ namespace JC_helper
         KDL::JntArray joint_last_pos{ };
         KDL::JntArray joint_last_last_pos{ };
 
-        int _Cartesian_vel_index{ 0 };//+-1对应x轴,+-2对应y轴,+-3对应z轴
+        int _Cartesian_vel_index{ 0 };  //+-1对应x轴,+-2对应y轴,+-3对应z轴
         std::atomic< bool >* external_finished_flag_ptr;
 
-        std::string  _reference_frame {""};
+        std::string _reference_frame{ "" };
 
-        KDL::ChainFkSolverPos_recursive   FK_slover;  //!因为flang_.M一直在刷新，实时读取有问题，暂时这么处理
-        KDL::Frame current_flange{ };  
-
+        KDL::ChainFkSolverPos_recursive FK_slover;  //! 因为flang_.M一直在刷新，实时读取有问题，暂时这么处理
+        KDL::Frame current_flange{ };
 
         //**-------------------------------**//
     public:
+        SmartServo_Cartesian( std::atomic< bool >*, const KDL::Chain& robot_chain );
 
-        SmartServo_Cartesian(  std::atomic< bool >* , const KDL::Chain& robot_chain ) ;
+        void init( rocos::Robot* robot_ptr, double target_vel, double max_vel = 5, double max_acc = 20, double max_jerk = 60 );
 
-        void init( rocos::Robot* robot_ptr  , double target_vel, double max_vel = 5, double max_acc = 20, double max_jerk = 60 );
-      
-      
         /**
          * @brief  只有OTG正常计算，且不在奇异位置，joint_vel才会为有效值，其余情况通通为0
          * @return  otg失败 = -1；雅克比在奇异位置 = -1;working = 1;finished  = 0
@@ -312,9 +311,9 @@ namespace JC_helper
 
         void RunMotion( rocos::Robot* robot_ptr );
 
-        void command( int Cartesian_vel_index ,const char * reference_frame);
+        void command( int Cartesian_vel_index, const char* reference_frame );
 
-        void Cartesian_stop( double max_vel=10, double max_acc =50 , double max_jerk=180 );
+        void Cartesian_stop( double max_vel = 10, double max_acc = 50, double max_jerk = 180 );
 
 #if 0
 
@@ -401,8 +400,8 @@ namespace JC_helper
         KDL::JntArray joint_last_pos{ };
         KDL::JntArray joint_last_last_pos{ };
 
-        int _jogging_Direction{ 0 };//+1表示正转，-1表是负转，0表示无
-        int _command_Direction{ 0 };//用于保证臂角方向与_jogging_Direction方向一致
+        int _jogging_Direction{ 0 };  //+1表示正转，-1表是负转，0表示无
+        int _command_Direction{ 0 };  // 用于保证臂角方向与_jogging_Direction方向一致
         std::atomic< bool >* external_finished_flag_ptr;
 
         KDL::Jacobian jac;
@@ -432,7 +431,37 @@ namespace JC_helper
 
         void nullspace_stop( double max_vel = 10, double max_acc = 50, double max_jerk = 180 );
 
-        bool is_same_on_direction( const Eigen::Block<Eigen::Matrix<double, _joint_num, _joint_num>, _joint_num, 1, true> &);
+        bool is_same_on_direction( const Eigen::Block< Eigen::Matrix< double, _joint_num, _joint_num >, _joint_num, 1, true >& );
+    };
+
+    typedef double JC_double;
+    class inverse_special_to_SRS
+    {
+    private:
+        JC_double d_bs;
+        KDL::Vector l_0_bs;
+        JC_double d_se;
+        JC_double d_ew;
+        JC_double d_wt;
+        KDL::Vector l_7_wt;
+        double joint_1_inverse;
+        double joint_3_inverse;
+        double joint_5_inverse;
+
+    public:
+        void init( const KDL::Chain& dof_7_robot );
+        int JC_cartesian_to_joint( KDL::Frame inter_T, JC_double inter_joint_3, const KDL::JntArray& last_joint, KDL::JntArray& joint_out );
+        class JC_exception : public std::exception
+        {
+        public:
+            JC_exception( ) = default;
+            JC_exception( const char* arg_1, int arg_2 ) : error_str{ arg_1 }, error_code{ arg_2 } { };
+
+            int error_code = 0;
+            std::string error_str{ };
+
+            const char* what( ) const noexcept override { return error_str.c_str( ); }
+        };
     };
 
     inline KDL::JntArray vector_2_JntArray( const std::vector< std::atomic<double> > & pos )

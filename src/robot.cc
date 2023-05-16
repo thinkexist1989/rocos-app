@@ -71,6 +71,10 @@ namespace rocos {
         //      exit( 0 );
         //  }
 
+
+        // 解析逆运动学求解器初始化
+        SRS_kinematics_.init( kinematics_.getChain( ) );
+
         startMotionThread( );
     }
 
@@ -2522,7 +2526,7 @@ namespace rocos {
         for ( int i = 0; i < _joint_num; ++i )
             if ( joint_offset( i ) > joints_[ i ]->getMaxVel( ) * 0.001 )
             {
-                PLOG_ERROR << "target vel [" << i << "]= " << joint_offset( i ) * KDL::rad2deg * 1000 << " is out of range ";
+                PLOG_ERROR << "target vel [" << i << "]= " << joint_offset( i ) * KDL::rad2deg * 1000 << " deg/s is out of range ";
                 return -1;
             }
         //**-------------------------------**//
@@ -2539,8 +2543,10 @@ namespace rocos {
 
     int Robot::servoL( const KDL::Frame& target_frame )
     {
+        KDL::JntArray joint_in( _joint_num );
         KDL::JntArray joint_out( _joint_num );
-        if ( kinematics_.CartToJnt( JC_helper::vector_2_JntArray( pos_ ), target_frame, joint_out ) < 0 )
+        joint_in = JC_helper::vector_2_JntArray( pos_ );
+        if ( SRS_kinematics_.JC_cartesian_to_joint( target_frame, joint_in( 2 ), joint_in, joint_out ) < 0 )
         {
             PLOG_ERROR << "逆解失败";
             return -1;
