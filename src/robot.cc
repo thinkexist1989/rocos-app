@@ -71,9 +71,17 @@ namespace rocos {
         //      exit( 0 );
         //  }
 
-
         // 解析逆运动学求解器初始化
-        SRS_kinematics_.init( kinematics_.getChain( ) );
+        KDL::JntArray q_min( joints_.size( ) );
+        KDL::JntArray q_max( joints_.size( ) );
+        for ( int i = 0; i < joints_.size( ); ++i )
+        {
+            q_min( i ) = joints_[ i ]->getMinPosLimit( );
+            q_max( i ) = joints_[ i ]->getMaxPosLimit( );
+        }
+
+        if ( SRS_kinematics_.init( kinematics_.getChain( ), q_min, q_max ) < 0 )
+            exit( -1 );
 
         startMotionThread( );
     }
@@ -2513,13 +2521,13 @@ namespace rocos {
 
     int Robot::servoJ( const KDL::JntArray& target_pos )
     {
-        //** 位置检查 **//
-        for ( int i = 0; i < _joint_num; ++i )
-            if ( target_pos( i ) > joints_[ i ]->getMaxPosLimit( ) || target_pos( i ) < joints_[ i ]->getMinPosLimit( ) )
-            {
-                PLOG_ERROR << "target pos [" << i << "]= " << target_pos( i ) * KDL::rad2deg << " is out of range ";
-                return -1;
-            }
+        //** 位置检查(解析求解器内置位置检查) **//
+        // for ( int i = 0; i < _joint_num; ++i )
+        //     if ( target_pos( i ) > joints_[ i ]->getMaxPosLimit( ) || target_pos( i ) < joints_[ i ]->getMinPosLimit( ) )
+        //     {
+        //         PLOG_ERROR << "target pos [" << i << "]= " << target_pos( i ) * KDL::rad2deg << " is out of range ";
+        //         return -1;
+        //     }
         //**-------------------------------**//
         //** 速度检查 **//
         Eigen::Matrix< double, _joint_num, 1 > joint_offset = ( target_pos.data - JC_helper::vector_2_JntArray( pos_ ).data ).cwiseAbs( );

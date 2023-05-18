@@ -22,46 +22,43 @@
 
 #define RESET "\033[0m"
 
-#define BLACK "\033[30m" /* Black */
+#define BLACK "\033[30m"              /* Black */
 
-#define RED "\033[31m" /* Red */
+#define RED "\033[31m"                /* Red */
 
-#define GREEN "\033[32m" /* Green */
+#define GREEN "\033[32m"              /* Green */
 
-#define YELLOW "\033[33m" /* Yellow */
+#define YELLOW "\033[33m"             /* Yellow */
 
-#define BLUE "\033[34m" /* Blue */
+#define BLUE "\033[34m"               /* Blue */
 
-#define MAGENTA "\033[35m" /* Magenta */
+#define MAGENTA "\033[35m"            /* Magenta */
 
-#define CYAN "\033[36m" /* Cyan */
+#define CYAN "\033[36m"               /* Cyan */
 
-#define WHITE "\033[37m" /* White */
+#define WHITE "\033[37m"              /* White */
 
-#define BOLDBLACK "\033[1m\033[30m" /* Bold Black */
+#define BOLDBLACK "\033[1m\033[30m"   /* Bold Black */
 
-#define BOLDRED "\033[1m\033[31m" /* Bold Red */
+#define BOLDRED "\033[1m\033[31m"     /* Bold Red */
 
-#define BOLDGREEN "\033[1m\033[32m" /* Bold Green */
+#define BOLDGREEN "\033[1m\033[32m"   /* Bold Green */
 
-#define BOLDYELLOW "\033[1m\033[33m" /* Bold Yellow */
+#define BOLDYELLOW "\033[1m\033[33m"  /* Bold Yellow */
 
-#define BOLDBLUE "\033[1m\033[34m" /* Bold Blue */
+#define BOLDBLUE "\033[1m\033[34m"    /* Bold Blue */
 
 #define BOLDMAGENTA "\033[1m\033[35m" /* Bold Magenta */
 
-#define BOLDCYAN "\033[1m\033[36m" /* Bold Cyan */
+#define BOLDCYAN "\033[1m\033[36m"    /* Bold Cyan */
 
-#define BOLDWHITE "\033[1m\033[37m" /* Bold White */
+#define BOLDWHITE "\033[1m\033[37m"   /* Bold White */
 
-//示例
-// std::cout << BLUE << " hello world " << std::endl;
-
+// 示例
+//  std::cout << BLUE << " hello world " << std::endl;
 
 //** 显式指定关节数量 **//
 constexpr size_t _joint_num{ 7 };
-
-
 
 namespace rocos
 {
@@ -110,14 +107,11 @@ namespace JC_helper
 
     int link_vel( const KDL::Frame& start, const KDL::Frame& end, double v_p, double v_r, KDL::Twist& Cartesian_vel );
 
-
     int link_trajectory( std::vector< KDL::Frame >& traj, const KDL::Frame& start, const KDL::Frame& end, double v_start, double v_end, double max_path_v, double max_path_a );
 
     int link_trajectory( std::vector< KDL::Frame >& traj, const KDL::Frame& start, const KDL::Frame& end, double max_path_v, double max_path_a );
-    
+
     int link_trajectory( std::vector< KDL::Twist >& traj, const KDL::Frame& start, const KDL::Frame& end, double max_path_v, double max_path_a );
-
-
 
     /**
      * @brief
@@ -176,26 +170,23 @@ namespace JC_helper
      * @return int
      */
     int circle_trajectory( std::vector< KDL::Frame >& traj, const KDL::Frame& f_p1, const KDL::Frame& center, double theta13, int axiz, double max_path_v, double max_path_a, bool fixed_rotation );
-  
 
     int circle_trajectory( std::vector< KDL::Twist >& traj_vel, const KDL::Frame& f_p1, const KDL::Frame& f_p2, const KDL::Frame& f_p3, double max_path_v, double max_path_a, bool fixed_rotation );
     int circle_trajectory( std::vector< KDL::Twist >& traj_vel, const KDL::Frame& f_p1, const KDL::Frame& center, double theta13, int axiz, double max_path_v, double max_path_a, bool fixed_rotation );
 
-
-        /**
-         * @brief 位置保持，只旋转姿态
-         *
-         * @param traj 输出计算结果
-         * @param f_p 位置保持
-         * @param f_r1 起始姿态
-         * @param f_r2 终止姿态
-         * @param max_path_v 最大速度
-         * @param max_path_a 最大加速度
-         * @param equivalent_radius 等效半径，用于乘以角度得到等效弧度
-         * @return int
-         */
-        int rotation_trajectory( std::vector< KDL::Frame >& traj, const KDL::Vector& f_p, const KDL::Rotation& f_r1, const KDL::Rotation& f_r2, double max_path_v = 0.01, double max_path_a = 0.01, double equivalent_radius = 0.01 );
-
+    /**
+     * @brief 位置保持，只旋转姿态
+     *
+     * @param traj 输出计算结果
+     * @param f_p 位置保持
+     * @param f_r1 起始姿态
+     * @param f_r2 终止姿态
+     * @param max_path_v 最大速度
+     * @param max_path_a 最大加速度
+     * @param equivalent_radius 等效半径，用于乘以角度得到等效弧度
+     * @return int
+     */
+    int rotation_trajectory( std::vector< KDL::Frame >& traj, const KDL::Vector& f_p, const KDL::Rotation& f_r1, const KDL::Rotation& f_r2, double max_path_v = 0.01, double max_path_a = 0.01, double equivalent_radius = 0.01 );
 
     class SmartServo_Joint
     {
@@ -212,7 +203,7 @@ namespace JC_helper
 
     public:
         SmartServo_Joint( std::atomic< bool >* finished_flag_ptr );
-        void init( const std::vector< std::atomic<double> > & q_init, const std::vector< std::atomic<double> > &  v_init, const std::vector< std::atomic<double> > &  a_init, double max_v, double max_a, double max_j );
+        void init( const std::vector< std::atomic< double > >& q_init, const std::vector< std::atomic< double > >& v_init, const std::vector< std::atomic< double > >& a_init, double max_v, double max_a, double max_j );
         void RunSmartServo( rocos::Robot* robot_ptr );
         void command( KDL::JntArray q_target );
     };
@@ -448,8 +439,11 @@ namespace JC_helper
         double joint_3_inverse;
         double joint_5_inverse;
 
+        KDL::JntArray _pos_minimum;
+        KDL::JntArray _pos_maximum;
+
     public:
-        void init( const KDL::Chain& dof_7_robot );
+        int init( const KDL::Chain& dof_7_robot, const KDL::JntArray& pos_minimum, const KDL::JntArray& pos_maximum );
         int JC_cartesian_to_joint( KDL::Frame inter_T, JC_double inter_joint_3, const KDL::JntArray& last_joint, KDL::JntArray& joint_out );
         class JC_exception : public std::exception
         {
@@ -464,7 +458,7 @@ namespace JC_helper
         };
     };
 
-    inline KDL::JntArray vector_2_JntArray( const std::vector< std::atomic<double> > & pos )
+    inline KDL::JntArray vector_2_JntArray( const std::vector< std::atomic< double > >& pos )
     {
         KDL::JntArray _pos( pos.size( ) );
         for ( int i = 0; i < pos.size( ); i++ )
@@ -502,7 +496,7 @@ namespace JC_helper
     int check_vel_acc( const KDL::JntArray& current_pos, const KDL::JntArray& last_pos, const KDL::JntArray& last_last_pos, const double max_vel, const double max_acc );
 
     /**
-     * @brief 带安全位置检查的伺服,无效则报错并程序终止 
+     * @brief 带安全位置检查的伺服,无效则报错并程序终止
      *
      * @param robot_ptr
      * @param target_pos 目标位置
