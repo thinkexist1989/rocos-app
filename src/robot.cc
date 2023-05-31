@@ -68,10 +68,23 @@ namespace rocos {
         static plog::ColorConsoleAppender< plog::TxtFormatter > consoleAppender;
         plog::init< 0 >( plog::debug, &consoleAppender );//终端显示                                                                      // Initialize the logger.
 
-//        if ( JC_helper::authentication( ) < 0 )
-//        {
-//            exit( 0 );
-//        }
+        // 实现密匙加密
+        //  if ( JC_helper::authentication( ) < 0 )
+        //  {
+        //      exit( 0 );
+        //  }
+
+        // 解析逆运动学求解器初始化
+        KDL::JntArray q_min( joints_.size( ) );
+        KDL::JntArray q_max( joints_.size( ) );
+        for ( int i = 0; i < joints_.size( ); ++i )
+        {
+            q_min( i ) = joints_[ i ]->getMinPosLimit( );
+            q_max( i ) = joints_[ i ]->getMaxPosLimit( );
+        }
+
+        if ( SRS_kinematics_.init( kinematics_.getChain( ), q_min, q_max ) < 0 )
+            exit( -1 );
 
         startMotionThread( );
     }
@@ -1954,17 +1967,25 @@ namespace rocos {
         static std::atomic< bool > _dragging_finished_flag{ true };
         static JC_helper::SmartServo_Joint _SmartServo_Joint{ &_dragging_finished_flag };
         static JC_helper::SmartServo_Cartesian _SmartServo_Cartesian{ &_dragging_finished_flag , kinematics_.getChain() };
+        static JC_helper::SmartServo_Nullsapace _SmartServo_Nullsapace{ &_dragging_finished_flag , kinematics_.getChain() };
         static std::shared_ptr< boost::thread > _thread_planning{ nullptr };
         KDL::JntArray target_joint{ static_cast< unsigned int >( jnt_num_ ) };
         KDL::Frame target_frame{ };
         int index{ static_cast< int >( flag ) };
-        static int last_index{ index };
+        static DRAGGING_TYPE index_type;
+        static DRAGGING_TYPE last_index_type;
         int res{ -1 };
         constexpr double vector_speed_scale{0.1};
         constexpr double rotation_speed_scale{0.2};
         //**-------------------------------**//
 
         //** 命令有效性检查 **//
+        if ( index < 0 )
+        {
+            PLOG_ERROR << "未定义指令：" << index;
+            return -1;
+        }
+
         if ( index <= static_cast< int >( DRAGGING_FLAG::J6 ) )  //当前命令类型为关节空间
         {
             //只检查速度、加速度,关节位置指令这里不检查，如果超过范围，则为最大/小关节值
@@ -1981,46 +2002,49 @@ namespace rocos {
                            << " is not allow because of the jnt_num_=" << jnt_num_;
                 return -1;
             }
+            index_type = DRAGGING_TYPE::JOINT;
         }
-        else  //当前命令类型为笛卡尔空间
+        else if( index <= static_cast< int >( DRAGGING_FLAG::BASE_YAW ) ) //当前命令类型为笛卡尔空间
         {
-            //只检查速度、加速度,笛卡尔指令这里不检查，由planningIK()检查
+            //只检查速度、加速度,笛卡尔指令不检查
             if ( CheckBeforeMove( flange_, max_speed, max_acceleration, 0, 0 ) < 0 )
             {
                 PLOG_ERROR << "given parameters is invalid";
                 return -1;
             }
+            index_type = DRAGGING_TYPE::CARTESIAN;
+        }
+        else if ( index <= static_cast< int >( DRAGGING_FLAG::NULLSPACE ) )  // 当前指令为零空间运动
+        {
+            if ( jnt_num_ < 7 )
+            {
+                PLOG_ERROR << "当前机械臂关节数量为:" << jnt_num_ << ",无法实现零空间点动";
+                return -1;
+            }
+            index_type = DRAGGING_TYPE::NULLSPACE;
+        }
+        else  // 未定义指令
+        {
+            PLOG_ERROR << "未定义指令：" << index;
+            return -1;
         }
         //**-------------------------------**//
 
-        //** 禁止在运动中，笛卡尔点动和关节点动来回切换**//
-        if ( index <= static_cast< int >( DRAGGING_FLAG::J6 ) && last_index > static_cast< int >( DRAGGING_FLAG::J6 ) )  //当前命令类型为关节空间，上次为笛卡尔空间
+        //** 禁止在运动中，各种点动来回切换**//
+        if ( index_type != last_index_type && !_dragging_finished_flag )
         {
-            if ( !_dragging_finished_flag )  //暂时不支持在关节点动示教时，切换为笛卡尔点动示教
-            {
-                PLOG_ERROR << "It is not allow to change into Joint dragging while Cartesian  dragging is running ";
-                return -1;
-            }
+            PLOG_ERROR << "不允许点动指令运行中切换点动类型";
+            return -1;
         }
-        else if ( index > static_cast< int >( DRAGGING_FLAG::J6 ) && last_index <= static_cast< int >( DRAGGING_FLAG::J6 ) )  //当前命令类型为笛卡尔空间，上次为关节空间
-        {
-            if ( !_dragging_finished_flag )
-            {
-                PLOG_ERROR << "It is not allow to change into Cartesian dragging while Joint  dragging is running ";
-                return -1;
-            }
-        }
-        //三种情况能通过检查：没改没完成、没改完成了、改了完成了
-        last_index = index;
+        // 三种情况能通过检查：没改没完成、没改完成了、改了完成了
+        last_index_type = index_type;
         //**-------------------------------**//
 
         //** is_running_motion的作用：不允许其他运动异步运行时,执行dragging;不允许执行dragging时，执行其他离线类运动**//
         //** _dragging_finished_flag的作用：保证dragging 多次调用时，只初始化一次**//
         if ( _dragging_finished_flag && is_running_motion )
         {
-            PLOG_DEBUG << "_dragging_finished_flag = " << _dragging_finished_flag;
-            PLOG_DEBUG << "is_running_motion = " << is_running_motion;
-            PLOG_ERROR << "offline Motion is still running and waiting for it to finish" << WHITE;
+            PLOG_ERROR << "其他运动仍在运行，不允许执行点动功能";
             return -1;
         }
         else if ( _dragging_finished_flag && !is_running_motion )
@@ -2043,21 +2067,21 @@ namespace rocos {
         //**-------------------------------**//
 
         //** 线程初始化 **//
-        //新动作需要第一次初始化,然后等待_dragging_finished_flag
+        // 新动作需要第一次初始化,然后等待_dragging_finished_flag
         //!_dragging_finished_flag由command()置false
-        //关节空间点动指令
-        if ( _dragging_finished_flag && DRAGGING_FLAG::J0 <= flag && DRAGGING_FLAG::J6 >= flag )
+        // 关节空间点动指令
+        if ( _dragging_finished_flag && index_type == DRAGGING_TYPE::JOINT )
         {
             if ( _thread_planning )
             {
                 _thread_planning->join( );
                 _thread_planning = nullptr;
             }
-            _SmartServo_Joint.init( pos_, vel_, acc_, max_speed, max_acceleration, 2 * max_acceleration );
+            _SmartServo_Joint.init( pos_, vel_, acc_, max_speed, max_acceleration, 4 * max_acceleration );
             _thread_planning.reset( new boost::thread{ &JC_helper::SmartServo_Joint::RunSmartServo, &_SmartServo_Joint, this } );
         }
         //笛卡尔空间点动指令
-        else if ( _dragging_finished_flag && DRAGGING_FLAG::TOOL_X <= flag && DRAGGING_FLAG::BASE_YAW >= flag )
+        else if ( _dragging_finished_flag && index_type == DRAGGING_TYPE::CARTESIAN )
         {
             if ( _thread_planning )
             {
@@ -2066,11 +2090,25 @@ namespace rocos {
             }
 
             if ( index % 10 <= 2 )
-                _SmartServo_Cartesian.init( this, max_speed * 0.15 );
+                // 笛卡尔空间位置点动
+                _SmartServo_Cartesian.init( this, max_speed * 0.4 );
             else
-                _SmartServo_Cartesian.init( this, max_speed * 0.5);
+                // 笛卡尔空间姿态点动
+                _SmartServo_Cartesian.init( this, max_speed * 1.5 );
 
-                _thread_planning.reset( new boost::thread{ &JC_helper::SmartServo_Cartesian::RunMotion, &_SmartServo_Cartesian, this } );
+            _thread_planning.reset( new boost::thread{ &JC_helper::SmartServo_Cartesian::RunMotion, &_SmartServo_Cartesian, this } );
+        }
+        // 零空间点动指令
+        else if ( _dragging_finished_flag && index_type == DRAGGING_TYPE::NULLSPACE )
+        {
+          if ( _thread_planning )
+            {
+                _thread_planning->join( );
+                _thread_planning = nullptr;
+            }
+
+            _SmartServo_Nullsapace.init( this, max_speed);
+            _thread_planning.reset( new boost::thread{ &JC_helper::SmartServo_Nullsapace::RunMotion, &_SmartServo_Nullsapace, this } );
         }
         //**-------------------------------**//
 
@@ -2087,7 +2125,7 @@ namespace rocos {
 
                 for ( int i = 0; i < jnt_num_; i++ )
                     target_joint( i ) = pos_[ i ];
-                target_joint( index ) = std::min( target_joint( index ) + static_cast< double >( dir ) * max_speed * 0.1, joints_[ index ]->getMaxPosLimit( ) );  //取最大速度的10%
+                target_joint( index ) = std::min( target_joint( index ) + static_cast< double >( dir ) * max_speed * 1.5, joints_[ index ]->getMaxPosLimit( ) );  //! 取最大速度1.5倍作为目标距离,不要太小
                 target_joint( index ) = std::max( target_joint( index ), joints_[ index ]->getMinPosLimit( ) );
                 _SmartServo_Joint.command( target_joint );
 
@@ -2145,6 +2183,10 @@ namespace rocos {
                 index = index - static_cast< int >( DRAGGING_FLAG::BASE_X ) + 1;
                 index = index * static_cast< double >( dir );
                 _SmartServo_Cartesian.command( index, "base" );
+                break;
+
+            case DRAGGING_FLAG::NULLSPACE:
+                _SmartServo_Nullsapace.command( static_cast< int >( dir ) );
                 break;
 
             default:
@@ -2235,20 +2277,6 @@ namespace rocos {
                 return -1;
             }
         }
-        //总时间检查
-        if ( time < 0 )
-        {
-            PLOG_ERROR << " time is less than 0 invalidly";
-            return -1;
-        }
-
-        if ( time )
-        {
-            PLOG_ERROR << " time not supported yet";
-            return -1;
-        }
-
-
         //**-------------------------------**//
         return 0;
     }
@@ -2496,20 +2524,20 @@ namespace rocos {
 
     int Robot::servoJ( const KDL::JntArray& target_pos )
     {
-        //** 位置检查 **//
-        for ( int i = 0; i < _joint_num; ++i )
-            if ( target_pos( i ) > joints_[ i ]->getMaxPosLimit( ) || target_pos( i ) < joints_[ i ]->getMinPosLimit( ) )
-            {
-                PLOG_ERROR << "target pos [" << i << "]= " << target_pos( i ) * KDL::rad2deg << " is out of range ";
-                return -1;
-            }
+        //** 位置检查(解析求解器内置位置检查) **//
+        // for ( int i = 0; i < _joint_num; ++i )
+        //     if ( target_pos( i ) > joints_[ i ]->getMaxPosLimit( ) || target_pos( i ) < joints_[ i ]->getMinPosLimit( ) )
+        //     {
+        //         PLOG_ERROR << "target pos [" << i << "]= " << target_pos( i ) * KDL::rad2deg << " is out of range ";
+        //         return -1;
+        //     }
         //**-------------------------------**//
         //** 速度检查 **//
         Eigen::Matrix< double, _joint_num, 1 > joint_offset = ( target_pos.data - JC_helper::vector_2_JntArray( pos_ ).data ).cwiseAbs( );
         for ( int i = 0; i < _joint_num; ++i )
             if ( joint_offset( i ) > joints_[ i ]->getMaxVel( ) * 0.001 )
             {
-                PLOG_ERROR << "target vel [" << i << "]= " << joint_offset( i ) * KDL::rad2deg * 1000 << " is out of range ";
+                PLOG_ERROR << "target vel [" << i << "]= " << joint_offset( i ) * KDL::rad2deg * 1000 << " deg/s is out of range ";
                 return -1;
             }
         //**-------------------------------**//
@@ -2526,8 +2554,10 @@ namespace rocos {
 
     int Robot::servoL( const KDL::Frame& target_frame )
     {
+        KDL::JntArray joint_in( _joint_num );
         KDL::JntArray joint_out( _joint_num );
-        if ( kinematics_.CartToJnt( JC_helper::vector_2_JntArray( pos_ ), target_frame, joint_out ) < 0 )
+        joint_in = JC_helper::vector_2_JntArray( pos_ );
+        if ( SRS_kinematics_.JC_cartesian_to_joint( target_frame, joint_in( 2 ), joint_in, joint_out ) < 0 )
         {
             PLOG_ERROR << "逆解失败";
             return -1;

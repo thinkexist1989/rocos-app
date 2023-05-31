@@ -14,6 +14,7 @@ endif ()
 
 find_package(Boost REQUIRED COMPONENTS date_time system)
 
+add_library(trac_ik SHARED src/kdl_tl.cpp src/nlopt_ik.cpp src/trac_ik.cpp)
 
 add_library(trac_ik SHARED
         src/kdl_tl.cpp
@@ -21,6 +22,8 @@ add_library(trac_ik SHARED
         src/trac_ik.cpp
         )
 
+install(DIRECTORY include/trac_ik
+DESTINATION ${CMAKE_INSTALL_INCLUDEDIR})
 
 target_link_libraries(trac_ik
         PUBLIC

@@ -6,59 +6,59 @@
 #include <Eigen/Geometry>
 #include <atomic>
 #include <fstream>
-#include "interpolate.h"
+#include <interpolate.h>
 #include <iostream>
-#include "kdl/chainiksolvervel_pinv.hpp"
-#include "kdl/frames.hpp"
-#include "kdl/jntarray.hpp"
+#include <kdl/chainiksolvervel_pinv.hpp>
+#include <kdl/frames.hpp>
+#include <kdl/jntarray.hpp>
+#include <kdl/utilities/svd_eigen_HH.hpp>
 #include <mutex>
-#include "plog/Appenders/ColorConsoleAppender.h"
-#include "plog/Initializers/RollingFileInitializer.h"
-#include "plog/Log.h"
-#include "ruckig/ruckig.hpp"
-#include "trac_ik/trac_ik.hpp"
+#include <plog/Appenders/ColorConsoleAppender.h>
+#include <plog/Initializers/RollingFileInitializer.h>
+#include <plog/Log.h>
+#include <ruckig/ruckig.hpp>
+#include <trac_ik/trac_ik.hpp>
 #include <vector>
 
 #define RESET "\033[0m"
 
-#define BLACK "\033[30m" /* Black */
+#define BLACK "\033[30m"              /* Black */
 
-#define RED "\033[31m" /* Red */
+#define RED "\033[31m"                /* Red */
 
-#define GREEN "\033[32m" /* Green */
+#define GREEN "\033[32m"              /* Green */
 
-#define YELLOW "\033[33m" /* Yellow */
+#define YELLOW "\033[33m"             /* Yellow */
 
-#define BLUE "\033[34m" /* Blue */
+#define BLUE "\033[34m"               /* Blue */
 
-#define MAGENTA "\033[35m" /* Magenta */
+#define MAGENTA "\033[35m"            /* Magenta */
 
-#define CYAN "\033[36m" /* Cyan */
+#define CYAN "\033[36m"               /* Cyan */
 
-#define WHITE "\033[37m" /* White */
+#define WHITE "\033[37m"              /* White */
 
-#define BOLDBLACK "\033[1m\033[30m" /* Bold Black */
+#define BOLDBLACK "\033[1m\033[30m"   /* Bold Black */
 
-#define BOLDRED "\033[1m\033[31m" /* Bold Red */
+#define BOLDRED "\033[1m\033[31m"     /* Bold Red */
 
-#define BOLDGREEN "\033[1m\033[32m" /* Bold Green */
+#define BOLDGREEN "\033[1m\033[32m"   /* Bold Green */
 
-#define BOLDYELLOW "\033[1m\033[33m" /* Bold Yellow */
+#define BOLDYELLOW "\033[1m\033[33m"  /* Bold Yellow */
 
-#define BOLDBLUE "\033[1m\033[34m" /* Bold Blue */
+#define BOLDBLUE "\033[1m\033[34m"    /* Bold Blue */
 
 #define BOLDMAGENTA "\033[1m\033[35m" /* Bold Magenta */
 
-#define BOLDCYAN "\033[1m\033[36m" /* Bold Cyan */
+#define BOLDCYAN "\033[1m\033[36m"    /* Bold Cyan */
 
-#define BOLDWHITE "\033[1m\033[37m" /* Bold White */
+#define BOLDWHITE "\033[1m\033[37m"   /* Bold White */
 
-//示例
-// std::cout << BLUE << " hello world " << std::endl;
+// 示例
+//  std::cout << BLUE << " hello world " << std::endl;
 
+//** 显式指定关节数量 **//
 constexpr size_t _joint_num{ 7 };
-
-
 
 namespace rocos
 {
@@ -107,14 +107,11 @@ namespace JC_helper
 
     int link_vel( const KDL::Frame& start, const KDL::Frame& end, double v_p, double v_r, KDL::Twist& Cartesian_vel );
 
-
     int link_trajectory( std::vector< KDL::Frame >& traj, const KDL::Frame& start, const KDL::Frame& end, double v_start, double v_end, double max_path_v, double max_path_a );
 
     int link_trajectory( std::vector< KDL::Frame >& traj, const KDL::Frame& start, const KDL::Frame& end, double max_path_v, double max_path_a );
-    
+
     int link_trajectory( std::vector< KDL::Twist >& traj, const KDL::Frame& start, const KDL::Frame& end, double max_path_v, double max_path_a );
-
-
 
     /**
      * @brief
@@ -173,26 +170,23 @@ namespace JC_helper
      * @return int
      */
     int circle_trajectory( std::vector< KDL::Frame >& traj, const KDL::Frame& f_p1, const KDL::Frame& center, double theta13, int axiz, double max_path_v, double max_path_a, bool fixed_rotation );
-  
 
     int circle_trajectory( std::vector< KDL::Twist >& traj_vel, const KDL::Frame& f_p1, const KDL::Frame& f_p2, const KDL::Frame& f_p3, double max_path_v, double max_path_a, bool fixed_rotation );
     int circle_trajectory( std::vector< KDL::Twist >& traj_vel, const KDL::Frame& f_p1, const KDL::Frame& center, double theta13, int axiz, double max_path_v, double max_path_a, bool fixed_rotation );
 
-
-        /**
-         * @brief 位置保持，只旋转姿态
-         *
-         * @param traj 输出计算结果
-         * @param f_p 位置保持
-         * @param f_r1 起始姿态
-         * @param f_r2 终止姿态
-         * @param max_path_v 最大速度
-         * @param max_path_a 最大加速度
-         * @param equivalent_radius 等效半径，用于乘以角度得到等效弧度
-         * @return int
-         */
-        int rotation_trajectory( std::vector< KDL::Frame >& traj, const KDL::Vector& f_p, const KDL::Rotation& f_r1, const KDL::Rotation& f_r2, double max_path_v = 0.01, double max_path_a = 0.01, double equivalent_radius = 0.01 );
-
+    /**
+     * @brief 位置保持，只旋转姿态
+     *
+     * @param traj 输出计算结果
+     * @param f_p 位置保持
+     * @param f_r1 起始姿态
+     * @param f_r2 终止姿态
+     * @param max_path_v 最大速度
+     * @param max_path_a 最大加速度
+     * @param equivalent_radius 等效半径，用于乘以角度得到等效弧度
+     * @return int
+     */
+    int rotation_trajectory( std::vector< KDL::Frame >& traj, const KDL::Vector& f_p, const KDL::Rotation& f_r1, const KDL::Rotation& f_r2, double max_path_v = 0.01, double max_path_a = 0.01, double equivalent_radius = 0.01 );
 
     class SmartServo_Joint
     {
@@ -209,7 +203,7 @@ namespace JC_helper
 
     public:
         SmartServo_Joint( std::atomic< bool >* finished_flag_ptr );
-        void init( const std::vector< std::atomic<double> > & q_init, const std::vector< std::atomic<double> > &  v_init, const std::vector< std::atomic<double> > &  a_init, double max_v, double max_a, double max_j );
+        void init( const std::vector< std::atomic< double > >& q_init, const std::vector< std::atomic< double > >& v_init, const std::vector< std::atomic< double > >& a_init, double max_v, double max_a, double max_j );
         void RunSmartServo( rocos::Robot* robot_ptr );
         void command( KDL::JntArray q_target );
     };
@@ -281,28 +275,24 @@ namespace JC_helper
         KDL::JntArray joint_current{ };
         KDL::JntArray joint_target{ };
         KDL::JntArray joint_vel{ };
-        KDL::JntArray joint_last_vel{ };
 
         KDL::JntArray joint_last_pos{ };
         KDL::JntArray joint_last_last_pos{ };
 
-        int _Cartesian_vel_index{ 0 };//+-1对应x轴,+-2对应y轴,+-3对应z轴
+        int _Cartesian_vel_index{ 0 };  //+-1对应x轴,+-2对应y轴,+-3对应z轴
         std::atomic< bool >* external_finished_flag_ptr;
 
-        std::string  _reference_frame {""};
+        std::string _reference_frame{ "" };
 
-        KDL::ChainFkSolverPos_recursive   FK_slover;  //!因为flang_.M一直在刷新，实时读取有问题，暂时这么处理
-        KDL::Frame current_flange{ };  
-
+        KDL::ChainFkSolverPos_recursive FK_slover;  //! 因为flang_.M一直在刷新，实时读取有问题，暂时这么处理
+        KDL::Frame current_flange{ };
 
         //**-------------------------------**//
     public:
+        SmartServo_Cartesian( std::atomic< bool >*, const KDL::Chain& robot_chain );
 
-        SmartServo_Cartesian(  std::atomic< bool >* , const KDL::Chain& robot_chain ) ;
+        void init( rocos::Robot* robot_ptr, double target_vel, double max_vel = 5, double max_acc = 20, double max_jerk = 60 );
 
-        void init( rocos::Robot* robot_ptr  , double target_vel, double max_vel = 0.3, double max_acc = 1, double max_jerk = 1 );
-      
-      
         /**
          * @brief  只有OTG正常计算，且不在奇异位置，joint_vel才会为有效值，其余情况通通为0
          * @return  otg失败 = -1；雅克比在奇异位置 = -1;working = 1;finished  = 0
@@ -312,9 +302,9 @@ namespace JC_helper
 
         void RunMotion( rocos::Robot* robot_ptr );
 
-        void command( int Cartesian_vel_index ,const char * reference_frame);
+        void command( int Cartesian_vel_index, const char* reference_frame );
 
-        void Cartesian_stop( double max_vel=1, double max_acc =30 , double max_jerk=200 );
+        void Cartesian_stop( double max_vel = 10, double max_acc = 50, double max_jerk = 180 );
 
 #if 0
 
@@ -382,7 +372,93 @@ namespace JC_helper
 #endif
     };
 
-    inline KDL::JntArray vector_2_JntArray( const std::vector< std::atomic<double> > & pos )
+    class SmartServo_Nullsapace
+    {
+    private:
+        //** 变量初始化 **//
+        ruckig::Ruckig< 1 > otg{ 0.001 };
+        ruckig::InputParameter< 1 > input;
+        ruckig::OutputParameter< 1 > output;
+        ruckig::Result otg_res;
+        KDL::ChainJntToJacSolver jnt2jac;
+        const double servo_dt = 0.001;
+        std::atomic< bool > flag_stop{ false };
+
+        KDL::JntArray joint_current{ };
+        KDL::JntArray joint_target{ };
+        KDL::JntArray joint_vel{ };
+
+        KDL::JntArray joint_last_pos{ };
+        KDL::JntArray joint_last_last_pos{ };
+
+        int _jogging_Direction{ 0 };  //+1表示正转，-1表是负转，0表示无
+        int _command_Direction{ 0 };  // 用于保证臂角方向与_jogging_Direction方向一致
+        std::atomic< bool >* external_finished_flag_ptr;
+
+        KDL::Jacobian jac;
+
+        Eigen::MatrixXd U;
+        Eigen::VectorXd S;
+        Eigen::VectorXd Sinv;
+        Eigen::MatrixXd V;
+        Eigen::VectorXd tmp;
+
+        Eigen::Matrix< double, _joint_num, _joint_num > null_space_jac;
+        int _max_jac_cul_index = -1;  // 表示对角矩阵中系数最大的列，也是指示控制哪个关节
+        KDL::ChainFkSolverPos_recursive fk_slover;
+
+        //**-------------------------------**//
+
+    public:
+        SmartServo_Nullsapace( std::atomic< bool >*, const KDL::Chain& robot_chain );
+
+        void init( rocos::Robot* robot_ptr, double target_vel, double max_vel = 2, double max_acc = 2, double max_jerk = 4 );
+
+        int update( KDL::JntArray& joint_vel );
+
+        void RunMotion( rocos::Robot* robot_ptr );
+
+        void command( int Direction );
+
+        void nullspace_stop( double max_vel = 10, double max_acc = 50, double max_jerk = 180 );
+
+        bool is_same_on_direction( const Eigen::Block< Eigen::Matrix< double, _joint_num, _joint_num >, _joint_num, 1, true >& );
+    };
+
+    typedef double JC_double;
+    class inverse_special_to_SRS
+    {
+    private:
+        JC_double d_bs;
+        KDL::Vector l_0_bs;
+        JC_double d_se;
+        JC_double d_ew;
+        JC_double d_wt;
+        KDL::Vector l_7_wt;
+        double joint_1_inverse;
+        double joint_3_inverse;
+        double joint_5_inverse;
+
+        KDL::JntArray _pos_minimum;
+        KDL::JntArray _pos_maximum;
+
+    public:
+        int init( const KDL::Chain& dof_7_robot, const KDL::JntArray& pos_minimum, const KDL::JntArray& pos_maximum );
+        int JC_cartesian_to_joint( KDL::Frame inter_T, JC_double inter_joint_3, const KDL::JntArray& last_joint, KDL::JntArray& joint_out );
+        class JC_exception : public std::exception
+        {
+        public:
+            JC_exception( ) = default;
+            JC_exception( const char* arg_1, int arg_2 ) : error_str{ arg_1 }, error_code{ arg_2 } { };
+
+            int error_code = 0;
+            std::string error_str{ };
+
+            const char* what( ) const noexcept override { return error_str.c_str( ); }
+        };
+    };
+
+    inline KDL::JntArray vector_2_JntArray( const std::vector< std::atomic< double > >& pos )
     {
         KDL::JntArray _pos( pos.size( ) );
         for ( int i = 0; i < pos.size( ); i++ )
@@ -417,10 +493,10 @@ namespace JC_helper
      * @param max_acc 最大加速度
      * @return int
      */
-    int check_vel_acc( const KDL::JntArray& current_pos, const KDL::JntArray& last_pos, const KDL::JntArray& last_last_pos, const std::vector< double >& max_vel, const std::vector< double >& max_acc );
+    int check_vel_acc( const KDL::JntArray& current_pos, const KDL::JntArray& last_pos, const KDL::JntArray& last_last_pos, const double max_vel, const double max_acc );
 
     /**
-     * @brief 带安全位置检查的伺服,无效则报错并程序终止 
+     * @brief 带安全位置检查的伺服,无效则报错并程序终止
      *
      * @param robot_ptr
      * @param target_pos 目标位置
