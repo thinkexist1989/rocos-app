@@ -3610,6 +3610,7 @@ namespace JC_helper
 
         _pos_minimum = pos_minimum;
         _pos_maximum = pos_maximum;
+        return 0;
     }
 
     int inverse_special_to_SRS::JC_cartesian_to_joint( KDL::Frame inter_T, JC_double inter_joint_3, const KDL::JntArray& last_joint, KDL::JntArray& joint_out )

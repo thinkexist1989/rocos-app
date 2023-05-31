@@ -6,7 +6,7 @@
 #include <Eigen/Geometry>
 #include <atomic>
 #include <fstream>
-#include <interpolate.h>
+#include "interpolate.h"
 #include <iostream>
 #include <kdl/chainiksolvervel_pinv.hpp>
 #include <kdl/frames.hpp>
