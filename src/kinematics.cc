@@ -144,7 +144,7 @@ namespace rocos {
         kin_chain.addSegment(Segment(Joint(Joint::RotZ), Frame::DH_Craig1989(0.0, -M_PI_2, 0.2145, 0.0)));
         q_min(5) = -167.5 / 180.0 * M_PI ; q_max(6) = 167.5 / 180.0 * M_PI; //见调试总结，关节限位值
         //joint 7
-        kin_chain.addSegment(Segment(Joint(Joint::Fixed), Frame::DH_Craig1989(0.0, 0.0, 0.0, 0.0)));
+        kin_chain.addSegment(Segment(Joint(Joint::None), Frame::DH_Craig1989(0.0, 0.0, 0.0, 0.0)));
 
 
         chain = kin_chain;

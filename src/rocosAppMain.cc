@@ -38,33 +38,10 @@ DEFINE_string(tip, "link_7", "Tip link name");
 bool isRuning = true;
 
 
-#pragma region  //*测试9  完整上电保护程序
+#pragma region  
 
 namespace rocos
 {
-    /**
-     * @brief 字符串切割函数
-     *
-     * @param str 待切割字符串
-     * @param tokens 结果存储
-     * @param delim 切割符
-     */
-    void split( const std::string& str,
-                std::vector< std::string >& tokens,
-                const std::string delim = " " )
-    {
-        tokens.clear( );  //!注意清除上次结果
-
-        auto start    = str.find_first_not_of( delim, 0 );  // 分割到的字符串的第一个字符
-        auto position = str.find_first_of( delim, start );  // 分隔符的位置
-        while ( position != std::string::npos || start != std::string::npos )
-        {
-            // [start, position) 为分割下来的字符串
-            tokens.emplace_back( std::move( str.substr( start, position - start ) ) );
-            start    = str.find_first_not_of( delim, position );
-            position = str.find_first_of( delim, start );
-        }
-    }
 
     void Robot::test( )
     {
@@ -79,6 +56,8 @@ namespace rocos
         KDL::JntArray last_joints( _joint_num );
 
         int row_index = 1;
+
+        JC_helper::TCP_server my_server;
 
         //**-------------------------------**//
 
@@ -125,7 +104,9 @@ namespace rocos
         //     servo_data.push_back( joints );
         // }
 
-        auto t_start = std::chrono::high_resolution_clock::now( ); //记录程序启动时间
+
+        my_server.init( );
+        boost::thread( &JC_helper::TCP_server::RunServer, &my_server ).detach( );  //开启服务器
 
         //**-------------------------------**//
 
@@ -155,128 +136,41 @@ namespace rocos
 
         while ( isRuning )
         {
-            str.clear();
+            str.clear( );
 
             PLOG_INFO << "当前环境是否安全,如果是,输入run开始执行程序";
             std::cin >> str;
 
-            auto t_stop     = std::chrono::high_resolution_clock::now( );
-            auto t_duration = std::chrono::duration< double >( t_stop - t_start );
-            PLOG_DEBUG << "当前已经运行了: " << t_duration.count( ) / 60 << "分钟";
-
-            if(t_duration.count( ) / 60   >45)
-            {
-                PLOG_ERROR<< "运行时间已超过45分钟,程序关闭";
-                exit(0);
-            }
-
-
             if ( str == std::string_view{ "run" } )
             {
-            
                 using namespace KDL;
+
+                //** movej **//
                 KDL::JntArray q_target( _joint_num );
-
-
-                //** 正方形+ 直线+moveJ+圆弧 **//
-
-                // KDL::Frame f_p0;
-                // KDL::Frame f_p1;
-                // KDL::Frame f_p2;
-                // KDL::Frame f_p3;
-                // KDL::Frame f_p4;
-                // KDL::Frame f_p5;
-                // KDL::Frame f_p6;
-
-                // for ( int i = 0; i < 7; i++ )
-                //     joints_[ i ]->setMode( ModeOfOperation::CyclicSynchronousPositionMode );
-
-                // q_target( 0 ) = 0 * M_PI / 180;
-                // q_target( 1 ) = -45 * M_PI / 180;
-                // q_target( 2 ) = 0 * M_PI / 180;
-                // q_target( 3 ) = -90 * M_PI / 180;
-                // q_target( 4 ) = 0 * M_PI / 180;
-                // q_target( 5 ) = 45 * M_PI / 180;
-                // q_target( 6 ) = 0 * M_PI / 180;
-
-                // MoveJ( q_target, 0.3, 1, 0, 0, false );
-
-                // kinematics_.JntToCart( q_target, f_p0 );
-
-
-                // f_p1 = f_p0 * KDL::Frame{ KDL::Vector{ 0.0, -0.15, 0.0 } };
-                // MoveL( f_p1, 0.07, 0.2, 0, 0, false );
-
-
-
-                // KDL::Frame f_c_p1 = f_p0 * KDL::Frame{ KDL::Vector{ -0.15, 0.0, 0.0 } };
-                // KDL::Frame f_c_p2 = f_p0 * KDL::Frame{ KDL::Vector{ 0.0, 0.15, 0.0 } };
-                // MoveC( f_c_p1, f_c_p2, 0.04, 0.3, 0, 0, Robot::OrientationMode::UNCONSTRAINED, false );
-
-                // MoveC( f_p0, M_PI, 2, 0.04, 0.3, 0, 0, Robot::OrientationMode::UNCONSTRAINED, false );
-
-                // PLOG_INFO << "开始速度模式";
-                // std::cin >> str;
-
-                // for ( int i = 0; i < 7; i++ )
-                //     joints_[ i ]->setMode( ModeOfOperation::CyclicSynchronousVelocityMode );
-
-                // MoveJ( q_target, 0.1, 1, 0, 0, false );
-
-                // MoveL( f_p1, 0.07, 0.2, 0, 0, false );
-
-                // MoveC( f_c_p1, f_c_p2, 0.04, 0.3, 0, 0, Robot::OrientationMode::UNCONSTRAINED, false );
-
-                // MoveC( f_p0, M_PI, 2, 0.04, 0.3, 0, 0, Robot::OrientationMode::UNCONSTRAINED, false );
-
-                //**-------------------------------**//
-
-                //** 回到起始位置 **//
-
-                // for ( int i = 0; i < jnt_num_; i++ )
-                //     q_target( i ) = 0;
-                // MoveJ( q_target, 0.4, 0.6, 0, 0, false );
-
-                //**-------------------------------**//
-
                 q_target( 0 ) = 0 * M_PI / 180;
-                q_target( 1 ) = -45 * M_PI / 180;
-                q_target( 2 ) = 0 * M_PI / 180;
-                q_target( 3 ) = -90 * M_PI / 180;
+                q_target( 1 ) = 45 * M_PI / 180;
+                q_target( 2 ) = 30 * M_PI / 180;
+                q_target( 3 ) = 90 * M_PI / 180;
                 q_target( 4 ) = 0 * M_PI / 180;
-                q_target( 5 ) = 45 * M_PI / 180;
+                q_target( 5 ) = -45 * M_PI / 180;
                 q_target( 6 ) = 0 * M_PI / 180;
 
-                for ( int i = 0; i < 7; i++ )
-                    joints_[ i ]->setMode( ModeOfOperation::CyclicSynchronousPositionMode );
+                MoveJ( q_target, 0.8, 0.6, 0, 0, false );
 
-                MoveJ( q_target, 0.3, 1, 0, 0, false );
+                KDL::Frame f_p0;
+                kinematics_.JntToCart( q_target, f_p0 );
+                //** servoL **//
+                KDL::Frame f_p5;
+                f_p5     = f_p0;
+                double i = 0;
+                while ( i < KDL::PI )
+                {
+                    f_p5.p( 2 ) = f_p0.p( 2 ) + 0.1 * sin( 3 * i );
+                    servoL( f_p5 );
+                    i = i + 0.001;
+                }
 
-                PLOG_INFO << "切换速度模式";
-                // std::cin >> str;
-
-                for ( int i = 0; i < 7; i++ )
-                    joints_[ i ]->setMode( ModeOfOperation::CyclicSynchronousVelocityMode );
-
-                q_target( 5 ) = 0;
-
-                MoveJ( q_target, 0.3, 1, 0, 0, false );
-
-                PLOG_INFO << "切换位置模式，危险";
-                // std::cin >> str;
-
-                for ( int i = 0; i < 7; i++ )
-                    joints_[ i ]->setMode( ModeOfOperation::CyclicSynchronousPositionMode );
-
-                q_target( 5 ) = 45 * M_PI / 180;
-                MoveJ( q_target, 0.3, 1, 0, 0, false );
-
-                for ( int i = 0; i < 7; i++ )
-                    joints_[ i ]->setMode( ModeOfOperation::CyclicSynchronousVelocityMode );
-
-                for ( int i = 0; i < jnt_num_; i++ )
-                    q_target( i ) = 0;
-                MoveJ( q_target, 0.4, 0.6, 0, 0, false );
+                //**-------------------------------**//
             }
             else
             {
@@ -284,9 +178,6 @@ namespace rocos
                 setDisabled( );
                 return ;
             }
-     
-     
-     
         }
 
         PLOG_INFO << "全部测试结束,goodbye!";
@@ -295,7 +186,50 @@ namespace rocos
 
 #pragma endregion
 
+/**
+ * @brief 设置指定进程为最高优先级
+ *
+ * @param this_thread 线程号
+ * @return int -1失败，0成功
+ */
+int set_process_priority_max( pid_t pid )
+{
+    const int max_thread_priority = sched_get_priority_max( SCHED_FIFO );
+    if ( max_thread_priority != -1 )
+    {
+        // We'll operate on the currently running thread.
+        // pthread_t this_thread = pthread_self( );
 
+        // struct sched_param is used to store the scheduling priority
+        struct sched_param params;
+
+        // We'll set the priority to the maximum.
+        params.sched_priority = max_thread_priority;
+
+        int ret = sched_setscheduler( pid, SCHED_FIFO, &params );
+        if ( ret != 0 )
+        {
+            std::cerr << RED << "Unsuccessful in setting main process realtime priority. Error code: " << ret << GREEN << std::endl;
+            return -1;
+        }
+        // Now verify the change in thread priority
+        ret = sched_getparam( pid, &params );
+        if ( ret != 0 )
+        {
+            std::cerr << RED << "Couldn't retrieve real-time scheduling paramers" << GREEN << std::endl;
+            return -1;
+        }
+
+        // Print thread scheduling priority
+        std::cout << GREEN << "Main process : [" << pid << "] priority is " << params.sched_priority << std::endl;
+        return 0;
+    }
+    else
+    {
+        std::cerr << RED << "Could not get maximum thread priority for main process" << GREEN << std::endl;
+        return -1;
+    }
+}
 
 
 
@@ -322,6 +256,12 @@ int main( int argc, char* argv[] )
         std::cout << "\033[1;31m"
                   << "Can not catch SIGINT"
                   << "\033[0m" << std::endl;
+    }
+
+    if ( set_process_priority_max( getpid( ) ) < 0 )
+    {
+        std::cerr << RED << "Can not set priority max for rocos-app process" << std::endl;
+        exit( -1 );
     }
 
     using namespace rocos;
