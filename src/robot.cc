@@ -2560,6 +2560,7 @@ namespace rocos {
         if ( SRS_kinematics_.JC_cartesian_to_joint( target_frame, joint_in( 2 ), joint_in, joint_out ) < 0 )
         {
             PLOG_ERROR << "逆解失败";
+            hw_interface_->waitForSignal( 0 );
             return -1;
         }
         else

@@ -166,7 +166,9 @@ namespace rocos
                 double i = 0;
                 while ( i < KDL::PI )
                 {
-                    f_p5.p( 2 ) = f_p0.p( 2 ) + 0.1 * sin( 3 * i );
+                    f_p5.p( 0 ) = f_p0.p( 0 ) + 0.1 * sin( 0.1 * i );
+                    f_p5.p( 1 ) = f_p0.p( 1 ) + 0.1 * sin( 0.1 * i );
+                    f_p5.p( 2 ) = f_p0.p( 2 ) + 0.1 * sin( 0.1 * i );
                     servoL( f_p5 );
                     i = i + 0.001;
                 }

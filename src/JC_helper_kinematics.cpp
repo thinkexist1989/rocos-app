@@ -3838,7 +3838,6 @@ namespace JC_helper
                         std::array< JC_double, 7 > temp1{ thet1, thet2, thet3, thet_4, thet5, thet6, thet7 };
 
                         //! 最终检查,16组全检查
-                        bool is_out_of_range{ false };
                         for ( int i = 0; i < 7; i++ )
                         {
                             if ( std::isnan( temp1[ i ] ) )
@@ -3853,15 +3852,20 @@ namespace JC_helper
                                 string << "关节[" << i << "]=Inf,结果无效";
                                 throw JC_exception{ string.str( ).c_str( ), -7 };
                             }
-                            else if ( temp1[ i ] > _pos_maximum( i ) || temp1[ i ] < _pos_minimum( i ) )
+                        }
+
+                        bool is_out_of_range{ false };
+                        slover_utility::my_convert( temp1 );
+                        for ( int i = 0; i < 7; i++ )
+                            if ( temp1[ i ] > _pos_maximum( i ) || temp1[ i ] < _pos_minimum( i ) )
                             {
                                 // PLOG_WARNING << "关节[" << i << "]超出关节限定范围,结果无效";
                                 is_out_of_range = true;
                                 break;
                             }
-                        }
+
                         if ( !is_out_of_range )
-                            res_thet.emplace_back( slover_utility::my_convert( temp1 ) );
+                            res_thet.emplace_back( temp1 );
                     }
                 }
             }
