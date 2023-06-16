@@ -386,13 +386,13 @@ namespace rocos {
         //! \param max_running_count MoveL规划失败重新尝试规划的最大次数
         //! \return 错误标志位,成功返回0
         int MoveL(Frame pose, double speed = 1.05, double acceleration = 1.4,
-                  double time = 0.0, double radius = 0.0, bool asynchronous = false,int max_running_count = 10);
+                  double time = 0.0, double radius = 0.0, bool asynchronous = false,int max_running_count = 1);
 
         int MoveL_pos( Frame pose, double speed = 1.05, double acceleration = 1.4,
-                       double time = 0.0, double radius = 0.0, bool asynchronous = false, int max_running_count = 10 );
+                       double time = 0.0, double radius = 0.0, bool asynchronous = false, int max_running_count = 1 );
 
         int MoveL_vel( Frame pose, double speed = 1.05, double acceleration = 1.4,
-                       double time = 0.0, double radius = 0.0, bool asynchronous = false, int max_running_count = 10 );
+                       double time = 0.0, double radius = 0.0, bool asynchronous = false, int max_running_count = 1 );
 
         //! \brief 直线运动到关节空间指定位置
         //! \param q 关节位置
@@ -420,15 +420,15 @@ namespace rocos {
 
         int MoveC(Frame pose_via, Frame pose_to, double speed = 0.25,
                   double acceleration = 1.2, double time = 0.0, double radius = 0.0,
-                  OrientationMode mode = UNCONSTRAINED, bool asynchronous = false,int max_running_count =10);
+                  OrientationMode mode = UNCONSTRAINED, bool asynchronous = false,int max_running_count =1);
 
         int MoveC_pos(Frame pose_via, Frame pose_to, double speed = 0.25,
                   double acceleration = 1.2, double time = 0.0, double radius = 0.0,
-                  OrientationMode mode = UNCONSTRAINED, bool asynchronous = false,int max_running_count =10);
+                  OrientationMode mode = UNCONSTRAINED, bool asynchronous = false,int max_running_count =1);
 
         int MoveC_vel(Frame pose_via, Frame pose_to, double speed = 0.25,
                   double acceleration = 1.2, double time = 0.0, double radius = 0.0,
-                  OrientationMode mode = UNCONSTRAINED, bool asynchronous = false,int max_running_count =10);
+                  OrientationMode mode = UNCONSTRAINED, bool asynchronous = false,int max_running_count =1);
 
         //! \brief 圆弧运动（支持位置和速度模式）
         //! \param center 圆弧圆心位姿
@@ -445,15 +445,15 @@ namespace rocos {
 
         int MoveC( const KDL::Frame& center, double theta, int axiz = 2, double speed = 0.25,
                    double acceleration = 1.2, double time = 0.0, double radius = 0.0,
-                   OrientationMode mode = UNCONSTRAINED, bool asynchronous = false, int max_running_count = 10 );
+                   OrientationMode mode = UNCONSTRAINED, bool asynchronous = false, int max_running_count = 1 );
 
         int MoveC_pos( const KDL::Frame& center, double theta, int axiz = 2, double speed = 0.25,
                        double acceleration = 1.2, double time = 0.0, double radius = 0.0,
-                       OrientationMode mode = UNCONSTRAINED, bool asynchronous = false, int max_running_count = 10 );
+                       OrientationMode mode = UNCONSTRAINED, bool asynchronous = false, int max_running_count = 1 );
 
         int MoveC_vel( const KDL::Frame& center, double theta, int axiz = 2, double speed = 0.25,
                        double acceleration = 1.2, double time = 0.0, double radius = 0.0,
-                       OrientationMode mode = UNCONSTRAINED, bool asynchronous = false, int max_running_count = 10 );
+                       OrientationMode mode = UNCONSTRAINED, bool asynchronous = false, int max_running_count = 1 );
 
         //! \brief TODO: 什么是MoveP?
         //! \param pose 位姿
@@ -504,7 +504,7 @@ namespace rocos {
          */
         int
         MultiMoveL(const std::vector<KDL::Frame> &point, std::vector<double> bound_dist, std::vector<double> max_path_v,
-                   std::vector<double> max_path_a, bool asynchronous = false,int max_running_count = 10);
+                   std::vector<double> max_path_a, bool asynchronous = false,int max_running_count = 1);
 
 
         enum class DRAGGING_FLAG :int {
