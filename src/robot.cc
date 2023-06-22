@@ -2529,6 +2529,7 @@ namespace rocos {
         //     if ( target_pos( i ) > joints_[ i ]->getMaxPosLimit( ) || target_pos( i ) < joints_[ i ]->getMinPosLimit( ) )
         //     {
         //         PLOG_ERROR << "target pos [" << i << "]= " << target_pos( i ) * KDL::rad2deg << " is out of range ";
+        //         hw_interface_->waitForSignal( 0 );
         //         return -1;
         //     }
         //**-------------------------------**//
@@ -2538,6 +2539,7 @@ namespace rocos {
             if ( joint_offset( i ) > joints_[ i ]->getMaxVel( ) * 0.001 )
             {
                 PLOG_ERROR << "target vel [" << i << "]= " << joint_offset( i ) * KDL::rad2deg * 1000 << " deg/s is out of range ";
+                hw_interface_->waitForSignal( 0 );
                 return -1;
             }
         //**-------------------------------**//
