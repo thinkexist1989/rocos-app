@@ -36,12 +36,12 @@ namespace JC_helper
         for ( int i = 0; i < 3; i++ )
             res = Receive( &socketHandle );
 
-        init_force_torque.force[ 0 ]  = res.fx / FORCE_DIV + 0.2;
-        init_force_torque.force[ 1 ]  = res.fy / FORCE_DIV - 2.3;
-        init_force_torque.force[ 2 ]  = res.fz / FORCE_DIV + 5.1;
-        init_force_torque.torque[ 0 ] = res.tx / TORQUE_DIV + 0.05;
-        init_force_torque.torque[ 1 ] = res.ty / TORQUE_DIV - 0.04;
-        init_force_torque.torque[ 2 ] = res.tz / TORQUE_DIV - 0.09;
+        init_force_torque.force[ 0 ]  = res.fx / FORCE_DIV ;
+        init_force_torque.force[ 1 ]  = res.fy / FORCE_DIV ;
+        init_force_torque.force[ 2 ]  = res.fz / FORCE_DIV ;
+        init_force_torque.torque[ 0 ] = res.tx / TORQUE_DIV ;
+        init_force_torque.torque[ 1 ] = res.ty / TORQUE_DIV ;
+        init_force_torque.torque[ 2 ] = res.tz / TORQUE_DIV ;
 
         //将起始收到的力信息转变到base坐标系下
         // TODO处理力矩
@@ -61,7 +61,7 @@ namespace JC_helper
         }
 
             //收到的力信息转换到base系
-            KDL::Vector  force_temp = ( flange_pos * KDL::Frame{ KDL::Rotation::RPY( 0, 0, M_PI ), KDL::Vector( 0, 0, 0.035 ) } ) * KDL::Vector{res.fx / FORCE_DIV + 0.2, res.fy / FORCE_DIV - 2.3,res.fz / FORCE_DIV + 5.1 };
+            KDL::Vector  force_temp = ( flange_pos * KDL::Frame{ KDL::Rotation::RPY( 0, 0, M_PI ), KDL::Vector( 0, 0, 0.035 ) } ) * KDL::Vector{res.fx / FORCE_DIV , res.fy / FORCE_DIV ,res.fz / FORCE_DIV  };
 
             // 重力补偿
             force_temp = force_temp - init_force_torque.force;
