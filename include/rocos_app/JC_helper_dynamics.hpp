@@ -88,7 +88,6 @@ private:
     double _dt{ 0.001 };
     KDL::Twist _Cartesian_vel;
 
-    std::ofstream out_dat{ };
 
 public:
     spring_mass_dump( );

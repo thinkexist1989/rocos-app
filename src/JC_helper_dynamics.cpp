@@ -101,12 +101,10 @@ namespace JC_helper
         for ( int i{ 0 }; i < _joint_num; i++ )
             B[ i ] = 2 * damp * sqrt( M[ i ] * K[ i ] );
 
-        // out_dat.open( "/home/think/rocos-app/debug/admittance.csv" );
     }
 
     spring_mass_dump::~spring_mass_dump( )
     {
-        out_dat.close( );
     }
     void spring_mass_dump::calculate_translate( )
     {
@@ -155,7 +153,6 @@ namespace JC_helper
 
     int spring_mass_dump::calculate( KDL::Frame& pos_offset, KDL::Twist& Cartesian_vel, double dt )
     {
-        // static int dt_count{0};
         _dt = dt;
 
         calculate_translate( );
@@ -164,11 +161,8 @@ namespace JC_helper
         {
             pos_offset.p[ i ] = force_pos_offset[ i ];
         }
-        // out_dat << std::to_string( dt_count++*0.001) << "\t,";
-        // out_dat << std::to_string( pos_offset.p[ 0 ]) ;
-        // out_dat << "\n,";
 
-        // pos_offset.M = calculate_rotation( );
+        pos_offset.M = calculate_rotation( );
 
         //_Cartesian_vel代表仅仅由力引起的速度矢量
         Cartesian_vel = _Cartesian_vel;
@@ -330,8 +324,9 @@ namespace JC_helper
         for ( ; traj_count < max_count; traj_count++ )
         {
             // TODO 导纳计算
-            smd.set_force( my_ft_sensor_ptr->force_torque.force[ 0 ], my_ft_sensor_ptr->force_torque.force[ 1 ], my_ft_sensor_ptr->force_torque.force[ 2 ] );
-            smd.calculate( frame_offset, admittance_vel );
+            smd.set_force(my_ft_sensor_ptr->force_torque.force[0], my_ft_sensor_ptr->force_torque.force[1], my_ft_sensor_ptr->force_torque.force[2]);
+            smd.set_torque(my_ft_sensor_ptr->force_torque.torque[0], my_ft_sensor_ptr->force_torque.torque[1], my_ft_sensor_ptr->force_torque.torque[2]);
+            smd.calculate(frame_offset, admittance_vel);
 
             //** 读取最新Frame **//
             // frame_target = frame_offset * traj_target;  //示教模式
