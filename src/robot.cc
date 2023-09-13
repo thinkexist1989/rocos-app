@@ -144,6 +144,7 @@ namespace rocos {
 
         tinyxml2::XMLDocument xml_doc;
         xml_doc.LoadFile(urdf_file_path.c_str()); // 解析urdf文件
+        std::cout << "urdf: " << urdf_file_path << std::endl;
 
         auto robot = xml_doc.FirstChildElement("robot");
 
@@ -168,9 +169,9 @@ namespace rocos {
 
                     jnt_ptr->setMinPosLimit(limit->FloatAttribute("lower", -M_PI));
                     jnt_ptr->setMaxPosLimit(limit->FloatAttribute("upper", M_PI));
-                    jnt_ptr->setMaxVel(limit->FloatAttribute("vel", 1.0));
-                    jnt_ptr->setMaxAcc(limit->FloatAttribute("acc", 10.0));
-                    jnt_ptr->setMaxJerk(limit->FloatAttribute("jerk", 100.0));
+                    jnt_ptr->setMaxVel(limit->FloatAttribute("vel", 5.0));
+                    jnt_ptr->setMaxAcc(limit->FloatAttribute("acc", 50.0));
+                    jnt_ptr->setMaxJerk(limit->FloatAttribute("jerk", 150.0));
 
                     std::cout << "- limits: \n"
                               << "----- lower: " << limit->FloatAttribute("lower", -M_PI) << std::endl

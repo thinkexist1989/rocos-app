@@ -36,12 +36,12 @@ namespace JC_helper
         for ( int i = 0; i < 3; i++ )
             res = Receive( &socketHandle );
 
-        init_force_torque.force[ 0 ]  = res.fx / FORCE_DIV ;
-        init_force_torque.force[ 1 ]  = res.fy / FORCE_DIV ;
-        init_force_torque.force[ 2 ]  = res.fz / FORCE_DIV ;
-        init_force_torque.torque[ 0 ] = res.tx / TORQUE_DIV ;
-        init_force_torque.torque[ 1 ] = res.ty / TORQUE_DIV ;
-        init_force_torque.torque[ 2 ] = res.tz / TORQUE_DIV ;
+        init_force_torque.force[ 0 ]  = res.fx / FORCE_DIV + 0.2;
+        init_force_torque.force[ 1 ]  = res.fy / FORCE_DIV - 2.3;
+        init_force_torque.force[ 2 ]  = res.fz / FORCE_DIV + 5.1;
+        init_force_torque.torque[ 0 ] = res.tx / TORQUE_DIV + 0.05;
+        init_force_torque.torque[ 1 ] = res.ty / TORQUE_DIV - 0.04;
+        init_force_torque.torque[ 2 ] = res.tz / TORQUE_DIV - 0.09;
 
         //将起始收到的力信息转变到base坐标系下
         // TODO处理力矩
@@ -61,7 +61,7 @@ namespace JC_helper
         }
 
             //收到的力信息转换到base系
-            KDL::Vector  force_temp = ( flange_pos * KDL::Frame{ KDL::Rotation::RPY( 0, 0, M_PI ), KDL::Vector( 0, 0, 0.035 ) } ) * KDL::Vector{res.fx / FORCE_DIV , res.fy / FORCE_DIV ,res.fz / FORCE_DIV  };
+            KDL::Vector  force_temp = ( flange_pos * KDL::Frame{ KDL::Rotation::RPY( 0, 0, M_PI ), KDL::Vector( 0, 0, 0.035 ) } ) * KDL::Vector{res.fx / FORCE_DIV + 0.2, res.fy / FORCE_DIV - 2.3,res.fz / FORCE_DIV + 5.1 };
 
             // 重力补偿
             force_temp = force_temp - init_force_torque.force;
@@ -101,10 +101,12 @@ namespace JC_helper
         for ( int i{ 0 }; i < _joint_num; i++ )
             B[ i ] = 2 * damp * sqrt( M[ i ] * K[ i ] );
 
+        // out_dat.open( "/home/think/rocos-app/debug/admittance.csv" );
     }
 
     spring_mass_dump::~spring_mass_dump( )
     {
+        out_dat.close( );
     }
     void spring_mass_dump::calculate_translate( )
     {
@@ -153,6 +155,7 @@ namespace JC_helper
 
     int spring_mass_dump::calculate( KDL::Frame& pos_offset, KDL::Twist& Cartesian_vel, double dt )
     {
+        // static int dt_count{0};
         _dt = dt;
 
         calculate_translate( );
@@ -161,6 +164,9 @@ namespace JC_helper
         {
             pos_offset.p[ i ] = force_pos_offset[ i ];
         }
+        // out_dat << std::to_string( dt_count++*0.001) << "\t,";
+        // out_dat << std::to_string( pos_offset.p[ 0 ]) ;
+        // out_dat << "\n,";
 
         pos_offset.M = calculate_rotation( );
 
@@ -217,6 +223,27 @@ namespace JC_helper
 
         PLOG_DEBUG << "k  = " << value;
     }
+
+    void spring_mass_dump::set_m( double value )
+    {
+        if ( abs( value ) < 1 )
+        {
+            for ( int i{ 0 }; i < _joint_num; i++ )
+            {
+                M[i] = 1;
+            }
+        }
+        else
+        {
+            for ( int i{ 0 }; i < _joint_num; i++ )
+            {
+                M[i] = value;
+            }
+        }
+
+        PLOG_DEBUG << "m  = " << value;
+    }
+
 #pragma endregion
 
 #pragma region  //*导纳控制
@@ -324,9 +351,8 @@ namespace JC_helper
         for ( ; traj_count < max_count; traj_count++ )
         {
             // TODO 导纳计算
-            smd.set_force(my_ft_sensor_ptr->force_torque.force[0], my_ft_sensor_ptr->force_torque.force[1], my_ft_sensor_ptr->force_torque.force[2]);
-            smd.set_torque(my_ft_sensor_ptr->force_torque.torque[0], my_ft_sensor_ptr->force_torque.torque[1], my_ft_sensor_ptr->force_torque.torque[2]);
-            smd.calculate(frame_offset, admittance_vel);
+            smd.set_force( my_ft_sensor_ptr->force_torque.force[ 0 ], my_ft_sensor_ptr->force_torque.force[ 1 ], my_ft_sensor_ptr->force_torque.force[ 2 ] );
+            smd.calculate( frame_offset, admittance_vel );
 
             //** 读取最新Frame **//
             // frame_target = frame_offset * traj_target;  //示教模式

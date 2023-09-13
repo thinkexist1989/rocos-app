@@ -88,6 +88,7 @@ private:
     double _dt{ 0.001 };
     KDL::Twist _Cartesian_vel;
 
+    std::ofstream out_dat{ };
 
 public:
     spring_mass_dump( );
@@ -105,6 +106,7 @@ public:
 
     void set_damp( double value );
     void set_k(double vaule);
+    void set_m( double value );
 };
 
 class admittance
