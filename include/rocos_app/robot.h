@@ -346,9 +346,13 @@ namespace rocos {
             for( int i{0};i<jnt_num_;i++)
             q_in(i) = pos_[i];
             //            std::cout << q_in.data << std::endl;
-
+            KDL::Frame tempt;
             // Flange Reference
-            JntToCart(q_in, flange_);
+            JntToCart(q_in, tempt);
+            flange_.xyz[0]= tempt.p[0];
+            flange_.xyz[1]= tempt.p[1];
+            flange_.xyz[2]= tempt.p[2];
+            tempt.M.GetRPY(flange_.rpy[0],flange_.rpy[1],flange_.rpy[2]  );
             //            std::cout << "OK" << std::endl;
         }
 
@@ -636,10 +640,20 @@ namespace rocos {
         Kinematics kinematics_;
         JC_helper::inverse_special_to_SRS SRS_kinematics_;
 
+        struct JC_frame
+        {
+            std::array<std::atomic<double>, 3> xyz{};
+            std::array<std::atomic<double>, 3> rpy{};
 
-        Frame flange_;  //!< 法兰位置姿态
-        Frame tool_;    //!< 工具位置姿态
-        Frame object_;  //!< 工件位置姿态
+            operator KDL::Frame
+            {
+            return KDL::Frame{KDL::Rotation::RPY(rpy[0], rpy[1], rpy[2]), KDL::Vector{xyz[0], xyz[1], xyz[2]}};
+            };
+        };
+
+        JC_frame flange_;  //!< 法兰位置姿态
+        JC_frame tool_;    //!< 工具位置姿态
+        JC_frame object_;  //!< 工件位置姿态
 
         std::vector<KDL::JntArray> traj_;
         std::atomic<int> tick_count{0};

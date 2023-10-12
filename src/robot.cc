@@ -650,7 +650,7 @@ namespace rocos {
     int Robot::MoveL( Frame pose, double speed, double acceleration, double time,
                       double radius, bool asynchronous, int max_running_count )
     {
-        if ( pose == flange_ )
+        if ( pose == KDL::Frame(flange_) )
         {
             PLOG_ERROR << "设置的目标等于当前位姿";
             return -1;
@@ -1231,7 +1231,7 @@ namespace rocos {
             PLOG_ERROR << "max_running_count parameters must be greater than 0";
             return -1;
         }
-        if ( CheckBeforeMove( flange_, speed, acceleration, time, radius ) < 0 )
+        if ( CheckBeforeMove( KDL::Frame(flange_), speed, acceleration, time, radius ) < 0 )
         {
             PLOG_ERROR << "given parameters is invalid";
             return -1;
@@ -1547,7 +1547,7 @@ namespace rocos {
             PLOG_ERROR << "max_running_count parameters must be greater than 0";
             return -1;
         }
-        if ( CheckBeforeMove( flange_, speed, acceleration, time, radius ) < 0 )
+        if ( CheckBeforeMove( KDL::Frame(flange_), speed, acceleration, time, radius ) < 0 )
         {
             PLOG_ERROR << "given parameters is invalid";
             return -1;
@@ -2008,7 +2008,7 @@ namespace rocos {
         else if( index <= static_cast< int >( DRAGGING_FLAG::BASE_YAW ) ) //当前命令类型为笛卡尔空间
         {
             //只检查速度、加速度,笛卡尔指令不检查
-            if ( CheckBeforeMove( flange_, max_speed, max_acceleration, 0, 0 ) < 0 )
+            if ( CheckBeforeMove( KDL::Frame(flange_), max_speed, max_acceleration, 0, 0 ) < 0 )
             {
                 PLOG_ERROR << "given parameters is invalid";
                 return -1;
