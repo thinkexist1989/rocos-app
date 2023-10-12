@@ -352,7 +352,11 @@ namespace rocos {
             flange_.xyz[0]= tempt.p[0];
             flange_.xyz[1]= tempt.p[1];
             flange_.xyz[2]= tempt.p[2];
-            tempt.M.GetRPY(flange_.rpy[0],flange_.rpy[1],flange_.rpy[2]  );
+            double tempt2[3];
+            tempt.M.GetRPY(tempt2[0],tempt2[1],tempt2[2]  );
+            flange_.rpy[0]= tempt2[0];
+            flange_.rpy[1]= tempt2[1];
+            flange_.rpy[2]= tempt2[2];
             //            std::cout << "OK" << std::endl;
         }
 
@@ -634,8 +638,8 @@ namespace rocos {
         std::vector<bool> need_plan_;  // 是否需要重新规划标志
 
         boost::shared_ptr<boost::thread> otg_motion_thread_{
-                nullptr};                                                 // otg在线规划线程
-        boost::shared_ptr<boost::thread> motion_thread_{nullptr};  // 执行motion线程
+            nullptr};                                             // otg在线规划线程
+        boost::shared_ptr<boost::thread> motion_thread_{nullptr}; // 执行motion线程
 
         Kinematics kinematics_;
         JC_helper::inverse_special_to_SRS SRS_kinematics_;

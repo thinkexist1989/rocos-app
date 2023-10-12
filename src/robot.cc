@@ -2463,7 +2463,7 @@ namespace rocos {
         flag_admittance_turnoff = false;
 
         std::shared_ptr< std::thread > _thread_admittance_teaching{ nullptr };
-        _thread_admittance_teaching.reset( new std::thread{ &JC_helper::admittance::Runteaching, &admittance_control, this, flange_, &flag_admittance_turnoff } );
+        _thread_admittance_teaching.reset( new std::thread{ &JC_helper::admittance::Runteaching, &admittance_control, this, KDL::Frame{flange_}, &flag_admittance_turnoff } );
 
         PLOG_INFO << "开始示教";
 
