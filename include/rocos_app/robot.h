@@ -388,16 +388,15 @@ namespace rocos
             KDL::Frame tempt;
             // Flange Reference
             JntToCart(q_in, tempt);
-            flange_.xyz[0] = tempt.p[0];
-            flange_.xyz[1] = tempt.p[1];
-            flange_.xyz[2] = tempt.p[2];
+            flange_.xyz[0]= tempt.p[0];
+            flange_.xyz[1]= tempt.p[1];
+            flange_.xyz[2]= tempt.p[2];
             double tempt2[3];
-            tempt.M.GetRPY(tempt2[0], tempt2[1], tempt2[2]);
-            flange_.rpy[0] = tempt2[0];
-            flange_.rpy[1] = tempt2[1];
-            flange_.rpy[2] = tempt2[2];
-            // tempt.M.GetRPY(flange_.rpy[0],flange_.rpy[1],flange_.rpy[2]  );
-            //             std::cout << "OK" << std::endl;
+            tempt.M.GetRPY(tempt2[0],tempt2[1],tempt2[2]  );
+            flange_.rpy[0]= tempt2[0];
+            flange_.rpy[1]= tempt2[1];
+            flange_.rpy[2]= tempt2[2];
+            //            std::cout << "OK" << std::endl;
         }
 
     public:
