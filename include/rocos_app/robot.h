@@ -26,23 +26,27 @@
 #include "kinematics.h"
 #include "JC_helper_kinematics.hpp"
 #include "JC_helper_dynamics.hpp"
-#include <Eigen/StdVector>  //!< Eigen官网说明 https://eigen.tuxfamily.org/dox/group__TopicStlContainers.html
+#include <Eigen/StdVector> //!< Eigen官网说明 https://eigen.tuxfamily.org/dox/group__TopicStlContainers.html
 #include <boost/smart_ptr.hpp>
 #include <vector>
 #include "kdl_parser/kdl_parser.hpp" //!< 解析URDF文件
 #include "gripper.hpp"
 #include "JC_helper_TCP.hpp"
 
-namespace rocos {
+namespace rocos
+{
     //! Class Robot
-    class Robot {
+    class Robot
+    {
         friend class RobotServiceImpl;
 
     public:
         //! Class PathEntry is used by Class Path
-        class PathEntry {
+        class PathEntry
+        {
         public:
-            enum MoveType {
+            enum MoveType
+            {
                 MOVE_J,
                 MOVE_L,
                 MOVE_P,
@@ -56,18 +60,21 @@ namespace rocos {
         };
 
         //! Class Path is used by MovePath
-        class Path {
+        class Path
+        {
         private:
             std::vector<PathEntry> waypoints_;
         };
 
-        enum Synchronization {
+        enum Synchronization
+        {
             SYNC_NONE,
             SYNC_TIME,
             SYNC_PHASE
         };
 
-        enum OrientationMode {
+        enum OrientationMode
+        {
             UNCONSTRAINED,
             FIXED
         };
@@ -83,7 +90,7 @@ namespace rocos {
 
         bool parseDriveParamsFromUrdf(const std::string &urdf_file_path);
 
-        bool switchHW(boost::shared_ptr<HardwareInterface> hw);  //切换硬件指针
+        bool switchHW(boost::shared_ptr<HardwareInterface> hw); // 切换硬件指针
 
         void setEnabled();
 
@@ -93,7 +100,8 @@ namespace rocos {
 
         inline void setJointDisabled(int id) { joints_[id]->setDisabled(); }
 
-        inline void setJointMode(int id, ModeOfOperation mode) {
+        inline void setJointMode(int id, ModeOfOperation mode)
+        {
             joints_[id]->setMode(mode);
         }
 
@@ -110,87 +118,107 @@ namespace rocos {
 
         inline double getJointTorque(int id) { return joints_[id]->getTorque(); }
 
-        inline double getJointLoadTorque(int id) {
+        inline double getJointLoadTorque(int id)
+        {
             return joints_[id]->getLoadTorque();
         }
 
-        inline void setJointPosition(int id, double pos) {
+        inline void setJointPosition(int id, double pos)
+        {
             joints_[id]->setPosition(pos);
         }
 
-        inline void setJointVelocity(int id, double vel) {
+        inline void setJointVelocity(int id, double vel)
+        {
             joints_[id]->setVelocity(vel);
         }
 
-        inline void setJointTorque(int id, double tor) {
+        inline void setJointTorque(int id, double tor)
+        {
             joints_[id]->setTorque(tor);
         }
 
         /////////////////////获取原始信息//////////////////////////
-        inline int32_t getJointPositionRaw(int id) {
+        inline int32_t getJointPositionRaw(int id)
+        {
             return joints_[id]->getPositionInCnt();
         }
 
-        inline int32_t getJointVelocityRaw(int id) {
+        inline int32_t getJointVelocityRaw(int id)
+        {
             return joints_[id]->getVelocityInCnt();
         }
 
-        inline int16_t getJointTorqueRaw(int id) {
+        inline int16_t getJointTorqueRaw(int id)
+        {
             return joints_[id]->getTorqueInCnt();
         }
 
-        inline int16_t getJointLoadTorqueRaw(int id) {
+        inline int16_t getJointLoadTorqueRaw(int id)
+        {
             return joints_[id]->getLoadTorqueInCnt();
         }
 
-        inline void setJointPositionRaw(int id, int32_t pos) {
+        inline void setJointPositionRaw(int id, int32_t pos)
+        {
             joints_[id]->setPositionInCnt(pos);
         }
 
-        inline void setJointVelocityRaw(int id, int32_t vel) {
+        inline void setJointVelocityRaw(int id, int32_t vel)
+        {
             joints_[id]->setVelocityInCnt(vel);
         }
 
-        inline void setJointTorqueRaw(int id, int16_t tor) {
+        inline void setJointTorqueRaw(int id, int16_t tor)
+        {
             joints_[id]->setTorqueInCnt(tor);
         }
 
         ////////////////////单位转换////////////////////////////
-        inline double getJointCntPerUnit(int id) {
+        inline double getJointCntPerUnit(int id)
+        {
             return joints_[id]->getCntPerUnit();
         }
 
-        inline double getJointTorquePerUnit(int id) {
+        inline double getJointTorquePerUnit(int id)
+        {
             return joints_[id]->getTorquePerUnit();
         }
 
         inline double getJointRatio(int id) { return joints_[id]->getRatio(); }
 
-        inline int32_t getJointPosZeroOffset(int id) {
+        inline int32_t getJointPosZeroOffset(int id)
+        {
             return joints_[id]->getPosZeroOffset();
         }
 
-        inline std::string getJointUserUnitName(int id) {
+        inline std::string getJointUserUnitName(int id)
+        {
             return joints_[id]->getUserUnitName();
         }
 
-        inline void setJointCntPerUnit(int id, double cnt_per_unit) {
+        inline void setJointCntPerUnit(int id, double cnt_per_unit)
+        {
             joints_[id]->setCntPerUnit(cnt_per_unit);
         }
 
-        inline void setJointTorquePerUnit(int id, double tor_per_unit) {
+        inline void setJointTorquePerUnit(int id, double tor_per_unit)
+        {
             joints_[id]->setTorquePerUnit(tor_per_unit);
         }
 
-        inline void setJointRatio(int id, double ratio) {
+        inline void setJointRatio(int id, double ratio)
+        {
             joints_[id]->setRatio(ratio);
         }
 
-        inline void setJointPosZeroOffset(int id, int32_t offset) {
+        inline void setJointPosZeroOffset(int id, int32_t offset)
+        {
             joints_[id]->setPosZeroOffset(offset);
         }
 
-        inline void setJointUserUnitName(int id, std::string name) {
+        inline void setJointUserUnitName(int id, std::string name)
+        {
             joints_[id]->setUserUnitName(name);
         }
 
@@ -234,7 +262,8 @@ namespace rocos {
 
         /// \brief 设置多关节速度约束
         /// \param max_vel 速度约束值
-        inline void setJntVelLimits(std::vector<double> &max_vel) {
+        inline void setJntVelLimits(std::vector<double> &max_vel)
+        {
             max_vel_ = max_vel;
             need_plan_.resize(jnt_num_, true);
         }
@@ -246,7 +275,8 @@ namespace rocos {
         /// \brief 设置单关节速度约束
         /// \param id 关节ID
         /// \param max_vel 速度约束值
-        inline void setJntVelLimit(int id, double max_vel) {
+        inline void setJntVelLimit(int id, double max_vel)
+        {
             max_vel_[id] = max_vel;
             need_plan_[id] = true;
         }
@@ -258,7 +288,8 @@ namespace rocos {
 
         /// \brief 设置关节加速度约束
         /// \param max_acc 加速度约束值
-        inline void setJntAccLimits(std::vector<double> &max_acc) {
+        inline void setJntAccLimits(std::vector<double> &max_acc)
+        {
             max_acc_ = max_acc;
             need_plan_.resize(jnt_num_, true);
         }
@@ -270,7 +301,8 @@ namespace rocos {
         /// \brief 设置单关节加速度约束
         /// \param id 关节ID
         /// \param max_acc 加速度约束值
-        inline void setJntAccLimit(int id, double max_acc) {
+        inline void setJntAccLimit(int id, double max_acc)
+        {
             max_acc_[id] = max_acc;
             need_plan_[id] = true;
         }
@@ -282,7 +314,8 @@ namespace rocos {
 
         /// \brief 设置多关节加加速约束
         /// \param max_jerk 多关节加加速约束值
-        inline void setJntJerkLimits(std::vector<double> &max_jerk) {
+        inline void setJntJerkLimits(std::vector<double> &max_jerk)
+        {
             max_jerk_ = max_jerk;
             need_plan_.resize(jnt_num_, true);
         }
@@ -294,7 +327,8 @@ namespace rocos {
         /// \brief 设置单关节加加速度约束
         /// \param id 关节id
         /// \param max_jerk 关节加加速约束值
-        inline void setJntJerkLimit(int id, double max_jerk) {
+        inline void setJntJerkLimit(int id, double max_jerk)
+        {
             max_jerk_[id] = max_jerk;
             need_plan_[id] = true;
         }
@@ -306,14 +340,16 @@ namespace rocos {
 
         /// \brief 设置规划Profile类型
         /// \param type Trapezoid、DoubleS
-        inline void setProfileType(ProfileType type) {
+        inline void setProfileType(ProfileType type)
+        {
             profile_type_ = type;
             need_plan_.resize(jnt_num_, true);
         }
 
         /// \brief 设置同步模式
         /// \param sync 无同步、时间同步、相位同步
-        inline void setSynchronization(Synchronization sync) {
+        inline void setSynchronization(Synchronization sync)
+        {
             sync_ = sync;
             need_plan_.resize(jnt_num_, true);
         }
@@ -325,35 +361,43 @@ namespace rocos {
         inline Frame getObject() { return object_; }
 
         /*****轨迹规划线程相关*****/
-        void startMotionThread();    // 启动轨迹规划线程
-        void stopMotionThread();     // 停止轨迹规划线程
-        void motionThreadHandler();  // 轨迹规划相关处理句柄
+        void startMotionThread();   // 启动轨迹规划线程
+        void stopMotionThread();    // 停止轨迹规划线程
+        void motionThreadHandler(); // 轨迹规划相关处理句柄
 
     protected:
         void addAllJoints();
 
-        int JntToCart(const JntArray &q_in, Frame &p_out) {
+        int JntToCart(const JntArray &q_in, Frame &p_out)
+        {
             return kinematics_.JntToCart(q_in, p_out);
         }
 
-        int CartToJnt(const JntArray &q_init, const Frame &p_in, JntArray &q_out) {
+        int CartToJnt(const JntArray &q_init, const Frame &p_in, JntArray &q_out)
+        {
             return kinematics_.CartToJnt(q_init, p_in, q_out);
         }
 
         //! 更新法兰系,工具系,工件系pose
-        void updateCartesianInfo() {
+        void updateCartesianInfo()
+        {
             JntArray q_in(jnt_num_);
-            for( int i{0};i<jnt_num_;i++)
-            q_in(i) = pos_[i];
+            for (int i{0}; i < jnt_num_; i++)
+                q_in(i) = pos_[i];
             //            std::cout << q_in.data << std::endl;
             KDL::Frame tempt;
             // Flange Reference
             JntToCart(q_in, tempt);
-            flange_.xyz[0]= tempt.p[0];
-            flange_.xyz[1]= tempt.p[1];
-            flange_.xyz[2]= tempt.p[2];
-            tempt.M.GetRPY(flange_.rpy[0],flange_.rpy[1],flange_.rpy[2]  );
-            //            std::cout << "OK" << std::endl;
+            flange_.xyz[0] = tempt.p[0];
+            flange_.xyz[1] = tempt.p[1];
+            flange_.xyz[2] = tempt.p[2];
+            double tempt2[3];
+            tempt.M.GetRPY(tempt2[0], tempt2[1], tempt2[2]);
+            flange_.rpy[0] = tempt2[0];
+            flange_.rpy[1] = tempt2[1];
+            flange_.rpy[2] = tempt2[2];
+            // tempt.M.GetRPY(flange_.rpy[0],flange_.rpy[1],flange_.rpy[2]  );
+            //             std::cout << "OK" << std::endl;
         }
 
     public:
@@ -390,13 +434,13 @@ namespace rocos {
         //! \param max_running_count MoveL规划失败重新尝试规划的最大次数
         //! \return 错误标志位,成功返回0
         int MoveL(Frame pose, double speed = 1.05, double acceleration = 1.4,
-                  double time = 0.0, double radius = 0.0, bool asynchronous = false,int max_running_count = 1);
+                  double time = 0.0, double radius = 0.0, bool asynchronous = false, int max_running_count = 1);
 
-        int MoveL_pos( Frame pose, double speed = 1.05, double acceleration = 1.4,
-                       double time = 0.0, double radius = 0.0, bool asynchronous = false, int max_running_count = 1 );
+        int MoveL_pos(Frame pose, double speed = 1.05, double acceleration = 1.4,
+                      double time = 0.0, double radius = 0.0, bool asynchronous = false, int max_running_count = 1);
 
-        int MoveL_vel( Frame pose, double speed = 1.05, double acceleration = 1.4,
-                       double time = 0.0, double radius = 0.0, bool asynchronous = false, int max_running_count = 1 );
+        int MoveL_vel(Frame pose, double speed = 1.05, double acceleration = 1.4,
+                      double time = 0.0, double radius = 0.0, bool asynchronous = false, int max_running_count = 1);
 
         //! \brief 直线运动到关节空间指定位置
         //! \param q 关节位置
@@ -424,15 +468,15 @@ namespace rocos {
 
         int MoveC(Frame pose_via, Frame pose_to, double speed = 0.25,
                   double acceleration = 1.2, double time = 0.0, double radius = 0.0,
-                  OrientationMode mode = UNCONSTRAINED, bool asynchronous = false,int max_running_count =1);
+                  OrientationMode mode = UNCONSTRAINED, bool asynchronous = false, int max_running_count = 1);
 
         int MoveC_pos(Frame pose_via, Frame pose_to, double speed = 0.25,
-                  double acceleration = 1.2, double time = 0.0, double radius = 0.0,
-                  OrientationMode mode = UNCONSTRAINED, bool asynchronous = false,int max_running_count =1);
+                      double acceleration = 1.2, double time = 0.0, double radius = 0.0,
+                      OrientationMode mode = UNCONSTRAINED, bool asynchronous = false, int max_running_count = 1);
 
         int MoveC_vel(Frame pose_via, Frame pose_to, double speed = 0.25,
-                  double acceleration = 1.2, double time = 0.0, double radius = 0.0,
-                  OrientationMode mode = UNCONSTRAINED, bool asynchronous = false,int max_running_count =1);
+                      double acceleration = 1.2, double time = 0.0, double radius = 0.0,
+                      OrientationMode mode = UNCONSTRAINED, bool asynchronous = false, int max_running_count = 1);
 
         //! \brief 圆弧运动（支持位置和速度模式）
         //! \param center 圆弧圆心位姿
@@ -447,17 +491,17 @@ namespace rocos {
         //! \param max_running_count MoveC规划失败重新尝试规划的最大次数
         //! \return 错误标志位,成功返回0
 
-        int MoveC( const KDL::Frame& center, double theta, int axiz = 2, double speed = 0.25,
-                   double acceleration = 1.2, double time = 0.0, double radius = 0.0,
-                   OrientationMode mode = UNCONSTRAINED, bool asynchronous = false, int max_running_count = 1 );
+        int MoveC(const KDL::Frame &center, double theta, int axiz = 2, double speed = 0.25,
+                  double acceleration = 1.2, double time = 0.0, double radius = 0.0,
+                  OrientationMode mode = UNCONSTRAINED, bool asynchronous = false, int max_running_count = 1);
 
-        int MoveC_pos( const KDL::Frame& center, double theta, int axiz = 2, double speed = 0.25,
-                       double acceleration = 1.2, double time = 0.0, double radius = 0.0,
-                       OrientationMode mode = UNCONSTRAINED, bool asynchronous = false, int max_running_count = 1 );
+        int MoveC_pos(const KDL::Frame &center, double theta, int axiz = 2, double speed = 0.25,
+                      double acceleration = 1.2, double time = 0.0, double radius = 0.0,
+                      OrientationMode mode = UNCONSTRAINED, bool asynchronous = false, int max_running_count = 1);
 
-        int MoveC_vel( const KDL::Frame& center, double theta, int axiz = 2, double speed = 0.25,
-                       double acceleration = 1.2, double time = 0.0, double radius = 0.0,
-                       OrientationMode mode = UNCONSTRAINED, bool asynchronous = false, int max_running_count = 1 );
+        int MoveC_vel(const KDL::Frame &center, double theta, int axiz = 2, double speed = 0.25,
+                      double acceleration = 1.2, double time = 0.0, double radius = 0.0,
+                      OrientationMode mode = UNCONSTRAINED, bool asynchronous = false, int max_running_count = 1);
 
         //! \brief TODO: 什么是MoveP?
         //! \param pose 位姿
@@ -468,8 +512,8 @@ namespace rocos {
         //! \param mode 姿态运行模式, UNCONSTRAINED姿态随动
         //! \param asynchronous 是否异步运行
         //! \return 错误标志位,成功返回0
-        int MoveP( Frame pose, double speed = 1.05, double acceleration = 1.4,
-                   double time = 0.0, double radius = 0.0, bool asynchronous = false );
+        int MoveP(Frame pose, double speed = 1.05, double acceleration = 1.4,
+                  double time = 0.0, double radius = 0.0, bool asynchronous = false);
 
         //! \brief 沿指定路径运动
         //! \param path 路径
@@ -477,18 +521,17 @@ namespace rocos {
         //! \return 错误标志位,成功返回0
         int MovePath(const Path &path, bool asynchronous = false);
 
-
         /**
          * @brief 多段直线的连续运动
-         * @note 1、过渡半径bound_dist可以为0，表示终止速度为0；2、point[0]代表第一个目标点 
+         * @note 1、过渡半径bound_dist可以为0，表示终止速度为0；2、point[0]代表第一个目标点
          * @param point 目标点集
          * @param bound_dist 过渡半径
          * @param max_path_v 最大速度
          * @param max_path_a 最大加速度
          * @param asynchronous 是否异步运行
          * @param max_running_count 规划失败重新尝试规划的最大次数
-         * 
-         * @example 
+         *
+         * @example
             Frame f_p1;
             Frame f_p2;
             Frame f_p3;
@@ -508,25 +551,54 @@ namespace rocos {
          */
         int
         MultiMoveL(const std::vector<KDL::Frame> &point, std::vector<double> bound_dist, std::vector<double> max_path_v,
-                   std::vector<double> max_path_a, bool asynchronous = false,int max_running_count = 1);
+                   std::vector<double> max_path_a, bool asynchronous = false, int max_running_count = 1);
 
-
-        enum class DRAGGING_FLAG :int {
-            J0 = 0, J1 = 1, J2 = 2, J3 = 3, J4 = 4, J5 = 5, J6 = 6,
-            TOOL_X = 100, TOOL_Y = 101, TOOL_Z = 102, TOOL_ROLL = 103, TOOL_PITCH= 104, TOOL_YAW = 105,
-            FLANGE_X = 200, FLANGE_Y = 201, FLANGE_Z = 202,FLANGE_ROLL = 203, FLANGE_PITCH = 204, FLANGE_YAW = 205,
-            OBJECT_X = 300, OBJECT_Y = 301, OBJECT_Z = 302,OBJECT_ROLL= 303, OBJECT_PITCH = 304, OBJECT_YAW = 305,
-            BASE_X = 400, BASE_Y = 401, BASE_Z = 402, BASE_ROLL= 403, BASE_PITCH = 404, BASE_YAW = 405,
+        enum class DRAGGING_FLAG : int
+        {
+            J0 = 0,
+            J1 = 1,
+            J2 = 2,
+            J3 = 3,
+            J4 = 4,
+            J5 = 5,
+            J6 = 6,
+            TOOL_X = 100,
+            TOOL_Y = 101,
+            TOOL_Z = 102,
+            TOOL_ROLL = 103,
+            TOOL_PITCH = 104,
+            TOOL_YAW = 105,
+            FLANGE_X = 200,
+            FLANGE_Y = 201,
+            FLANGE_Z = 202,
+            FLANGE_ROLL = 203,
+            FLANGE_PITCH = 204,
+            FLANGE_YAW = 205,
+            OBJECT_X = 300,
+            OBJECT_Y = 301,
+            OBJECT_Z = 302,
+            OBJECT_ROLL = 303,
+            OBJECT_PITCH = 304,
+            OBJECT_YAW = 305,
+            BASE_X = 400,
+            BASE_Y = 401,
+            BASE_Z = 402,
+            BASE_ROLL = 403,
+            BASE_PITCH = 404,
+            BASE_YAW = 405,
             NULLSPACE = 500
         };
 
-        enum class DRAGGING_DIRRECTION :int{
-            NONE = 0, POSITION = 1, NEGATIVE = -1
+        enum class DRAGGING_DIRRECTION : int
+        {
+            NONE = 0,
+            POSITION = 1,
+            NEGATIVE = -1
         };
 
         enum class DRAGGING_TYPE : int
         {
-            JOINT     = 0,
+            JOINT = 0,
             CARTESIAN = 1,
             NULLSPACE = 2
         };
@@ -539,37 +611,37 @@ namespace rocos {
          * @param dir 正方向或反方向
          * @param max_speed 最大运行速度,其10%的值+当前位置等于目标位置
          * @param max_acceleration 最大关节速度
-         * @return int 
-         * @example 
+         * @return int
+         * @example
          *   for ( int i = 0; i < 100; i++ )
          *  {
          *   robot.Dragging( Robot::DraggingFlag::J1, Robot::DraggingDirection::POSITION, 1, 1);
          *   std::this_thread::sleep_for( std::chrono::milliseconds( 50 ) );
          *   }
-         * 
+         *
          */
         int Dragging(DRAGGING_FLAG flag, DRAGGING_DIRRECTION dir, double max_speed, double max_acceleration);
 
     private:
-        //运动前检查数据有效性
+        // 运动前检查数据有效性
         int CheckBeforeMove(const JntArray &q, double speed,
                             double acceleration, double time, double radius);
 
         int CheckBeforeMove(const Frame &pos, double speed,
                             double acceleration, double time, double radius);
 
-        //实际movej执行线程
+        // 实际movej执行线程
         void RunMoveJ(JntArray q, double speed = 1.05, double acceleration = 1.4,
                       double time = 0.0, double radius = 0.0);
 
-        //实际movel执行线程
+        // 实际movel执行线程
         void RunMoveL(const std::vector<KDL::JntArray> &traj);
 
-        //实际multimovel执行线程
+        // 实际multimovel执行线程
         void RunMultiMoveL(const std::vector<KDL::JntArray> &traj);
-        int admittance_teaching( );
-        int stop_admittance_teaching( );
-        int admittance_link( KDL::Frame frame_target, double speed, double acceleration );
+        int admittance_teaching();
+        int stop_admittance_teaching();
+        int admittance_link(KDL::Frame frame_target, double speed, double acceleration);
 
         /**
          * @brief 1000hz关节伺服接口
@@ -577,17 +649,17 @@ namespace rocos {
          * @param target_pos 目标位置
          * @return int
          */
-        int servoJ( const KDL::JntArray& target_pos );
+        int servoJ(const KDL::JntArray &target_pos);
         /**
          * @brief 1000hz位姿伺服接口
          *
          * @param target_frame 目标位置
          * @return int
          */
-        int servoL( const KDL::Frame& target_frame );
+        int servoL(const KDL::Frame &target_frame);
 
     public:
-        void test( );  // 为了测试
+        void test(); // 为了测试
 
     private:
         // TODO： 测试用MoveJ，阻塞运行，需要改为private
@@ -601,17 +673,17 @@ namespace rocos {
 
     protected:
         boost::shared_ptr<HardwareInterface> hw_interface_{nullptr};
-        std::vector<boost::shared_ptr<Drive> > joints_;
+        std::vector<boost::shared_ptr<Drive>> joints_;
 
-        std::vector<double> target_positions_;       // 当前目标位置
-        std::vector<double> target_positions_prev_;  // 上一次的目标位置
+        std::vector<double> target_positions_;      // 当前目标位置
+        std::vector<double> target_positions_prev_; // 上一次的目标位置
 
         std::vector<double> target_velocities_;
         std::vector<double> target_torques_;
 
-        std::vector< std::atomic<double>> pos_;
-        std::vector< std::atomic<double>> vel_;
-        std::vector< std::atomic<double>> acc_;
+        std::vector<std::atomic<double>> pos_;
+        std::vector<std::atomic<double>> vel_;
+        std::vector<std::atomic<double>> acc_;
 
         std::vector<double> max_vel_;
         std::vector<double> max_acc_;
@@ -631,11 +703,11 @@ namespace rocos {
         bool is_exit_{false};
         std::atomic<bool> is_running_motion{false};
 
-        std::vector<bool> need_plan_;  // 是否需要重新规划标志
+        std::vector<bool> need_plan_; // 是否需要重新规划标志
 
         boost::shared_ptr<boost::thread> otg_motion_thread_{
-                nullptr};                                                 // otg在线规划线程
-        boost::shared_ptr<boost::thread> motion_thread_{nullptr};  // 执行motion线程
+            nullptr};                                             // otg在线规划线程
+        boost::shared_ptr<boost::thread> motion_thread_{nullptr}; // 执行motion线程
 
         Kinematics kinematics_;
         JC_helper::inverse_special_to_SRS SRS_kinematics_;
@@ -645,15 +717,15 @@ namespace rocos {
             std::array<std::atomic<double>, 3> xyz{};
             std::array<std::atomic<double>, 3> rpy{};
 
-            operator KDL::Frame
+            operator KDL::Frame()
             {
-            return KDL::Frame{KDL::Rotation::RPY(rpy[0], rpy[1], rpy[2]), KDL::Vector{xyz[0], xyz[1], xyz[2]}};
+                return KDL::Frame{KDL::Rotation::RPY(rpy[0], rpy[1], rpy[2]), KDL::Vector{xyz[0], xyz[1], xyz[2]}};
             };
         };
 
-        JC_frame flange_;  //!< 法兰位置姿态
-        JC_frame tool_;    //!< 工具位置姿态
-        JC_frame object_;  //!< 工件位置姿态
+        JC_frame flange_; //!< 法兰位置姿态
+        JC_frame tool_;   //!< 工具位置姿态
+        JC_frame object_; //!< 工件位置姿态
 
         std::vector<KDL::JntArray> traj_;
         std::atomic<int> tick_count{0};
@@ -661,27 +733,25 @@ namespace rocos {
     public:
         friend void JC_helper::SmartServo_Joint::RunSmartServo(rocos::Robot *);
 
-        friend class JC_helper::SmartServo_Cartesian ;
+        friend class JC_helper::SmartServo_Cartesian;
 
-        friend class JC_helper::SmartServo_Nullsapace ;
+        friend class JC_helper::SmartServo_Nullsapace;
 
-        friend void JC_helper::Joint_stop( rocos::Robot* robot_ptr, const KDL::JntArray& current_pos, const KDL::JntArray& last_pos, const KDL::JntArray& last_last_pos );
+        friend void JC_helper::Joint_stop(rocos::Robot *robot_ptr, const KDL::JntArray &current_pos, const KDL::JntArray &last_pos, const KDL::JntArray &last_last_pos);
 
-        friend class JC_helper::admittance ;
+        friend class JC_helper::admittance;
 
-        friend int JC_helper::safety_servo( rocos::Robot* robot_ptr, const std::array< double, _joint_num >& target_pos );
+        friend int JC_helper::safety_servo(rocos::Robot *robot_ptr, const std::array<double, _joint_num> &target_pos);
 
-        friend int JC_helper::safety_servo( rocos::Robot* robot_ptr, const std::vector< double >& target_pos );
+        friend int JC_helper::safety_servo(rocos::Robot *robot_ptr, const std::vector<double> &target_pos);
 
-        friend int JC_helper::safety_servo( rocos::Robot* robot_ptr, const KDL::JntArray& target_pos );
+        friend int JC_helper::safety_servo(rocos::Robot *robot_ptr, const KDL::JntArray &target_pos);
 
     private:
-        JC_helper::ft_sensor my_ft_sensor;  // 6维力传感器
-        bool flag_admittance_turnoff {false}; //导纳开关
+        JC_helper::ft_sensor my_ft_sensor;   // 6维力传感器
+        bool flag_admittance_turnoff{false}; // 导纳开关
     };
 
+} // namespace rocos
 
-
-}  // namespace rocos
-
-#endif  // ROCOS_APP_ROBOT_H
+#endif // ROCOS_APP_ROBOT_H
