@@ -645,7 +645,7 @@ namespace rocos {
             std::array<std::atomic<double>, 3> xyz{};
             std::array<std::atomic<double>, 3> rpy{};
 
-            operator KDL::Frame
+            operator KDL::Frame()
             {
             return KDL::Frame{KDL::Rotation::RPY(rpy[0], rpy[1], rpy[2]), KDL::Vector{xyz[0], xyz[1], xyz[2]}};
             };
