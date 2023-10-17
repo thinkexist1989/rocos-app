@@ -113,6 +113,8 @@ namespace rocos {
         inline double getJointLoadTorque(int id) {
             return joints_[id]->getLoadTorque();
         }
+        //获取滤波后的数据
+        inline double getJointTorqueFilter(int id) { return joints_[id]->getSecondaryPositionInCnt(); }
 
         inline void setJointPosition(int id, double pos) {
             joints_[id]->setPosition(pos);
@@ -567,7 +569,7 @@ namespace rocos {
         int stop_admittance_teaching( );
         int admittance_link( KDL::Frame frame_target, double speed, double acceleration );
 
-        //关节导纳拖动示教
+        //关节导纳拖动示教sun
         int joint_admittance_teaching();
         int stop_joint_admittance_teaching();
 
@@ -637,7 +639,7 @@ namespace rocos {
                 nullptr};                                                 // otg在线规划线程
         boost::shared_ptr<boost::thread> motion_thread_{nullptr};  // 执行motion线程
 
-        Kinematics kinematics_;
+       
         JC_helper::inverse_special_to_SRS SRS_kinematics_;
 
 
@@ -649,6 +651,7 @@ namespace rocos {
         std::atomic<int> tick_count{0};
 
     public:
+        Kinematics kinematics_;
         friend void JC_helper::SmartServo_Joint::RunSmartServo(rocos::Robot *);
 
         friend class JC_helper::SmartServo_Cartesian ;
@@ -658,6 +661,8 @@ namespace rocos {
         friend void JC_helper::Joint_stop( rocos::Robot* robot_ptr, const KDL::JntArray& current_pos, const KDL::JntArray& last_pos, const KDL::JntArray& last_last_pos );
 
         friend class JC_helper::admittance ;
+        //声明友元类
+        friend class JC_helper::admittance_joint ;
 
         friend int JC_helper::safety_servo( rocos::Robot* robot_ptr, const std::array< double, _joint_num >& target_pos );
 
@@ -668,6 +673,7 @@ namespace rocos {
     private:
         JC_helper::ft_sensor my_ft_sensor;  // 6维力传感器
         bool flag_admittance_turnoff {false}; //导纳开关
+        bool flag_admittance_joint_turnoff {false}; //关节拖动开关
     };
 
 

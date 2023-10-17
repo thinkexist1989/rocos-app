@@ -2486,6 +2486,14 @@ namespace rocos {
         return 0;
     }
 
+    
+ 
+
+
+
+
+
+
     int Robot::admittance_link( KDL::Frame frame_target, double speed, double acceleration )
     {
         if ( is_running_motion )  // 最大一条任务异步执行
@@ -2521,6 +2529,7 @@ namespace rocos {
         is_running_motion = false;
         return 0;
     }
+
 
     int Robot::servoJ( const KDL::JntArray& target_pos )
     {
@@ -2570,10 +2579,40 @@ namespace rocos {
     }
 
     int Robot::joint_admittance_teaching() {
+         if ( is_running_motion )  // 最大一条任务异步执行
+        {
+            PLOG_ERROR << " Motion is still running and waiting for it to finish";
+            return -1;
+        }
+        else
+            is_running_motion = true;
+
+        JC_helper::admittance_joint  admittance_control{ this };
+    
+        flag_admittance_joint_turnoff = false;
+
+        std::shared_ptr< std::thread > _thread_admittance_teaching{ nullptr };
+        _thread_admittance_teaching.reset( new std::thread{ &JC_helper::admittance_joint::Runteaching, &admittance_control, this,  &flag_admittance_joint_turnoff } );
+
+        PLOG_INFO << "开始示教";
+
+        //** 等待关闭指令 **//
+        while ( !flag_admittance_joint_turnoff )
+            std::this_thread::sleep_for( std::chrono::duration< double >( 0.002 ) );
+        //**-------------------------------**//
+
+        _thread_admittance_teaching->join( );
+       
+        PLOG_INFO << "结束示教";
+
+        is_running_motion = false;
+
         return 0;
     }
 
     int Robot::stop_joint_admittance_teaching() {
+        flag_admittance_joint_turnoff = true;
+        
         return 0;
     }
 }  // namespace rocos
