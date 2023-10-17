@@ -567,6 +567,10 @@ namespace rocos {
         int stop_admittance_teaching( );
         int admittance_link( KDL::Frame frame_target, double speed, double acceleration );
 
+        //关节导纳拖动示教
+        int joint_admittance_teaching();
+        int stop_joint_admittance_teaching();
+
         /**
          * @brief 1000hz关节伺服接口
          *
@@ -649,7 +653,7 @@ namespace rocos {
 
         friend class JC_helper::SmartServo_Cartesian ;
 
-        friend class JC_helper::SmartServo_Nullsapace ;
+        friend class JC_helper::SmartServo_Nullspace ;
 
         friend void JC_helper::Joint_stop( rocos::Robot* robot_ptr, const KDL::JntArray& current_pos, const KDL::JntArray& last_pos, const KDL::JntArray& last_last_pos );
 

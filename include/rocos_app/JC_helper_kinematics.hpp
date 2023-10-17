@@ -193,9 +193,9 @@ namespace JC_helper
     private:
         //** 这里都是关节smart servo 所需的全部变量 **//
         std::mutex input_mutex;
-        ruckig::Ruckig< _joint_num > otg{ 0.001 };
-        ruckig::InputParameter< _joint_num > input;
-        ruckig::OutputParameter< _joint_num > output;
+        ruckig::Ruckig<ruckig::DynamicDOFs>* otg;
+        ruckig::InputParameter<ruckig::DynamicDOFs>* input;
+        ruckig::OutputParameter<ruckig::DynamicDOFs>* output;
         //**-------------------------------**//
 
         std::atomic< bool > on_stop_trajectory{ false };
@@ -372,7 +372,7 @@ namespace JC_helper
 #endif
     };
 
-    class SmartServo_Nullsapace
+    class SmartServo_Nullspace
     {
     private:
         //** 变量初始化 **//
@@ -410,7 +410,7 @@ namespace JC_helper
         //**-------------------------------**//
 
     public:
-        SmartServo_Nullsapace( std::atomic< bool >*, const KDL::Chain& robot_chain );
+        SmartServo_Nullspace(std::atomic< bool >*, const KDL::Chain& robot_chain );
 
         void init( rocos::Robot* robot_ptr, double target_vel, double max_vel = 2, double max_acc = 2, double max_jerk = 4 );
 

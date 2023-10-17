@@ -206,7 +206,7 @@ namespace JC_helper
 
             doubleS_P.planDoubleSProfile( 0, 0, 1, v_start / Path_length, v_end / Path_length, max_path_v / Path_length, max_path_a / Path_length, max_path_a * 2 / Path_length );
             bool isplanned = doubleS_P.isValidMovement( );
-            if ( !isplanned || !( doubleS_P.getDuration( ) > 0 ) )
+            if (!isplanned || doubleS_P.getDuration() <= 0)
             {
                 PLOG_ERROR << "Error_MotionPlanning_Not_Feasible";
                 return -1;
@@ -214,7 +214,7 @@ namespace JC_helper
 
             doubleS_R.planDoubleSProfile( 0, 0, 1, 0, 0, max_path_v / Path_length, max_path_a / Path_length, max_path_a * 2 / Path_length );
             isplanned = doubleS_R.isValidMovement( );
-            if ( !isplanned || !( doubleS_R.getDuration( ) > 0 ) )
+            if (!isplanned || doubleS_R.getDuration() <= 0)
             {
                 PLOG_ERROR << "Error_MotionPlanning_Not_Feasible";
                 return -1;
@@ -1015,27 +1015,30 @@ namespace JC_helper
     SmartServo_Joint::SmartServo_Joint( std::atomic< bool >* finished_flag_ptr )
     {
         external_finished_flag_ptr = finished_flag_ptr;
+        otg = new ruckig::Ruckig<ruckig::DynamicDOFs>(_joint_num, 0.001);
+        input = new ruckig::InputParameter<ruckig::DynamicDOFs>(_joint_num);
+        output = new ruckig::OutputParameter<ruckig::DynamicDOFs>(_joint_num);
     }
 
     //! init()只负责轨迹的信息重置，运行状态Flag由各运动线程结束后{手动重置}
     void SmartServo_Joint::init( const std::vector< std::atomic< double > >& q_init, const std::vector< std::atomic< double > >& v_init, const std::vector< std::atomic< double > >& a_init, double max_v, double max_a, double max_j )
     {
-        input.control_interface = ruckig::ControlInterface::Position;
-        input.synchronization   = ruckig::Synchronization::Phase;
+        input->control_interface = ruckig::ControlInterface::Position;
+        input->synchronization   = ruckig::Synchronization::Phase;
 
         for ( int i = 0; i < _joint_num; i++ )
         {
-            input.current_position[ i ]     = q_init[ i ];
-            input.current_velocity[ i ]     = v_init[ i ];
-            input.current_acceleration[ i ] = a_init[ i ];
+            input->current_position[ i ]     = q_init[ i ];
+            input->current_velocity[ i ]     = v_init[ i ];
+            input->current_acceleration[ i ] = a_init[ i ];
 
-            input.target_position[ i ]     = q_init[ i ];
-            input.target_velocity[ i ]     = v_init[ i ];
-            input.target_acceleration[ i ] = a_init[ i ];
+            input->target_position[ i ]     = q_init[ i ];
+            input->target_velocity[ i ]     = v_init[ i ];
+            input->target_acceleration[ i ] = a_init[ i ];
 
-            input.max_velocity[ i ]     = max_v;
-            input.max_acceleration[ i ] = max_a;
-            input.max_jerk[ i ]         = max_j;
+            input->max_velocity[ i ]     = max_v;
+            input->max_acceleration[ i ] = max_a;
+            input->max_jerk[ i ]         = max_j;
         }
 
         PLOG_INFO << "smart servo init succesed";
@@ -1050,7 +1053,7 @@ namespace JC_helper
         int _tick_count{ robot_ptr->tick_count };
         auto t_start = std::chrono::high_resolution_clock::now( );
         auto t_stop  = t_start;
-        std::chrono::duration< double > duration;
+        std::chrono::duration< double > duration{};
 
         //**-------------------------------**//
 
@@ -1066,7 +1069,7 @@ namespace JC_helper
             t_start = std::chrono::high_resolution_clock::now( );
 
             input_lock.lock( );
-            res = otg.update( input, output );
+            res = otg->update( *input, *output );
             input_lock.unlock( );
 
             if ( res == ruckig::Result::Finished )
@@ -1079,10 +1082,10 @@ namespace JC_helper
             }
             else if ( res == ruckig::Result::Working )
             {
-                safety_servo( robot_ptr, output.new_position );
+                safety_servo( robot_ptr, output->new_position );
 
                 input_lock.lock( );
-                output.pass_to_input( input );
+                output->pass_to_input( *input );
                 input_lock.unlock( );
             }
             else  // 计算失败，紧急停止
@@ -1090,16 +1093,16 @@ namespace JC_helper
                 PLOG_ERROR << "otg 计算失败！";
                 on_stop_trajectory = true;
                 input_lock.lock( );
-                input.control_interface = ruckig::ControlInterface::Velocity;
-                input.synchronization   = ruckig::Synchronization::None;
+                input->control_interface = ruckig::ControlInterface::Velocity;
+                input->synchronization   = ruckig::Synchronization::None;
 
                 for ( int i = 0; i < _joint_num; i++ )
                 {
-                    input.target_velocity[ i ]     = 0.0;
-                    input.target_acceleration[ i ] = 0.0;
-                    input.max_velocity[ i ]        = robot_ptr->joints_[ i ]->getMaxVel( );
-                    input.max_acceleration[ i ]    = robot_ptr->joints_[ i ]->getMaxAcc( );
-                    input.max_jerk[ i ]            = robot_ptr->joints_[ i ]->getMaxJerk( );
+                    input->target_velocity[ i ]     = 0.0;
+                    input->target_acceleration[ i ] = 0.0;
+                    input->max_velocity[ i ]        = robot_ptr->joints_[ i ]->getMaxVel( );
+                    input->max_acceleration[ i ]    = robot_ptr->joints_[ i ]->getMaxAcc( );
+                    input->max_jerk[ i ]            = robot_ptr->joints_[ i ]->getMaxJerk( );
                 }
                 input_lock.unlock( );
             }
@@ -1119,16 +1122,16 @@ namespace JC_helper
 
                     on_stop_trajectory = true;
                     input_lock.lock( );
-                    input.control_interface = ruckig::ControlInterface::Velocity;
-                    input.synchronization   = ruckig::Synchronization::None;
+                    input->control_interface = ruckig::ControlInterface::Velocity;
+                    input->synchronization   = ruckig::Synchronization::None;
 
                     for ( int i = 0; i < _joint_num; i++ )
                     {
-                        input.target_velocity[ i ]     = 0.0;
-                        input.target_acceleration[ i ] = 0.0;
-                        input.max_velocity[ i ]        = robot_ptr->joints_[ i ]->getMaxVel( );
-                        input.max_acceleration[ i ]    = robot_ptr->joints_[ i ]->getMaxAcc( );
-                        input.max_jerk[ i ]            = robot_ptr->joints_[ i ]->getMaxJerk( );
+                        input->target_velocity[ i ]     = 0.0;
+                        input->target_acceleration[ i ] = 0.0;
+                        input->max_velocity[ i ]        = robot_ptr->joints_[ i ]->getMaxVel( );
+                        input->max_acceleration[ i ]    = robot_ptr->joints_[ i ]->getMaxAcc( );
+                        input->max_jerk[ i ]            = robot_ptr->joints_[ i ]->getMaxJerk( );
                     }
                     input_lock.unlock( );
                 }
@@ -1151,9 +1154,9 @@ namespace JC_helper
 
             for ( int i = 0; i < _joint_num; i++ )
             {
-                input.target_position[ i ]     = q_target( i );
-                input.target_velocity[ i ]     = 0.0;
-                input.target_acceleration[ i ] = 0.0;
+                input->target_position[ i ]     = q_target( i );
+                input->target_velocity[ i ]     = 0.0;
+                input->target_acceleration[ i ] = 0.0;
             }
 
             ( *external_finished_flag_ptr ) = false;
@@ -3151,13 +3154,13 @@ namespace JC_helper
 
 #pragma region  //*零空间点动实现
 
-    SmartServo_Nullsapace::SmartServo_Nullsapace( std::atomic< bool >* finished_flag_ptr, const KDL::Chain& robot_chain ) : jnt2jac( robot_chain ), jac( _joint_num ),
-                                                                                                                            U( Eigen::MatrixXd::Zero( 6, _joint_num ) ),
-                                                                                                                            S( Eigen::VectorXd::Zero( _joint_num ) ),
-                                                                                                                            Sinv( Eigen::VectorXd::Zero( _joint_num ) ),
-                                                                                                                            V( Eigen::MatrixXd::Zero( _joint_num, _joint_num ) ),
-                                                                                                                            tmp( Eigen::VectorXd::Zero( _joint_num ) ),
-                                                                                                                            fk_slover( robot_chain )
+    SmartServo_Nullspace::SmartServo_Nullspace(std::atomic< bool >* finished_flag_ptr, const KDL::Chain& robot_chain ) : jnt2jac(robot_chain ), jac(_joint_num ),
+                                                                                                                         U( Eigen::MatrixXd::Zero( 6, _joint_num ) ),
+                                                                                                                         S( Eigen::VectorXd::Zero( _joint_num ) ),
+                                                                                                                         Sinv( Eigen::VectorXd::Zero( _joint_num ) ),
+                                                                                                                         V( Eigen::MatrixXd::Zero( _joint_num, _joint_num ) ),
+                                                                                                                         tmp( Eigen::VectorXd::Zero( _joint_num ) ),
+                                                                                                                         fk_slover( robot_chain )
 
     {
         joint_current.resize( _joint_num );
@@ -3168,7 +3171,7 @@ namespace JC_helper
         external_finished_flag_ptr = finished_flag_ptr;
     }
 
-    void SmartServo_Nullsapace::init( rocos::Robot* robot_ptr, double target_vel, double max_vel, double max_acc, double max_jerk )
+    void SmartServo_Nullspace::init(rocos::Robot* robot_ptr, double target_vel, double max_vel, double max_acc, double max_jerk )
     {
         input.current_position[ 0 ]     = 0;
         input.current_velocity[ 0 ]     = 0;
@@ -3203,7 +3206,7 @@ namespace JC_helper
         PLOG_INFO << "零空间点动初始化完成";
     }
 
-    int SmartServo_Nullsapace::update( KDL::JntArray& joint_vel )
+    int SmartServo_Nullspace::update(KDL::JntArray& joint_vel )
     {
         KDL::SetToZero( joint_vel );
 
@@ -3275,7 +3278,7 @@ namespace JC_helper
             return 0;
     }
 
-    void SmartServo_Nullsapace::RunMotion( rocos::Robot* robot_ptr )
+    void SmartServo_Nullspace::RunMotion(rocos::Robot* robot_ptr )
     {
         int t_count = 0;  // 时间计数
         int _tick_count{ robot_ptr->tick_count };
@@ -3362,7 +3365,7 @@ namespace JC_helper
         robot_ptr->is_running_motion    = false;  // 机械臂运动已结束，可以执行其他离线类运动
     }
 
-    void SmartServo_Nullsapace::command( int jogging_Direction )
+    void SmartServo_Nullspace::command(int jogging_Direction )
     {
         if ( _jogging_Direction == 0 )
             _jogging_Direction = jogging_Direction;
@@ -3381,7 +3384,7 @@ namespace JC_helper
             PLOG_WARNING << "紧急停止中,不允许修改目标";
     }
 
-    void SmartServo_Nullsapace::nullspace_stop( double max_vel, double max_acc, double max_jerk )
+    void SmartServo_Nullspace::nullspace_stop(double max_vel, double max_acc, double max_jerk )
     {
         flag_stop                      = true;
         input.target_position[ 0 ]     = 0;
@@ -3393,7 +3396,7 @@ namespace JC_helper
         input.max_jerk[ 0 ]         = max_jerk;
     }
 
-    bool SmartServo_Nullsapace::is_same_on_direction( const Eigen::Block< Eigen::Matrix< double, _joint_num, _joint_num >, _joint_num, 1, true >& joint_vel )
+    bool SmartServo_Nullspace::is_same_on_direction(const Eigen::Block< Eigen::Matrix< double, _joint_num, _joint_num >, _joint_num, 1, true >& joint_vel )
     {
         KDL::JntArray joint_target( _joint_num );
         for ( int i = 0; i < _joint_num; i++ )

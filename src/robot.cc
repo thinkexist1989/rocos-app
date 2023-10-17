@@ -1967,7 +1967,7 @@ namespace rocos {
         static std::atomic< bool > _dragging_finished_flag{ true };
         static JC_helper::SmartServo_Joint _SmartServo_Joint{ &_dragging_finished_flag };
         static JC_helper::SmartServo_Cartesian _SmartServo_Cartesian{ &_dragging_finished_flag , kinematics_.getChain() };
-        static JC_helper::SmartServo_Nullsapace _SmartServo_Nullsapace{ &_dragging_finished_flag , kinematics_.getChain() };
+        static JC_helper::SmartServo_Nullspace _SmartServo_Nullsapace{&_dragging_finished_flag , kinematics_.getChain() };
         static std::shared_ptr< boost::thread > _thread_planning{ nullptr };
         KDL::JntArray target_joint{ static_cast< unsigned int >( jnt_num_ ) };
         KDL::Frame target_frame{ };
@@ -2108,7 +2108,7 @@ namespace rocos {
             }
 
             _SmartServo_Nullsapace.init( this, max_speed);
-            _thread_planning.reset( new boost::thread{ &JC_helper::SmartServo_Nullsapace::RunMotion, &_SmartServo_Nullsapace, this } );
+            _thread_planning.reset( new boost::thread{&JC_helper::SmartServo_Nullspace::RunMotion, &_SmartServo_Nullsapace, this } );
         }
         //**-------------------------------**//
 
@@ -2567,5 +2567,13 @@ namespace rocos {
         }
         else
             return servoJ( joint_out );
+    }
+
+    int Robot::joint_admittance_teaching() {
+        return 0;
+    }
+
+    int Robot::stop_joint_admittance_teaching() {
+        return 0;
     }
 }  // namespace rocos
