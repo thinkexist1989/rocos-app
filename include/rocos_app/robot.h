@@ -115,6 +115,7 @@ namespace rocos {
         }
         //获取滤波后的数据
         inline double getJointTorqueFilter(int id) { return joints_[id]->getSecondaryPositionInCnt(); }
+         
 
         inline void setJointPosition(int id, double pos) {
             joints_[id]->setPosition(pos);
@@ -320,7 +321,9 @@ namespace rocos {
             need_plan_.resize(jnt_num_, true);
         }
 
-        inline Frame getFlange() { return flange_; }
+        inline Frame getFlange() { 
+            std::lock_guard<std::mutex> lock(mtx);  // 自动获取互斥锁
+            return flange_; }
 
         inline Frame getTool() { return tool_; }
 
@@ -571,7 +574,7 @@ namespace rocos {
 
         //关节导纳拖动示教sun
         int joint_admittance_teaching();
-        int stop_joint_admittance_teaching();
+        
 
         /**
          * @brief 1000hz关节伺服接口
@@ -590,6 +593,8 @@ namespace rocos {
 
     public:
         void test( );  // 为了测试
+
+        int stop_joint_admittance_teaching();
 
     private:
         // TODO： 测试用MoveJ，阻塞运行，需要改为private
@@ -674,6 +679,8 @@ namespace rocos {
         JC_helper::ft_sensor my_ft_sensor;  // 6维力传感器
         bool flag_admittance_turnoff {false}; //导纳开关
         bool flag_admittance_joint_turnoff {false}; //关节拖动开关
+        std::mutex mtx;    // 互斥锁
+
     };
 
 

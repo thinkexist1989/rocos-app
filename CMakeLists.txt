@@ -92,7 +92,7 @@ link_directories(
 
 file(GLOB_RECURSE SRCS src/*.cpp)
 file(GLOB_RECURSE HDRS include/*.h include/*.hpp)
-file(GLOB_RECURSE CONFIG_FILE config/*.urdf  config/public.key  config/license )
+file(GLOB_RECURSE CONFIG_FILE config/*.urdf  config/public.key  config/license config/*.yaml )
 
 set(DEP_LIBS
         dl

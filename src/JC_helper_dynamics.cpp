@@ -219,12 +219,12 @@ namespace JC_helper
 #pragma endregion
 #pragma region
     // sun
-    admittance_joint::admittance_joint(rocos::Robot *robot_ptr) : rne_solver{robot_ptr->kinematics_.getChain(), gravity}
+    admittance_joint::admittance_joint(rocos::Robot *robot_ptr, std::string yaml_path) : rne_solver{robot_ptr->kinematics_.getChain(), gravity}
     {
         // // 读取yaml文件
         joint_num = robot_ptr->kinematics_.getChain().getNrOfJoints();
         yaml_node = YAML::LoadFile(yaml_path);
-        
+
         Initialize(joint_num);
         for (int i = 0; i < joint_num; i++)
         {
@@ -233,15 +233,30 @@ namespace JC_helper
             kesai[i] = yaml_node["kesai"][i].as<double>();
             K[i] = yaml_node["K"][i].as<double>();
             M[i] = yaml_node["M"][i].as<double>();
-            B[i] = 2.0*kesai[i]*sqrt(M[i] * K[i]);
+            B[i] = 2.0 * kesai[i] * sqrt(M[i] * K[i]);
             joint_K[i] = yaml_node["joint_K"][i].as<double>();
             F_joint_stop[i] = yaml_node["F_joint_stop"][i].as<double>();
+            ZeroOffset[i] = yaml_node["ZeroOffset"][i].as<double>();
             pose_stop[i] = F_joint_stop[i] / M[i] * 0.001 * 0.001;
             q_max[i] = robot_ptr->joints_[i]->getMaxPosLimit();
             q_min[i] = robot_ptr->joints_[i]->getMinPosLimit();
         }
-        
+
         external_forces = KDL::Wrenches(joint_num, KDL::Wrench::Zero());
+
+        // 打印admittance_joint参数
+        PLOG_INFO << "a_sensor = " << a_sensor[0] << " " << a_sensor[1] << " " << a_sensor[2] << " " << a_sensor[3] << " " << a_sensor[4] << " " << a_sensor[5] << " " << a_sensor[6];
+        PLOG_INFO << "b_sensor = " << b_sensor[0] << " " << b_sensor[1] << " " << b_sensor[2] << " " << b_sensor[3] << " " << b_sensor[4] << " " << b_sensor[5] << " " << b_sensor[6];
+        PLOG_INFO << "kesai = " << kesai[0] << " " << kesai[1] << " " << kesai[2] << " " << kesai[3] << " " << kesai[4] << " " << kesai[5] << " " << kesai[6];
+        PLOG_INFO << "K = " << K[0] << " " << K[1] << " " << K[2] << " " << K[3] << " " << K[4] << " " << K[5] << " " << K[6];
+        PLOG_INFO << "M = " << M[0] << " " << M[1] << " " << M[2] << " " << M[3] << " " << M[4] << " " << M[5] << " " << M[6];
+        PLOG_INFO << "B = " << B[0] << " " << B[1] << " " << B[2] << " " << B[3] << " " << B[4] << " " << B[5] << " " << B[6];
+        PLOG_INFO << "joint_K = " << joint_K[0] << " " << joint_K[1] << " " << joint_K[2] << " " << joint_K[3] << " " << joint_K[4] << " " << joint_K[5] << " " << joint_K[6];
+        PLOG_INFO << "F_joint_stop = " << F_joint_stop[0] << " " << F_joint_stop[1] << " " << F_joint_stop[2] << " " << F_joint_stop[3] << " " << F_joint_stop[4] << " " << F_joint_stop[5] << " " << F_joint_stop[6];
+        PLOG_INFO << "pose_stop = " << pose_stop[0] << " " << pose_stop[1] << " " << pose_stop[2] << " " << pose_stop[3] << " " << pose_stop[4] << " " << pose_stop[5] << " " << pose_stop[6];
+        PLOG_INFO << "q_max = " << q_max[0] << " " << q_max[1] << " " << q_max[2] << " " << q_max[3] << " " << q_max[4] << " " << q_max[5] << " " << q_max[6];
+        PLOG_INFO << "q_min = " << q_min[0] << " " << q_min[1] << " " << q_min[2] << " " << q_min[3] << " " << q_min[4] << " " << q_min[5] << " " << q_min[6];
+        PLOG_INFO << "ZeroOffset = " << ZeroOffset[0] << " " << ZeroOffset[1] << " " << ZeroOffset[2] << " " << ZeroOffset[3] << " " << ZeroOffset[4] << " " << ZeroOffset[5] << " " << ZeroOffset[6];
     }
     admittance_joint::~admittance_joint()
     {
@@ -259,7 +274,7 @@ namespace JC_helper
         // PLOG_DEBUG.printf( "Theory_torques = %f %f %f %f %f %f %f", Theory_torques[ 0 ], Theory_torques[ 1 ], Theory_torques[ 2 ], Theory_torques[ 3 ], Theory_torques[ 4 ], Theory_torques[ 5 ], Theory_torques[ 6 ] );
     }
 
-    double admittance_joint::set_K_sensor(double x, double K , double amplitude )
+    double admittance_joint::set_K_sensor(double x, double K, double amplitude)
     {
         double y;
 
@@ -290,7 +305,12 @@ namespace JC_helper
             com_fext[i] = 0.0;
             acc(i) = 0.0;
             vel(i) = 0.0;
+            // 打印关节角
         }
+
+        PLOG_DEBUG.printf("pose = %f %f %f %f %f %f %f", pose(0), pose(1), pose(2), pose(3), pose(4), pose(5), pose(5));
+        // 延时2s
+        std::this_thread::sleep_for(std::chrono::duration<double>(2));
         while (!(*flag_admittance_joint_turnoff))
         {
             Theory_torques = get_theory_torques(robot_ptr, pose, vel, acc);
@@ -298,8 +318,8 @@ namespace JC_helper
             {
                 Actual_torques[i] = robot_ptr->getJointTorqueFilter(i);
 
-                fext[i] = Actual_torques[i] * a_sensor[i] + b_sensor[i] - Theory_torques[i];
-                com_fext[i] = (fext[i], joint_K[i]);
+                fext[i] = Actual_torques[i] * 0.001 * a_sensor[i] + b_sensor[i] - Theory_torques[i];
+                com_fext[i] = set_K_sensor(fext[i], joint_K[i]);
 
                 if (abs(com_fext[i]) < F_joint_stop[i])
                 {
@@ -309,15 +329,17 @@ namespace JC_helper
                 {
                     acc(i) = (com_fext[i] - B[i] * vel(i)) / M[i];
                 }
+
                 vel(i) = vel(i) + acc(i) * dt;
                 pose(i) = pose(i) + vel(i) * dt;
+
+                // std::cout << "id" << i << "vel: " << vel(i) << "\t"
+                //                  << "acc: " << acc(i) << "com_fext: " << com_fext[i] << "last_pose" << last_pose(i)<< std::endl;
                 if ((abs(pose(i) - last_pose(i))) < pose_stop[i])
                 {
                     vel(i) = 0.0;
                     pose(i) = last_pose(i);
                 }
-
-                q_target(i) = pose(i);
 
                 if (pose(i) < (q_min[i] + 0.2) || pose(i) > (q_max[i] - 0.2))
                 {
@@ -325,13 +347,17 @@ namespace JC_helper
                     std::cout << "id" << i << "vel: " << vel(i) << "\t"
                               << "acc: " << acc(i) << "com_fext: " << com_fext[i] << "last_pose" << last_pose(i) << "pose" << pose(i) << std::endl;
 
-                    robot_ptr->setDisabled();
-                    *flag_admittance_joint_turnoff=true;
+                    // robot_ptr->setDisabled();
+                    // *flag_admittance_joint_turnoff=true;
+                    pose(i) = last_pose(i);
                 }
-
+                q_target(i) = pose(i);
                 last_pose(i) = pose(i);
             }
-            // servoJ(q_target);
+            // 打印理论力矩和真实力矩
+            /// PLOG_DEBUG.printf( "Theory_torques = %f %f %f %f %f %f %f", Theory_torques[ 0 ], Theory_torques[ 1 ], Theory_torques[ 2 ], Theory_torques[ 3 ], Theory_torques[ 4 ], Theory_torques[ 5 ], Theory_torques[ 6 ] );
+            // PLOG_DEBUG.printf( "Actual_torques = %f %f %f %f %f %f %f", fext[ 0 ], fext[ 1 ], fext[ 2 ], fext[ 3 ], fext[ 4 ], fext[ 5 ], fext[ 6 ] );
+            robot_ptr->servoJ(q_target);
         }
     }
 

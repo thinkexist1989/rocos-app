@@ -127,16 +127,17 @@ namespace JC_helper
         std::vector<double> kesai;
         std::vector<double> pose_stop;
         std::vector<double> F_joint_stop;
+        std::vector<double> ZeroOffset;
         std::vector<double> q_min;
         std::vector<double> q_max;
         // yaml文件的路径
-        std::string yaml_path = "config/joint_config.yaml";
+        
         YAML::Node yaml_node;
         unsigned int  joint_num;
          KDL::Wrenches external_forces;
 
     public:
-        admittance_joint(rocos::Robot *robot_ptr);
+        admittance_joint(rocos::Robot *robot_ptr,std::string yaml_path = "joint_impedance_control.yaml");
         ~admittance_joint();
         // 初始化参数，从yaml文件中读取及初始化q_min,q_max,因为从yaml中读取，所以不需要各个参数的set函数
         int init(string yaml_path);
@@ -163,6 +164,7 @@ namespace JC_helper
             joint_K.resize(joint_num);
             kesai.resize(joint_num);
             fext.resize(joint_num);
+            ZeroOffset.resize(joint_num);
         };
         //开始示教
          void Runteaching(rocos::Robot *robot_ptr,bool *flag_admittance_joint_turnoff);
