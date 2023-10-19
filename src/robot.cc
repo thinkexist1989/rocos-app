@@ -221,6 +221,41 @@ namespace rocos {
     // TODO: 切换HW指针
     bool Robot::switchHW(boost::shared_ptr<HardwareInterface> hw) { return false; }
 
+    
+    bool Robot::setWorkMode(WorkMode mode) {
+        // 机器人只能在停止状态切换工作模式
+        if(getRunState() != RunState::Stopped) {
+            std::cout << "[ERROR] Robot is not stopped!" << std::endl;
+            return false;
+        }
+
+        work_mode_ = mode;
+    }
+
+    bool Robot::setRunState(RunState state) {
+        run_state_ = state;
+
+        switch(state) {
+        case RunState::Disabled:
+            is_running_ = false;
+            is_running_motion = false;
+            break;
+        case RunState::Stopped:
+            is_running_ = false;
+            is_running_motion = false;
+            break;
+        case RunState::Running:
+            is_running_ = true;
+            is_running_motion = true;
+            break;
+        default:
+            break;
+        }
+    }
+
+
+    
+
     // TODO: 测试用MoveJ，阻塞运行，需要改为private
     void Robot::moveJ(const std::vector<double> &pos,
                       const std::vector<double> &max_vel,
@@ -302,24 +337,32 @@ namespace rocos {
     }
 
     void Robot::setEnabled() {
+        setRunState(RunState::Stopped);
+
         for_each(joints_.begin(), joints_.end(),
                  [=](boost::shared_ptr<Drive> &d) { d->setEnabled(); });
     }
 
     void Robot::setDisabled() {
+        setRunState(RunState::Disabled);
+
         for_each(joints_.begin(), joints_.end(),
                  [=](boost::shared_ptr<Drive> &d) { d->setDisabled(); });
     }
 
     void Robot::startMotionThread() {
-        is_running_ = true;
+        // is_running_ = true;
+        setRunState(RunState::Running);
+
         otg_motion_thread_ =
                 boost::make_shared<boost::thread>(&Robot::motionThreadHandler, this);
         //        boost::thread(&Robot::motionThreadHandler, this);
     }
 
     void Robot::stopMotionThread() {
-        is_running_ = false;
+        // is_running_ = false;
+        setRunState(RunState::Stopped);
+
         otg_motion_thread_->interrupt();
         otg_motion_thread_->join();  //等待运动线程结束
     }
@@ -608,8 +651,10 @@ namespace rocos {
             PLOG_ERROR << " Motion is still running and waiting for it to finish";
             return -1;
         }
-        else
-            is_running_motion = true;
+        else{
+            // is_running_motion = true;
+            setRunState(RunState::Running);
+        }
 
         if ( motion_thread_ ){ motion_thread_->join( );motion_thread_=nullptr; }
 
@@ -708,7 +753,10 @@ namespace rocos {
             PLOG_ERROR <<" Motion is still running and waiting for it to finish" ;
             return -1;
         }
-        else is_running_motion =true;
+        else {
+            //is_running_motion = true;
+            setRunState(RunState::Running);
+        }
 
         if ( motion_thread_ )
         {
@@ -739,7 +787,9 @@ namespace rocos {
         if ( JC_helper::link_trajectory( traj_target, frame_init, pose,  speed, acceleration ) < 0 )
         {
             PLOG_ERROR << "link trajectory planning fail ";
-             is_running_motion =false;
+            //  is_running_motion =false;
+            setRunState(RunState::Stopped);
+
             return -1;
         }
 
@@ -786,17 +836,23 @@ namespace rocos {
             }
             catch ( int flag_error )
             {
-                switch ( flag_error )
-                {
-                    case -1: break;
-                    case -2: break;
-                    default: PLOG_ERROR << "Undefined error!";  is_running_motion =false; return -1;
+                switch (flag_error) {
+                case -1:
+                    break;
+                case -2:
+                    break;
+                default:
+                    PLOG_ERROR << "Undefined error!";
+                    // is_running_motion = false;
+                    setRunState(RunState::Stopped);
+                    return -1;
                 }
             }
             catch ( ... )
             {
                 PLOG_ERROR << "Undefined error!";
-                is_running_motion =false;
+                // is_running_motion =false;
+                setRunState(RunState::Stopped);
                 return -1;
             }
        
@@ -805,7 +861,8 @@ namespace rocos {
         if ( ik_count == max_running_count )
         {
             PLOG_ERROR << "CartToJnt still failed even after " << max_running_count << " attempts";
-            is_running_motion =false;
+            // is_running_motion =false;
+            setRunState(RunState::Stopped);
             return -1;
         }
 
@@ -814,14 +871,16 @@ namespace rocos {
         if (asynchronous)  //异步执行
         {
             motion_thread_.reset( new boost::thread{ &Robot::RunMoveL, this, std::ref( traj_ ) } );
-            is_running_motion = true;
+            // is_running_motion = true;
+            setRunState(RunState::Running);
         }
         else  //同步执行
         {
             motion_thread_.reset( new boost::thread{ &Robot::RunMoveL, this, std::ref( traj_ )  } );
             motion_thread_->join( );
             motion_thread_=nullptr; 
-            is_running_motion = false;
+            // is_running_motion = false;
+            setRunState(RunState::Stopped);
         }
 
         return 0;
@@ -862,7 +921,10 @@ namespace rocos {
             PLOG_ERROR <<" Motion is still running and waiting for it to finish" ;
             return -1;
         }
-        else is_running_motion =true;
+        else{
+            // is_running_motion = true;
+            setRunState(RunState::Running);
+        }
 
         if ( motion_thread_ )
         {
@@ -884,7 +946,8 @@ namespace rocos {
         if ( JC_helper::link_trajectory( vel_target, frame_current, pose,  speed, acceleration ) < 0 )
         {
             PLOG_ERROR << "link trajectory planning fail ";
-             is_running_motion =false;
+            //  is_running_motion =false;
+            setRunState(RunState::Stopped);
             return -1;
         }
 
@@ -947,18 +1010,26 @@ namespace rocos {
             }
             catch ( int flag_error )
             {
-                switch ( flag_error )
+                switch (flag_error)
                 {
-                    case -1: break;
-                    case -2: break;
-                    case -3: break;
-                    default: PLOG_ERROR << "Undefined error!";  is_running_motion =false; return -1;
+                case -1:
+                    break;
+                case -2:
+                    break;
+                case -3:
+                    break;
+                default:
+                    PLOG_ERROR << "Undefined error!";
+                    // is_running_motion = false;
+                    setRunState(RunState::Stopped);
+                    return -1;
                 }
             }
             catch ( ... )
             {
                 PLOG_ERROR << "Undefined error!";
-                is_running_motion =false;
+                // is_running_motion =false;
+                setRunState(RunState::Stopped);
                 return -1;
             }
        
@@ -967,7 +1038,8 @@ namespace rocos {
         if ( ik_count == max_running_count )
         {
             PLOG_ERROR << "CartToJnt still failed even after " << max_running_count << " attempts";
-            is_running_motion =false;
+            // is_running_motion =false;
+            setRunState(RunState::Stopped);
             return -1;
         }
 
@@ -976,14 +1048,16 @@ namespace rocos {
         if (asynchronous)  //异步执行
         {
             motion_thread_.reset( new boost::thread{ &Robot::RunMoveL, this, std::ref( traj_ ) } );
-            is_running_motion = true;
+            // is_running_motion = true;
+            setRunState(RunState::Running);
         }
         else  //同步执行
         {
             motion_thread_.reset( new boost::thread{ &Robot::RunMoveL, this, std::ref( traj_ )  } );
             motion_thread_->join( );
             motion_thread_=nullptr; 
-            is_running_motion = false;
+            // is_running_motion = false;
+            setRunState(RunState::Stopped);
         }
 
         return 0;
@@ -1092,8 +1166,10 @@ namespace rocos {
             PLOG_ERROR << RED << " Motion is still running and waiting for it to finish" << WHITE;
             return -1;
         }
-        else
-            is_running_motion = true;
+        else{
+            // is_running_motion = true;
+            setRunState(RunState::Running);
+        }
 
         if ( motion_thread_ )
         {
@@ -1122,7 +1198,8 @@ namespace rocos {
                                            orientation_fixed ) < 0 )
         {
             PLOG_ERROR << "circle trajectory planning fail ";
-            is_running_motion =false;
+            // is_running_motion =false;
+            setRunState(RunState::Stopped);
             return -1;
         }
 
@@ -1167,17 +1244,25 @@ namespace rocos {
             }
             catch ( int flag_error )
             {
-                switch ( flag_error )
+                switch (flag_error)
                 {
-                    case -1: PLOG_ERROR << " CartToJnt failed on the " << ik_count << " times"; break;
-                    case -2: break;
-                    default: PLOG_ERROR << "Undefined error!";  is_running_motion =false;return -1;
+                case -1:
+                    PLOG_ERROR << " CartToJnt failed on the " << ik_count << " times";
+                    break;
+                case -2:
+                    break;
+                default:
+                    PLOG_ERROR << "Undefined error!";
+                    // is_running_motion = false;
+                    setRunState(RunState::Stopped);
+                    return -1;
                 }
             }
             catch ( ... )
             {
                 PLOG_ERROR << "Undefined error!";
-                is_running_motion =false;
+                // is_running_motion =false;
+                setRunState(RunState::Stopped);
                 return -1;
             }
         }
@@ -1185,7 +1270,8 @@ namespace rocos {
         if ( ik_count == max_running_count )
         {
             PLOG_ERROR << "CartToJnt still failed even after " << max_running_count << " attempts";
-            is_running_motion =false;
+            // is_running_motion =false;
+            setRunState(RunState::Stopped);
             return -1;
         }
 
@@ -1194,14 +1280,16 @@ namespace rocos {
         if ( asynchronous )  //异步执行
         {
             motion_thread_.reset( new boost::thread{ &Robot::RunMoveL, this, std::ref( traj_ ) } );
-            is_running_motion = true;
+            // is_running_motion = true;
+            setRunState(RunState::Running);
         }
         else  //同步执行
         {
             motion_thread_.reset( new boost::thread{ &Robot::RunMoveL, this, std::ref( traj_ ) } );
             motion_thread_->join( );
             motion_thread_    = nullptr;
-            is_running_motion = false;
+            // is_running_motion = false;
+            setRunState(RunState::Stopped);
         }
 
         return 0;
@@ -1242,8 +1330,10 @@ namespace rocos {
             PLOG_ERROR << RED << " Motion is still running and waiting for it to finish" << WHITE;
             return -1;
         }
-        else
-            is_running_motion = true;
+        else{
+            // is_running_motion = true;
+            setRunState(RunState::Running);
+        }
 
         if ( motion_thread_ )
         {
@@ -1272,7 +1362,8 @@ namespace rocos {
                                            orientation_fixed ) < 0 )
         {
             PLOG_ERROR << "circle trajectory planning fail ";
-            is_running_motion =false;
+            // is_running_motion =false;
+            setRunState(RunState::Stopped);
             return -1;
         }
 
@@ -1317,17 +1408,25 @@ namespace rocos {
             }
             catch ( int flag_error )
             {
-                switch ( flag_error )
+                switch (flag_error)
                 {
-                    case -1: PLOG_ERROR << " CartToJnt failed on the " << ik_count << " times"; break;
-                    case -2: break;
-                    default: PLOG_ERROR << "Undefined error!";  is_running_motion =false;return -1;
+                case -1:
+                    PLOG_ERROR << " CartToJnt failed on the " << ik_count << " times";
+                    break;
+                case -2:
+                    break;
+                default:
+                    PLOG_ERROR << "Undefined error!";
+                    // is_running_motion = false;
+                    setRunState(RunState::Stopped);
+                    return -1;
                 }
             }
             catch ( ... )
             {
                 PLOG_ERROR << "Undefined error!";
-                is_running_motion =false;
+                // is_running_motion =false;
+                setRunState(RunState::Stopped);
                 return -1;
             }
         }
@@ -1335,7 +1434,8 @@ namespace rocos {
         if ( ik_count == max_running_count )
         {
             PLOG_ERROR << "CartToJnt still failed even after " << max_running_count << " attempts";
-            is_running_motion =false;
+            // is_running_motion =false;
+            setRunState(RunState::Stopped);
             return -1;
         }
 
@@ -1344,14 +1444,16 @@ namespace rocos {
         if ( asynchronous )  //异步执行
         {
             motion_thread_.reset( new boost::thread{ &Robot::RunMoveL, this, std::ref( traj_ ) } );
-            is_running_motion = true;
+            // is_running_motion = true;
+            setRunState(RunState::Running);
         }
         else  //同步执行
         {
             motion_thread_.reset( new boost::thread{ &Robot::RunMoveL, this, std::ref( traj_ ) } );
             motion_thread_->join( );
             motion_thread_    = nullptr;
-            is_running_motion = false;
+            // is_running_motion = false;
+            setRunState(RunState::Stopped);
         }
 
         return 0;
@@ -1396,8 +1498,10 @@ namespace rocos {
             PLOG_ERROR << " Motion is still running and waiting for it to finish" << WHITE;
             return -1;
         }
-        else
-            is_running_motion = true;
+        else{
+            // is_running_motion = true;
+            setRunState(RunState::Running);
+        }
 
         if ( motion_thread_ )
         {
@@ -1481,18 +1585,26 @@ namespace rocos {
             }
             catch ( int flag_error )
             {
-                switch ( flag_error )
+                switch (flag_error)
                 {
-                    case -1: break;
-                    case -2: break;
-                    case -3: break;
-                    default: PLOG_ERROR << "Undefined error!";  is_running_motion =false;return -1;
+                case -1:
+                    break;
+                case -2:
+                    break;
+                case -3:
+                    break;
+                default:
+                    PLOG_ERROR << "Undefined error!";
+                    // is_running_motion = false;
+                    setRunState(RunState::Stopped);
+                    return -1;
                 }
             }
             catch ( ... )
             {
                 PLOG_ERROR << "Undefined error!";
-                is_running_motion =false;
+                // is_running_motion =false;
+                setRunState(RunState::Stopped);
                 return -1;
             }
         }
@@ -1500,7 +1612,8 @@ namespace rocos {
         if ( ik_count == max_running_count )
         {
             PLOG_ERROR << "CartToJnt still failed even after " << max_running_count << " attempts";
-            is_running_motion =false;
+            // is_running_motion =false;
+            setRunState(RunState::Stopped);
             return -1;
         }
 
@@ -1509,14 +1622,16 @@ namespace rocos {
         if ( asynchronous )  //异步执行
         {
             motion_thread_.reset( new boost::thread{ &Robot::RunMoveL, this, std::ref( traj_ ) } );
-            is_running_motion = true;
+            // is_running_motion = true;
+            setRunState(RunState::Running);
         }
         else  //同步执行
         {
             motion_thread_.reset( new boost::thread{ &Robot::RunMoveL, this, std::ref( traj_ ) } );
             motion_thread_->join( );
             motion_thread_    = nullptr;
-            is_running_motion = false;
+            // is_running_motion = false;
+            setRunState(RunState::Stopped);
         }
 
         return 0;
@@ -1558,8 +1673,10 @@ namespace rocos {
             PLOG_ERROR << " Motion is still running and waiting for it to finish" ;
             return -1;
         }
-        else
-            is_running_motion = true;
+        else{
+            // is_running_motion = true;
+            setRunState(RunState::Running);
+        }
 
         if ( motion_thread_ )
         {
@@ -1581,7 +1698,8 @@ namespace rocos {
                                            orientation_fixed ) < 0 )
         {
             PLOG_ERROR << "circle trajectory planning fail ";
-            is_running_motion =false;
+            // is_running_motion =false;
+            setRunState(RunState::Stopped);
             return -1;
         }
 
@@ -1643,18 +1761,26 @@ namespace rocos {
             }
             catch ( int flag_error )
             {
-                switch ( flag_error )
+                switch (flag_error)
                 {
-                    case -1: break;
-                    case -2: break;
-                    case -3: break;
-                    default: PLOG_ERROR << "Undefined error!";  is_running_motion =false;return -1;
+                case -1:
+                    break;
+                case -2:
+                    break;
+                case -3:
+                    break;
+                default:
+                    PLOG_ERROR << "Undefined error!";
+                    // is_running_motion = false;
+                    setRunState(RunState::Stopped);
+                    return -1;
                 }
             }
             catch ( ... )
             {
                 PLOG_ERROR << "Undefined error!";
-                is_running_motion =false;
+                // is_running_motion =false;
+                setRunState(RunState::Stopped);
                 return -1;
             }
         }
@@ -1662,7 +1788,8 @@ namespace rocos {
         if ( ik_count == max_running_count )
         {
             PLOG_ERROR << "CartToJnt still failed even after " << max_running_count << " attempts";
-            is_running_motion =false;
+            // is_running_motion =false;
+            setRunState(RunState::Stopped);
             return -1;
         }
 
@@ -1671,14 +1798,16 @@ namespace rocos {
         if ( asynchronous )  //异步执行
         {
             motion_thread_.reset( new boost::thread{ &Robot::RunMoveL, this, std::ref( traj_ ) } );
-            is_running_motion = true;
+            // is_running_motion = true;
+            setRunState(RunState::Running);
         }
         else  //同步执行
         {
             motion_thread_.reset( new boost::thread{ &Robot::RunMoveL, this, std::ref( traj_ ) } );
             motion_thread_->join( );
             motion_thread_    = nullptr;
-            is_running_motion = false;
+            // is_running_motion = false;
+            setRunState(RunState::Running);
         }
 
         return 0;
@@ -1885,14 +2014,16 @@ namespace rocos {
                     case -2: break;
                     default:
                         PLOG_ERROR << "Undefined error!";
-                        is_running_motion = false;
+                        // is_running_motion = false;
+                        setRunState(RunState::Stopped);
                         return -1;
                 }
             }
             catch ( ... )
             {
                 PLOG_ERROR << "Undefined error!";
-                is_running_motion = false;
+                // is_running_motion = false;
+                setRunState(RunState::Stopped);
                 return -1;
             }
         }
@@ -1900,7 +2031,8 @@ namespace rocos {
         if ( ik_count == max_running_count )
         {
             PLOG_ERROR << "\n\nCartToJnt still failed even after " << max_running_count << " attempts";
-            is_running_motion = false;
+            // is_running_motion = false;
+            setRunState(RunState::Stopped);
             return -1;
         }
 
@@ -1950,13 +2082,15 @@ namespace rocos {
         if (asynchronous)  //异步执行
         {
             motion_thread_.reset(new boost::thread{&Robot::RunMultiMoveL, this, std::ref(traj_)});
-            is_running_motion = true;
+            // is_running_motion = true;
+            setRunState(RunState::Running);
         } else  //同步执行
         {
             motion_thread_.reset( new boost::thread{ &Robot::RunMultiMoveL, this, std::ref(traj_) } );
             motion_thread_->join( );
             motion_thread_=nullptr; 
-            is_running_motion = false;
+            // is_running_motion = false;
+            setRunState(RunState::Stopped);
         }
 
         return 0;
@@ -2055,7 +2189,8 @@ namespace rocos {
                 motion_thread_->join( );
                 motion_thread_ = nullptr;
             }
-            is_running_motion = true;
+            // is_running_motion = true;
+            setRunState(RunState::Running);
             traj_.clear( );  //!
         }
         //**-------------------------------**//
@@ -2195,7 +2330,8 @@ namespace rocos {
                 //! 在此处位置时会置位is_running_motion
                 //! 如果没有jogging 运动线程 且 is_running_motion 被置位，那is_running_motion就会被永久卡住
                 if ( _dragging_finished_flag && is_running_motion )
-                    is_running_motion = false;
+                    // is_running_motion = false;
+                    setRunState(RunState::Stopped);
                 return -1;
         }
         return 0;
@@ -2323,7 +2459,8 @@ namespace rocos {
 
             if (!interp[i]->isValidMovement() || !(interp[i]->getDuration() > 0)) {
                 PLOG_ERROR<< "movej trajectory is infeasible";
-                is_running_motion = false;
+                // is_running_motion = false;
+                setRunState(RunState::Stopped);
                 return;
             }
             max_time = max(max_time, interp[i]->getDuration());
@@ -2352,7 +2489,8 @@ namespace rocos {
                     PLOG_ERROR << "q_target( " << i << " )  = " << target_pos[i] * 180 / M_PI;
                     PLOG_ERROR << "q_init( " << i << " ) =" << init_pos[i]  * 180 / M_PI;
 
-                    is_running_motion = false;
+                    // is_running_motion = false;
+                    setRunState(RunState::Stopped);
                     return;
                 }
                 else
@@ -2383,7 +2521,8 @@ namespace rocos {
         }
         //**-------------------------------**//
 
-        is_running_motion = false;
+        // is_running_motion = false;
+        setRunState(RunState::Stopped);
     }
 
     void Robot::RunMoveL( const std::vector< KDL::JntArray >& traj )
@@ -2409,7 +2548,8 @@ namespace rocos {
                 else
                 {
                     PLOG_ERROR << "关节[" << i << "] 不支持此模式 :"<< static_cast<int> (joints_[i]->getMode()) ;
-                    is_running_motion = false;
+                    // is_running_motion = false;
+                    setRunState(RunState::Stopped);
                     return;
                 }
             }
@@ -2417,7 +2557,8 @@ namespace rocos {
             hw_interface_->waitForSignal( 0 );
         }
 
-        is_running_motion = false;
+        // is_running_motion = false;
+        setRunState(RunState::Stopped);
     }
 
     void Robot::RunMultiMoveL( const std::vector< KDL::JntArray >& traj )
@@ -2434,7 +2575,8 @@ namespace rocos {
             hw_interface_->waitForSignal( 0 );
         }
 
-        is_running_motion = false;
+        // is_running_motion = false;
+        setRunState(RunState::Stopped);
     }
 
     int Robot::admittance_teaching( )
@@ -2444,14 +2586,17 @@ namespace rocos {
             PLOG_ERROR << " Motion is still running and waiting for it to finish";
             return -1;
         }
-        else
-            is_running_motion = true;
+        else {
+            // is_running_motion = true;
+            setRunState(RunState::Running);
+        }
 
         JC_helper::admittance admittance_control{ this, &my_ft_sensor };
 
         if ( admittance_control.init( flange_ ) < 0 )
         {
-            is_running_motion = false;
+            // is_running_motion = false;
+            setRunState(RunState::Stopped);
             return -1;
         }
 
@@ -2477,7 +2622,8 @@ namespace rocos {
 
         PLOG_INFO << "结束示教";
 
-        is_running_motion = false;
+        // is_running_motion = false;
+        setRunState(RunState::Stopped);
         return 0;
     }
 
@@ -2502,15 +2648,18 @@ namespace rocos {
             PLOG_ERROR << " Motion is still running and waiting for it to finish";
             return -1;
         }
-        else
-            is_running_motion = true;
+        else {
+            // is_running_motion = true;
+            setRunState(RunState::Running);
+        }
 
         JC_helper::admittance admittance_control{ this, &my_ft_sensor };
 
         // admittance类里自带传感器类，需要初始化才能用
         if ( admittance_control.init( flange_ ) < 0 )
         {
-            is_running_motion = false;
+            // is_running_motion = false;
+            setRunState(RunState::Stopped);
             return -1;
         }
 
@@ -2527,7 +2676,8 @@ namespace rocos {
 
         PLOG_INFO << "结束导纳运动";
 
-        is_running_motion = false;
+        // is_running_motion = false;
+        setRunState(RunState::Stopped);
         return 0;
     }
 
@@ -2585,8 +2735,10 @@ namespace rocos {
             PLOG_ERROR << " Motion is still running and waiting for it to finish";
             return -1;
         }
-        else
-            is_running_motion = true;
+        else {
+            // is_running_motion = true;
+            setRunState(RunState::Running);
+        }
 
         JC_helper::admittance_joint  admittance_control{ this };
     
@@ -2606,7 +2758,8 @@ namespace rocos {
        
         PLOG_INFO << "结束示教";
 
-        is_running_motion = false;
+        // is_running_motion = false;
+        setRunState(RunState::Stopped);
 
         return 0;
     }

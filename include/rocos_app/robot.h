@@ -38,6 +38,9 @@ namespace rocos {
     class Robot {
         friend class RobotServiceImpl;
 
+        using JntArray = KDL::JntArray;
+        using Frame = KDL::Frame;
+
     public:
         //! Class PathEntry is used by Class Path
         class PathEntry {
@@ -72,6 +75,20 @@ namespace rocos {
             FIXED
         };
 
+        enum class WorkMode {
+            Position = 0,
+            EeAdmitTeach = 1,
+            JntAdmitTeach = 2,
+            JntImp = 3,
+            CartImp = 4
+        };
+
+        enum class RunState {
+            Disabled = 0,
+            Stopped = 1,
+            Running = 2
+        };
+
         explicit Robot(boost::shared_ptr<HardwareInterface> hw,
                        const std::string &urdf_file_path = "robot.urdf",
                        const std::string &base_link = "base_link",
@@ -84,6 +101,13 @@ namespace rocos {
         bool parseDriveParamsFromUrdf(const std::string &urdf_file_path);
 
         bool switchHW(boost::shared_ptr<HardwareInterface> hw);  //切换硬件指针
+
+        //机器人状态机相关
+        inline WorkMode getWorkMode() { return work_mode_; }
+        bool setWorkMode(WorkMode mode);
+        inline RunState getRunState() { return run_state_; }
+        bool setRunState(RunState state);
+
 
         void setEnabled();
 
@@ -654,6 +678,9 @@ namespace rocos {
 
         std::vector<KDL::JntArray> traj_;
         std::atomic<int> tick_count{0};
+
+        WorkMode work_mode_ {WorkMode::Position}; //机器人当前模式，默认为位置模式
+        RunState run_state_ {RunState::Disabled}; //机器人当前状态，默认为下使能
 
     public:
         Kinematics kinematics_;
