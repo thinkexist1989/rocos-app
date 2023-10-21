@@ -2769,4 +2769,104 @@ namespace rocos {
         
         return 0;
     }
+
+
+
+     // TODO: 未完成,Sun的伺服驱动接口
+    // 模仿UR机械臂的servoj函数的实现
+    // SERVOJ的函数原理:
+    // 目标位置target_pos,当前位置current_pos,当前速度current_vel,当前加速度current_acc,采样周期dt
+    // 下一时刻的加速度next_acc = (target_pos - current_pos) *gain+current_vel*lookhead*gain
+    // 下一时刻的速度next_vel = current_vel + next_acc*dt
+    // 下一时刻的位置next_pos = current_pos + next_vel*dt
+    int Robot::sun_servoJ(const KDL::JntArray &target_pos, const KDL::JntArray &max_vel, const KDL::JntArray &max_acc, double Gain, double lookhead)
+    {
+        KDL::JntArray current_pose{_joint_num};
+        KDL::JntArray current_vel{_joint_num};
+        KDL::JntArray current_acc{_joint_num};
+        KDL::JntArray next_acc{_joint_num};
+        KDL::JntArray next_vel{_joint_num};
+        KDL::JntArray next_pos{_joint_num};
+        KDL::JntArray next_jerk{_joint_num};
+        double dt = 0.001;
+        double look_head2=0.6;
+        int pre = 0;
+        bool is_first = true; // 是否可以一次性到达目标位置，不可以一直循环，可以退出
+        for (int i = 0; i < _joint_num; ++i)
+        {
+            current_pose(i) = pos_[i];
+            current_vel(i) = vel_[i];
+            current_acc(i)=acc_[i];
+            next_acc(i)=0;
+            next_vel(i)=0;
+            next_pos(i)=0;
+            next_jerk(i)=0;
+            std::cout<<"target_pos"<<target_pos(i)<<endl;
+
+        }
+
+        //Eigen::Matrix<double, _joint_num, 1> joint_offset = (target_pos.data - JC_helper::vector_2_JntArray(pos_).data).cwiseAbs();
+        // while (is_first)
+         
+            std::cout<<"next_pose: ";
+            for (int i = 0; i < _joint_num; ++i)
+            {
+                next_jerk(i)=(0-current_vel(i))*Gain+(0-current_acc(i))*look_head2*Gain+(target_pos(i) - current_pose(i)) * Gain +(0-current_vel(i) )* lookhead * Gain;
+                next_acc(i) = next_jerk(i)*0.001;
+                //next_acc(i) = (target_pos(i) - current_pose(i)) * Gain +(0-current_vel(i) )* lookhead * Gain;
+                if (next_acc(i) > max_acc(i) * 0.001)
+                {
+                    next_acc(i) = max_acc(i) * 0.001;
+                }
+                else if (next_acc(i) < -max_acc(i) * 0.001)
+                {
+                    next_acc(i) = -max_acc(i) * 0.001;
+                }
+
+                next_vel(i) = current_vel(i) + next_acc(i) ;
+
+                if (next_vel(i) > max_vel(i) * 0.001)
+                {
+                    next_vel(i) = max_vel(i) * 0.001;
+                }
+                else if (next_vel(i) < -max_vel(i) * 0.001)
+                {
+                    next_vel(i) = -max_vel(i) * 0.001;
+                }
+                next_pos(i) = current_pose(i) + next_vel(i) ;
+               
+                //  if (abs(next_pos(i) - target_pos(i)) < 0.0001)
+                // {
+                //     pre=pre+1;
+                //     // std::cout<<"目标位置: "<<target_pos(i)<<"next pose "<<next_pos(i)<<std::endl;
+                // }
+                pos_[i] = next_pos(i);
+                vel_[i]=next_vel(i);
+                acc_[i]=next_acc(i);
+                joints_[i]->setPosition(next_pos(i));
+                // std::cout<<next_pos(i)<<",";
+                // current_pose(i) = next_pos(i);
+               
+                // current_vel(i) = next_vel(i);
+            }
+            std::cout<<std::endl;
+            // if(pre==_joint_num)
+            // {
+            //     is_first=false;
+            //     std::cout<<"over"<<std::endl;
+
+            // }
+            // pre=0;
+            //**-------------------------------**//
+            //** 位置伺服 **//
+
+            hw_interface_->waitForSignal(0);
+        
+        
+        //**-------------------------------**//
+        return 0;
+    }
+
+
+
 }  // namespace rocos

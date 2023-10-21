@@ -329,7 +329,16 @@ namespace JC_helper
                 {
                     acc(i) = (com_fext[i] - B[i] * vel(i)) / M[i];
                 }
-
+                 //添加速度约束，如果速度大于2rads/s，那么将速度限制在2rads/s
+                if (vel(i) > 2)
+                {
+                    vel(i) = 2;
+                }
+                else if (vel(i) < -2)
+                {
+                    vel(i) = -2;
+                }
+                
                 vel(i) = vel(i) + acc(i) * dt;
                 pose(i) = pose(i) + vel(i) * dt;
 
@@ -340,6 +349,7 @@ namespace JC_helper
                     vel(i) = 0.0;
                     pose(i) = last_pose(i);
                 }
+               
 
                 if (pose(i) < (q_min[i] + 0.2) || pose(i) > (q_max[i] - 0.2))
                 {

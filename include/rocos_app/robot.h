@@ -613,6 +613,19 @@ namespace rocos {
          * @param target_frame 目标位置
          * @return int
          */
+
+
+         int sun_servoJ( const KDL::JntArray& target_pos , const KDL::JntArray& max_vel, const KDL::JntArray& max_acc ,double Gain,double lookhead);
+        /**
+         * @brief 1000hz位姿伺服接口
+         *
+         * @param target_pose 目标位置
+         * @param Gain 比例增益
+         * @param lookhead 前瞻时间
+         * @param max_vel 最大速度
+         * @param max_acc 最大加速度
+         * @return int
+         */
         int servoL( const KDL::Frame& target_frame );
 
     public:
