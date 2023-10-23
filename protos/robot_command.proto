@@ -39,6 +39,14 @@ enum Mode {
   MODE_CST = 2;
 }
 
+enum WorkMode {
+  Position = 0;
+  EeAdmitTeach = 1;
+  JntAdmitTeach = 2;
+  JntImp = 3;
+  CartImp = 4;
+}
+
 enum DraggingFlag {
   J0 = 0; J1 = 1; J2 = 2; J3 = 3;J4 = 4;J5 = 5;J6 = 6;
   TOOL_X = 100; TOOL_Y = 101; TOOL_Z = 102; TOOL_ROLL = 103; TOOL_PITCH= 104; TOOL_YAW = 105;
@@ -131,7 +139,8 @@ message MultiAxisCommand {
 }
 
 
-/////// General Command /////////////
+/////// Enable/Disable Command /////////////
+
 message Enabled {
   repeated double target_pos = 1;
   repeated double target_vel = 2;
@@ -139,6 +148,8 @@ message Enabled {
 
 message Disabled {
 }
+
+/////// General Command /////////////
 
 // 查询或设置零位偏移
 message ZeroOffset {
@@ -148,6 +159,19 @@ message ZeroOffset {
 // 查询或设置单位转换
 message CntPerUnit {
   repeated google.protobuf.DoubleValue value = 1;
+}
+
+message SetWorkMode {
+  WorkMode value = 1;
+}
+
+
+message GeneralCommand {
+  oneof command {
+//    ZeroOffset zero_offset = 3;
+//    CntPerUnit cnt_per_unit = 4;
+    SetWorkMode set_work_mode = 5;
+  }
 }
 
 /////// Motion Command /////////////
@@ -268,6 +292,7 @@ message RobotCommand {
     MultiAxisCommand multi_axis_command = 5;
     MotionCommand motion_command = 6;
     DraggingCommand dragging_command = 7;
+    GeneralCommand general_command = 8;
   }
 }
 

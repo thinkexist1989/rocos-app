@@ -43,8 +43,8 @@ std::ofstream outputFile_Flange_KDL("/home/landau/Documents/rocos-app/src/Flange
 namespace rocos
 {
 
-    // boost::shared_ptr< HardwareInterface > hw = boost::make_shared< HardwareSim >( _joint_num );  // 仿真
-    boost::shared_ptr<HardwareInterface> hw = boost::make_shared<Hardware>(); // 真实机械臂
+     boost::shared_ptr< HardwareInterface > hw = boost::make_shared< HardwareSim >( 7 );  // 仿真
+//    boost::shared_ptr<HardwareInterface> hw = boost::make_shared<Hardware>(); // 真实机械臂
 
     Robot robot(hw, FLAGS_urdf, FLAGS_base, FLAGS_tip);
 
@@ -138,12 +138,16 @@ int main(int argc, char *argv[])
 
     //**-------------启动admittance_joint-----------**//
     // 初始化类
+//     boost::shared_ptr< HardwareInterface > hw = boost::make_shared< HardwareSim >( 7 );  // 仿真
+//    boost::shared_ptr<HardwareInterface> hw = boost::make_shared<Hardware>(); // 真实机械臂
 
-    // auto robotService = RobotServiceImpl::getInstance(&robot);
-    std::thread thread_test{&rocos::Robot::test, &robot};
+//    Robot robot(hw, FLAGS_urdf, FLAGS_base, FLAGS_tip);
+
+     auto robotService = RobotServiceImpl::getInstance(&robot);
+//    std::thread thread_test{&rocos::Robot::test, &robot};
     //------------------------wait----------------------------------
-    // robotService->runServer();
-    thread_test.join();
+     robotService->runServer();
+//    thread_test.join();
 
     return 0;
 }

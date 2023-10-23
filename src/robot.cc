@@ -223,6 +223,27 @@ namespace rocos {
 
     
     bool Robot::setWorkMode(WorkMode mode) {
+
+        switch(work_mode_) {
+            case WorkMode::Position:
+                break;
+            case WorkMode::EeAdmitTeach:
+                this->stop_admittance_teaching();
+                break;
+            case WorkMode::JntAdmitTeach:
+                this->stop_joint_admittance_teaching();
+                break;
+            case WorkMode::JntImp:
+                break;
+            case WorkMode::CartImp:
+                break;
+            default:
+                break;
+        }
+
+        for(int i = 0; i < 10; i++)
+            hw_interface_->waitForSignal(5);
+
         // 机器人只能在停止状态切换工作模式
         if(getRunState() != RunState::Stopped) {
             std::cout << "[ERROR] Robot is not stopped!" << std::endl;
@@ -230,6 +251,28 @@ namespace rocos {
         }
 
         work_mode_ = mode;
+
+        switch(mode) {
+            case WorkMode::Position:
+                PLOG(plog::info) << "Robot work mode is set to Position";
+                break;
+            case WorkMode::EeAdmitTeach:
+                this->admittance_teaching(true);
+                PLOG(plog::info) << "Robot work mode is set to EeAdmitTeach";
+                break;
+            case WorkMode::JntAdmitTeach:
+                this->joint_admittance_teaching(true);
+                PLOG(plog::info) << "Robot work mode is set to JntAdmitTeach";
+                break;
+            case WorkMode::JntImp:
+                PLOG(plog::info) << "Robot work mode is set to JntImp";
+                break;
+            case WorkMode::CartImp:
+                PLOG(plog::info) << "Robot work mode is set to CartImp";
+                break;
+            default:
+                break;
+        }
     }
 
     bool Robot::setRunState(RunState state) {
@@ -2579,7 +2622,7 @@ namespace rocos {
         setRunState(RunState::Stopped);
     }
 
-    int Robot::admittance_teaching( )
+    int Robot::admittance_teaching(bool asynchronous)
     {
         if ( is_running_motion )  // 最大一条任务异步执行
         {
@@ -2612,18 +2655,20 @@ namespace rocos {
 
         PLOG_INFO << "开始示教";
 
+        if(!asynchronous) {
         //** 等待关闭指令 **//
-        while ( !flag_admittance_turnoff )
-            std::this_thread::sleep_for( std::chrono::duration< double >( 0.002 ) );
-        //**-------------------------------**//
+            while (!flag_admittance_turnoff)
+                std::this_thread::sleep_for(std::chrono::duration<double>(0.002));
+            //**-------------------------------**//
 
-        _thread_admittance_teaching->join( );
-        _thread_ft_sensor->join( );
+            _thread_admittance_teaching->join();
+            _thread_ft_sensor->join();
 
-        PLOG_INFO << "结束示教";
+            PLOG_INFO << "结束示教";
 
-        // is_running_motion = false;
-        setRunState(RunState::Stopped);
+            // is_running_motion = false;
+            setRunState(RunState::Stopped);
+        }
         return 0;
     }
 
@@ -2729,7 +2774,7 @@ namespace rocos {
             return servoJ( joint_out );
     }
 
-    int Robot::joint_admittance_teaching() {
+    int Robot::joint_admittance_teaching(bool asynchronous) {
          if ( is_running_motion )  // 最大一条任务异步执行
         {
             PLOG_ERROR << " Motion is still running and waiting for it to finish";
@@ -2749,17 +2794,19 @@ namespace rocos {
 
         PLOG_INFO << "开始示教";
 
-        //** 等待关闭指令 **//
-        while ( !flag_admittance_joint_turnoff )
-            std::this_thread::sleep_for( std::chrono::duration< double >( 0.002 ) );
-        //**-------------------------------**//
+        if(!asynchronous) {
+            //** 等待关闭指令 **//
+            while (!flag_admittance_joint_turnoff)
+                std::this_thread::sleep_for(std::chrono::duration<double>(0.002));
+            //**-------------------------------**//
 
-        _thread_admittance_teaching->join( );
-       
-        PLOG_INFO << "结束示教";
+            _thread_admittance_teaching->join();
 
-        // is_running_motion = false;
-        setRunState(RunState::Stopped);
+            PLOG_INFO << "结束示教";
+
+            // is_running_motion = false;
+            setRunState(RunState::Stopped);
+        }
 
         return 0;
     }

@@ -396,11 +396,20 @@ namespace rocos {
                 //! TODO: MovePath
                 std::cout << "Received MovePath command!" << std::endl;
             }
-        } else if (request->command().has_dragging_command()) {
+        }
+        //! Dragging Command
+        else if (request->command().has_dragging_command()) {
             auto dragging_command = request->command().dragging_command();
             robot_ptr_->Dragging(static_cast<Robot::DRAGGING_FLAG>(dragging_command.flag()),
                                  static_cast<Robot::DRAGGING_DIRRECTION>(dragging_command.dir()),
                                  dragging_command.max_speed(), dragging_command.max_acceleration());
+        }
+        //! General Command
+        else if (request->command().has_general_command()) {
+            auto general_command = request->command().general_command();
+            if(general_command.has_set_work_mode()) {
+                robot_ptr_->setWorkMode(static_cast<Robot::WorkMode>(general_command.set_work_mode().value()));
+            }
         }
 
         return grpc::Status::OK;

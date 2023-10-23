@@ -83,7 +83,7 @@ namespace rocos
 
         setEnabled();
 #pragma endregion
-        int ret =robot.joint_admittance_teaching();
+        int ret = robot.joint_admittance_teaching(false);
         std::cout<<"ret: "<<ret<<std::endl;
         //**-------------------------------**//
 

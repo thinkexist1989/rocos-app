@@ -592,12 +592,12 @@ namespace rocos {
 
         //实际multimovel执行线程
         void RunMultiMoveL(const std::vector<KDL::JntArray> &traj);
-        int admittance_teaching( );
+        int admittance_teaching(bool asynchronous = false);
         int stop_admittance_teaching( );
         int admittance_link( KDL::Frame frame_target, double speed, double acceleration );
 
         //关节导纳拖动示教sun
-        int joint_admittance_teaching();
+        int joint_admittance_teaching(bool asynchronous = false);
         
 
         /**
