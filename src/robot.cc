@@ -245,7 +245,7 @@ namespace rocos {
             hw_interface_->waitForSignal(5);
 
         // 机器人只能在停止状态切换工作模式
-        if(getRunState() != RunState::Stopped) {
+        if(getRunState() == RunState::Running) {
             std::cout << "[ERROR] Robot is not stopped!" << std::endl;
             return false;
         }
@@ -257,12 +257,12 @@ namespace rocos {
                 PLOG(plog::info) << "Robot work mode is set to Position";
                 break;
             case WorkMode::EeAdmitTeach:
-                this->admittance_teaching(true);
                 PLOG(plog::info) << "Robot work mode is set to EeAdmitTeach";
+                this->admittance_teaching(true);
                 break;
             case WorkMode::JntAdmitTeach:
-                this->joint_admittance_teaching(true);
                 PLOG(plog::info) << "Robot work mode is set to JntAdmitTeach";
+                this->joint_admittance_teaching(true);
                 break;
             case WorkMode::JntImp:
                 PLOG(plog::info) << "Robot work mode is set to JntImp";
@@ -394,8 +394,8 @@ namespace rocos {
     }
 
     void Robot::startMotionThread() {
-        // is_running_ = true;
-        setRunState(RunState::Running);
+         is_running_ = true;
+//        setRunState(RunState::Running);
 
         otg_motion_thread_ =
                 boost::make_shared<boost::thread>(&Robot::motionThreadHandler, this);
@@ -2233,7 +2233,7 @@ namespace rocos {
                 motion_thread_ = nullptr;
             }
             // is_running_motion = true;
-            setRunState(RunState::Running);
+            setRunState(RunState::Running); // TODO: 感觉应该是Stopped，原来为Running
             traj_.clear( );  //!
         }
         //**-------------------------------**//
@@ -2669,6 +2669,10 @@ namespace rocos {
             // is_running_motion = false;
             setRunState(RunState::Stopped);
         }
+        else {
+            _thread_admittance_teaching->detach();
+        }
+
         return 0;
     }
 
@@ -2806,6 +2810,9 @@ namespace rocos {
 
             // is_running_motion = false;
             setRunState(RunState::Stopped);
+        }
+        else {
+            _thread_admittance_teaching->detach();
         }
 
         return 0;

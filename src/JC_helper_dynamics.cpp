@@ -311,6 +311,7 @@ namespace JC_helper
         PLOG_DEBUG.printf("pose = %f %f %f %f %f %f %f", pose(0), pose(1), pose(2), pose(3), pose(4), pose(5), pose(5));
         // 延时2s
         std::this_thread::sleep_for(std::chrono::duration<double>(2));
+
         while (!(*flag_admittance_joint_turnoff))
         {
             Theory_torques = get_theory_torques(robot_ptr, pose, vel, acc);

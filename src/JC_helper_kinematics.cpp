@@ -1041,7 +1041,7 @@ namespace JC_helper
             input->max_jerk[ i ]         = max_j;
         }
 
-        PLOG_INFO << "smart servo init succesed";
+//        PLOG_INFO << "smart servo init succesed";
     }
 
     void SmartServo_Joint::RunSmartServo( rocos::Robot* robot_ptr )
@@ -1064,7 +1064,7 @@ namespace JC_helper
             PLOG_INFO << "waiting for command";
         }
 
-        while ( 1 )
+        while ( true )
         {
             t_start = std::chrono::high_resolution_clock::now( );
 
@@ -1075,9 +1075,10 @@ namespace JC_helper
             if ( res == ruckig::Result::Finished )
             {
                 ( *external_finished_flag_ptr ) = true;   // 这次smart servo已结束，等待下一次smart servo
-                robot_ptr->is_running_motion    = false;  // 机械臂运动已结束，可以执行其他离线类运动
+//                robot_ptr->is_running_motion    = false;  // 机械臂运动已结束，可以执行其他离线类运动
+                robot_ptr->setRunState(rocos::Robot::RunState::Stopped);  // 机械臂运动已结束，可以执行其他离线类运动
                 on_stop_trajectory              = false;  // 这个必须设为false,因为新线程仍然使用同一个对象数据成员
-                PLOG_INFO << "smart servo has finished";
+//                PLOG_INFO << "smart servo has finished";
                 break;
             }
             else if ( res == ruckig::Result::Working )
@@ -1118,7 +1119,7 @@ namespace JC_helper
                 }
                 else
                 {
-                    PLOG_WARNING << "点动指令时间间隔过长,停止";
+//                    PLOG_WARNING << "点动指令时间间隔过长,停止";
 
                     on_stop_trajectory = true;
                     input_lock.lock( );
@@ -1139,10 +1140,10 @@ namespace JC_helper
             //**-------------------------------**//
             t_stop   = std::chrono::high_resolution_clock::now( );
             duration = ( t_stop - t_start );
-            if ( duration.count( ) > 0.0015 )
-            {
-                PLOG_WARNING << "计算时间超时：" << duration.count( ) << "s" << std::endl;
-            }
+//            if ( duration.count( ) > 0.0015 )
+//            {
+//                PLOG_WARNING << "计算时间超时：" << duration.count( ) << "s" << std::endl;
+//            }
         }
     }
 
@@ -3053,7 +3054,7 @@ namespace JC_helper
                     _tick_count = robot_ptr->tick_count;
                 else
                 {
-                    PLOG_WARNING << "点动指令时间间隔过长,停止";
+//                    PLOG_WARNING << "点动指令时间间隔过长,停止";
                     Cartesian_stop( );  // 速度目标设置为0
                 }
             }
@@ -3101,14 +3102,15 @@ namespace JC_helper
             }
             t_stop   = std::chrono::high_resolution_clock::now( );
             duration = ( t_stop - t_start );
-            if ( duration.count( ) > 0.0015 )
-            {
-                PLOG_WARNING << "计算时间超时：" << duration.count( ) << "s";
-            }
+//            if ( duration.count( ) > 0.0015 )
+//            {
+//                PLOG_WARNING << "计算时间超时：" << duration.count( ) << "s";
+//            }
         }
 
         ( *external_finished_flag_ptr ) = true;   // 这次smart servo已结束，等待下一次smart servo
-        robot_ptr->is_running_motion    = false;  // 机械臂运动已结束，可以执行其他离线类运动
+//        robot_ptr->is_running_motion    = false;  // 机械臂运动已结束，可以执行其他离线类运动
+        robot_ptr->setRunState(rocos::Robot::RunState::Stopped);  // 机械臂运动已结束，可以执行其他离线类运动
     }
 
     void SmartServo_Cartesian::command( int Cartesian_vel_index, const char* reference_frame )
@@ -3307,7 +3309,7 @@ namespace JC_helper
                     _tick_count = robot_ptr->tick_count;
                 else
                 {
-                    PLOG_WARNING << "点动指令时间间隔过长,停止";
+//                    PLOG_WARNING << "点动指令时间间隔过长,停止";
                     nullspace_stop( );  // 速度目标设置为0
                 }
             }
@@ -3355,14 +3357,15 @@ namespace JC_helper
             }
             t_stop   = std::chrono::high_resolution_clock::now( );
             duration = ( t_stop - t_start );
-            if ( duration.count( ) > 0.0015 )
-            {
-                PLOG_WARNING << "计算时间超时：" << duration.count( ) << "s";
-            }
+//            if ( duration.count( ) > 0.0015 )
+//            {
+//                PLOG_WARNING << "计算时间超时：" << duration.count( ) << "s";
+//            }
         }
 
         ( *external_finished_flag_ptr ) = true;   // 这次smart servo已结束，等待下一次smart servo
-        robot_ptr->is_running_motion    = false;  // 机械臂运动已结束，可以执行其他离线类运动
+//        robot_ptr->is_running_motion    = false;  // 机械臂运动已结束，可以执行其他离线类运动
+        robot_ptr->setRunState(rocos::Robot::RunState::Stopped);  // 机械臂运动已结束，可以执行其他离线类运动
     }
 
     void SmartServo_Nullspace::command(int jogging_Direction )
