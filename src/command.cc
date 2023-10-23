@@ -22,7 +22,7 @@
 
 #include <iomanip>
 
-#include <ethercat/command.h>
+#include <rocos_app/ethercat/command.h>
 
 namespace rocos {
 

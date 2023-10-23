@@ -55,3 +55,8 @@ qtcreator-*
 
 # Catkin custom files
 CATKIN_IGNORE
+
+
+#log
+**/command_log.csv
+**/log

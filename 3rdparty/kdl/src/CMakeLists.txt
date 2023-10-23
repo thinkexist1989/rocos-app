@@ -64,7 +64,8 @@ SET_TARGET_PROPERTIES( orocos-kdl PROPERTIES
   SOVERSION "${KDL_VERSION_MAJOR}.${KDL_VERSION_MINOR}"
   VERSION "${KDL_VERSION}"
   COMPILE_FLAGS "${CMAKE_CXX_FLAGS_ADD} ${KDL_CFLAGS}"
-  PUBLIC_HEADER "${KDL_HPPS};${CMAKE_CURRENT_BINARY_DIR}/config.h"
+#   打开会导致全部头文件安装在include文件夹中
+#   PUBLIC_HEADER "${KDL_HPPS};${CMAKE_CURRENT_BINARY_DIR}/config.h" 
   )
 
 #### Settings for rpath disabled (back-compatibility)
@@ -100,3 +101,5 @@ INSTALL(TARGETS orocos-kdl
 )
 
 INSTALL(FILES ${UTIL_HPPS} DESTINATION include/kdl/utilities)
+
+INSTALL(FILES ${KDL_HPPS} DESTINATION include/kdl)

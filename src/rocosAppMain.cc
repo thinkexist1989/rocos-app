@@ -17,56 +17,105 @@
 // Shenyang Institute of Automation, Chinese Academy of Sciences.
 // email: luoyang@sia.cn
 
-#include <cstdlib>
-#include <cstdio>
 #include <csignal>
+#include <cstdio>
+#include <cstdlib>
 
-//#include <QtCore>
-//#include <QProcess>
-//#include <QString>
-//#include <QDebug>
-//#include <QFile>
-
+#include <rocos_app/drive.h>
+#include <rocos_app/ethercat/hardware.h>
+#include <rocos_app/ethercat/hardware_sim.h>
+#include <fstream>
 #include <iostream>
-#include <ethercat/hardware.h>
-#include <ethercat/hardware_sim.h>
-#include <drive.h>
-#include <robot.h>
-#include <robot_service.h>
+#include <rocos_app/robot.h>
+#include <rocos_app/robot_service.h>
+#include <string>
+#include <gflags/gflags.h>
+
+DEFINE_string(urdf, "robot_sun_new.urdf", "Urdf file path");
+DEFINE_string(base, "base_link", "Base link name");
+DEFINE_string(tip, "link_7", "Tip link name");
 
 bool isRuning = true;
 
-/// \brief 处理终端的Ctrl-C信号
-/// \param signo
-void signalHandler(int signo) {
-    if (signo == SIGINT) {
-        std::cout << "\033[1;31m" << "[!!SIGNAL!!]" << "INTERRUPT by CTRL-C" << "\033[0m" << std::endl;
-        isRuning = false;
-        exit(0);
+#pragma region
+
+namespace rocos
+{
+
+    //boost::shared_ptr< HardwareInterface > hw = boost::make_shared< HardwareSim >( _joint_num );  // 仿真
+    boost::shared_ptr<HardwareInterface> hw = boost::make_shared<Hardware>(); // 真实机械臂
+
+    Robot robot(hw, FLAGS_urdf, FLAGS_base, FLAGS_tip);
+
+    void signalHandler(int signo)
+    {
+        if (signo == SIGINT)
+        {
+            std::cout << "\033[1;31m"
+                      << "[!!SIGNAL!!]"
+                      << "INTERRUPT by CTRL-C"
+                      << "\033[0m" << std::endl;
+
+            isRuning = false;
+            robot.stop_joint_admittance_teaching();
+            std::cout<<"stop teaching"<<std::endl;
+            robot.setDisabled();
+            
+            exit(0);
+        }
     }
+
+    void Robot::test()
+    {
+        //**变量初始化 **//
+       
+
+        JC_helper::TCP_server my_server;
+
+        //**-------------------------------**//
+
+        my_server.init();
+        boost::thread(&JC_helper::TCP_server::RunServer, &my_server).detach(); // 开启服务器
+
+        //**-------------------------------**//
+
+#pragma region //*电机使能检查
+
+        setEnabled();
+#pragma endregion
+        int ret = robot.joint_admittance_teaching(false);
+        std::cout<<"ret: "<<ret<<std::endl;
+        //**-------------------------------**//
+
+    } // namespace rocos
+
+#pragma endregion
 
 }
 
-int main(int argc, char *argv[]) {
-
-    if (signal(SIGINT, signalHandler) == SIG_ERR) {
-        std::cout << "\033[1;31m" << "Can not catch SIGINT" << "\033[0m" << std::endl;
+int main(int argc, char *argv[])
+{
+    if (signal(SIGINT, rocos::signalHandler) == SIG_ERR)
+    {
+        std::cout << "\033[1;31m"
+                  << "Can not catch SIGINT"
+                  << "\033[0m" << std::endl;
     }
 
     using namespace rocos;
-    boost::shared_ptr<HardwareInterface> hw = boost::make_shared<HardwareSim>(6); // 仿真
-//    boost::shared_ptr<HardwareInterface> hw = boost::make_shared<Hardware>();
 
-    Robot robot(hw);
+    gflags::ParseCommandLineFlags(&argc, &argv, true);
+    //**-------------------------------**//
 
-    auto robotService = RobotServiceImpl::getInstance(&robot);
+    //**-------------启动admittance_joint-----------**//
+    // 初始化类
+    
 
+    // auto robotService = RobotServiceImpl::getInstance(&robot);
+    std::thread thread_test{ &rocos::Robot::test, &robot };
     //------------------------wait----------------------------------
-    robotService->runServer();
+    // robotService->runServer();
+    thread_test.join();
 
     return 0;
 }
-
-
-
-

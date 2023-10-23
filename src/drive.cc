@@ -17,13 +17,17 @@
 // Shenyang Institute of Automation, Chinese Academy of Sciences.
 // email: luoyang@sia.cn
 
-#include <drive.h>
+#include "include/rocos_app/drive.h"
 
 
 namespace rocos {
 
     Drive::Drive(boost::shared_ptr<HardwareInterface> hw, int id) : hw_interface_(hw),
                                                                     id_(id) {
+        if(id_ < 0) {
+            std::cout << "[ERROR][rocos::Drive] Wrong hardware ID of joint" << std::endl;
+            return;
+        }
 
         drive_guard_ = DriveGuard::getInstance(); // 获取DriveGuard单例句柄
         drive_guard_->addDrive(this); // 将Drive实例添加到_driveGuard中来更新数据
@@ -389,6 +393,14 @@ namespace rocos {
 
     int16_t Drive::getLoadTorqueInCnt() {
         return hw_interface_->getLoadTorqueRaw(id_);
+    }
+
+    int32_t Drive::getSecondaryPositionInCnt() {
+        return hw_interface_->getSecondaryPositionRaw(id_);
+    }
+
+    int32_t Drive::getSecondaryVelocityInCnt() {
+        return hw_interface_->getSecondaryVelocityRaw(id_);
     }
 
     void Drive::moveToPositionInCnt(int32_t pos, double max_vel, double max_acc, double max_jerk, ProfileType type) {

@@ -17,7 +17,7 @@
 // Shenyang Institute of Automation, Chinese Academy of Sciences.
 // email: luoyang@sia.cn
 
-#include <include/hardware_interface.h>
+#include "include/rocos_app/hardware_interface.h"
 
 #include <boost/core/ignore_unused.hpp>
 
@@ -133,6 +133,21 @@ namespace rocos {
 
     std::string HardwareInterface::getSlaveName(int id) {
         return std::string();
+    }
+
+    HardwareInterface::HWState HardwareInterface::getHardwareState() {
+        return HardwareInterface::READY;
+    }
+
+    void HardwareInterface::setHardwareState(HardwareInterface::HWState state) {
+    }
+
+    int32_t HardwareInterface::getSecondaryPositionRaw(int id) {
+        return 0;
+    }
+
+    int32_t HardwareInterface::getSecondaryVelocityRaw(int id) {
+        return 0;
     }
 
 }

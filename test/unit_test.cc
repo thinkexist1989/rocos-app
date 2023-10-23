@@ -1,18 +1,33 @@
+// Copyright 2021, Yang Luo"
+// This program is free software: you can redistribute it and/or modify
+// it under the terms of the GNU General Public License as published by
+// the Free Software Foundation, either version 3 of the License, or
+// (at your option) any later version.
 //
-// Created by think on 2021/11/19.
+// This program is distributed in the hope that it will be useful,
+// but WITHOUT ANY WARRANTY; without even the implied warranty of
+// MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+// GNU General Public License for more details.
 //
+// You should have received a copy of the GNU General Public License
+// along with this program.  If not, see <http://www.gnu.org/licenses/>.
+//
+// @Author
+// Yang Luo, PHD
+// Shenyang Institute of Automation, Chinese Academy of Sciences.
+// email: luoyang@sia.cn
 
 //#define DOCTEST_CONFIG_IMPLEMENT
 #define DOCTEST_CONFIG_IMPLEMENT_WITH_MAIN
 
 #include <test/doctest.h>
 
-#include <ethercat/hardware.h>
-#include <ethercat/hardware_sim.h>
-#include <drive.h>
-#include <robot.h>
-#include <robot_service.h>
-#include <kinematics.h>
+#include <rocos_app/ethercat/hardware.h>
+#include <rocos_app/ethercat/hardware_sim.h>
+#include <rocos_app/drive.h>
+#include <rocos_app/robot.h>
+#include <rocos_app/robot_service.h>
+#include <rocos_app/kinematics.h>
 
 
 TEST_CASE("Hello World") {
@@ -295,5 +310,73 @@ TEST_CASE("Kinematics") {
         std::cout <<"ik solve failed"  << std::endl;
     std::cout << "q_out: " << std::endl;
     std::cout << q_out.data << std::endl;
+
+}
+
+void printLink(const KDL::SegmentMap::const_iterator & link, const std::string & prefix, tinyxml2::XMLDocument* xmlDocument = nullptr)
+{
+    std::cout << prefix << "- Segment " << GetTreeElementSegment(link->second).getName() <<
+              " has " << GetTreeElementChildren(link->second).size() << " children and joint name is " << GetTreeElementSegment(link->second).getJoint().getName() << std::endl;
+    for (unsigned int i = 0; i < GetTreeElementChildren(link->second).size(); i++) {
+        printLink(GetTreeElementChildren(link->second)[i], prefix + "  ");
+    }
+}
+
+
+TEST_CASE("URDF") {
+    urdf::ModelInterfaceSharedPtr robot_model = urdf::parseURDFFile("robot.urdf");
+    if (!robot_model) {
+        std::cerr << "Could not generate robot model" << std::endl;
+        return;
+    }
+
+    KDL::Tree my_tree;
+    bool bOk = kdl_parser::treeFromUrdfModel(*robot_model, my_tree);
+    if (!kdl_parser::treeFromUrdfModel(*robot_model, my_tree)) {
+        std::cerr << "Could not extract kdl tree" << std::endl;
+        return;
+    }
+
+    tinyxml2::XMLDocument xml_doc;
+    xml_doc.LoadFile("robot.urdf");
+
+    KDL::Chain chain;
+    my_tree.getChain("base_link", "link_6", chain);
+
+    auto robot = xml_doc.FirstChildElement("robot");
+    for(auto element = robot->FirstChildElement("joint"); element; element = element->NextSiblingElement("joint")) {
+        for(int i = 0; i < chain.getNrOfJoints(); ++i) {
+            if(element->Attribute("name") == chain.getSegment(i).getJoint().getName()) {
+                std::cout << "Joint" << std::endl
+                          <<     "\t name: " <<  element->Attribute("name") << "\n";
+                auto hw = element->FirstChildElement("hardware");
+                auto limit = hw->FirstChildElement("limit");
+                std::cout <<     "   limits: \n"
+                          <<     "    - lower: " << atof(limit->Attribute("lower"))<< std::endl
+                          <<     "    - upper: " << atof(limit->Attribute("upper"))<< std::endl
+                          <<     "    - vel: " << atof(limit->Attribute("vel"))<< std::endl
+                          <<     "    - acc: " << atof(limit->Attribute("acc"))<< std::endl
+                          <<     "    - jerk: " << atof(limit->Attribute("jerk")) << std::endl;
+                auto trans = hw->FirstChildElement("transform");
+                std::cout <<     "  transform: \n"
+                          <<     "    - ratio: " << trans->FloatAttribute("ratio", 2.0) << std::endl
+                          <<     "    - offset_pos_cnt: " << trans->FloatAttribute("offset_pos_cnt", 1.0)<< std::endl
+                          <<     "    - cnt_per_unit: " << trans->FloatAttribute("cnt_per_unit", 22.0)<< std::endl
+                          <<     "    - torque_per_unit: " << trans->FloatAttribute("torque_per_unit", 33.0) << std::endl;
+                if(trans->Attribute("user_unit_name"))
+                    std::cout << "    - user_unit_name: " << trans->Attribute("user_unit_name") << std::endl;
+                else
+                    std::cout << "    - user_unit_name: " << "rad" << std::endl;
+            }
+        }
+    }
+
+    // walk through tree
+    std::cout << " ======================================" << std::endl;
+    std::cout << " Tree has " << my_tree.getNrOfSegments() << " link(s) and a root link" << std::endl;
+    std::cout << " ======================================" << std::endl;
+    KDL::SegmentMap::const_iterator root = my_tree.getRootSegment();
+
+    printLink(root, "", &xml_doc);
 
 }

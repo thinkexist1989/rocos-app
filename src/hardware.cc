@@ -17,7 +17,7 @@
 // Shenyang Institute of Automation, Chinese Academy of Sciences.
 // email: luoyang@sia.cn
 
-#include <ethercat/hardware.h>
+#include <rocos_app/ethercat/hardware.h>
 
 
 namespace rocos {
@@ -120,6 +120,22 @@ namespace rocos {
 
     std::string Hardware::getSlaveName(int id) {
         return ecPtr->ecatSlaveNameVec->at(id).c_str();
+    }
+
+    HardwareInterface::HWState Hardware::getHardwareState() {
+        return static_cast<HardwareInterface::HWState >(ecPtr->ecatInfo->ecatState);
+    }
+
+    void Hardware::setHardwareState(HardwareInterface::HWState state) {
+        ecPtr->ecatInfo->ecatState = static_cast<EcatInfo::EcatState>(state);
+    }
+
+    int32_t Hardware::getSecondaryPositionRaw(int id) {
+        return ecPtr->getSecondaryPositionEC(id);
+    }
+
+    int32_t Hardware::getSecondaryVelocityRaw(int id) {
+        return ecPtr->getSecondaryVelocityEC(id);
     }
 
 }
