@@ -330,15 +330,8 @@ namespace JC_helper
                 {
                     acc(i) = (com_fext[i] - B[i] * vel(i)) / M[i];
                 }
-                 //添加速度约束，如果速度大于2rads/s，那么将速度限制在2rads/s
-                if (vel(i) > 2)
-                {
-                    vel(i) = 2;
-                }
-                else if (vel(i) < -2)
-                {
-                    vel(i) = -2;
-                }
+                
+                
                 
                 vel(i) = vel(i) + acc(i) * dt;
                 pose(i) = pose(i) + vel(i) * dt;
@@ -370,6 +363,8 @@ namespace JC_helper
             // PLOG_DEBUG.printf( "Actual_torques = %f %f %f %f %f %f %f", fext[ 0 ], fext[ 1 ], fext[ 2 ], fext[ 3 ], fext[ 4 ], fext[ 5 ], fext[ 6 ] );
             robot_ptr->servoJ(q_target);
         }
+        robot_ptr->setRunState(rocos::Robot::RunState::Stopped);
+        delete this;
     }
 
 #pragma endregion

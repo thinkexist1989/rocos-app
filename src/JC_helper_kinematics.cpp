@@ -1130,9 +1130,9 @@ namespace JC_helper
                     {
                         input->target_velocity[ i ]     = 0.0;
                         input->target_acceleration[ i ] = 0.0;
-                        input->max_velocity[ i ]        = robot_ptr->joints_[ i ]->getMaxVel( );
-                        input->max_acceleration[ i ]    = robot_ptr->joints_[ i ]->getMaxAcc( );
-                        input->max_jerk[ i ]            = robot_ptr->joints_[ i ]->getMaxJerk( );
+                        input->max_velocity[ i ]        = robot_ptr->joints_[ i ]->getMaxVel( )*0.2;
+                        input->max_acceleration[ i ]    = robot_ptr->joints_[ i ]->getMaxAcc( )*0.02;
+                        input->max_jerk[ i ]            = robot_ptr->joints_[ i ]->getMaxJerk( )*0.01;
                     }
                     input_lock.unlock( );
                 }

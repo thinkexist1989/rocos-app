@@ -2650,7 +2650,6 @@ namespace rocos {
 
         flag_admittance_turnoff = false;
 
-        std::shared_ptr< std::thread > _thread_admittance_teaching{ nullptr };
         _thread_admittance_teaching.reset( new std::thread{ &JC_helper::admittance::Runteaching, &admittance_control, this, flange_, &flag_admittance_turnoff } );
 
         PLOG_INFO << "开始示教";
@@ -2789,12 +2788,12 @@ namespace rocos {
             setRunState(RunState::Running);
         }
 
-        JC_helper::admittance_joint  admittance_control{ this };
+        JC_helper::admittance_joint*  admittance_control = new JC_helper::admittance_joint{ this };
     
         flag_admittance_joint_turnoff = false;
 
-        std::shared_ptr< std::thread > _thread_admittance_teaching{ nullptr };
-        _thread_admittance_teaching.reset( new std::thread{ &JC_helper::admittance_joint::Runteaching, &admittance_control, this,  &flag_admittance_joint_turnoff } );
+        
+        _thread_admittance_teaching.reset( new std::thread{ &JC_helper::admittance_joint::Runteaching, admittance_control, this,  &flag_admittance_joint_turnoff } );
 
         PLOG_INFO << "开始示教";
 
@@ -2808,6 +2807,7 @@ namespace rocos {
 
             PLOG_INFO << "结束示教";
 
+            delete admittance_control;
             // is_running_motion = false;
             setRunState(RunState::Stopped);
         }
