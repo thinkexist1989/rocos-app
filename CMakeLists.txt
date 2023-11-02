@@ -279,9 +279,32 @@ add_library(rocos::rocos_app ALIAS rocos_app)
 add_executable(rocosAppMain
         src/rocosAppMain.cc
         )
-
+add_executable(demo_calculate6
+        src/demo_calculate6.cpp
+        )
+add_executable(demo_Violence
+src/demo_Violence.cpp
+)
 ## Specify libraries to link a library or executable target against
 target_link_libraries(rocosAppMain
+        PRIVATE
+        hardware
+        drive
+        protocol
+        kinematics
+        robot
+        gflags::gflags
+        )
+target_link_libraries(demo_calculate6
+        PRIVATE
+        hardware
+        drive
+        protocol
+        kinematics
+        robot
+        gflags::gflags
+        )
+target_link_libraries(demo_Violence
         PRIVATE
         hardware
         drive

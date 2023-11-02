@@ -347,6 +347,8 @@ namespace rocos {
 
         inline Frame getFlange() { 
             std::lock_guard<std::mutex> lock(mtx);  // 自动获取互斥锁
+           
+           
             return flange_; }
 
         inline Frame getTool() { return tool_; }
