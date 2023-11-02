@@ -449,7 +449,7 @@ namespace rocos {
         // std::vector< double > dt( jnt_num_, 0.0 );  // delta T
         // double max_time = 0.0;
 
-        while (is_running_) {  // while start
+        while (true) {  // while start
 
             hw_interface_->waitForSignal(9);
 
