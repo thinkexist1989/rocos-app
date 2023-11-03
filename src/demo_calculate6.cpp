@@ -53,12 +53,18 @@ public:
         }
 
         // 打印R_EB和P_TB
-        std::cout << "R_EB" << R_EB << std::endl;
-        std::cout << "P_TB" << P_TB << std::endl;
+        // std::cout << "R_EB" << R_EB << std::endl;
+        // std::cout << "P_TB" << P_TB << std::endl;
 
-        std::cout << (R_EB.transpose() * R_EB).inverse() * R_EB.transpose() * P_TB << std::endl;
+        std::cout << "solve_my"<<(R_EB.transpose() * R_EB).inverse() * R_EB.transpose() << std::endl;
         Eigen::Vector3d Pos = (R_EB.transpose() * R_EB).inverse() * R_EB.transpose() * P_TB;
-        //
+        std::cout << "Pos" << Pos << std::endl;
+        //测试pinv
+   
+        std::cout<<"pinv_R_TB"<<R_EB.completeOrthogonalDecomposition().pseudoInverse()<<std::endl;
+        Eigen::MatrixXd pinv_R_TB = R_EB.completeOrthogonalDecomposition().pseudoInverse();
+        Eigen::Vector3d Pos1 = pinv_R_TB * P_TB;
+        std::cout << "Pos1" << Pos1 << std::endl;
 
         // Calibration of rotation
         Eigen::Vector3d Vx{(pose5.p - pose4.p).data[0], (pose5.p - pose4.p).data[1], (pose5.p - pose4.p).data[2]};
