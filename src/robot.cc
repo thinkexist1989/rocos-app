@@ -166,31 +166,31 @@ namespace rocos {
 
                     auto limit = hw->FirstChildElement("limit");
 
-                    jnt_ptr->setMinPosLimit(limit->FloatAttribute("lower", -M_PI));
-                    jnt_ptr->setMaxPosLimit(limit->FloatAttribute("upper", M_PI));
-                    jnt_ptr->setMaxVel(limit->FloatAttribute("vel", 1.0));
-                    jnt_ptr->setMaxAcc(limit->FloatAttribute("acc", 10.0));
-                    jnt_ptr->setMaxJerk(limit->FloatAttribute("jerk", 100.0));
+                    jnt_ptr->setMinPosLimit(limit->DoubleAttribute("lower", -M_PI));
+                    jnt_ptr->setMaxPosLimit(limit->DoubleAttribute("upper", M_PI));
+                    jnt_ptr->setMaxVel(limit->DoubleAttribute("vel", 1.0));
+                    jnt_ptr->setMaxAcc(limit->DoubleAttribute("acc", 10.0));
+                    jnt_ptr->setMaxJerk(limit->DoubleAttribute("jerk", 100.0));
 
                     std::cout << "- limits: \n"
-                              << "----- lower: " << limit->FloatAttribute("lower", -M_PI) << std::endl
-                              << "----- upper: " << limit->FloatAttribute("upper", M_PI) << std::endl
-                              << "----- vel: " << limit->FloatAttribute("vel", 1.0) << std::endl
-                              << "----- acc: " << limit->FloatAttribute("acc", 10.0) << std::endl
-                              << "----- jerk: " << limit->FloatAttribute("jerk", 100.0) << std::endl;
+                              << "----- lower: " << limit->DoubleAttribute("lower", -M_PI) << std::endl
+                              << "----- upper: " << limit->DoubleAttribute("upper", M_PI) << std::endl
+                              << "----- vel: " << limit->DoubleAttribute("vel", 1.0) << std::endl
+                              << "----- acc: " << limit->DoubleAttribute("acc", 10.0) << std::endl
+                              << "----- jerk: " << limit->DoubleAttribute("jerk", 100.0) << std::endl;
 
                     auto trans = hw->FirstChildElement("transform");
 
-                    jnt_ptr->setRatio(trans->FloatAttribute("ratio", 1.0));
+                    jnt_ptr->setRatio(trans->DoubleAttribute("ratio", 1.0));
                     jnt_ptr->setPosZeroOffset(trans->IntAttribute("offset_pos_cnt", 0));
-                    jnt_ptr->setCntPerUnit(trans->FloatAttribute("cnt_per_unit", 1.0));
-                    jnt_ptr->setTorquePerUnit(trans->FloatAttribute("torque_per_unit", 1.0));
+                    jnt_ptr->setCntPerUnit(trans->DoubleAttribute("cnt_per_unit", 1.0));
+                    jnt_ptr->setTorquePerUnit(trans->DoubleAttribute("torque_per_unit", 1.0));
 
                     std::cout << "- transform: \n"
-                              << "----- ratio: " << trans->FloatAttribute("ratio", 1.0) << std::endl
+                              << "----- ratio: " << trans->DoubleAttribute("ratio", 1.0) << std::endl
                               << "----- offset_pos_cnt: " << trans->IntAttribute("offset_pos_cnt", 0) << std::endl
-                              << "----- cnt_per_unit: " << trans->FloatAttribute("cnt_per_unit", 1.0) << std::endl
-                              << "----- torque_per_unit: " << trans->FloatAttribute("torque_per_unit", 1.0)
+                              << "----- cnt_per_unit: " << trans->DoubleAttribute("cnt_per_unit", 1.0) << std::endl
+                              << "----- torque_per_unit: " << trans->DoubleAttribute("torque_per_unit", 1.0)
                               << std::endl;
                     if (trans->Attribute("user_unit_name")) {
                         jnt_ptr->setUserUnitName(trans->Attribute("user_unit_name"));
