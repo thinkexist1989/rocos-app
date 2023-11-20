@@ -285,6 +285,10 @@ add_executable(demo_calculate6
 add_executable(demo_Violence
 src/demo_Violence.cpp
 )
+
+add_executable(Teaching_record
+src/Teaching_record.cpp
+)
 ## Specify libraries to link a library or executable target against
 target_link_libraries(rocosAppMain
         PRIVATE
@@ -295,6 +299,16 @@ target_link_libraries(rocosAppMain
         robot
         gflags::gflags
         )
+target_link_libraries(Teaching_record
+        PRIVATE
+        hardware
+        drive
+        protocol
+        kinematics
+        robot
+        gflags::gflags
+        )
+        
 target_link_libraries(demo_calculate6
         PRIVATE
         hardware
