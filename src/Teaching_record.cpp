@@ -31,7 +31,7 @@
 #include <string>
 #include <gflags/gflags.h>
 #include <yaml-cpp/yaml.h>
-DEFINE_string(urdf, "config/robot.urdf", "Urdf file path");
+DEFINE_string(urdf, "robot_sun_new.urdf", "Urdf file path");
 DEFINE_string(base, "base_link", "Base link name");
 DEFINE_string(tip, "link_7", "Tip link name");
 
@@ -173,7 +173,7 @@ namespace rocos
         {
             ReadJointsFromCSV(filename_run, joint, i);
             std::cout << "joint" << i << ":" << joint(0) << "," << joint(1) << "," << joint(2) << "," << joint(3) << "," << joint(4) << "," << joint(5) << "," << joint(6) << std::endl;
-            robot.MoveJ(joint, 0.1, 0.1);
+            robot.MoveL_FK(joint, 0.1, 0.1);
         }
         std::cout << "test finished" << std::endl;
         robot.setDisabled();
