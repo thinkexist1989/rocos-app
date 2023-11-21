@@ -1,0 +1,459 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- This URDF was automatically created by SolidWorks to URDF Exporter! Originally created by Stephen Brawner (brawner@gmail.com) 
+     Commit Version: 1.6.0-4-g7f85cfe  Build Version: 1.6.7995.38578
+     For more information, please see http://wiki.ros.org/sw_urdf_exporter -->
+<robot
+  name="arm8">
+  <link
+    name="base_link">
+    <inertial>
+      <origin
+        xyz="0 0 0"
+        rpy="0 0 0" />
+      <mass
+        value="0.001" />
+      <inertia
+        ixx="0.001"
+        ixy="0"
+        ixz="0"
+        iyy="0.001"
+        iyz="0"
+        izz="0.001" />
+    </inertial>
+    <visual>
+      <origin
+        xyz="0 0 0"
+        rpy="0 0 0" />
+      <geometry>
+        <mesh
+          filename="../meshes/base_link.STL" />
+      </geometry>
+      <material
+        name="">
+        <color
+          rgba="1 1 1 1" />
+      </material>
+    </visual>
+    <collision>
+      <origin
+        xyz="0 0 0"
+        rpy="0 0 0" />
+      <geometry>
+        <mesh
+          filename="../meshes/base_link.STL" />
+      </geometry>
+    </collision>
+  </link>
+  <link
+    name="shoulder1_link">
+    <inertial>
+      <origin
+        xyz="0.0998 -0.00815 -0.00815"
+        rpy="0 0 0" />
+      <mass
+        value="15" />
+      <inertia
+        ixx="0.0698774"
+        ixy="0"
+        ixz="0"
+        iyy="0.19"
+        iyz="0"
+        izz="0.19" />
+    </inertial>
+    <visual>
+      <origin
+        xyz="0 0 0"
+        rpy="0 0 0" />
+      <geometry>
+        <mesh
+          filename="../meshes/shoulder1_link.STL" />
+      </geometry>
+      <material
+        name="">
+        <color
+          rgba="0.75294 0.75294 0.75294 1" />
+      </material>
+    </visual>
+    <collision>
+      <origin
+        xyz="0 0 0"
+        rpy="0 0 0" />
+      <geometry>
+        <mesh
+          filename="../meshes/shoulder1_link.STL" />
+      </geometry>
+    </collision>
+  </link>
+  <joint
+    name="shoulder1_joint"
+    type="continuous">
+    <origin
+      xyz="0 0 0.1763"
+      rpy="0 0 0" />
+    <parent
+      link="base_link" />
+    <child
+      link="shoulder1_link" />
+    <axis
+      xyz="0 0 1" />
+    <hardware id="0">
+            <limit lower="-2.99" upper="2.99" vel="1.0" acc="10.0" jerk="150.0" effort="30.0"/>
+            <transform ratio="1.0" offset_pos_cnt="0" cnt_per_unit="156455.678" torque_per_unit="1.0"
+                       user_unit_name="rad"/>
+        </hardware>
+  </joint>
+  <link
+    name="shoulder2_link">
+    <inertial>
+      <origin
+        xyz="7.8E-05 -0.0166 0"
+        rpy="0 0 0" />
+      <mass
+        value="7.5" />
+      <inertia
+        ixx="0.022"
+        ixy="0"
+        ixz="0"
+        iyy="0.035"
+        iyz="0"
+        izz="0.035" />
+    </inertial>
+    <visual>
+      <origin
+        xyz="0 0 0"
+        rpy="0 0 0" />
+      <geometry>
+        <mesh
+          filename="../meshes/shoulder2_link.STL" />
+      </geometry>
+      <material
+        name="">
+        <color
+          rgba="1 1 1 1" />
+      </material>
+    </visual>
+    <collision>
+      <origin
+        xyz="0 0 0"
+        rpy="0 0 0" />
+      <geometry>
+        <mesh
+          filename="../meshes/shoulder2_link.STL" />
+      </geometry>
+    </collision>
+  </link>
+  <joint
+    name="shoulder2_joint"
+    type="continuous">
+    <origin
+      xyz="0.1996 -0.1738 0"
+      rpy="1.5708 -1.5708 0" />
+    <parent
+      link="shoulder1_link" />
+    <child
+      link="shoulder2_link" />
+    <axis
+      xyz="0 0 1" />
+    
+      <hardware id="1">
+            <limit lower="-2.99" upper="2.99" vel="1.0" acc="10.0" jerk="150.0" effort="30.0"/>
+            <transform ratio="1.0" offset_pos_cnt="0" cnt_per_unit="156455.678" torque_per_unit="1.0"
+                       user_unit_name="rad"/>
+        </hardware>
+  </joint>
+  <link
+    name="shoulder3_link">
+    <inertial>
+      <origin
+        xyz="-1.8E-05 0.022 -0.106"
+        rpy="0 0 0" />
+      <mass
+        value="5" />
+      <inertia
+        ixx="0.0135"
+        ixy="0"
+        ixz="0"
+        iyy="0.447"
+        iyz="0"
+        izz="0.451" />
+    </inertial>
+    <visual>
+      <origin
+        xyz="0 0 0"
+        rpy="0 0 0" />
+      <geometry>
+        <mesh
+          filename="../meshes/shoulder3_link.STL" />
+      </geometry>
+      <material
+        name="">
+        <color
+          rgba="1 1 1 1" />
+      </material>
+    </visual>
+    <collision>
+      <origin
+        xyz="0 0 0"
+        rpy="0 0 0" />
+      <geometry>
+        <mesh
+          filename="../meshes/shoulder3_link.STL" />
+      </geometry>
+    </collision>
+  </link>
+  <joint
+    name="shoulder3_joint"
+    type="continuous">
+    <origin
+      xyz="0 -1.105 0"
+      rpy="1.5708 0 0" />
+    <parent
+      link="shoulder2_link" />
+    <child
+      link="shoulder3_link" />
+    <axis
+      xyz="0 0 1" />
+    
+      <hardware id="2">
+            <limit lower="-2.99" upper="2.99" vel="1.0" acc="10.0" jerk="150.0" effort="30.0"/>
+            <transform ratio="1.0" offset_pos_cnt="0" cnt_per_unit="156455.678" torque_per_unit="1.0"
+                       user_unit_name="rad"/>
+        </hardware>
+  </joint>
+  <link
+    name="elbow1_link">
+    <inertial>
+      <origin
+        xyz="-2.0726E-05 0.0264 -0.00397"
+        rpy="0 0 0" />
+      <mass
+        value="4.25" />
+      <inertia
+        ixx="0.00755"
+        ixy="0"
+        ixz="0"
+        iyy="0.011"
+        iyz="0"
+        izz="0.01" />
+    </inertial>
+    <visual>
+      <origin
+        xyz="0 0 0"
+        rpy="0 0 0" />
+      <geometry>
+        <mesh
+          filename="../meshes/elbow1_link.STL" />
+      </geometry>
+      <material
+        name="">
+        <color
+          rgba="1 1 1 1" />
+      </material>
+    </visual>
+    <collision>
+      <origin
+        xyz="0 0 0"
+        rpy="0 0 0" />
+      <geometry>
+        <mesh
+          filename="../meshes/elbow1_link.STL" />
+      </geometry>
+    </collision>
+  </link>
+  <joint
+    name="elbow1_joint"
+    type="continuous">
+    <origin
+      xyz="0 0.1538 0"
+      rpy="-1.5708 0 0" />
+    <parent
+      link="shoulder3_link" />
+    <child
+      link="elbow1_link" />
+    <axis
+      xyz="0 0 1" />
+    
+      <hardware id="3">
+            <limit lower="-2.99" upper="2.99" vel="1.0" acc="10.0" jerk="150.0" effort="30.0"/>
+            <transform ratio="1.0" offset_pos_cnt="0" cnt_per_unit="156455.678" torque_per_unit="1.0"
+                       user_unit_name="rad"/>
+        </hardware>
+  </joint>
+  <link
+    name="elbow2_link">
+    <inertial>
+      <origin
+        xyz="-2.687E-05 -0.0115 -0.0913"
+        rpy="0 0 0" />
+      <mass
+        value="2" />
+      <inertia
+        ixx="0.004"
+        ixy="0"
+        ixz="0"
+        iyy="0.127"
+        iyz="0"
+        izz="0.127" />
+    </inertial>
+    <visual>
+      <origin
+        xyz="0 0 0"
+        rpy="0 0 0" />
+      <geometry>
+        <mesh
+          filename="../meshes/elbow2_link.STL" />
+      </geometry>
+      <material
+        name="">
+        <color
+          rgba="1 1 1 1" />
+      </material>
+    </visual>
+    <collision>
+      <origin
+        xyz="0 0 0"
+        rpy="0 0 0" />
+      <geometry>
+        <mesh
+          filename="../meshes/elbow2_link.STL" />
+      </geometry>
+    </collision>
+  </link>
+  <joint
+    name="elbow2_joint"
+    type="continuous">
+    <origin
+      xyz="0 0.895 0"
+      rpy="-1.5708 0 0" />
+    <parent
+      link="elbow1_link" />
+    <child
+      link="elbow2_link" />
+    <axis
+      xyz="0 0 1" />
+   
+      <hardware id="4">
+            <limit lower="-2.99" upper="2.99" vel="1.0" acc="10.0" jerk="150.0" effort="30.0"/>
+            <transform ratio="1.0" offset_pos_cnt="0" cnt_per_unit="156455.678" torque_per_unit="1.0"
+                       user_unit_name="rad"/>
+        </hardware>
+  </joint>
+  <link
+    name="wrist1_link">
+    <inertial>
+      <origin
+        xyz="3.193E-05 0.01369 -0.00296"
+        rpy="0 0 0" />
+      <mass
+        value="1.7" />
+      <inertia
+        ixx="0.00137"
+        ixy="0"
+        ixz="0"
+        iyy="0.0035"
+        iyz="0"
+        izz="0.0035" />
+    </inertial>
+    <visual>
+      <origin
+        xyz="0 0 0"
+        rpy="0 0 0" />
+      <geometry>
+        <mesh
+          filename="../meshes/wrist1_link.STL" />
+      </geometry>
+      <material
+        name="">
+        <color
+          rgba="1 1 1 1" />
+      </material>
+    </visual>
+    <collision>
+      <origin
+        xyz="0 0 0"
+        rpy="0 0 0" />
+      <geometry>
+        <mesh
+          filename="../meshes/wrist1_link.STL" />
+      </geometry>
+    </collision>
+  </link>
+  <joint
+    name="wrist1_joint"
+    type="continuous">
+    <origin
+      xyz="0 -0.1208 0"
+      rpy="1.5708 0 0" />
+    <parent
+      link="elbow2_link" />
+    <child
+      link="wrist1_link" />
+    <axis
+      xyz="0 0 1" />
+    
+      <hardware id="5">
+            <limit lower="-2.99" upper="2.99" vel="1.0" acc="10.0" jerk="150.0" effort="30.0"/>
+            <transform ratio="1.0" offset_pos_cnt="0" cnt_per_unit="156455.678" torque_per_unit="1.0"
+                       user_unit_name="rad"/>
+        </hardware>
+  </joint>
+  <link
+    name="wrist2_link">
+    <inertial>
+      <origin
+        xyz="0 0 0"
+        rpy="0 0 0" />
+      <mass
+        value="1E-05" />
+      <inertia
+        ixx="1E-05"
+        ixy="0"
+        ixz="0"
+        iyy="1E-05"
+        iyz="0"
+        izz="1E-05" />
+    </inertial>
+    <visual>
+      <origin
+        xyz="0 0 0"
+        rpy="0 0 0" />
+      <geometry>
+        <mesh
+          filename="../meshes/wrist2_link.STL" />
+      </geometry>
+      <material
+        name="">
+        <color
+          rgba="1 1 1 1" />
+      </material>
+    </visual>
+    <collision>
+      <origin
+        xyz="0 0 0"
+        rpy="0 0 0" />
+      <geometry>
+        <mesh
+          filename="../meshes/wrist2_link.STL" />
+      </geometry>
+    </collision>
+  </link>
+  <joint
+    name="wrist2_joint"
+    type="continuous">
+    <origin
+      xyz="0 0.0755 0"
+      rpy="-1.5708 0 0" />
+    <parent
+      link="wrist1_link" />
+    <child
+      link="wrist2_link" />
+    <axis
+      xyz="0 0 1" />
+   
+      <hardware id="6">
+            <limit lower="-2.99" upper="2.99" vel="1.0" acc="10.0" jerk="150.0" effort="30.0"/>
+            <transform ratio="1.0" offset_pos_cnt="0" cnt_per_unit="156455.678" torque_per_unit="1.0"
+                       user_unit_name="rad"/>
+        </hardware>
+  </joint>
+</robot>

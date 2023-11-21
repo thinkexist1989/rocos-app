@@ -31,9 +31,9 @@
 #include <string>
 #include <gflags/gflags.h>
 
-DEFINE_string(urdf, "robot_sun_new.urdf", "Urdf file path");
+DEFINE_string(urdf, "arm8.urdf", "Urdf file path");
 DEFINE_string(base, "base_link", "Base link name");
-DEFINE_string(tip, "link_7", "Tip link name");
+DEFINE_string(tip, "wrist2_link", "Tip link name");
 
 bool isRuning = true;
 std::ofstream outputFile_Flange("/home/landau/Documents/rocos-app/src/Flange.csv");
