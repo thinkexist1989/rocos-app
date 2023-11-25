@@ -1,6 +1,6 @@
 cmake-build-*/
 .idea/
-
+*.csv
 devel/
 logs/
 build/

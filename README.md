@@ -1,48 +1,11 @@
-<!--
- Copyright (c) 2021 'Yang Luo, luoyang@sia.cn'
+# 笛卡尔空间的阻抗控制
+## 1. 介绍
+  笛卡尔空间的阻抗控制是一种基于力的控制方法，它通过对末端执行器施加力或力矩来控制机械臂的运动。笛卡尔空间的阻抗控制可以用于机械臂的力控制、力跟踪、力限制等应用场景。笛卡尔空间的阻抗控制的基本原理是：通过对末端执行器施加力或力矩，使得末端执行器的运动满足一定的阻抗特性，从而实现对机械臂的控制。笛卡尔空间的阻抗控制的阻抗特性可以通过阻抗参数来描述，阻抗参数包括阻抗的刚度、阻抗的阻尼和阻抗的质量。笛卡尔空间的阻抗控制的阻抗特性可以通过阻抗参数来描述，阻抗参数包括阻抗的刚度、阻抗的阻尼和阻抗的质量。阻抗的刚度描述了末端执行器受到外界力或力矩作用时的位移或角位移的响应程度，阻抗的阻尼描述了末端执行器受到外界力或力矩作用时的速度或角速度的响应程度，阻抗的质量描述了末端执行器受到外界力或力矩作用时的加速度或角加速度的响应程度。 
+  本分支还涉及混合力位控制,在任务空间中同时控制位置和力,分为力的子空间和位置的子空间,在力的子空间中,控制力的大小和方向,在位置的子空间中,控制位置的大小和方向,
+## 2. 功能尝试
+  本分支的功能尝试包括: 
+  1. 机械臂的阻抗控制
+  2. 机械臂的阻抗控制(无六维力传感器,直接控制关节实现,把笛卡尔空间的阻抗控制转化为关节空间的阻抗控制)
+  3. 机械臂的混合力位控制,机械臂某个截平面的阻抗控制,其余方向位置控制
+   
 
- This software is released under the MIT License.
- https://opensource.org/licenses/MIT
--->
-
-<div align="center">
-  <img src="./rocos-app.png" alt="" height="150">
-  <h1>ROCOS-Application</h1>
-  <blockquote>The Application of Robotics for ROCOS </blockquote>
-</div>
-:warning: Rocos-App is under development, not finished~ :thinking:
-
-## Introduction
-
-ROCOS-App is the application of robotics, which is designed as the robot controller for ROCOS. 
-
-
-
-## Dependencies
-
-- orocos-kdl
-- ruckig
-- nlopt
-- trac_ik
-- Eigen3
-- protobuf
-- grpc
-- tinyFSM
-
-
-
-## Usage
-
-
-
-
-
-## Related Projects
-
-
-
-## Contributor
-
-:bust_in_silhouette: **Yang Luo (luoyang@sia.cn)**
-
-:framed_picture: Icon Designed by :**Yuhan Ying (1027649507@qq.com)**
