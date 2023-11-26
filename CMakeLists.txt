@@ -61,14 +61,15 @@ find_package(Threads REQUIRED)
 find_package(Eigen3 REQUIRED)
 find_package(OpenSSL REQUIRED)
 
+set(rocos_ecm_DIR "/home/jc/rocos-ecm/outut_install/lib/cmake/rocos_ecm")
 find_package(rocos_ecm REQUIRED)
 
-find_package(orocos_kdl REQUIRED)
+# find_package(orocos_kdl REQUIRED)
 
 ##################
 ##   3rdparty   ##
 ##################
-#add_subdirectory(3rdparty/kdl)
+add_subdirectory(3rdparty/kdl)
 add_subdirectory(3rdparty/nlopt)
 add_subdirectory(3rdparty/trac_ik)
 add_subdirectory(3rdparty/kdl_parser)
@@ -258,6 +259,7 @@ target_link_libraries(protocol
         ${_GRPC_GRPCPP}
         ${_PROTOBUF_LIBPROTOBUF}
         $<BUILD_INTERFACE:rocos::robot>
+        z
         )
 add_library(rocos::protocol ALIAS protocol)
 

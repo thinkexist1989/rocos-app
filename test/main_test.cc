@@ -39,6 +39,7 @@ bool isRuning = true;
 
 
 #pragma region  //*测试9  完整上电保护程序
+# if 0
 
 namespace rocos
 {
@@ -292,10 +293,141 @@ namespace rocos
         PLOG_INFO << "全部测试结束,goodbye!";
     }
 }  // namespace rocos
-
+# endif
 #pragma endregion
 
 
+#pragma region  //*测试10  测试动态调速
+
+namespace rocos
+{
+    /**
+     * @brief 字符串切割函数
+     *
+     * @param str 待切割字符串
+     * @param tokens 结果存储
+     * @param delim 切割符
+     */
+    void split( const std::string& str,
+                std::vector< std::string >& tokens,
+                const std::string delim = " " )
+    {
+        tokens.clear( );  //!注意清除上次结果
+
+        auto start    = str.find_first_not_of( delim, 0 );  // 分割到的字符串的第一个字符
+        auto position = str.find_first_of( delim, start );  // 分隔符的位置
+        while ( position != std::string::npos || start != std::string::npos )
+        {
+            // [start, position) 为分割下来的字符串
+            tokens.emplace_back( std::move( str.substr( start, position - start ) ) );
+            start    = str.find_first_not_of( delim, position );
+            position = str.find_first_of( delim, start );
+        }
+    }
+
+    void Robot::test( )
+    {
+        //**变量初始化 **//
+        std::string str{ "" };
+        std::ifstream csv_null_motion;
+
+        char tem[ 2048 ];
+        std::vector< std::string > tokens;
+        std::vector< KDL::JntArray > servo_data;
+        KDL::JntArray joints( _joint_num );
+        KDL::JntArray last_joints( _joint_num );
+
+        int row_index = 1;
+
+        //**-------------------------------**//
+
+       
+
+        auto t_start = std::chrono::high_resolution_clock::now( ); //记录程序启动时间
+
+        //**-------------------------------**//
+
+#pragma region  //*电机使能检查
+
+        for ( int i{ 0 }; i < jnt_num_; i++ )
+        {
+            if ( joints_[ i ]->getDriveState( ) != DriveState::OperationEnabled )
+            {
+                for ( int j{ 0 }; j < 1; j++ )
+                {
+                    PLOG_ERROR << "电机[" << i << "] 未使能，确定主站已初始化完成了？,输入y确认";
+                    std::cin >> str;
+                    if ( str != std::string_view{ "y" } )
+                    {
+                        PLOG_ERROR << "未输入y, 判断主站 {未} 初始化完成,程序关闭";
+
+                        exit( 0 );
+                    }
+                }
+            }
+        }
+
+        setEnabled( );
+#pragma endregion
+
+
+        while ( isRuning )
+        {
+            str.clear();
+
+            PLOG_INFO << "当前环境是否安全,如果是,输入run开始执行程序";
+            std::cin >> str;
+
+            auto t_stop     = std::chrono::high_resolution_clock::now( );
+            auto t_duration = std::chrono::duration< double >( t_stop - t_start );
+            PLOG_DEBUG << "当前已经运行了: " << t_duration.count( ) / 60 << "分钟";
+
+            if(t_duration.count( ) / 60   >45)
+            {
+                PLOG_ERROR<< "运行时间已超过45分钟,程序关闭";
+                exit(0);
+            }
+
+
+            if ( str == std::string_view{ "run" } )
+            {
+
+                using namespace KDL;
+                KDL::JntArray q_target( _joint_num );
+                for ( int i = 0; i < 1;i ++)
+                {
+                    q_target( 0 ) = 0 * M_PI / 180;
+                    q_target( 1 ) = -45 * M_PI / 180;
+                    q_target( 2 ) = 0 * M_PI / 180;
+                    q_target( 3 ) = -90 * M_PI / 180;
+                    q_target( 4 ) = 0 * M_PI / 180;
+                    q_target( 5 ) = 45 * M_PI / 180;
+                    q_target( 6 ) = 0 * M_PI / 180;
+
+                    moveJ_with_speed_scaling( q_target, 1, 3, 10 );
+
+                    q_target( 1 ) = 45 * M_PI / 180;
+                    q_target( 3 ) = 90 * M_PI / 180;
+                    q_target( 5 ) = -45 * M_PI / 180;
+
+                    moveJ_with_speed_scaling( q_target, 1, 3, 10 );
+                }
+            }
+            else
+            {
+                PLOG_ERROR << "不安全环境,电机抱闸";
+                setDisabled( );
+                return ;
+            }
+
+
+
+        }
+
+        PLOG_INFO << "全部测试结束,goodbye!";
+    }
+}  // namespace rocos
+#pragma endregion
 
 
 
@@ -328,7 +460,7 @@ TEST_CASE("rocosAppMain") {
     //** 等待主站清除共享内存,25后再启动APP **//
     std::cerr << "\033[32m"
               << "等待主站清除共享内存" << std::endl;
-    std::this_thread::sleep_for( std::chrono::duration< double >( 15 ) );
+    std::this_thread::sleep_for( std::chrono::duration< double >( 1 ) );
     //**-------------------------------**//
 
     boost::shared_ptr< HardwareInterface > hw = boost::make_shared< HardwareSim >( _joint_num );  // 仿真
@@ -374,7 +506,7 @@ TEST_CASE("rocosAppMain") {
     }
     //**-------------------------------**//
 
-    Robot robot( hw );
+    Robot robot( hw,"robot.urdf","base_link","link_7" );
 
     auto robotService = RobotServiceImpl::getInstance( &robot );
 
