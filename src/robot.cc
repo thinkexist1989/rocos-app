@@ -369,6 +369,7 @@ namespace rocos {
             hw_interface_->waitForSignal(9);
 
             //!< Update Flange State
+            std::lock_guard<std::mutex> lock(mtx);
             updateCartesianInfo();
 
             //     //! 屏蔽开始

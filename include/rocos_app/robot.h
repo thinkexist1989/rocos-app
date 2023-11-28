@@ -354,7 +354,9 @@ namespace rocos
             need_plan_.resize(jnt_num_, true);
         }
 
-        inline Frame getFlange() { return flange_; }
+        inline Frame getFlange() { 
+             std::lock_guard<std::mutex> lock(mtx);
+            return flange_; }
 
         inline Frame getTool() { return tool_; }
 
@@ -659,7 +661,7 @@ namespace rocos
 
     public:
         void test(); // 为了测试
-
+        Kinematics kinematics_;
     private:
         // TODO： 测试用MoveJ，阻塞运行，需要改为private
         void
@@ -708,7 +710,7 @@ namespace rocos
             nullptr};                                             // otg在线规划线程
         boost::shared_ptr<boost::thread> motion_thread_{nullptr}; // 执行motion线程
 
-        Kinematics kinematics_;
+        
         JC_helper::inverse_special_to_SRS SRS_kinematics_;
 
         struct JC_frame
@@ -749,6 +751,7 @@ namespace rocos
     private:
         JC_helper::ft_sensor my_ft_sensor;   // 6维力传感器
         bool flag_admittance_turnoff{false}; // 导纳开关
+        std::mutex mtx; 
     };
 
 } // namespace rocos
