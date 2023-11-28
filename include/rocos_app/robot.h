@@ -661,7 +661,11 @@ namespace rocos
 
     public:
         void test(); // 为了测试
+<<<<<<< Updated upstream
         Kinematics kinematics_;
+=======
+
+>>>>>>> Stashed changes
     private:
         // TODO： 测试用MoveJ，阻塞运行，需要改为private
         void
@@ -751,7 +755,10 @@ namespace rocos
     private:
         JC_helper::ft_sensor my_ft_sensor;   // 6维力传感器
         bool flag_admittance_turnoff{false}; // 导纳开关
+<<<<<<< Updated upstream
         std::mutex mtx; 
+=======
+>>>>>>> Stashed changes
     };
 
 } // namespace rocos

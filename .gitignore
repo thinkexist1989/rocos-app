@@ -60,3 +60,4 @@ CATKIN_IGNORE
 #log
 **/command_log.csv
 **/log
+include/rocos_app/robot.h
