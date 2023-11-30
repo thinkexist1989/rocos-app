@@ -139,14 +139,17 @@ namespace rocos
             //**关节空间的运动 **//
             // 每个循环读取一次yaml文件，其中joint是目标关节角，pose是目标位姿，joint的名字从joint1到num_joint每次读取的名字都是累加1的
             // pose的名字从pose1到pose_joint每次读取的名字都是累加1的
-            // for (int i = 1; i < num_joint; i++)
-            // {
-            //     std::string jointName = "joint" + std::to_string(i);
-            //     // std::string poseName="pose"+std::to_string(i);
-            //     readJointFromYAML(yaml_node, jointName, q_target);
-            //     // readPoseFromYAML(yaml_node,poseName,pose);
-            //     robot.MoveJ(q_target, Vel_joint, Acc_joint);
-            // }
+            for (int i = 1; i < num_joint; i++)
+            {
+                std::string jointName = "joint" + std::to_string(i);
+                // std::string poseName="pose"+std::to_string(i);
+                readJointFromYAML(yaml_node, jointName, q_target);
+                std::cout<< i <<std::endl;
+                //读取输入的回车键
+                getchar();
+                // readPoseFromYAML(yaml_node,poseName,pose);
+                robot.MoveJ(q_target, Vel_joint, Acc_joint);
+            }
 
             // **笛卡尔空间的运动 **//
             // for(int i=1;i<pose_joint;i++)
