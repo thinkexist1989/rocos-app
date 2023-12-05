@@ -279,7 +279,9 @@ add_library(rocos::rocos_app ALIAS rocos_app)
 add_executable(rocosAppMain
         src/rocosAppMain.cc
         )
-
+add_executable(Force_impedance
+        src/Force_impedance.cpp
+        )
 ## Specify libraries to link a library or executable target against
 target_link_libraries(rocosAppMain
         PRIVATE
@@ -290,7 +292,15 @@ target_link_libraries(rocosAppMain
         robot
         gflags::gflags
         )
-
+target_link_libraries(Force_impedance
+        PRIVATE
+        hardware
+        drive
+        protocol
+        kinematics
+        robot
+        gflags::gflags
+        )
 # move rocosAppMain to test. Due to rocos_app is a robot library.
 add_executable(rocosAppSim
         src/rocosAppSim.cc
