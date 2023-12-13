@@ -111,11 +111,11 @@ int main(int argc, char *argv[])
     // 初始化类
     
 
-    // auto robotService = RobotServiceImpl::getInstance(&robot);
-    std::thread thread_test{ &rocos::Robot::test, &robot };
+     auto robotService = RobotServiceImpl::getInstance(&robot);
+    //std::thread thread_test{ &rocos::Robot::test, &robot };
     //------------------------wait----------------------------------
-    // robotService->runServer();
-    thread_test.join();
+     robotService->runServer();
+    //thread_test.join();
 
     return 0;
 }
