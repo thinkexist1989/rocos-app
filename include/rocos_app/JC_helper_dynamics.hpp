@@ -107,6 +107,10 @@ namespace JC_helper
 
         void set_damp(double value);
         void set_k(double vaule);
+        void set_m(double vaule);
+        void set_damp(vector<double> value);
+        void set_k(vector<double> vaule);
+        void set_m(vector<double> vaule);
     };
 
     class admittance_joint

@@ -110,6 +110,7 @@ namespace JC_helper
         for (int i{0}; i < 3; i++)
         {
             force_acc_offset[i] = (TCP_force[i] - B[i] * force_vel_offset[i] - K[i] * force_pos_offset[i]) / M[i];
+            
             force_vel_offset[i] = _dt * (force_acc_offset[i] + force_last_acc_offset[i]) / 2 + force_vel_offset[i];
             force_pos_offset[i] = _dt * (force_vel_offset[i] + force_last_vel_offset[i]) / 2 + force_pos_offset[i];
 
@@ -118,6 +119,11 @@ namespace JC_helper
 
             _Cartesian_vel.vel[i] = force_vel_offset[i];
         }
+        PLOG_DEBUG<<"force_acc_offset[2]: "<<force_acc_offset[2];
+        PLOG_DEBUG<<"TCP_force[2]: "<<TCP_force[2];
+        PLOG_DEBUG<<"force_vel_offset[2]: "<<force_vel_offset[2];
+        PLOG_DEBUG<<"force_pos_offset[2]: "<<force_pos_offset[2];
+
     }
 
     KDL::Rotation spring_mass_dump::calculate_rotation()
@@ -187,34 +193,89 @@ namespace JC_helper
 
     void spring_mass_dump::set_damp(double value)
     {
-        damp += value;
+        damp = value;
 
         for (int i{0}; i < _joint_num; i++)
-            B[i] = 2 * damp * sqrt(M[i] * K[i]);
-
+            B[i] = 2 * damp ;
+            // B[i] = 2 * damp * sqrt(M[i] * K[i]);
+                
         PLOG_DEBUG << "damp  = " << damp;
     }
 
     void spring_mass_dump::set_k(double value)
     {
-        if (abs(value) < 1e-3)
-        {
-            for (int i{0}; i < _joint_num; i++)
-            {
-                B[i] = 50;
-                K[i] = 0;
-            }
-        }
-        else
-        {
+        // if (abs(value) < 1e-3)
+        // {
+        //     for (int i{0}; i < _joint_num; i++)
+        //     {
+        //         B[i] = 50;
+        //         K[i] = 0;
+        //     }
+        // }
+        // else
+        // {
             for (int i{0}; i < _joint_num; i++)
             {
                 K[i] = value;
-                B[i] = 2 * damp * sqrt(M[i] * K[i]);
+                // B[i] = 2 * damp * sqrt(M[i] * K[i]);
             }
-        }
+        // }
 
         PLOG_DEBUG << "k  = " << value;
+    }
+    void spring_mass_dump::set_m(double value)
+    {
+        
+            for (int i{0}; i < _joint_num; i++)
+            {
+                M[i] = value;
+            }
+        
+
+        PLOG_DEBUG << "M  = " << value;
+    
+    }
+    void spring_mass_dump::set_damp(vector<double> value)
+    {
+        if (value.size() != _joint_num)
+        {
+            PLOG_ERROR << "damp size error";
+            return;
+        }
+        for (int i{0}; i < _joint_num; i++)
+        {
+            damp = value[i];
+            B[i] = 2 * damp * sqrt(M[i] * K[i]);
+        }
+
+    }
+    void spring_mass_dump::set_k(vector<double> value)
+    {
+        if (value.size() != _joint_num)
+        {
+            PLOG_ERROR << "k size error";
+            return;
+        }
+        for (int i{0}; i < _joint_num; i++)
+        {
+            K[i] = value[i];
+            B[i] = 2 * damp * sqrt(M[i] * K[i]);
+        }
+
+  
+    }
+    void spring_mass_dump::set_m(vector<double> value)
+    {
+        if (value.size() != _joint_num)
+        {
+            PLOG_ERROR << "M size error";
+            return;
+        }
+        for (int i{0}; i < _joint_num; i++)
+        {
+            M[i] = value[i];
+        }
+
     }
 #pragma endregion
 #pragma region

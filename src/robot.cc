@@ -869,6 +869,7 @@ namespace rocos {
                         }
                     }
                     //**-------------------------------**//
+                    
                     q_init = q_target;
                     traj_.push_back( q_target );
 

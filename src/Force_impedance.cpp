@@ -28,6 +28,7 @@
 #include <kdl/chainiksolverpos_lma.hpp>
 #include <kdl/frames_io.hpp>
 #include <Eigen/Dense>
+#include <Eigen/QR>
 #include "kdl/chainiksolvervel_pinv_nso.hpp"
 #include "kdl/chainiksolvervel_pinv.hpp"
 DEFINE_string(urdf, "robot_sun_new.urdf", "Urdf file path");
@@ -106,7 +107,7 @@ namespace rocos
         PLOG_INFO << "雅可比矩阵:  " << jacobian.data << std::endl;
         // 2.3笛卡尔空间下的力映射到关节空间下的力（test）
         Eigen::VectorXd cartesian_force(6), cartesian_force1(6); // 6维笛卡尔空间力
-        cartesian_force << -10, 0, 0, 0, 0, 0;                    // 6维笛卡尔空间力
+        cartesian_force << -5, 0, 0, 0, 0, 0;                    // 6维笛卡尔空间力
         cartesian_force1 << 0, 0, -10, 0, 0, 0;                  // 6维笛卡尔空间力
         Eigen::MatrixXd jacobian_transpose = jacobian.data.transpose();
         // 将笛卡尔空间力映射到关节空间
@@ -117,13 +118,132 @@ namespace rocos
                   << joint_space_force << std::endl;
         std::cout << "映射得到的关节空间力:\n"
                   << joint_space_force1 << std::endl;
-
+        Eigen::MatrixXd jacobian_pinv(6, 7);
+        // *(joint_space_force+joint_space_force1);
+        std::cout << jacobian.data.rows() << std::endl;
+        std::cout << jacobian.data.cols() << std::endl;
+        Eigen::VectorXd tau(7);
+        std::cout << (joint_space_force + joint_space_force1).rows() << std::endl;
+        std::cout << (joint_space_force + joint_space_force1).cols() << std::endl;
+        std::cout << jacobian_transpose.completeOrthogonalDecomposition().pseudoInverse().rows() << std::endl;
+        std::cout << jacobian_transpose.completeOrthogonalDecomposition().pseudoInverse().cols() << std::endl;
+        std::cout << jacobian_transpose.completeOrthogonalDecomposition().pseudoInverse() << std::endl;
+        std::cout << (joint_space_force + joint_space_force1) << std::endl;
+        jacobian_pinv = jacobian_transpose.completeOrthogonalDecomposition().pseudoInverse();
+        tau = (joint_space_force + joint_space_force1);
+        std::cout << "映射得到的关节空间力:\n"
+                  << jacobian_pinv * tau << std::endl;
         // 阻抗控制模拟
         // 设置期望外力5N->cartesian_force
         JC_helper::spring_mass_dump smd{};
         int max_count = 100000000;
         int traj_count{0};
-        smd.set_force(0, 0, 1);
+        KDL::Frame frame_offset{};
+        KDL::Twist admittance_vel;
+        KDL::JntArray _q_init{_joint_num};
+        KDL::JntArray joints_vel(_joint_num);
+        KDL::JntArray _q_target(_joint_num);
+        KDL::JntArray current_pos(_joint_num);
+        KDL::JntArray last_pos(_joint_num);
+        KDL::JntArray last_last_pos(_joint_num);
+        KDL::ChainIkSolverVel_pinv _ik_vel{robot_ptr->kinematics_.getChain()};
+        KDL::JntArray opt_joint(7);
+        KDL::JntArray weight_joint(7);
+
+        PLOG_DEBUG << "开始";
+
+        for (int i = 0; i < 7; i++)
+        {
+            opt_joint(i) = q(i);
+            weight_joint(i) = 1e7;
+        }
+        
+        
+        //** 程序初始化 **//
+        
+        for (int i = 0; i < 7; i++)
+        {
+            _q_init(i) = q(i);
+        
+            _q_target(i) = _q_init(i);
+            current_pos(i) = q(i);
+    
+            last_pos(i) = current_pos(i);
+            last_last_pos(i) = current_pos(i);
+        }
+     
+        smd.set_k(0);
+        smd.set_m(6);
+        smd.set_damp(10);
+
+        double force_z=0;
+        double last_force_z=0;
+        double force_z_target=1.0;
+        double force_z_dot=0.0;
+        double force_z_command=0.0;
+        std::atomic<bool> on_stop_trajectory{false};
+        for (; traj_count < max_count; traj_count++)
+        {
+            // force_z从1到0,中间间隔0.0001
+            last_force_z=force_z;
+            force_z+=0.0001;
+            if (force_z>=1.0)
+            {
+                force_z=1.0;
+            }
+           force_z_command=force_z_target-force_z;
+           std::cout<<"force_z_command: "<<force_z_command<<std::endl;
+            smd.set_force(0, 0, force_z_command);
+            smd.calculate(frame_offset, admittance_vel);
+            admittance_vel(0)=0.001;
+            PLOG_INFO << "admittance_vel: " << admittance_vel(0) << " " << admittance_vel(1) << " " << admittance_vel(2) << " " << admittance_vel(3) << " " << admittance_vel(4) << " " << admittance_vel(5) << " " << std::endl;
+
+            // 打印admittance_vel
+            //** 笛卡尔速度求解 **//
+            if (_ik_vel.CartToJnt(_q_init, admittance_vel, joints_vel) != 0)
+            {
+                PLOG_ERROR << "ik_vel.CartToJnt  ERROR";
+                break;
+            }
+            KDL::Multiply(joints_vel, 0.001, joints_vel);
+            KDL::Add(_q_init, joints_vel, _q_target);
+            //**-------------------------------**//
+
+            //** 速度和加速度保护 **//
+
+            if (on_stop_trajectory)
+                break;
+
+            if (JC_helper::check_vel_acc(_q_target, current_pos, last_pos, 5, 50) < 0)
+            {
+                on_stop_trajectory = true;
+                break;
+            }
+
+            last_last_pos = last_pos;
+            last_pos = current_pos;
+            current_pos = _q_target;
+
+            //** 位置伺服 **//
+            //! 提供位置保护，防止越过关节限位
+
+            JC_helper::safety_servo(robot_ptr, _q_target);
+
+            //**-------------------------------**//
+
+            _q_init = _q_target;
+
+            on_stop_trajectory = false; // 由外界调用者决定什么时候停止
+        }
+
+        if (on_stop_trajectory)
+        {
+            PLOG_ERROR << "IK 触发急停";
+            JC_helper::Joint_stop(robot_ptr, current_pos, last_pos, last_last_pos);
+            isRunning = true; // 告知调用者，因为速度太大而线程已停止
+        }
+        else
+            PLOG_INFO << "IK结束";
     }
 }
 
@@ -144,13 +264,13 @@ int main(int argc, char *argv[])
 
     // boost::shared_ptr<HardwareInterface> hw = boost::make_shared<HardwareSim>(_joint_num); // 仿真
 
-    // auto robotService = RobotServiceImpl::getInstance(&robot);
+    auto robotService = RobotServiceImpl::getInstance(robot_ptr);
 
     //------------------------wait----------------------------------
     std::thread thread_test{&rocos::Robot::test, robot_ptr};
 
     //------------------------wait----------------------------------
-    // robotService->runServer();
+    robotService->runServer();
 
     thread_test.join();
 
