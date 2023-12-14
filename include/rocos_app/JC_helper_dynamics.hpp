@@ -115,12 +115,12 @@ namespace JC_helper
 
     class admittance_joint
     {
-    private:
+    public:
         KDL::Vector gravity{0, 0, 9.81};
         KDL::ChainIdSolver_RNE rne_solver;
 
         std::vector<double> Theory_torques;
-        std::vector<double> Actual_torques;
+        Eigen::VectorXd Actual_torques;
         std::vector<double> a_sensor;
         std::vector<double> b_sensor;
         std::vector<double> K;
@@ -148,6 +148,7 @@ namespace JC_helper
         // 获取当前关节位置下的理论力矩
         std::vector<double> get_theory_torques(rocos::Robot *robot_ptr, KDL::JntArray &joint, KDL::JntArray &joint_vel, KDL::JntArray &joint_acc);
         // 获取当前关节位置下的实际力矩从基础函数getLoadTorque中获取
+        Eigen::VectorXd get_actual_torques(rocos::Robot *robot_ptr, KDL::JntArray &joint, KDL::JntArray &joint_vel, KDL::JntArray &joint_acc);
         // 设置关节的模拟外力矩
         void set_torque(int id, double tor_que);
         // 设置力矩缩放的参数

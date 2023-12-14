@@ -119,10 +119,10 @@ namespace JC_helper
 
             _Cartesian_vel.vel[i] = force_vel_offset[i];
         }
-        PLOG_DEBUG<<"force_acc_offset[2]: "<<force_acc_offset[2];
-        PLOG_DEBUG<<"TCP_force[2]: "<<TCP_force[2];
-        PLOG_DEBUG<<"force_vel_offset[2]: "<<force_vel_offset[2];
-        PLOG_DEBUG<<"force_pos_offset[2]: "<<force_pos_offset[2];
+        // PLOG_DEBUG<<"force_acc_offset[2]: "<<force_acc_offset[2];
+        // PLOG_DEBUG<<"TCP_force[2]: "<<TCP_force[2];
+        // PLOG_DEBUG<<"force_vel_offset[2]: "<<force_vel_offset[2];
+        // PLOG_DEBUG<<"force_pos_offset[2]: "<<force_pos_offset[2];
 
     }
 
@@ -333,6 +333,21 @@ namespace JC_helper
         }
         return Theory_torques;
         // PLOG_DEBUG.printf( "Theory_torques = %f %f %f %f %f %f %f", Theory_torques[ 0 ], Theory_torques[ 1 ], Theory_torques[ 2 ], Theory_torques[ 3 ], Theory_torques[ 4 ], Theory_torques[ 5 ], Theory_torques[ 6 ] );
+    }
+    Eigen::VectorXd admittance_joint::get_actual_torques(rocos::Robot *robot_ptr, KDL::JntArray &joint, KDL::JntArray &joint_vel, KDL::JntArray &joint_acc)
+    {
+        KDL::JntArray torque{joint_num};
+        KDL::JntArray torqueS{joint_num};
+        rne_solver.CartToJnt(joint, joint_vel, joint_acc, external_forces, torque);
+        for (int i{0}; i < joint_num; i++)
+        {
+            torqueS(i)= robot_ptr->getJointTorqueFilter(i);
+            Actual_torques[i] = torqueS(i)*0.001 * a_sensor[i]+b_sensor[i]- torque(i);
+            // std::cout<<"Actual_torques["<<i<<"]:"<<torqueS(i)<<std::endl;
+
+        }
+        return Actual_torques;
+
     }
 
     double admittance_joint::set_K_sensor(double x, double K, double amplitude)

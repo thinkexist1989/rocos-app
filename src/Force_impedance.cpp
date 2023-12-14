@@ -40,8 +40,8 @@ KDL::Chain robotChain;
 
 namespace rocos
 {
-    boost::shared_ptr<HardwareInterface> hw = boost::make_shared<HardwareSim>(_joint_num); // 仿真
-    // boost::shared_ptr<HardwareInterface> hw = boost::make_shared<Hardware>(); // 真实机械臂
+    // boost::shared_ptr<HardwareInterface> hw = boost::make_shared<HardwareSim>(_joint_num); // 仿真
+    boost::shared_ptr<HardwareInterface> hw = boost::make_shared<Hardware>(); // 真实机械臂
 
     Robot *robot_ptr = new Robot(hw, FLAGS_urdf, FLAGS_base, FLAGS_tip);
     void signalHandler(int signo)
@@ -59,8 +59,35 @@ namespace rocos
             exit(0);
         }
     }
+
     void Robot::test()
     {
+        #pragma region  //*电机使能检查
+        string str;
+        for ( int i{ 0 }; i < jnt_num_; i++ )
+        {
+            if ( joints_[ i ]->getDriveState( ) != DriveState::OperationEnabled )
+            {
+                for ( int j{ 0 }; j < 1; j++ )
+                {
+                    PLOG_ERROR << "电机[" << i << "] 未使能，确定主站已初始化完成了？,输入y确认";
+                    std::cin >> str;
+                    if ( str != std::string_view{ "y" } )
+                    {
+                        PLOG_ERROR << "未输入y, 判断主站 {未} 初始化完成,程序关闭";
+
+                        exit( 0 );
+                    }
+                }
+            }
+        }
+
+        setEnabled( );
+#pragma endregion
+
+
+
+
         // 1.初始化
         KDL::JntArray q(_joint_num);
         KDL::JntArray qd(_joint_num);
@@ -89,7 +116,7 @@ namespace rocos
             q(6) = 0 * M_PI / 180.0;
         }
 
-        robot_ptr->MoveJ(q, 1, 3);
+        robot_ptr->MoveJ(q, 0.2, 0.2);
         // 2. 通过理论力矩计算笛卡尔空间的力（test）
         // 2.1 计算理论力矩1.44137e-16 60.1491 -0.215822 21.8786 -0.0923832 3.71445 0
         KDL::Wrenches external_forces(robotChain.getNrOfSegments());
@@ -131,11 +158,14 @@ namespace rocos
         std::cout << (joint_space_force + joint_space_force1) << std::endl;
         jacobian_pinv = jacobian_transpose.completeOrthogonalDecomposition().pseudoInverse();
         tau = (joint_space_force + joint_space_force1);
-        std::cout << "映射得到的关节空间力:\n"
+        std::cout << "映射得到的笛卡尔空间力:\n"
                   << jacobian_pinv * tau << std::endl;
         // 阻抗控制模拟
         // 设置期望外力5N->cartesian_force
         JC_helper::spring_mass_dump smd{};
+
+        JC_helper::admittance_joint admittance_joint(robot_ptr);
+
         int max_count = 100000000;
         int traj_count{0};
         KDL::Frame frame_offset{};
@@ -157,93 +187,117 @@ namespace rocos
             opt_joint(i) = q(i);
             weight_joint(i) = 1e7;
         }
-        
-        
+        usleep(4000000);
+        admittance_joint.get_actual_torques(robot_ptr, q, qd, qdd);
+            PLOG_DEBUG << "外力：" << admittance_joint.Actual_torques[0] << " " << admittance_joint.Actual_torques[1] << " " << admittance_joint.Actual_torques[2] << " " << admittance_joint.Actual_torques[3] << " " << admittance_joint.Actual_torques[4] << " " << admittance_joint.Actual_torques[5] << " " << admittance_joint.Actual_torques[6] << " " << std::endl;
+            jnt_to_jac_solver.JntToJac(q, jacobian);
+            jacobian_transpose = jacobian.data.transpose();
+            jacobian_pinv = jacobian_transpose.completeOrthogonalDecomposition().pseudoInverse();
+            cartesian_force1=jacobian_pinv * admittance_joint.Actual_torques;
+            std::cout << "映射得到的笛卡尔空间力:\n"
+                      << cartesian_force1 << std::endl;
+
         //** 程序初始化 **//
-        
+
         for (int i = 0; i < 7; i++)
         {
             _q_init(i) = q(i);
-        
+
             _q_target(i) = _q_init(i);
             current_pos(i) = q(i);
-    
+
             last_pos(i) = current_pos(i);
             last_last_pos(i) = current_pos(i);
         }
-     
-        smd.set_k(0);
-        smd.set_m(6);
-        smd.set_damp(10);
 
-        double force_z=0;
-        double last_force_z=0;
-        double force_z_target=1.0;
-        double force_z_dot=0.0;
-        double force_z_command=0.0;
+        smd.set_k(0);
+        smd.set_m(30);
+        smd.set_damp(100);
+
+        double force_z = 0;
+        double last_force_z = 0;
+        double force_z_target = 1.0;
+        double force_z_dot = 0.0;
+        double force_z_command = 0.0;
         std::atomic<bool> on_stop_trajectory{false};
         for (; traj_count < max_count; traj_count++)
         {
-            // force_z从1到0,中间间隔0.0001
-            last_force_z=force_z;
-            force_z+=0.0001;
-            if (force_z>=1.0)
-            {
-                force_z=1.0;
-            }
-           force_z_command=force_z_target-force_z;
-           std::cout<<"force_z_command: "<<force_z_command<<std::endl;
-            smd.set_force(0, 0, force_z_command);
-            smd.calculate(frame_offset, admittance_vel);
-            admittance_vel(0)=0.001;
-            PLOG_INFO << "admittance_vel: " << admittance_vel(0) << " " << admittance_vel(1) << " " << admittance_vel(2) << " " << admittance_vel(3) << " " << admittance_vel(4) << " " << admittance_vel(5) << " " << std::endl;
+            admittance_joint.get_actual_torques(robot_ptr, current_pos, qd, qdd);
+            std::cout<< "外力：" << admittance_joint.Actual_torques[0] << " " << admittance_joint.Actual_torques[1] << " " << admittance_joint.Actual_torques[2] << " " << admittance_joint.Actual_torques[3] << " " << admittance_joint.Actual_torques[4] << " " << admittance_joint.Actual_torques[5] << " " << admittance_joint.Actual_torques[6] << " " << std::endl;
+            jnt_to_jac_solver.JntToJac(current_pos, jacobian);
+            jacobian_transpose = jacobian.data.transpose();
+            jacobian_pinv = jacobian_transpose.completeOrthogonalDecomposition().pseudoInverse();
+            cartesian_force=jacobian_pinv * admittance_joint.Actual_torques-cartesian_force1;
+             std::cout << "映射得到的笛卡尔空间力:\n"
+                      << cartesian_force[2] << std::endl;
+        
+          
+        //         // force_z从1到0,中间间隔0.0001
+     
+               force_z_command=cartesian_force[2];
+            //    if(abs(force_z_command) <0.3)
+            //    force_z_command=0;
+            //    if(force_z_command>5)
+            //    {
+               
+            //     force_z_command=5.0;
+            //    }
+            //    else if(force_z_command<-5)
+            //    {
+            //         force_z_command=-5.0;
+            //    }
+                // std::cout<<"force_z_command: "<<force_z_command<<std::endl;
+                smd.set_force(0, 0, force_z_command);
+                smd.calculate(frame_offset, admittance_vel);
+              
+                // PLOG_INFO << "admittance_vel: " << admittance_vel(0) << " " << admittance_vel(1) << " " << admittance_vel(2) << " " << admittance_vel(3) << " " << admittance_vel(4) << " " << admittance_vel(5) << " " << std::endl;
 
-            // 打印admittance_vel
-            //** 笛卡尔速度求解 **//
-            if (_ik_vel.CartToJnt(_q_init, admittance_vel, joints_vel) != 0)
-            {
-                PLOG_ERROR << "ik_vel.CartToJnt  ERROR";
-                break;
-            }
-            KDL::Multiply(joints_vel, 0.001, joints_vel);
-            KDL::Add(_q_init, joints_vel, _q_target);
-            //**-------------------------------**//
+                // 打印admittance_vel
+                //** 笛卡尔速度求解 **//
+                if (_ik_vel.CartToJnt(_q_init, admittance_vel, joints_vel) != 0)
+                {
+                    PLOG_ERROR << "ik_vel.CartToJnt  ERROR";
+                    break;
+                }
+                KDL::Multiply(joints_vel, 0.001, joints_vel);
+                KDL::Add(_q_init, joints_vel, _q_target);
+                //**-------------------------------**//
 
-            //** 速度和加速度保护 **//
+                //** 速度和加速度保护 **//
+
+                if (on_stop_trajectory)
+                    break;
+
+                if (JC_helper::check_vel_acc(_q_target, current_pos, last_pos, 5, 50) < 0)
+                {
+                    on_stop_trajectory = true;
+                    break;
+                }
+
+                last_last_pos = last_pos;
+                last_pos = current_pos;
+                current_pos = _q_target;
+
+                //** 位置伺服 **//
+                //! 提供位置保护，防止越过关节限位
+
+                JC_helper::safety_servo(robot_ptr, _q_target);
+
+                //**-------------------------------**//
+
+                _q_init = _q_target;
+
+                on_stop_trajectory = false; // 由外界调用者决定什么时候停止
+            }
 
             if (on_stop_trajectory)
-                break;
-
-            if (JC_helper::check_vel_acc(_q_target, current_pos, last_pos, 5, 50) < 0)
             {
-                on_stop_trajectory = true;
-                break;
+                PLOG_ERROR << "IK 触发急停";
+                JC_helper::Joint_stop(robot_ptr, current_pos, last_pos, last_last_pos);
+                isRunning = true; // 告知调用者，因为速度太大而线程已停止
             }
-
-            last_last_pos = last_pos;
-            last_pos = current_pos;
-            current_pos = _q_target;
-
-            //** 位置伺服 **//
-            //! 提供位置保护，防止越过关节限位
-
-            JC_helper::safety_servo(robot_ptr, _q_target);
-
-            //**-------------------------------**//
-
-            _q_init = _q_target;
-
-            on_stop_trajectory = false; // 由外界调用者决定什么时候停止
-        }
-
-        if (on_stop_trajectory)
-        {
-            PLOG_ERROR << "IK 触发急停";
-            JC_helper::Joint_stop(robot_ptr, current_pos, last_pos, last_last_pos);
-            isRunning = true; // 告知调用者，因为速度太大而线程已停止
-        }
-        else
-            PLOG_INFO << "IK结束";
+            else
+                PLOG_INFO << "IK结束";
     }
 }
 
