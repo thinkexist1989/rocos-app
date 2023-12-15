@@ -25,7 +25,7 @@ namespace rocos {
 
     HardwareSim::~HardwareSim() = default;
 
-    Timestamp HardwareSim::getTimestamp() {
+    long HardwareSim::getTimestamp() {
         return boost::chrono::system_clock::now();
     }
 

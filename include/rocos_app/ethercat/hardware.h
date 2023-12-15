@@ -41,7 +41,7 @@ namespace rocos {
         Hardware();
         ~Hardware() override;
 
-        Timestamp getTimestamp() override;
+        long getTimestamp() override;
 
         double getMinCycleTime() override;
 

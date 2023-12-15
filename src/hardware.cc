@@ -34,7 +34,7 @@ namespace rocos {
         }
     }
 
-    Timestamp Hardware::getTimestamp() {
+    long Hardware::getTimestamp() {
         return ecPtr->ecatInfo->timestamp;
     }
 

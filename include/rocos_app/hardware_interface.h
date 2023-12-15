@@ -41,8 +41,6 @@
 
 namespace rocos {
 
-    typedef boost::chrono::time_point<boost::chrono::system_clock> Timestamp;
-
     class HardwareInterface {
     public:
         ///////Hardware Type Definition///////
@@ -69,7 +67,7 @@ namespace rocos {
         virtual ~HardwareInterface();
 
         ///////////////////////Data Info/////////////////////////
-        virtual Timestamp getTimestamp(); // Timestamp
+        virtual long getTimestamp(); // Timestamp
 
         virtual HWState getHardwareState();
         virtual void setHardwareState(HWState state);

@@ -118,6 +118,7 @@ add_library(hardware
         src/hardware.cc
         src/hardware_interface.cc
         src/hardware_sim.cc
+        src/ft_sensor_interface.cc
         )
 target_link_libraries(hardware
         PUBLIC
@@ -126,7 +127,6 @@ target_link_libraries(hardware
         rocos::ecat_config
         )
 add_library(rocos::hardware ALIAS hardware)
-
 
 ########## Library Drive #################
 add_library(drive

@@ -33,7 +33,7 @@ namespace rocos {
         ~HardwareSim() override;
 
         //////////// Override Hardware Interface //////////////////
-        Timestamp getTimestamp() override;
+        long getTimestamp() override;
 
         int32_t getSlaveNumber() override;
 

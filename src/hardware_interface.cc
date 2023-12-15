@@ -103,8 +103,8 @@ namespace rocos {
         return DriveState();
     }
 
-    Timestamp HardwareInterface::getTimestamp() {
-        return rocos::Timestamp();
+    long HardwareInterface::getTimestamp() {
+        return 0;
     }
 
     double HardwareInterface::getMinCycleTime() {
@@ -132,7 +132,7 @@ namespace rocos {
     }
 
     std::string HardwareInterface::getSlaveName(int id) {
-        return std::string();
+        return {};
     }
 
     HardwareInterface::HWState HardwareInterface::getHardwareState() {
