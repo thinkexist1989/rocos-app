@@ -26,7 +26,6 @@
 #include "status_word.h"
 #include "mode_of_operation.h"
 
-//#include <ethercat/ecat_config.hpp>
 #include <rocos_ecm/ecat_config.h>
 
 #include "../hardware_interface.h"
@@ -39,6 +38,7 @@ namespace rocos {
     class Hardware : public HardwareInterface {
     public:
         Hardware();
+
         ~Hardware() override;
 
         long getTimestamp() override;
@@ -93,6 +93,23 @@ namespace rocos {
 
     protected:
         boost::shared_ptr<EcatConfig> ecPtr;
+
+        int32_t *pTargetPos_;
+        int32_t *pTargetVel_;
+        int16_t *pTargetTor_;
+
+        int32_t *pActualPos_;
+        int32_t *pActualVel_;
+        int16_t *pActualTor_;
+        int16_t *pLoadTor_;
+        int32_t *pSecondaryPos_;
+        int32_t *pSecondaryVel_;
+
+        uint16_t *pStatusword_;
+        uint16_t *pControlword_;
+        int8_t *pModeOfOp_;
+
+
     };
 
 }

@@ -26,7 +26,7 @@ namespace rocos {
     HardwareSim::~HardwareSim() = default;
 
     long HardwareSim::getTimestamp() {
-        return boost::chrono::system_clock::now();
+        return 0;
     }
 
     int32_t HardwareSim::getSlaveNumber() {

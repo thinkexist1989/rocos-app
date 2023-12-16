@@ -9,6 +9,7 @@ namespace rocos {
 
     class FtSensorInterface {
 
+    public:
         virtual ~FtSensorInterface();
 
         virtual float getFx() const;

@@ -29,29 +29,29 @@ namespace rocos {
         _type = HW_ETHERCAT;
         ecPtr = boost::make_shared<EcatConfig>();
 
-        if(!ecPtr->getSharedMemory()) {
+        if(!ecPtr->init()) {
             std::cerr << "Hardware get shared memory failed. Please check if the Ec-Master is already running." << std::endl;
         }
     }
 
     long Hardware::getTimestamp() {
-        return ecPtr->ecatInfo->timestamp;
+        return ecPtr->getTimestamp();
     }
 
     double Hardware::getMinCycleTime() {
-        return ecPtr->ecatInfo->minCyclcTime;
+        return ecPtr->getBusMinCycleTime();
     }
 
     double Hardware::getMaxCycleTime() {
-        return ecPtr->ecatInfo->maxCycleTime;
+        return ecPtr->getBusMaxCycleTime();
     }
 
     double Hardware::getAvgCycleTime() {
-        return ecPtr->ecatInfo->avgCycleTime;
+        return ecPtr->getBusAvgCycleTime();
     }
 
     double Hardware::getCurrCycleTime() {
-        return ecPtr->ecatInfo->currCycleTime;
+        return ecPtr->getBusCurrentCycleTime();
     }
 
     void Hardware::setTargetPositionRaw(int id, int32_t pos) {
@@ -103,18 +103,18 @@ namespace rocos {
     }
 
     void Hardware::setModeOfOperation(int id, ModeOfOperation modeOfOperation) {
-        ecPtr->setModeOfOperationEC(id, static_cast<int8_t>(modeOfOperation));
+        setModeOfOperationRaw(id, static_cast<int8_t>(modeOfOperation));
     }
 
     Statusword Hardware::getStatusword(int id) {
         Statusword status;
-        status.setFromRawStatusword(ecPtr->getStatusWordEC(id));
+        status.setFromRawStatusword(getStatuswordRaw(id));
         return status;
     }
 
     DriveState Hardware::getDriverState(int id) {
         Statusword status;
-        status.setFromRawStatusword(ecPtr->getStatusWordEC(id));
+        status.setFromRawStatusword(getStatuswordRaw(id));
         return status.getDriveState();
     }
 
