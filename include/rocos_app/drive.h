@@ -26,6 +26,7 @@
 #include <boost/thread.hpp>
 #include <boost/thread/lock_guard.hpp>
 #include <boost/thread/recursive_mutex.hpp>
+#include <atomic>
 
 #include "drive_guard.h"
 
