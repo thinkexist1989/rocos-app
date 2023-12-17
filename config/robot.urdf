@@ -21,6 +21,20 @@
         </collision>
     </link>
     <link name="link_1">
+        <inertial>
+        <origin
+            xyz="0.0 0.008 -0.071"
+            rpy="0 0 0" />
+        <mass
+            value="5.683" />
+        <inertia
+            ixx="0.075"
+            ixy="0"
+            ixz="0"
+            iyy="0.075"
+            iyz="-0.002"
+            izz="0.012" />
+        </inertial>
         <visual>
             <origin xyz="0 0 0" rpy="0 0 0"/>
             <geometry>
@@ -38,24 +52,48 @@
         </collision>
     </link>
     <joint name="joint_1" type="continuous">
-        <origin xyz="0.0 0.0 0.3393" rpy="0 0 0"/>
+        <origin xyz="0.0 0.0 0.348" rpy="0 0 0"/>
         <parent link="base_link"/>
         <child link="link_1"/>
         <axis xyz="0 0 1"/>
-        <hardware id="0">
-            <limit lower="-2.99" upper="2.99" vel="1.0" acc="10.0" jerk="150.0" effort="30.0"/>
-            <transform ratio="1.0" offset_pos_cnt="486058" cnt_per_unit="156455.678" torque_per_unit="1.0"
+        <hardware id="0" type="driver">
+            <limit lower="-2.84" upper="2.84"  vel="3.0" acc="10.0" jerk="150.0" effort="30.0"/>
+            <transform ratio="1.0" offset_pos_cnt="0" cnt_per_unit="156455.678" torque_per_unit="1.0"
                        user_unit_name="rad"/>
+             <inputs name="Inputs">
+                <status_word>Statusword</status_word>
+                <position_actual_value>Position actual value</position_actual_value>
+                <velocity_actual_value>Velocity actual value</velocity_actual_value>
+                <torque_actual_value>Torque actual value</torque_actual_value>
+                <load_torque_value>Analog Input 1</load_torque_value>
+                <secondary_position_value>Auxiliary position actual value</secondary_position_value>
+                <secondary_velocity_value>Secondary velocity value</secondary_velocity_value>
+            </inputs>
+            <outputs name="Outputs">
+                <control_word>Controlword</control_word>
+                <mode_of_operation>Modes of operation</mode_of_operation>
+                <target_position>Target position</target_position>
+                <target_velocity>Target velocity</target_velocity>
+                <target_torque>Target torque</target_torque>
+            </outputs>        
         </hardware>
     </joint>
     <link name="link_2">
-        <inertial>
-            <origin xyz="0.12727 2.9785E-07 0.0044026" rpy="0 0 0"/>
-            <mass value="2.3222"/>
-            <inertia ixx="0.0033504" ixy="-1.9329E-07" ixz="0.00024826"
-                     iyy="0.038629" iyz="-1.8337E-09"
-                     izz="0.037222"/>
+    <inertial>
+        <origin
+            xyz="0.000 0.117 0.024"
+            rpy="0 0 0" />
+        <mass
+            value="3.99" />
+        <inertia
+            ixx="0.099"
+            ixy="0"
+            ixz="0"
+            iyy="0.01"
+            iyz="0.002"
+            izz="0.096" />
         </inertial>
+        
         <visual>
             <origin xyz="0 0 0" rpy="0 0 0"/>
             <geometry>
@@ -77,18 +115,41 @@
         <parent link="link_1"/>
         <child link="link_2"/>
         <axis xyz="0 0 1"/>
-        <hardware id="1">
-            <limit lower="-2.22" upper="2.22" vel="1.0" acc="10.0" jerk="150.0" effort="30.0" />
-            <transform ratio="1.0" offset_pos_cnt="361813" cnt_per_unit="156455.678" torque_per_unit="1.0" user_unit_name="rad"/>
+        <hardware id="1" type="driver">
+            <limit lower="-2.22" upper="2.22" vel="3.0" acc="10.0" jerk="150.0" effort="30.0" />
+            <transform ratio="1.0" offset_pos_cnt="0" cnt_per_unit="156455.678" torque_per_unit="1.0" user_unit_name="rad"/>
+            <inputs name="Inputs">
+                <status_word>Statusword</status_word>
+                <position_actual_value>Position actual value</position_actual_value>
+                <velocity_actual_value>Velocity actual value</velocity_actual_value>
+                <torque_actual_value>Torque actual value</torque_actual_value>
+                <load_torque_value>Analog Input 1</load_torque_value>
+                <secondary_position_value>Auxiliary position actual value</secondary_position_value>
+                <secondary_velocity_value>Secondary velocity value</secondary_velocity_value>
+            </inputs>
+            <outputs name="Outputs">
+                <control_word>Controlword</control_word>
+                <mode_of_operation>Modes of operation</mode_of_operation>
+                <target_position>Target position</target_position>
+                <target_velocity>Target velocity</target_velocity>
+                <target_torque>Target torque</target_torque>
+            </outputs>  
         </hardware>
     </joint>
     <link name="link_3">
         <inertial>
-            <origin xyz="0.155146756102727 1.69273745565068E-05 0.101933463705677" rpy="0 0 0"/>
-            <mass value="1.22157164179203"/>
-            <inertia ixx="0.00109587279988836" ixy="3.09669167464475E-06" ixz="-0.00129294542904466"
-                     iyy="0.0150983547059232" iyz="6.21914055513365E-07"
-                     izz="0.014642955242962"/>
+        <origin
+            xyz="0.000 0.009 -0.058"
+            rpy="0 0 0" />
+        <mass
+            value="3.685" />
+        <inertia
+            ixx="0.034"
+            ixy="0"
+            ixz="0"
+            iyy="0.021"
+            iyz="-0.001"
+            izz="0.006" />
         </inertial>
         <visual>
             <origin xyz="0 0 0" rpy="0 0 0"/>
@@ -107,22 +168,45 @@
         </collision>
     </link>
     <joint name="joint_3" type="continuous">
-        <origin xyz="0 0.3977 0" rpy="-1.5707963267948966 0 0"/>
+        <origin xyz="0 0.41 0" rpy="-1.5707963267948966 0 0"/>
         <parent link="link_2"/>
         <child link="link_3"/>
         <axis xyz="0 0 1"/>
-        <hardware id="2">
-            <limit lower="-2.89" upper="2.89" vel="1.0" acc="10.0" jerk="150.0" effort="30.0" />
-            <transform ratio="1.0" offset_pos_cnt="461483" cnt_per_unit="156455.678" torque_per_unit="1.0" user_unit_name="rad"/>
+        <hardware id="2" type="driver">
+            <limit lower="-2.84" upper="2.84" vel="3.0" acc="10.0" jerk="150.0" effort="30.0" />
+            <transform ratio="1.0" offset_pos_cnt="0" cnt_per_unit="156455.678" torque_per_unit="1.0" user_unit_name="rad"/>
+            <inputs name="Inputs">
+                <status_word>Statusword</status_word>
+                <position_actual_value>Position actual value</position_actual_value>
+                <velocity_actual_value>Velocity actual value</velocity_actual_value>
+                <torque_actual_value>Torque actual value</torque_actual_value>
+                <load_torque_value>Analog Input 1</load_torque_value>
+                <secondary_position_value>Auxiliary position actual value</secondary_position_value>
+                <secondary_velocity_value>Secondary velocity value</secondary_velocity_value>
+            </inputs>
+            <outputs name="Outputs">
+                <control_word>Controlword</control_word>
+                <mode_of_operation>Modes of operation</mode_of_operation>
+                <target_position>Target position</target_position>
+                <target_velocity>Target velocity</target_velocity>
+                <target_torque>Target torque</target_torque>
+            </outputs>  
         </hardware>
     </joint>
     <link name="link_4">
         <inertial>
-            <origin xyz="-2.4711E-07 -0.010264 -0.004748" rpy="0 0 0"/>
-            <mass value="0.45068"/>
-            <inertia ixx="0.00061623" ixy="3.4687E-09" ixz="1.1596E-09"
-                     iyy="0.00030262" iyz="2.1617E-05"
-                     izz="0.00057068"/>
+        <origin
+            xyz="0.000 0.136 0.016"
+            rpy="0 0 0" />
+        <mass
+            value="3.185" />
+        <inertia
+            ixx="0.085"
+            ixy="0"
+            ixz="0"
+            iyy="0.006"
+            iyz="0.001"
+            izz="0.084" />
         </inertial>
         <visual>
             <origin xyz="0 0 0" rpy="0 0 0"/>
@@ -146,18 +230,41 @@
         <parent link="link_3"/>
         <child link="link_4"/>
         <axis xyz="0 0 1"/>
-        <hardware id="3">
-            <limit lower="-2.23" upper="2.23" vel="1.0" acc="10.0" jerk="150.0" effort="30.0" />
-            <transform ratio="1.0" offset_pos_cnt="361811" cnt_per_unit="156455.678" torque_per_unit="1.0" user_unit_name="rad"/>
+        <hardware id="3" type="driver">
+            <limit lower="-2.23" upper="2.23" vel="3.0" acc="10.0" jerk="150.0" effort="30.0" />
+            <transform ratio="1.0" offset_pos_cnt="0" cnt_per_unit="156455.678" torque_per_unit="1.0" user_unit_name="rad"/>
+            <inputs name="Inputs">
+                <status_word>Statusword</status_word>
+                <position_actual_value>Position actual value</position_actual_value>
+                <velocity_actual_value>Velocity actual value</velocity_actual_value>
+                <torque_actual_value>Torque actual value</torque_actual_value>
+                <load_torque_value>Analog Input 1</load_torque_value>
+                <secondary_position_value>Auxiliary position actual value</secondary_position_value>
+                <secondary_velocity_value>Secondary velocity value</secondary_velocity_value>
+            </inputs>
+            <outputs name="Outputs">
+                <control_word>Controlword</control_word>
+                <mode_of_operation>Modes of operation</mode_of_operation>
+                <target_position>Target position</target_position>
+                <target_velocity>Target velocity</target_velocity>
+                <target_torque>Target torque</target_torque>
+            </outputs>  
         </hardware>
     </joint>
     <link name="link_5">
         <inertial>
-            <origin xyz="3.1874E-07 0.010265 -0.0047482" rpy="0 0 0"/>
-            <mass value="0.45069"/>
-            <inertia ixx="0.00061624" ixy="3.4201E-09" ixz="-1.323E-09"
-                     iyy="0.00030262" iyz="-2.1613E-05"
-                     izz="0.0005707"/>
+        <origin
+            xyz="0 0.008 -0.071"
+            rpy="0 0 0" />
+        <mass
+            value="2.932" />
+        <inertia
+            ixx="0.032"
+            ixy="0"
+            ixz="0.003"
+            iyy="0.032"
+            iyz="-0.001"
+            izz="0.004" />
         </inertial>
         <visual>
             <origin xyz="0 0 0" rpy="0 0 0"/>
@@ -176,22 +283,45 @@
         </collision>
     </link>
     <joint name="joint_5" type="continuous">
-        <origin xyz="0 0.3925 0" rpy="-1.5707963267948966 0 0"/>
+        <origin xyz="0 0.401 0" rpy="-1.5707963267948966 0 0"/>
         <parent link="link_4"/>
         <child link="link_5"/>
         <axis xyz="0 0 1"/>
-        <hardware id="4">
-            <limit lower="-2.71" upper="2.71" vel="1.0" acc="10.0" jerk="150.0" effort="30.0" />
-            <transform ratio="1.0" offset_pos_cnt="483328" cnt_per_unit="156455.678" torque_per_unit="1.0" user_unit_name="rad"/>
+        <hardware id="4" type="driver">
+            <limit lower="-2.71" upper="2.71" vel="3.0" acc="10.0" jerk="150.0" effort="30.0" />
+            <transform ratio="1.0" offset_pos_cnt="0" cnt_per_unit="156455.678" torque_per_unit="1.0" user_unit_name="rad"/>
+            <inputs name="Inputs">
+                <status_word>Statusword</status_word>
+                <position_actual_value>Position actual value</position_actual_value>
+                <velocity_actual_value>Velocity actual value</velocity_actual_value>
+                <torque_actual_value>Torque actual value</torque_actual_value>
+                <load_torque_value>Analog Input 1</load_torque_value>
+                <secondary_position_value>Auxiliary position actual value</secondary_position_value>
+                <secondary_velocity_value>Secondary velocity value</secondary_velocity_value>
+            </inputs>
+            <outputs name="Outputs">
+                <control_word>Controlword</control_word>
+                <mode_of_operation>Modes of operation</mode_of_operation>
+                <target_position>Target position</target_position>
+                <target_velocity>Target velocity</target_velocity>
+                <target_torque>Target torque</target_torque>
+            </outputs>  
         </hardware>
     </joint>
     <link name="link_6">
-        <inertial>
-            <origin xyz="-2.0889E-08 -0.00050715 -0.020114" rpy="0 0 0"/>
-            <mass value="0.11516"/>
-            <inertia ixx="4.3712E-05" ixy="-5.6644E-11" ixz="1.6692E-11"
-                     iyy="4.2018E-05" iyz="6.31E-07"
-                     izz="6.3255E-05"/>
+         <inertial>
+        <origin
+            xyz="0.000 0.089 0.018"
+            rpy="0 0 0" />
+        <mass
+            value="2.043" />
+        <inertia
+            ixx="0.029"
+            ixy="0"
+            ixz="0"
+            iyy="0.003"
+            iyz="0.001"
+            izz="0.028" />
         </inertial>
         <visual>
             <origin xyz="0 0 0" rpy="0 0 0"/>
@@ -214,18 +344,41 @@
         <parent link="link_5"/>
         <child link="link_6"/>
         <axis xyz="0 0 1"/>
-        <hardware id="5">
-            <limit lower="-2.11" upper="2.11" vel="1.0" acc="10.0" jerk="150.0" effort="30.0" />
-            <transform ratio="1.0" offset_pos_cnt="283307" cnt_per_unit="130379.73" torque_per_unit="1.0" user_unit_name="rad"/>
+        <hardware id="5" type="driver">
+            <limit lower="-2.11" upper="2.11" vel="3.0" acc="10.0" jerk="150.0" effort="30.0" />
+            <transform ratio="1.0" offset_pos_cnt="0" cnt_per_unit="130379.73" torque_per_unit="1.0" user_unit_name="rad"/>
+            <inputs name="Inputs">
+                <status_word>Statusword</status_word>
+                <position_actual_value>Position actual value</position_actual_value>
+                <velocity_actual_value>Velocity actual value</velocity_actual_value>
+                <torque_actual_value>Torque actual value</torque_actual_value>
+                <load_torque_value>Analog Input 1</load_torque_value>
+                <secondary_position_value>Auxiliary position actual value</secondary_position_value>
+                <secondary_velocity_value>Secondary velocity value</secondary_velocity_value>
+            </inputs>
+            <outputs name="Outputs">
+                <control_word>Controlword</control_word>
+                <mode_of_operation>Modes of operation</mode_of_operation>
+                <target_position>Target position</target_position>
+                <target_velocity>Target velocity</target_velocity>
+                <target_torque>Target torque</target_torque>
+            </outputs>  
         </hardware>
     </joint>
     <link name="link_7">
         <inertial>
-            <origin xyz="0 0 0" rpy="0 0 0"/>
-            <mass value="0.11516"/>
-            <inertia ixx="4.3712E-05" ixy="-5.6644E-11" ixz="1.6692E-11"
-                     iyy="4.2018E-05" iyz="6.31E-07"
-                     izz="6.3255E-05"/>
+        <origin
+            xyz="0.000 0.00 -0.032"
+            rpy="0 0 0" />
+        <mass
+            value="0.994" />
+        <inertia
+            ixx="0.002"
+            ixy="0"
+            ixz="0"
+            iyy="0.002"
+            iyz="0"
+            izz="0.001" />
         </inertial>
         <visual>
             <origin xyz="0 0 0" rpy="0 0 0"/>
@@ -244,13 +397,29 @@
         </collision>
     </link>
     <joint name="joint_7" type="continuous">
-        <origin xyz="0 0.2145 0" rpy="-1.5707963267948966 0 0"/>
+        <origin xyz="0 0.230 0" rpy="-1.5707963267948966 0 0"/>
         <parent link="link_6"/>
         <child link="link_7"/>
         <axis xyz="0 0 1"/>
-        <hardware id="6">
-            <limit lower="-2.86" upper="2.86" vel="1.0" acc="10.0" jerk="150.0" effort="30.0" />
-            <transform ratio="1.0" offset_pos_cnt="384569" cnt_per_unit="130379.73" torque_per_unit="1.0" user_unit_name="rad"/>
+        <hardware id="6" type="driver">
+            <limit lower="-2.84" upper="2.84" vel="3.0" acc="10.0" jerk="150.0" effort="30.0" />
+            <transform ratio="1.0" offset_pos_cnt="0" cnt_per_unit="130379.73" torque_per_unit="1.0" user_unit_name="rad"/>
+            <inputs name="Inputs">
+                <status_word>Statusword</status_word>
+                <position_actual_value>Position actual value</position_actual_value>
+                <velocity_actual_value>Velocity actual value</velocity_actual_value>
+                <torque_actual_value>Torque actual value</torque_actual_value>
+                <load_torque_value>Analog Input 1</load_torque_value>
+                <secondary_position_value>Auxiliary position actual value</secondary_position_value>
+                <secondary_velocity_value>Secondary velocity value</secondary_velocity_value>
+            </inputs>
+            <outputs name="Outputs">
+                <control_word>Controlword</control_word>
+                <mode_of_operation>Modes of operation</mode_of_operation>
+                <target_position>Target position</target_position>
+                <target_velocity>Target velocity</target_velocity>
+                <target_torque>Target torque</target_torque>
+            </outputs>  
         </hardware>
     </joint>
 </robot>
