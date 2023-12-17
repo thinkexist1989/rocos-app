@@ -123,7 +123,7 @@ add_library(hardware
         )
 target_link_libraries(hardware
         PUBLIC
-#        ${DEP_LIBS}
+        ${DEP_LIBS}
         Boost::thread
         rocos::ecat_config
         )
@@ -179,6 +179,7 @@ target_include_directories(robot
         )
 target_link_libraries(robot
         PUBLIC
+        ${DEP_LIBS}
         $<BUILD_INTERFACE:rocos::hardware>
         $<BUILD_INTERFACE:rocos::drive>
         $<BUILD_INTERFACE:rocos::kinematics>

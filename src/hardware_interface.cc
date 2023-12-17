@@ -19,8 +19,6 @@
 
 #include "include/rocos_app/hardware_interface.h"
 
-#include <boost/core/ignore_unused.hpp>
-
 namespace rocos {
 
 
@@ -49,7 +47,9 @@ namespace rocos {
     }
 
     Statusword HardwareInterface::getStatusword(int id) {
-        return Statusword();
+        Statusword status;
+        status.setFromRawStatusword(getStatuswordRaw(id));
+        return status;
     }
 
     uint16_t HardwareInterface::getStatuswordRaw(int id) {
@@ -57,27 +57,22 @@ namespace rocos {
     }
 
     void HardwareInterface::setTargetPositionRaw(int id, int32_t pos) {
-        boost::ignore_unused(id, pos);
     }
 
     void HardwareInterface::setTargetVelocityRaw(int id, int32_t vel) {
-        boost::ignore_unused(id, vel);
     }
 
     void HardwareInterface::setTargetTorqueRaw(int id, int16_t tor) {
-        boost::ignore_unused(id, tor);
     }
 
     void HardwareInterface::setControlwordRaw(int id, uint16_t ctrlwd) {
-        boost::ignore_unused(id, ctrlwd);
     }
 
     void HardwareInterface::setModeOfOperationRaw(int id, int8_t mode) {
-        boost::ignore_unused(id, mode);
     }
 
     void HardwareInterface::setModeOfOperation(int id, ModeOfOperation modeOfOperation) {
-        boost::ignore_unused(id, modeOfOperation);
+        setModeOfOperationRaw(id, static_cast<int8_t>(modeOfOperation));
     }
 
     int32_t HardwareInterface::getActualPositionRaw(int id) {
@@ -94,13 +89,13 @@ namespace rocos {
 
 
     int16_t HardwareInterface::getLoadTorqueRaw(int id) {
-        boost::ignore_unused(id);
         return 0;
     }
 
     DriveState HardwareInterface::getDriverState(int id) {
-        boost::ignore_unused(id);
-        return DriveState();
+        Statusword status;
+        status.setFromRawStatusword(getStatuswordRaw(id));
+        return status.getDriveState();
     }
 
     long HardwareInterface::getTimestamp() {
@@ -148,6 +143,10 @@ namespace rocos {
 
     int32_t HardwareInterface::getSecondaryVelocityRaw(int id) {
         return 0;
+    }
+
+    void HardwareInterface::wait() {
+        waitForSignal(0);
     }
 
 }

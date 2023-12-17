@@ -5,6 +5,8 @@
 #ifndef ROCOS_APP_FT_SENSOR_INTERFACE_H
 #define ROCOS_APP_FT_SENSOR_INTERFACE_H
 
+#include <string>
+
 namespace rocos {
 
     class FtSensorInterface {

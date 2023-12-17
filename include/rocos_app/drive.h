@@ -128,7 +128,7 @@ namespace rocos {
         bool conduct_state_change_{false}; //是否启动状态机 默认不启动
         std::atomic<bool> state_change_successful_{false}; //当前状态切换是否成功
 
-        Timestamp drive_state_change_time_point_;
+        boost::chrono::system_clock::time_point drive_state_change_time_point_;
 
         uint16_t num_of_successful_target_state_readings_{0};
 

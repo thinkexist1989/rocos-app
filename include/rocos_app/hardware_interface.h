@@ -34,8 +34,6 @@
 #include "ethercat/mode_of_operation.h"
 
 #include <string>
-#include <mutex>
-#include <atomic>
 
 #include <boost/chrono.hpp>
 
@@ -83,6 +81,8 @@ namespace rocos {
 
         virtual void waitForSignal(int id);    // Signal of Bus
 
+        virtual void wait();    // wait Signal of Bus
+
         ///////////////////////Raw Data/////////////////////////
         virtual void setTargetPositionRaw(int id, int32_t pos);
 
@@ -95,7 +95,6 @@ namespace rocos {
         virtual void setModeOfOperationRaw(int id, int8_t mode);
 
         virtual void setModeOfOperation(int id, ModeOfOperation modeOfOperation);
-
 
         virtual int32_t getActualPositionRaw(int id);
 

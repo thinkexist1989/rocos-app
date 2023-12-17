@@ -31,13 +31,11 @@
 #include "../hardware_interface.h"
 
 
-#include <boost/smart_ptr.hpp>
-
 namespace rocos {
 
     class Hardware : public HardwareInterface {
     public:
-        Hardware();
+        explicit Hardware(const std::string &urdf_file_path = "robot.urdf");
 
         ~Hardware() override;
 
@@ -79,35 +77,33 @@ namespace rocos {
 
         void setModeOfOperationRaw(int id, int8_t mode) override;
 
-        void setModeOfOperation(int id, ModeOfOperation modeOfOperation) override;
-
-        Statusword getStatusword(int id) override;
-
-        DriveState getDriverState(int id) override;
-
         void setHardwareState(HWState state) override;
 
         HWState getHardwareState() override;
 
-        void waitForSignal(int id = 0) override;
+        void waitForSignal(int id) override;
+
+        void wait() override;
+
+        void parseParamFormUrdf(const std::string &urdf_file_path);
 
     protected:
-        boost::shared_ptr<EcatConfig> ecPtr;
+        EcatConfig* ecPtr_ {nullptr};
 
-        int32_t *pTargetPos_;
-        int32_t *pTargetVel_;
-        int16_t *pTargetTor_;
+        std::vector<int32_t *> pTargetPos_;
+        std::vector<int32_t *> pTargetVel_;
+        std::vector<int16_t *> pTargetTor_;
+        std::vector<int32_t *> pActualPos_;
+        std::vector<int32_t *> pActualVel_;
+        std::vector<int16_t *> pActualTor_;
+        std::vector<int16_t *> pLoadTor_;
+        std::vector<int32_t *> pSecondaryPos_;
+        std::vector<int32_t *> pSecondaryVel_;
+        std::vector<uint16_t *> pStatusword_;
+        std::vector<uint16_t *> pControlword_;
+        std::vector<int8_t *> pModeOfOp_;
 
-        int32_t *pActualPos_;
-        int32_t *pActualVel_;
-        int16_t *pActualTor_;
-        int16_t *pLoadTor_;
-        int32_t *pSecondaryPos_;
-        int32_t *pSecondaryVel_;
-
-        uint16_t *pStatusword_;
-        uint16_t *pControlword_;
-        int8_t *pModeOfOp_;
+        int slave_num_ {0};
 
 
     };
