@@ -20,7 +20,7 @@
 #include <csignal>
 #include <cstdio>
 #include <cstdlib>
-
+#include <rocos_app/ethercat/ft_sensor.h>
 #include <rocos_app/drive.h>
 #include <rocos_app/ethercat/hardware.h>
 #include <rocos_app/ethercat/hardware_sim.h>
@@ -33,7 +33,7 @@
 
 DEFINE_string(urdf, "robot.urdf", "Urdf file path");
 DEFINE_string(base, "base_link", "Base link name");
-DEFINE_string(tip, "link_7", "Tip link name");
+DEFINE_string(tip, "link_8", "Tip link name");
 
 bool isRuning = true;
 
@@ -42,8 +42,9 @@ bool isRuning = true;
 namespace rocos
 {
 
-    //boost::shared_ptr< HardwareInterface > hw = boost::make_shared< HardwareSim >( _joint_num );  // 仿真
+    // boost::shared_ptr< HardwareInterface > hw = boost::make_shared< HardwareSim >( _joint_num );  // 仿真
     boost::shared_ptr<HardwareInterface> hw = boost::make_shared<Hardware>(); // 真实机械臂
+    FtSensor ftsensor;
 
     Robot robot(hw, FLAGS_urdf, FLAGS_base, FLAGS_tip);
 
@@ -58,9 +59,9 @@ namespace rocos
 
             isRuning = false;
             robot.stop_joint_admittance_teaching();
-            std::cout<<"stop teaching"<<std::endl;
+            std::cout << "stop teaching" << std::endl;
             robot.setDisabled();
-            
+
             exit(0);
         }
     }
@@ -68,7 +69,6 @@ namespace rocos
     void Robot::test()
     {
         //**变量初始化 **//
-       
 
         JC_helper::TCP_server my_server;
 
@@ -84,7 +84,7 @@ namespace rocos
         setEnabled();
 #pragma endregion
         int ret = robot.joint_admittance_teaching(false);
-        std::cout<<"ret: "<<ret<<std::endl;
+        std::cout << "ret: " << ret << std::endl;
         //**-------------------------------**//
 
     } // namespace rocos
@@ -109,13 +109,22 @@ int main(int argc, char *argv[])
 
     //**-------------启动admittance_joint-----------**//
     // 初始化类
-    
 
-     auto robotService = RobotServiceImpl::getInstance(&robot);
-    //std::thread thread_test{ &rocos::Robot::test, &robot };
+        float fx = ftsensor.getFx();
+    float fy = ftsensor.getFy();
+    float fz = ftsensor.getFz();
+    float mx=ftsensor.getMx();
+    float my=ftsensor.getMy();
+    float mz=ftsensor.getMz();
+    std::cout<<"Force:"<<fx<<","<<fy<<","<<fz<<","<<mx<<","<<my<<","<<mz<<std::endl;
+
+    
+    
+    auto robotService = RobotServiceImpl::getInstance(&robot);
+    // std::thread thread_test{ &rocos::Robot::test, &robot };
     //------------------------wait----------------------------------
-     robotService->runServer();
-    //thread_test.join();
+    robotService->runServer();
+    // thread_test.join();
 
     return 0;
 }

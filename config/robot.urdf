@@ -56,7 +56,7 @@
         <parent link="base_link"/>
         <child link="link_1"/>
         <axis xyz="0 0 1"/>
-        <hardware id="0" type="driver">
+        <hardware id="1" type="driver">
             <limit lower="-2.84" upper="2.84"  vel="3.0" acc="10.0" jerk="150.0" effort="30.0"/>
             <transform ratio="1.0" offset_pos_cnt="0" cnt_per_unit="156455.678" torque_per_unit="1.0"
                        user_unit_name="rad"/>
@@ -115,7 +115,7 @@
         <parent link="link_1"/>
         <child link="link_2"/>
         <axis xyz="0 0 1"/>
-        <hardware id="1" type="driver">
+        <hardware id="2" type="driver">
             <limit lower="-2.22" upper="2.22" vel="3.0" acc="10.0" jerk="150.0" effort="30.0" />
             <transform ratio="1.0" offset_pos_cnt="0" cnt_per_unit="156455.678" torque_per_unit="1.0" user_unit_name="rad"/>
             <inputs name="Inputs">
@@ -172,7 +172,7 @@
         <parent link="link_2"/>
         <child link="link_3"/>
         <axis xyz="0 0 1"/>
-        <hardware id="2" type="driver">
+        <hardware id="3" type="driver">
             <limit lower="-2.84" upper="2.84" vel="3.0" acc="10.0" jerk="150.0" effort="30.0" />
             <transform ratio="1.0" offset_pos_cnt="0" cnt_per_unit="156455.678" torque_per_unit="1.0" user_unit_name="rad"/>
             <inputs name="Inputs">
@@ -230,7 +230,7 @@
         <parent link="link_3"/>
         <child link="link_4"/>
         <axis xyz="0 0 1"/>
-        <hardware id="3" type="driver">
+        <hardware id="4" type="driver">
             <limit lower="-2.23" upper="2.23" vel="3.0" acc="10.0" jerk="150.0" effort="30.0" />
             <transform ratio="1.0" offset_pos_cnt="0" cnt_per_unit="156455.678" torque_per_unit="1.0" user_unit_name="rad"/>
             <inputs name="Inputs">
@@ -287,7 +287,7 @@
         <parent link="link_4"/>
         <child link="link_5"/>
         <axis xyz="0 0 1"/>
-        <hardware id="4" type="driver">
+        <hardware id="5" type="driver">
             <limit lower="-2.71" upper="2.71" vel="3.0" acc="10.0" jerk="150.0" effort="30.0" />
             <transform ratio="1.0" offset_pos_cnt="0" cnt_per_unit="156455.678" torque_per_unit="1.0" user_unit_name="rad"/>
             <inputs name="Inputs">
@@ -344,7 +344,7 @@
         <parent link="link_5"/>
         <child link="link_6"/>
         <axis xyz="0 0 1"/>
-        <hardware id="5" type="driver">
+        <hardware id="6" type="driver">
             <limit lower="-2.11" upper="2.11" vel="3.0" acc="10.0" jerk="150.0" effort="30.0" />
             <transform ratio="1.0" offset_pos_cnt="0" cnt_per_unit="130379.73" torque_per_unit="1.0" user_unit_name="rad"/>
             <inputs name="Inputs">
@@ -401,7 +401,7 @@
         <parent link="link_6"/>
         <child link="link_7"/>
         <axis xyz="0 0 1"/>
-        <hardware id="6" type="driver">
+        <hardware id="7" type="driver">
             <limit lower="-2.84" upper="2.84" vel="3.0" acc="10.0" jerk="150.0" effort="30.0" />
             <transform ratio="1.0" offset_pos_cnt="0" cnt_per_unit="130379.73" torque_per_unit="1.0" user_unit_name="rad"/>
             <inputs name="Inputs">
@@ -420,6 +420,51 @@
                 <target_velocity>Target velocity</target_velocity>
                 <target_torque>Target torque</target_torque>
             </outputs>  
+        </hardware>
+    </joint>
+    <link name="link_8">
+        <inertial>
+        <origin
+            xyz="0.000 0.00 -0.032"
+            rpy="0 0 0" />
+        <mass
+            value="0.994" />
+        <inertia
+            ixx="0.002"
+            ixy="0"
+            ixz="0"
+            iyy="0.002"
+            iyz="0"
+            izz="0.001" />
+        </inertial>
+        <visual>
+            <origin xyz="0 0 0" rpy="0 0 0"/>
+            <geometry>
+                <mesh filename="package://self_robot_description/meshes/arm7.STL"/>
+            </geometry>
+            <material name="">
+                <color rgba="1 1 1 1"/>
+            </material>
+        </visual>
+        
+    </link>
+    <joint name="joint_8" type="fixed">
+        <origin xyz="0 0.0 0" rpy="0 0 0"/>
+        <parent link="link_7"/>
+        <child link="link_8"/>
+        <axis xyz="0 0 1"/>
+        <hardware id="0" type="ft-sensor">
+            
+            <inputs name="AI Inputs">
+                <fx>FloatFx</fx>
+                <fy>FloatFy</fy>
+                <fz>FloatFz</fz>
+                <mx>FloatMx</mx>
+                <my>FloatMy</my>
+                <mz>FloatMz</mz>
+                
+            </inputs>
+            
         </hardware>
     </joint>
 </robot>
