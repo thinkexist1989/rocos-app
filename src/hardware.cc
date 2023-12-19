@@ -29,8 +29,6 @@ namespace rocos {
         _type = HW_ETHERCAT;
         ecPtr_ = EcatConfig::getInstance();
 
-        ecPtr_->init();
-
         slave_num_ = ecPtr_->getSlaveNum();
 
         pTargetPos_.resize(slave_num_, nullptr);

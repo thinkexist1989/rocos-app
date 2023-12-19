@@ -11,7 +11,6 @@ namespace rocos {
 
     FtSensor::FtSensor(const std::string &urdf_file_path) {
         ecPtr_ = EcatConfig::getInstance();
-        ecPtr_->init();
 
         parseParamFormUrdf(urdf_file_path);
     }
