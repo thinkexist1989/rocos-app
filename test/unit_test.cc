@@ -265,7 +265,6 @@ TEST_CASE("Robot Motion Thread") {
 }
 
 
-
 TEST_CASE("gRPC communication") {
     using namespace rocos;
 //    boost::shared_ptr<HardwareInterface> hw = boost::make_shared<HardwareSim>(5);
@@ -306,17 +305,18 @@ TEST_CASE("Kinematics") {
     q.data << 0.0, M_PI_4, 0.0, 0.0, 0.0, 0.0;
 
     int res = kin.CartToJnt(q, p, q_out);
-    if(res < 0)
-        std::cout <<"ik solve failed"  << std::endl;
+    if (res < 0)
+        std::cout << "ik solve failed" << std::endl;
     std::cout << "q_out: " << std::endl;
     std::cout << q_out.data << std::endl;
 
 }
 
-void printLink(const KDL::SegmentMap::const_iterator & link, const std::string & prefix, tinyxml2::XMLDocument* xmlDocument = nullptr)
-{
+void printLink(const KDL::SegmentMap::const_iterator &link, const std::string &prefix,
+               tinyxml2::XMLDocument *xmlDocument = nullptr) {
     std::cout << prefix << "- Segment " << GetTreeElementSegment(link->second).getName() <<
-              " has " << GetTreeElementChildren(link->second).size() << " children and joint name is " << GetTreeElementSegment(link->second).getJoint().getName() << std::endl;
+              " has " << GetTreeElementChildren(link->second).size() << " children and joint name is "
+              << GetTreeElementSegment(link->second).getJoint().getName() << std::endl;
     for (unsigned int i = 0; i < GetTreeElementChildren(link->second).size(); i++) {
         printLink(GetTreeElementChildren(link->second)[i], prefix + "  ");
     }
@@ -331,45 +331,16 @@ TEST_CASE("URDF") {
     }
 
     KDL::Tree my_tree;
-    bool bOk = kdl_parser::treeFromUrdfModel(*robot_model, my_tree);
+//    bool bOk = kdl_parser::treeFromUrdfModel(*robot_model, my_tree);
     if (!kdl_parser::treeFromUrdfModel(*robot_model, my_tree)) {
         std::cerr << "Could not extract kdl tree" << std::endl;
         return;
     }
 
-    tinyxml2::XMLDocument xml_doc;
-    xml_doc.LoadFile("robot.urdf");
-
     KDL::Chain chain;
     my_tree.getChain("base_link", "link_6", chain);
 
-    auto robot = xml_doc.FirstChildElement("robot");
-    for(auto element = robot->FirstChildElement("joint"); element; element = element->NextSiblingElement("joint")) {
-        for(int i = 0; i < chain.getNrOfJoints(); ++i) {
-            if(element->Attribute("name") == chain.getSegment(i).getJoint().getName()) {
-                std::cout << "Joint" << std::endl
-                          <<     "\t name: " <<  element->Attribute("name") << "\n";
-                auto hw = element->FirstChildElement("hardware");
-                auto limit = hw->FirstChildElement("limit");
-                std::cout <<     "   limits: \n"
-                          <<     "    - lower: " << atof(limit->Attribute("lower"))<< std::endl
-                          <<     "    - upper: " << atof(limit->Attribute("upper"))<< std::endl
-                          <<     "    - vel: " << atof(limit->Attribute("vel"))<< std::endl
-                          <<     "    - acc: " << atof(limit->Attribute("acc"))<< std::endl
-                          <<     "    - jerk: " << atof(limit->Attribute("jerk")) << std::endl;
-                auto trans = hw->FirstChildElement("transform");
-                std::cout <<     "  transform: \n"
-                          <<     "    - ratio: " << trans->FloatAttribute("ratio", 2.0) << std::endl
-                          <<     "    - offset_pos_cnt: " << trans->FloatAttribute("offset_pos_cnt", 1.0)<< std::endl
-                          <<     "    - cnt_per_unit: " << trans->FloatAttribute("cnt_per_unit", 22.0)<< std::endl
-                          <<     "    - torque_per_unit: " << trans->FloatAttribute("torque_per_unit", 33.0) << std::endl;
-                if(trans->Attribute("user_unit_name"))
-                    std::cout << "    - user_unit_name: " << trans->Attribute("user_unit_name") << std::endl;
-                else
-                    std::cout << "    - user_unit_name: " << "rad" << std::endl;
-            }
-        }
-    }
+
 
     // walk through tree
     std::cout << " ======================================" << std::endl;
@@ -377,6 +348,79 @@ TEST_CASE("URDF") {
     std::cout << " ======================================" << std::endl;
     KDL::SegmentMap::const_iterator root = my_tree.getRootSegment();
 
-    printLink(root, "", &xml_doc);
+    printLink(root, "");
+
+
+    tinyxml2::XMLDocument xml_doc;
+    xml_doc.LoadFile("robot.urdf");
+
+    auto robot = xml_doc.FirstChildElement("robot");
+    for (auto element = robot->FirstChildElement("joint"); element; element = element->NextSiblingElement("joint")) {
+        for (int i = 0; i < chain.getNrOfJoints(); ++i) {
+            if (element->Attribute("name") == chain.getSegment(i).getJoint().getName()) {
+                std::cout << "Joint" << std::endl
+                          << "\t name: " << element->Attribute("name") << "\n";
+                auto hw = element->FirstChildElement("hardware");
+                auto limit = hw->FirstChildElement("limit");
+                std::cout << "   limits: \n"
+                          << "    - lower: " << atof(limit->Attribute("lower")) << std::endl
+                          << "    - upper: " << atof(limit->Attribute("upper")) << std::endl
+                          << "    - vel: " << atof(limit->Attribute("vel")) << std::endl
+                          << "    - acc: " << atof(limit->Attribute("acc")) << std::endl
+                          << "    - jerk: " << atof(limit->Attribute("jerk")) << std::endl;
+                auto trans = hw->FirstChildElement("transform");
+                std::cout << "  transform: \n"
+                          << "    - ratio: " << trans->FloatAttribute("ratio", 2.0) << std::endl
+                          << "    - offset_pos_cnt: " << trans->FloatAttribute("offset_pos_cnt", 1.0) << std::endl
+                          << "    - cnt_per_unit: " << trans->FloatAttribute("cnt_per_unit", 22.0) << std::endl
+                          << "    - torque_per_unit: " << trans->FloatAttribute("torque_per_unit", 33.0) << std::endl;
+                if (trans->Attribute("user_unit_name"))
+                    std::cout << "    - user_unit_name: " << trans->Attribute("user_unit_name") << std::endl;
+                else
+                    std::cout << "    - user_unit_name: " << "rad" << std::endl;
+            }
+        }
+    }
+
+}
+
+TEST_CASE("chain_param") {
+    urdf::ModelInterfaceSharedPtr robot_model = urdf::parseURDFFile("robot.urdf");
+    if (!robot_model) {
+        std::cerr << "Could not generate robot model" << std::endl;
+        return;
+    }
+
+    KDL::Tree my_tree;
+//    bool bOk = kdl_parser::treeFromUrdfModel(*robot_model, my_tree);
+    if (!kdl_parser::treeFromUrdfModel(*robot_model, my_tree)) {
+        std::cerr << "Could not extract kdl tree" << std::endl;
+        return;
+    }
+
+    KDL::Chain chain;
+    my_tree.getChain("base_link", "link_6", chain);
+
+    double roll,pitch,yaw;
+
+    std::cout << "robot: " << std::endl;
+    for (int i = 0; i < chain.getNrOfJoints(); ++i) {
+        auto link = robot_model->getLink(chain.getSegment(i).getName());
+        auto joint = robot_model->getJoint(chain.getSegment(i).getJoint().getName());
+        std::cout << "  - name: " << link->name << ": " << std::endl;
+        std::cout << "    order: " << i << std::endl;
+        std::cout << "    translate: " << joint->parent_to_joint_origin_transform.position.x << ", "
+                  << joint->parent_to_joint_origin_transform.position.y << ", "
+                  << joint->parent_to_joint_origin_transform.position.z << std::endl;
+        joint->parent_to_joint_origin_transform.rotation.getRPY(roll, pitch, yaw);
+        std::cout << "    rotate: " << roll << ", " << pitch << ", " << yaw << std::endl;
+        std::cout << "    axis: " << joint->axis.x << ", " << joint->axis.y << ", " << joint->axis.z  << std::endl;
+
+        link->visual->origin.rotation.getRPY(roll, pitch, yaw);
+        std::cout << "    translateLink: " << link->visual->origin.position.x << ", " << link->visual->origin.position.y << ", "
+                  << link->visual->origin.position.z << std::endl;
+        std::cout << "    rotateLink: " << roll << ", " << pitch << ", " << yaw << std::endl;
+    }
+
 
 }

@@ -40,18 +40,12 @@ std::ofstream outputFile_Flange("/home/landau/Documents/rocos-app/src/Flange.csv
 std::ofstream outputFile_Flange_KDL("/home/landau/Documents/rocos-app/src/Flange_KDL.csv");
 #pragma region
 
-namespace rocos
-{
+namespace rocos {
 
-    boost::shared_ptr< HardwareInterface > hw = boost::make_shared< HardwareSim >( 7 );  // 仿真
-//    boost::shared_ptr<HardwareInterface> hw = boost::make_shared<Hardware>(); // 真实机械臂
+    Robot* robot_ptr = nullptr;
 
-    Robot robot(hw, FLAGS_urdf, FLAGS_base, FLAGS_tip);
-
-    void signalHandler(int signo)
-    {
-        if (signo == SIGINT)
-        {
+    void signalHandler(int signo) {
+        if (signo == SIGINT) {
             std::cout << "\033[1;31m"
                       << "[!!SIGNAL!!]"
                       << "INTERRUPT by CTRL-C"
@@ -61,14 +55,13 @@ namespace rocos
             outputFile_Flange.close();
             outputFile_Flange_KDL.close();
 
-            robot.setDisabled();
+            robot_ptr->setDisabled();
 
             exit(0);
         }
     }
 
-    void Robot::test()
-    {
+    void Robot::test() {
         //**变量初始化 **//
 
         JC_helper::TCP_server my_server;
@@ -87,13 +80,11 @@ namespace rocos
 
         //**-------------------------------**//
 
-        while (isRuning)
-        {
+        while (isRuning) {
 
             KDL::JntArray q_target(_joint_num);
-            for (int i = 0; i < _joint_num; i++)
-            {
-                q_target(i) = robot.getJointPosition(i);
+            for (int i = 0; i < _joint_num; i++) {
+                q_target(i) = robot_ptr->getJointPosition(i);
             }
             KDL::Frame p0, p1;
             KDL::Rotation rotation;
@@ -104,16 +95,14 @@ namespace rocos
 
             rotation = p0.M;
             rotation_KDL = p1.M;
-            for (int i = 0; i < 3; i++)
-            {
-                for (int j = 0; j < 3; j++)
-                {
+            for (int i = 0; i < 3; i++) {
+                for (int j = 0; j < 3; j++) {
                     outputFile_Flange << rotation(i, j) << ",";
                     outputFile_Flange_KDL << rotation_KDL(i, j) << ",";
                 }
             }
-            outputFile_Flange<<std::endl;
-            outputFile_Flange_KDL<<std::endl;
+            outputFile_Flange << std::endl;
+            outputFile_Flange_KDL << std::endl;
         }
 
     } // namespace rocos
@@ -122,10 +111,8 @@ namespace rocos
 
 }
 
-int main(int argc, char *argv[])
-{
-    if (signal(SIGINT, rocos::signalHandler) == SIG_ERR)
-    {
+int main(int argc, char *argv[]) {
+    if (signal(SIGINT, rocos::signalHandler) == SIG_ERR) {
         std::cout << "\033[1;31m"
                   << "Can not catch SIGINT"
                   << "\033[0m" << std::endl;
@@ -138,15 +125,17 @@ int main(int argc, char *argv[])
 
     //**-------------启动admittance_joint-----------**//
     // 初始化类
-//     boost::shared_ptr< HardwareInterface > hw = boost::make_shared< HardwareSim >( 7 );  // 仿真
+    boost::shared_ptr<HardwareInterface> hw = boost::make_shared<HardwareSim>(7);  // 仿真
 //    boost::shared_ptr<HardwareInterface> hw = boost::make_shared<Hardware>(); // 真实机械臂
 
-//    Robot robot(hw, FLAGS_urdf, FLAGS_base, FLAGS_tip);
+    Robot robot(hw, FLAGS_urdf, FLAGS_base, FLAGS_tip);
 
-     auto robotService = RobotServiceImpl::getInstance(&robot);
+    robot_ptr = &robot;
+
+    auto robotService = RobotServiceImpl::getInstance(&robot);
 //    std::thread thread_test{&rocos::Robot::test, &robot};
     //------------------------wait----------------------------------
-     robotService->runServer();
+    robotService->runServer();
 //    thread_test.join();
 
     return 0;
