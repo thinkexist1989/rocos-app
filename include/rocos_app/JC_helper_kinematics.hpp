@@ -58,7 +58,7 @@
 //  std::cout << BLUE << " hello world " << std::endl;
 
 //** 显式指定关节数量 **//
-constexpr size_t _joint_num{ 7 };
+extern size_t _joint_num;
 
 namespace rocos
 {
@@ -403,7 +403,7 @@ namespace JC_helper
         Eigen::MatrixXd V;
         Eigen::VectorXd tmp;
 
-        Eigen::Matrix< double, _joint_num, _joint_num > null_space_jac;
+        Eigen::Matrix< double, 7, 7 > null_space_jac; // 只有7自由度才能进行零空间运算
         int _max_jac_cul_index = -1;  // 表示对角矩阵中系数最大的列，也是指示控制哪个关节
         KDL::ChainFkSolverPos_recursive fk_slover;
 
@@ -422,7 +422,7 @@ namespace JC_helper
 
         void nullspace_stop( double max_vel = 10, double max_acc = 50, double max_jerk = 180 );
 
-        bool is_same_on_direction( const Eigen::Block< Eigen::Matrix< double, _joint_num, _joint_num >, _joint_num, 1, true >& );
+        bool is_same_on_direction( const Eigen::Block< Eigen::Matrix< double, 7, 7 >, 7, 1, true >& );
     };
 
     typedef double JC_double;
@@ -502,7 +502,7 @@ namespace JC_helper
      * @param target_pos 目标位置
      * @return int
      */
-    int safety_servo( rocos::Robot* robot_ptr, const std::array< double, _joint_num >& target_pos );
+//    int safety_servo( rocos::Robot* robot_ptr, const std::array< double, 7 >& target_pos );
 
     /**
      * @brief 带安全位置检查的伺服,无效则报错并程序终止

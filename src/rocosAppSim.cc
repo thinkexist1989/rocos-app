@@ -31,7 +31,7 @@
 #include <string>
 #include <gflags/gflags.h>
 
-DEFINE_string(urdf, "robot_sun_new.urdf", "Urdf file path");
+DEFINE_string(urdf, "robot.urdf", "Urdf file path");
 DEFINE_string(base, "base_link", "Base link name");
 DEFINE_string(tip, "link_7", "Tip link name");
 

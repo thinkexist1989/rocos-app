@@ -709,7 +709,7 @@ namespace rocos {
         //声明友元类
         friend class JC_helper::admittance_joint ;
 
-        friend int JC_helper::safety_servo( rocos::Robot* robot_ptr, const std::array< double, _joint_num >& target_pos );
+//        friend int JC_helper::safety_servo( rocos::Robot* robot_ptr, const std::array< double, 7 >& target_pos );
 
         friend int JC_helper::safety_servo( rocos::Robot* robot_ptr, const std::vector< double >& target_pos );
 

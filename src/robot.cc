@@ -21,15 +21,19 @@
 #include <rocos_app/JC_helper_authenticate.hpp>
 #include <kdl_parser/kdl_parser.hpp> // 用于将urdf文件解析为KDL::Tree
 
+#define  MAX_JOINT_NUM 50
+
 namespace rocos {
     Robot::Robot(boost::shared_ptr<HardwareInterface> hw,
                  const std::string &urdf_file_path,
                  const std::string &base_link,
-                 const std::string &tip) : hw_interface_(hw),pos_(_joint_num),vel_(_joint_num),acc_(_joint_num) {
+                 const std::string &tip) : hw_interface_(hw), pos_(MAX_JOINT_NUM), vel_(MAX_JOINT_NUM), acc_(MAX_JOINT_NUM){
         
         parseUrdf(urdf_file_path, base_link, tip);
 
 //        addAllJoints( ); // TODO: 这个应该直接加到参数解析里面，解析之后加入关节，顺序和主站顺序可能不一样
+
+        _joint_num = jnt_num_;
 
         target_positions_.resize(jnt_num_);
         target_positions_prev_.resize(jnt_num_);
@@ -2741,7 +2745,7 @@ namespace rocos {
         //     }
         //**-------------------------------**//
         //** 速度检查 **//
-        Eigen::Matrix< double, _joint_num, 1 > joint_offset = ( target_pos.data - JC_helper::vector_2_JntArray( pos_ ).data ).cwiseAbs( );
+        Eigen::MatrixXd joint_offset = ( target_pos.data - JC_helper::vector_2_JntArray( pos_ ).data ).cwiseAbs( );
         for ( int i = 0; i < _joint_num; ++i )
             if ( joint_offset( i ) > joints_[ i ]->getMaxVel( ) * 0.001 )
             {

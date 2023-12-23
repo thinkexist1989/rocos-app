@@ -1,6 +1,9 @@
 #include <rocos_app/JC_helper_kinematics.hpp>
 #include <rocos_app/robot.h>
 
+//** 显式指定关节数量 **//
+size_t _joint_num { 0 };
+
 namespace JC_helper
 {
 #pragma region  //* 轨迹计算函数
@@ -3399,8 +3402,12 @@ namespace JC_helper
         input.max_jerk[ 0 ]         = max_jerk;
     }
 
-    bool SmartServo_Nullspace::is_same_on_direction(const Eigen::Block< Eigen::Matrix< double, _joint_num, _joint_num >, _joint_num, 1, true >& joint_vel )
+    bool SmartServo_Nullspace::is_same_on_direction(const Eigen::Block< Eigen::Matrix< double, 7, 7 >, 7, 1, true >& joint_vel )
     {
+        // 如果不是7自由度直接退出
+        if(_joint_num != 7)
+            return false;
+
         KDL::JntArray joint_target( _joint_num );
         for ( int i = 0; i < _joint_num; i++ )
         {
@@ -3931,9 +3938,9 @@ namespace JC_helper
     void Joint_stop( rocos::Robot* robot_ptr, const KDL::JntArray& current_pos, const KDL::JntArray& last_pos, const KDL::JntArray& last_last_pos )
     {
         //** 变量初始化 **//
-        ruckig::Ruckig< _joint_num > otg{ 0.001 };
-        ruckig::InputParameter< _joint_num > input;
-        ruckig::OutputParameter< _joint_num > output;
+        ruckig::Ruckig<ruckig::DynamicDOFs> otg{_joint_num, 0.001 };
+        ruckig::InputParameter< ruckig::DynamicDOFs > input(_joint_num);
+        ruckig::OutputParameter< ruckig::DynamicDOFs > output(_joint_num);
         ruckig::Result res;
         //**-------------------------------**//
 
@@ -4035,31 +4042,31 @@ namespace JC_helper
         return 0;
     }
 
-    int safety_servo( rocos::Robot* robot_ptr, const std::array< double, _joint_num >& target_pos )
-    {
-        //** 伺服位置检查，无效则报错并程序终止 **//
-        for ( int i = 0; i < _joint_num; ++i )
-        {
-            if ( target_pos[ i ] > robot_ptr->joints_[ i ]->getMaxPosLimit( ) || target_pos[ i ] < robot_ptr->joints_[ i ]->getMinPosLimit( ) )
-            {
-                PLOG_ERROR << "target pos [" << i << "]= " << target_pos[ i ] * KDL::rad2deg << " is out of range ";
-                PLOG_ERROR << "program will be turn off after 4 seconds!!";
-                std::this_thread::sleep_for( std::chrono::duration< double >( 4 ) );
-                exit( -1 );
-            }
-        }
-        //**-------------------------------**//
-
-        //** 位置伺服 **//
-        for ( int i = 0; i < _joint_num; ++i )
-        {
-            robot_ptr->pos_[ i ] = target_pos[ i ];
-            robot_ptr->joints_[ i ]->setPosition( target_pos[ i ] );
-        }
-        robot_ptr->hw_interface_->waitForSignal( 0 );
-        //**-------------------------------**//
-        return 0;
-    }
+//    int safety_servo( rocos::Robot* robot_ptr, const std::array< double, 7 >& target_pos )
+//    {
+//        //** 伺服位置检查，无效则报错并程序终止 **//
+//        for ( int i = 0; i < _joint_num; ++i )
+//        {
+//            if ( target_pos[ i ] > robot_ptr->joints_[ i ]->getMaxPosLimit( ) || target_pos[ i ] < robot_ptr->joints_[ i ]->getMinPosLimit( ) )
+//            {
+//                PLOG_ERROR << "target pos [" << i << "]= " << target_pos[ i ] * KDL::rad2deg << " is out of range ";
+//                PLOG_ERROR << "program will be turn off after 4 seconds!!";
+//                std::this_thread::sleep_for( std::chrono::duration< double >( 4 ) );
+//                exit( -1 );
+//            }
+//        }
+//        //**-------------------------------**//
+//
+//        //** 位置伺服 **//
+//        for ( int i = 0; i < _joint_num; ++i )
+//        {
+//            robot_ptr->pos_[ i ] = target_pos[ i ];
+//            robot_ptr->joints_[ i ]->setPosition( target_pos[ i ] );
+//        }
+//        robot_ptr->hw_interface_->waitForSignal( 0 );
+//        //**-------------------------------**//
+//        return 0;
+//    }
 
     int safety_servo( rocos::Robot* robot_ptr, const std::vector< double >& target_pos )
     {
