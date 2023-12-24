@@ -403,24 +403,68 @@ TEST_CASE("chain_param") {
 
     double roll,pitch,yaw;
 
-    std::cout << "robot: " << std::endl;
-    for (int i = 0; i < chain.getNrOfJoints(); ++i) {
-        auto link = robot_model->getLink(chain.getSegment(i).getName());
-        auto joint = robot_model->getJoint(chain.getSegment(i).getJoint().getName());
-        std::cout << "  - name: " << link->name << ": " << std::endl;
-        std::cout << "    order: " << i << std::endl;
-        std::cout << "    translate: " << joint->parent_to_joint_origin_transform.position.x << ", "
-                  << joint->parent_to_joint_origin_transform.position.y << ", "
-                  << joint->parent_to_joint_origin_transform.position.z << std::endl;
-        joint->parent_to_joint_origin_transform.rotation.getRPY(roll, pitch, yaw);
-        std::cout << "    rotate: " << roll << ", " << pitch << ", " << yaw << std::endl;
-        std::cout << "    axis: " << joint->axis.x << ", " << joint->axis.y << ", " << joint->axis.z  << std::endl;
+    // 创建映射表
+    std::map<int, std::string> enumMap;
+    enumMap[urdf::Joint::FIXED] = "fixed";
+    enumMap[urdf::Joint::REVOLUTE] = "revolute";
+    enumMap[urdf::Joint::PRISMATIC] = "prismatic";
+    enumMap[urdf::Joint::CONTINUOUS] = "continuous";
 
-        link->visual->origin.rotation.getRPY(roll, pitch, yaw);
-        std::cout << "    translateLink: " << link->visual->origin.position.x << ", " << link->visual->origin.position.y << ", "
-                  << link->visual->origin.position.z << std::endl;
+    std::cout << "robot: " << std::endl;
+
+//    auto root = robot_model->getRoot();
+//    std::cout << "  - name: " << root->name << std::endl;
+//    std::cout << "    order: " << 0 << std::endl;
+//    std::cout << "    mesh: " << std::dynamic_pointer_cast<urdf::Mesh>(root->visual->geometry)->filename << std::endl;
+
+    std::vector<urdf::LinkSharedPtr> links;
+    robot_model->getLinks(links);
+
+    for(int i = 0; i < links.size(); i++) {
+        std::cout << "  - name: " << links[i]->name << std::endl;
+        std::cout << "    order: " << i << std::endl;
+        if(links[i]->parent_joint) {
+            std::cout << "    type: " << enumMap[links[i]->parent_joint->type] << std::endl;
+            std::cout << "    translate: " << links[i]->parent_joint->parent_to_joint_origin_transform.position.x << ", "
+                  << links[i]->parent_joint->parent_to_joint_origin_transform.position.y << ", "
+                  << links[i]->parent_joint->parent_to_joint_origin_transform.position.z << std::endl;
+
+            std::cout << "    rotate: " << links[i]->parent_joint->parent_to_joint_origin_transform.rotation.x << ", "
+                  << links[i]->parent_joint->parent_to_joint_origin_transform.rotation.y << ", "
+                  << links[i]->parent_joint->parent_to_joint_origin_transform.rotation.z << ", "
+                  << links[i]->parent_joint->parent_to_joint_origin_transform.rotation.w << std::endl;
+
+            std::cout << "    axis: " << links[i]->parent_joint->axis.x << ", "
+                  << links[i]->parent_joint->axis.y << ", "
+                  << links[i]->parent_joint->axis.z << std::endl;
+        }
+
+        links[i]->visual->origin.rotation.getRPY(roll, pitch, yaw);
+        std::cout << "    translateLink: " << links[i]->visual->origin.position.x << ", " << links[i]->visual->origin.position.y << ", "
+                  << links[i]->visual->origin.position.z << std::endl;
+
         std::cout << "    rotateLink: " << roll << ", " << pitch << ", " << yaw << std::endl;
+        std::cout << "    mesh: " << std::dynamic_pointer_cast<urdf::Mesh>(links[i]->visual->geometry)->filename << std::endl;
     }
 
+//    for (int i = 0; i < chain.getNrOfSegments(); ++i) {
+//        auto link = robot_model->getLink(chain.getSegment(i).getName());
+//        auto joint = robot_model->getJoint(chain.getSegment(i).getJoint().getName());
+//        std::cout << "  - name: " << link->name << std::endl;
+//        std::cout << "    order: " << i + 1 << std::endl;
+//        std::cout << "    translate: " << joint->parent_to_joint_origin_transform.position.x << ", "
+//                  << joint->parent_to_joint_origin_transform.position.y << ", "
+//                  << joint->parent_to_joint_origin_transform.position.z << std::endl;
+//        joint->parent_to_joint_origin_transform.rotation.getRPY(roll, pitch, yaw);
+//        std::cout << "    rotate: " << roll << ", " << pitch << ", " << yaw << std::endl;
+//        std::cout << "    axis: " << joint->axis.x << ", " << joint->axis.y << ", " << joint->axis.z  << std::endl;
+//
+//        link->visual->origin.rotation.getRPY(roll, pitch, yaw);
+//        std::cout << "    translateLink: " << link->visual->origin.position.x << ", " << link->visual->origin.position.y << ", "
+//                  << link->visual->origin.position.z << std::endl;
+//        std::cout << "    rotateLink: " << roll << ", " << pitch << ", " << yaw << std::endl;
+//        std::cout << "    mesh: " << std::dynamic_pointer_cast<urdf::Mesh>(link->visual->geometry)->filename << std::endl;
+//
+//    }
 
 }
