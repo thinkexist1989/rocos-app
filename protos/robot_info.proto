@@ -37,6 +37,15 @@ message JointInfo {
   string user_unit_name = 6; // 用户单位的名称，可能是rad, m, mm等
 }
 
+message Link {
+  string name = 1; // Link Name
+  
+}
+
+message RobotModel {
+
+}
+
 // The Infomation of the robot
 message RobotInfo {
   repeated JointInfo joint_infos = 1; //包含所有关节信息
