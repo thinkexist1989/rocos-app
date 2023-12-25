@@ -36,6 +36,12 @@ namespace rocos {
     public:
         static boost::shared_ptr<RobotServiceImpl> getInstance(Robot* robot);
 
+        grpc::Status GetRobotModel(::grpc::ServerContext *context, const ::google::protobuf::Empty *request,
+                                   ::rocos::RobotModel *response) override;
+
+        grpc::Status GetLinkMesh(::grpc::ServerContext *context, const ::rocos::LinkMeshPath *request,
+                                 ::rocos::LinkMeshFile *response) override;
+
         grpc::Status ReadRobotInfo(::grpc::ServerContext *context, const ::rocos::RobotInfoRequest *request,
                                    ::rocos::RobotInfoResponse *response) override;
 

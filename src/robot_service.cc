@@ -28,6 +28,9 @@
 #include <grpcpp/health_check_service_interface.h>
 #include <grpcpp/ext/proto_server_reflection_plugin.h>
 
+#include <filesystem>
+#include <fstream>
+
 namespace rocos {
     using namespace google::protobuf::util;  //使用命名空间
 
@@ -43,6 +46,121 @@ namespace rocos {
             });  // 因为默认访问不了private 析构函数,需传入删除器
         }
         return instance_;
+    }
+
+
+    grpc::Status
+    RobotServiceImpl::GetRobotModel(::grpc::ServerContext *context, const ::google::protobuf::Empty *request,
+                                    ::rocos::RobotModel *response) {
+
+        urdf::ModelInterfaceSharedPtr robot_model = urdf::parseURDFFile(robot_ptr_->urdf_file_path_);
+        if (!robot_model) {
+            std::cerr << "Could not generate robot model" << std::endl;
+            return grpc::Status::CANCELLED;
+        }
+
+        double roll,pitch,yaw;
+
+        // 创建映射表
+        std::map<int, std::string> enumMap;
+        enumMap[urdf::Joint::FIXED] = "fixed";
+        enumMap[urdf::Joint::REVOLUTE] = "revolute";
+        enumMap[urdf::Joint::PRISMATIC] = "prismatic";
+        enumMap[urdf::Joint::CONTINUOUS] = "continuous";
+
+        std::cout << "robot: " << std::endl;
+
+        std::vector<urdf::LinkSharedPtr> links;
+        robot_model->getLinks(links);
+
+        for(int i = 0; i < links.size(); i++) {
+
+            Link link;
+
+            std::cout << "  - name: " << links[i]->name << std::endl;
+            link.set_name(links[i]->name);
+
+            std::cout << "    order: " << i << std::endl;
+            link.set_order(i);
+
+            if(links[i]->parent_joint) {
+                std::cout << "    type: " << enumMap[links[i]->parent_joint->type] << std::endl;
+                link.set_type(static_cast<JointType>(links[i]->parent_joint->type));
+
+                std::cout << "    translate: " << links[i]->parent_joint->parent_to_joint_origin_transform.position.x << ", "
+                          << links[i]->parent_joint->parent_to_joint_origin_transform.position.y << ", "
+                          << links[i]->parent_joint->parent_to_joint_origin_transform.position.z << std::endl;
+                link.mutable_translate()->set_x(links[i]->parent_joint->parent_to_joint_origin_transform.position.x);
+                link.mutable_translate()->set_y(links[i]->parent_joint->parent_to_joint_origin_transform.position.y);
+                link.mutable_translate()->set_z(links[i]->parent_joint->parent_to_joint_origin_transform.position.z);
+
+                std::cout << "    rotate: " << links[i]->parent_joint->parent_to_joint_origin_transform.rotation.x << ", "
+                          << links[i]->parent_joint->parent_to_joint_origin_transform.rotation.y << ", "
+                          << links[i]->parent_joint->parent_to_joint_origin_transform.rotation.z << ", "
+                          << links[i]->parent_joint->parent_to_joint_origin_transform.rotation.w << std::endl;
+                link.mutable_rotate()->set_x(links[i]->parent_joint->parent_to_joint_origin_transform.rotation.x);
+                link.mutable_rotate()->set_y(links[i]->parent_joint->parent_to_joint_origin_transform.rotation.y);
+                link.mutable_rotate()->set_z(links[i]->parent_joint->parent_to_joint_origin_transform.rotation.z);
+
+                std::cout << "    axis: " << links[i]->parent_joint->axis.x << ", "
+                          << links[i]->parent_joint->axis.y << ", "
+                          << links[i]->parent_joint->axis.z << std::endl;
+                link.mutable_axis()->set_x(links[i]->parent_joint->axis.x);
+                link.mutable_axis()->set_y(links[i]->parent_joint->axis.y);
+                link.mutable_axis()->set_z(links[i]->parent_joint->axis.z);
+            }
+
+            std::cout << "    translateLink: " << links[i]->visual->origin.position.x << ", " << links[i]->visual->origin.position.y << ", "
+                      << links[i]->visual->origin.position.z << std::endl;
+            link.mutable_translatelink()->set_x(links[i]->visual->origin.position.x);
+            link.mutable_translatelink()->set_y(links[i]->visual->origin.position.y);
+            link.mutable_translatelink()->set_z(links[i]->visual->origin.position.z);
+
+            links[i]->visual->origin.rotation.getRPY(roll, pitch, yaw);
+            std::cout << "    rotateLink: " << roll << ", " << pitch << ", " << yaw << std::endl;
+            link.mutable_rotatelink()->set_x(roll);
+            link.mutable_rotatelink()->set_y(pitch);
+            link.mutable_rotatelink()->set_z(yaw);
+
+            std::cout << "    mesh: " << std::dynamic_pointer_cast<urdf::Mesh>(links[i]->visual->geometry)->filename << std::endl;
+            link.set_mesh(std::dynamic_pointer_cast<urdf::Mesh>(links[i]->visual->geometry)->filename);
+
+            *response->add_links() = link; // add link to response.links
+
+        }
+
+
+
+        return grpc::Status::OK;
+    }
+
+    grpc::Status RobotServiceImpl::GetLinkMesh(::grpc::ServerContext *context, const ::rocos::LinkMeshPath *request,
+                                               ::rocos::LinkMeshFile *response) {
+
+        std::cout << "request link file path: " << request->path() << std::endl;
+        std::filesystem::path file_path(request->path());
+
+        std::ifstream file(file_path, std::ios::binary); // 以二进制方式打开文件
+        if(!file.is_open()) {
+            std::cout << "open file failed!" << std::endl;
+            return grpc::Status::CANCELLED;
+        }
+
+        file.seekg(0, std::ios::end); // 定位到文件末尾
+        std::streampos file_size = file.tellg(); // 获取文件大小
+
+        file.seekg(0, std::ios::beg); // 定位到文件头
+        std::vector<char> buffer(file_size); // 创建缓冲区
+
+        file.read(buffer.data(), file_size); // 读取文件到缓冲区
+        buffer.push_back('\0'); // 添加字符串结束符
+
+        std::cout << "File Size: " << file_size / 1000.0 << " kB" << std::endl;
+
+        response->set_name(file_path.filename().string()); // 设置response.name
+        response->set_content(buffer.data(), buffer.size()); // 设置response.data
+
+        return grpc::Status::OK;
     }
 
     grpc::Status RobotServiceImpl::ReadRobotInfo(
@@ -453,7 +571,8 @@ namespace rocos {
         is_thread_running_ = false;
     }
 
-    boost::shared_ptr<RobotServiceImpl> RobotServiceImpl::instance_ =
-            nullptr;  // 单例模式对象
+    // 单例模式对象
+    boost::shared_ptr<RobotServiceImpl> RobotServiceImpl::instance_ = nullptr;
+
 
 }  // namespace rocos

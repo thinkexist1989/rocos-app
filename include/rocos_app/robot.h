@@ -647,6 +647,8 @@ namespace rocos {
         boost::shared_ptr<HardwareInterface> hw_interface_{nullptr};
         std::vector<boost::shared_ptr<Drive> > joints_;
 
+        std::string urdf_file_path_; // urdf文件路径
+
         std::vector<double> target_positions_;       // 当前目标位置
         std::vector<double> target_positions_prev_;  // 上一次的目标位置
 

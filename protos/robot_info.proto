@@ -37,13 +37,40 @@ message JointInfo {
   string user_unit_name = 6; // 用户单位的名称，可能是rad, m, mm等
 }
 
+enum JointType
+{
+  UNKNOWN = 0;
+  REVOLUTE = 1;
+  CONTINUOUS = 2;
+  PRISMATIC = 3;
+  FLOATING = 4;
+  PLANAR = 5;
+  FIXED = 6;
+}
+
 message Link {
   string name = 1; // Link Name
-  
+  int32 order = 2; // Link Order
+  JointType type = 3; // Link Type(fixed, continuous, revolute, prismatic)
+  Vec3 translate = 4; // joint origin xyz
+  Vec3 rotate = 5; // joint origin rpy
+  Vec3 axis = 6; // joint axis
+  Vec3 translateLink = 7; // link origin xyz
+  Vec3 rotateLink = 8; // link origin rpy
+  string mesh = 9; // link mesh path
 }
 
 message RobotModel {
+  repeated Link links = 1; // all links
+}
 
+message LinkMeshPath { // mesh file path in rocos-app
+  string path = 1; // mesh file path
+}
+
+message LinkMeshFile{
+  string name = 1; // mesh file name
+  bytes  content = 2; // mesh file content
 }
 
 // The Infomation of the robot

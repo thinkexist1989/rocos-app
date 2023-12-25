@@ -26,8 +26,13 @@ option java_outer_classname = "RobotServiceProto";
 import "robot_command.proto";
 import "robot_state.proto";
 import "robot_info.proto";
+import "google/protobuf/empty.proto";
 
 service RobotService {
+    // Get Robot Model
+    rpc GetRobotModel(google.protobuf.Empty) returns (RobotModel) {}
+    // Get Link Mesh. you need first get robot model and then get link mesh
+    rpc GetLinkMesh(LinkMeshPath) returns (LinkMeshFile) {}
     // Receive robot info information
     rpc ReadRobotInfo(RobotInfoRequest) returns (RobotInfoResponse) {}
     // Receive robot state information
