@@ -61,7 +61,8 @@ message Link {
 }
 
 message RobotModel {
-  repeated Link links = 1; // all links
+  string name = 1; // robot name
+  repeated Link links = 2; // all links
 }
 
 message LinkMeshPath { // mesh file path in rocos-app

@@ -69,6 +69,7 @@ namespace rocos {
         enumMap[urdf::Joint::CONTINUOUS] = "continuous";
 
         std::cout << "robot: " << std::endl;
+        response->set_name(robot_model->getName());
 
         std::vector<urdf::LinkSharedPtr> links;
         robot_model->getLinks(links);
@@ -94,13 +95,11 @@ namespace rocos {
                 link.mutable_translate()->set_y(links[i]->parent_joint->parent_to_joint_origin_transform.position.y);
                 link.mutable_translate()->set_z(links[i]->parent_joint->parent_to_joint_origin_transform.position.z);
 
-                std::cout << "    rotate: " << links[i]->parent_joint->parent_to_joint_origin_transform.rotation.x << ", "
-                          << links[i]->parent_joint->parent_to_joint_origin_transform.rotation.y << ", "
-                          << links[i]->parent_joint->parent_to_joint_origin_transform.rotation.z << ", "
-                          << links[i]->parent_joint->parent_to_joint_origin_transform.rotation.w << std::endl;
-                link.mutable_rotate()->set_x(links[i]->parent_joint->parent_to_joint_origin_transform.rotation.x);
-                link.mutable_rotate()->set_y(links[i]->parent_joint->parent_to_joint_origin_transform.rotation.y);
-                link.mutable_rotate()->set_z(links[i]->parent_joint->parent_to_joint_origin_transform.rotation.z);
+                links[i]->parent_joint->parent_to_joint_origin_transform.rotation.getRPY(roll, pitch, yaw);
+                std::cout << "    rotate: " << roll << ", " << pitch << ", " << yaw << std::endl;
+                link.mutable_rotate()->set_x(roll);
+                link.mutable_rotate()->set_y(pitch);
+                link.mutable_rotate()->set_z(yaw);
 
                 std::cout << "    axis: " << links[i]->parent_joint->axis.x << ", "
                           << links[i]->parent_joint->axis.y << ", "

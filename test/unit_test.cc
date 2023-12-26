@@ -411,6 +411,7 @@ TEST_CASE("chain_param") {
     enumMap[urdf::Joint::CONTINUOUS] = "continuous";
 
     std::cout << "robot: " << std::endl;
+    std::cout << "    name: " << robot_model->getName() << std::endl;
 
 //    auto root = robot_model->getRoot();
 //    std::cout << "  - name: " << root->name << std::endl;
