@@ -122,7 +122,8 @@ namespace rocos {
             link.mutable_rotatelink()->set_z(yaw);
 
             std::cout << "    mesh: " << std::dynamic_pointer_cast<urdf::Mesh>(links[i]->visual->geometry)->filename << std::endl;
-            link.set_mesh(std::dynamic_pointer_cast<urdf::Mesh>(links[i]->visual->geometry)->filename);
+            std::filesystem::path mesh_path = std::dynamic_pointer_cast<urdf::Mesh>(links[i]->visual->geometry)->filename;
+            link.set_mesh(mesh_path.filename());
 
             *response->add_links() = link; // add link to response.links
 
@@ -137,7 +138,8 @@ namespace rocos {
                                                ::rocos::LinkMeshFile *response) {
 
         std::cout << "request link file path: " << request->path() << std::endl;
-        std::filesystem::path file_path(request->path());
+        std::filesystem::path urdf_path(robot_ptr_->urdf_file_path_);
+        std::filesystem::path file_path(urdf_path.parent_path() / request->path());
 
         std::ifstream file(file_path, std::ios::binary); // 以二进制方式打开文件
         if(!file.is_open()) {
