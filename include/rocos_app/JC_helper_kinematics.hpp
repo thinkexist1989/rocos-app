@@ -460,8 +460,8 @@ namespace JC_helper
 
     inline KDL::JntArray vector_2_JntArray( const std::vector< std::atomic< double > >& pos )
     {
-        KDL::JntArray _pos( pos.size( ) );
-        for ( int i = 0; i < pos.size( ); i++ )
+        KDL::JntArray _pos( _joint_num );
+        for ( int i = 0; i <_joint_num; i++ )
             _pos( i ) = pos[ i ];
         return _pos;
     }

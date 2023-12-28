@@ -574,7 +574,13 @@ namespace rocos {
          * 
          */
         int Dragging(DRAGGING_FLAG flag, DRAGGING_DIRRECTION dir, double max_speed, double max_acceleration);
-
+        /**
+         * @brief 1000hz关节伺服接口
+         *
+         * @param target_pos 目标位置
+         * @return int
+         */
+        int servoJ( const KDL::JntArray& target_pos );
     private:
         //运动前检查数据有效性
         int CheckBeforeMove(const JntArray &q, double speed,
@@ -600,21 +606,13 @@ namespace rocos {
         int joint_admittance_teaching(bool asynchronous = false);
         
 
-        /**
-         * @brief 1000hz关节伺服接口
-         *
-         * @param target_pos 目标位置
-         * @return int
-         */
-        int servoJ( const KDL::JntArray& target_pos );
+        
         /**
          * @brief 1000hz位姿伺服接口
          *
          * @param target_frame 目标位置
          * @return int
          */
-
-
          int sun_servoJ( const KDL::JntArray& target_pos , const KDL::JntArray& max_vel, const KDL::JntArray& max_acc ,double Gain,double lookhead);
         /**
          * @brief 1000hz位姿伺服接口
