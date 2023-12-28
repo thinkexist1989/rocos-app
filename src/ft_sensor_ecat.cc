@@ -2,46 +2,46 @@
 // Created by think on 2023/12/15.
 //
 
-#include <rocos_app/ethercat/ft_sensor.h>
+#include <rocos_app/ethercat/ft_sensor_ecat.h>
 #include <tinyxml2.h>
 
 #include <iostream>
 
 namespace rocos {
 
-    FtSensor::FtSensor(const std::string &urdf_file_path) {
+    FtSensorEcat::FtSensorEcat(const std::string &urdf_file_path) {
         ecPtr_ = EcatConfig::getInstance();
 
         parseParamFormUrdf(urdf_file_path);
     }
 
-    FtSensor::~FtSensor() = default;
+    FtSensorEcat::~FtSensorEcat() = default;
 
-    float FtSensor::getFx() const {
+    float FtSensorEcat::getFx() const {
         return pFx_ ? *pFx_ : 0.0f;
     }
 
-    float FtSensor::getFy() const {
+    float FtSensorEcat::getFy() const {
         return pFy_ ? *pFy_ : 0.0f;
     }
 
-    float FtSensor::getFz() const {
+    float FtSensorEcat::getFz() const {
         return pFz_ ? *pFz_ : 0.0f;
     }
 
-    float FtSensor::getMx() const {
+    float FtSensorEcat::getMx() const {
         return pMx_ ? *pMx_ : 0.0f;
     }
 
-    float FtSensor::getMy() const {
+    float FtSensorEcat::getMy() const {
         return pMy_ ? *pMy_ : 0.0f;
     }
 
-    float FtSensor::getMz() const {
+    float FtSensorEcat::getMz() const {
         return pMz_ ? *pMz_ : 0.0f;
     }
 
-    void FtSensor::parseParamFormUrdf(const std::string &urdf_file_path) {
+    void FtSensorEcat::parseParamFormUrdf(const std::string &urdf_file_path) {
         tinyxml2::XMLDocument doc;
         doc.LoadFile(urdf_file_path.c_str());
 

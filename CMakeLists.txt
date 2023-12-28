@@ -119,7 +119,7 @@ add_library(hardware
         src/hardware_interface.cc
         src/hardware_sim.cc
         src/ft_sensor_interface.cc
-        src/ft_sensor.cc
+        src/ft_sensor_ecat.cc
         )
 target_link_libraries(hardware
         PUBLIC

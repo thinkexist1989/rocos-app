@@ -2,8 +2,8 @@
 // Created by think on 2023/12/15.
 //
 
-#ifndef ROCOS_APP_FT_SENSOR_H
-#define ROCOS_APP_FT_SENSOR_H
+#ifndef ROCOS_APP_FT_SENSOR_ECAT_H
+#define ROCOS_APP_FT_SENSOR_ECAT_H
 
 #include <rocos_app/ft_sensor_interface.h>
 #include <rocos_ecm/ecat_config.h>
@@ -11,11 +11,11 @@
 
 namespace rocos {
 
-    class FtSensor : FtSensorInterface {
+    class FtSensorEcat : FtSensorInterface {
     public:
-        explicit FtSensor(const std::string &urdf_file_path = "robot.urdf");
+        explicit FtSensorEcat(const std::string &urdf_file_path = "robot.urdf");
 
-        ~FtSensor() override;
+        ~FtSensorEcat() override;
 
         float getFx() const override;
 
@@ -46,4 +46,4 @@ namespace rocos {
 
 } // rocos
 
-#endif //ROCOS_APP_FT_SENSOR_H
+#endif //ROCOS_APP_FT_SENSOR_ECAT_H

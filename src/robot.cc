@@ -386,14 +386,14 @@ namespace rocos {
         setRunState(RunState::Stopped);
 
         for_each(joints_.begin(), joints_.end(),
-                 [=](boost::shared_ptr<Drive> &d) { d->setEnabled(); });
+                 [=](boost::shared_ptr<Drive> &d) { d->setEnabled(false); }); // 将抱闸设置为同时开启，不阻塞
     }
 
     void Robot::setDisabled() {
         setRunState(RunState::Disabled);
 
         for_each(joints_.begin(), joints_.end(),
-                 [=](boost::shared_ptr<Drive> &d) { d->setDisabled(); });
+                 [=](boost::shared_ptr<Drive> &d) { d->setDisabled(false); }); // 将抱闸设置为同时开启，不阻塞
     }
 
     void Robot::startMotionThread() {

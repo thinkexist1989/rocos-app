@@ -20,7 +20,7 @@
 #include <csignal>
 #include <cstdio>
 #include <cstdlib>
-#include <rocos_app/ethercat/ft_sensor.h>
+#include <rocos_app/ethercat/ft_sensor_ecat.h>
 #include <rocos_app/drive.h>
 #include <rocos_app/ethercat/hardware.h>
 #include <rocos_app/ethercat/hardware_sim.h>
@@ -44,7 +44,7 @@ namespace rocos
 
     // boost::shared_ptr< HardwareInterface > hw = boost::make_shared< HardwareSim >( _joint_num );  // 仿真
     boost::shared_ptr<HardwareInterface> hw = boost::make_shared<Hardware>(); // 真实机械臂
-    FtSensor ftsensor;
+    FtSensorEcat ftsensor;
 
     Robot robot(hw, FLAGS_urdf, FLAGS_base, FLAGS_tip);
 
