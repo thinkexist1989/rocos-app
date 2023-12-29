@@ -22,6 +22,7 @@
 #include <kdl_parser/kdl_parser.hpp> // 用于将urdf文件解析为KDL::Tree
 
 #define  MAX_JOINT_NUM 50
+#define  EPS 1e-7
 
 namespace rocos {
     Robot::Robot(boost::shared_ptr<HardwareInterface> hw,
@@ -387,6 +388,16 @@ namespace rocos {
 
         for_each(joints_.begin(), joints_.end(),
                  [=](boost::shared_ptr<Drive> &d) { d->setEnabled(false); }); // 将抱闸设置为同时开启，不阻塞
+
+        outerloop:
+        for (;;) {
+            for (const auto &joint: joints_) {
+                if (joint->getDriveState() != DriveState::OperationEnabled) {
+                    goto outerloop;
+                }
+            }
+            break;
+        }
     }
 
     void Robot::setDisabled() {
@@ -394,6 +405,16 @@ namespace rocos {
 
         for_each(joints_.begin(), joints_.end(),
                  [=](boost::shared_ptr<Drive> &d) { d->setDisabled(false); }); // 将抱闸设置为同时开启，不阻塞
+
+        outerloop:
+        for (;;) {
+            for (const auto &joint: joints_) {
+                if (joint->getDriveState() != DriveState::SwitchOnDisabled) {
+                    goto outerloop;
+                }
+            }
+            break;
+        }
     }
 
     void Robot::startMotionThread() {
@@ -2308,8 +2329,8 @@ namespace rocos {
         // std::cout << "Joint Pos: \n"
         //           << GREEN << q.data << WHITE << std::endl;
         for (int i = 0; i < jnt_num_; ++i) {
-            if (q(i) == pos_[i]) {
-                PLOG_WARNING << " Target pos[" << i << "] is same as  pos_[" << i << "]";
+            if (fabs(q(i) - pos_[i]) < EPS) {
+//                PLOG_WARNING << " Target pos[" << i << "] is same as  pos_[" << i << "]";
                 need_plan_[i] = false;
                 continue;
             }
@@ -2322,8 +2343,8 @@ namespace rocos {
                                           0,          // vf
                                           speed, acceleration, max_jerk_[i]);
 
-            if (!interp[i]->isValidMovement() || !(interp[i]->getDuration() > 0)) {
-                PLOG_ERROR << "movej trajectory is infeasible";
+            if (!interp[i]->isValidMovement() || interp[i]->getDuration() <= 0) {
+                PLOG_ERROR << "Joint[" << i << "] MoveJ trajectory is infeasible";
                 // is_running_motion = false;
                 setRunState(RunState::Stopped);
                 return;
