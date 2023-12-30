@@ -389,12 +389,26 @@ namespace rocos {
         for_each(joints_.begin(), joints_.end(),
                  [=](boost::shared_ptr<Drive> &d) { d->setEnabled(false); }); // 将抱闸设置为同时开启，不阻塞
 
+
+        // set a temporary time point to prevent getting caught in an infinite loop
+        auto driveStateChangeStartTimePoint = boost::chrono::system_clock::now();
+
         outerloop:
         for (;;) {
             for (const auto &joint: joints_) {
+                // First check timeout
+                auto duration_us = boost::chrono::duration_cast<boost::chrono::microseconds>(
+                        boost::chrono::system_clock::now() - driveStateChangeStartTimePoint);
+                if (duration_us.count() > 150000) { //wait for 100ms  TODO: configuration_.driveStateChangeMaxTimeout
+                    std::cout << "It takes too long (" << duration_us.count() / 1000.0 << " ms) to switch state!"
+                              << std::endl;
+                    break;
+                }
+
                 if (joint->getDriveState() != DriveState::OperationEnabled) {
                     goto outerloop;
                 }
+
             }
             break;
         }
@@ -406,12 +420,27 @@ namespace rocos {
         for_each(joints_.begin(), joints_.end(),
                  [=](boost::shared_ptr<Drive> &d) { d->setDisabled(false); }); // 将抱闸设置为同时开启，不阻塞
 
+
+
+        // set a temporary time point to prevent getting caught in an infinite loop
+        auto driveStateChangeStartTimePoint = boost::chrono::system_clock::now();
+
         outerloop:
         for (;;) {
             for (const auto &joint: joints_) {
+                // First check timeout
+                auto duration_us = boost::chrono::duration_cast<boost::chrono::microseconds>(
+                        boost::chrono::system_clock::now() - driveStateChangeStartTimePoint);
+                if (duration_us.count() > 150000) { //wait for 100ms  TODO: configuration_.driveStateChangeMaxTimeout
+                    std::cout << "It takes too long (" << duration_us.count() / 1000.0 << " ms) to switch state!"
+                              << std::endl;
+                    break;
+                }
+
                 if (joint->getDriveState() != DriveState::SwitchOnDisabled) {
                     goto outerloop;
                 }
+
             }
             break;
         }
