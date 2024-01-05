@@ -23,7 +23,7 @@ email: luoyang@sia.cn
 ]]
 
 cmake_minimum_required(VERSION 3.10)
-project(rocos_app VERSION 1.0.2 DESCRIPTION "ROCOS Application Library")
+project(rocos_app VERSION 1.0.3 DESCRIPTION "ROCOS Application Library")
 
 list(APPEND CMAKE_PREFIX_PATH "/opt/rocos/ecm")
 list(APPEND CMAKE_PREFIX_PATH "/opt/grpc")
