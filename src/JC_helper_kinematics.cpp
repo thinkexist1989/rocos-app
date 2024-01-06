@@ -4078,7 +4078,8 @@ namespace JC_helper
                 PLOG_ERROR << "joint [" << i + 1 << "] ( " << target_pos[ i ] * KDL::rad2deg << " ) is out of range ";
 //                PLOG_ERROR << "program will be turn off after 4 seconds!!";
 //                std::this_thread::sleep_for( std::chrono::duration< double >( 4 ) );
-                exit( -1 );
+//                exit( -1 );
+                return -1;
             }
         }
         //**-------------------------------**//
