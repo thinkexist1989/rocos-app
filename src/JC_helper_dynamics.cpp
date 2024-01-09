@@ -242,7 +242,7 @@ namespace JC_helper
             q_min[i] = robot_ptr->joints_[i]->getMinPosLimit();
         }
 
-        external_forces = KDL::Wrenches(joint_num, KDL::Wrench::Zero());
+        external_forces = KDL::Wrenches(robot_ptr->kinematics_.getChain().getNrOfSegments(), KDL::Wrench::Zero());
 
         // 打印admittance_joint参数
         PLOG_INFO << "a_sensor = " << a_sensor[0] << " " << a_sensor[1] << " " << a_sensor[2] << " " << a_sensor[3] << " " << a_sensor[4] << " " << a_sensor[5] << " " << a_sensor[6];

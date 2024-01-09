@@ -147,6 +147,8 @@ namespace rocos {
         auto robot = doc.FirstChildElement("robot");
         for (auto jnt = robot->FirstChildElement("joint"); jnt; jnt = jnt->NextSiblingElement("joint")) {
 
+            if(jnt->Attribute("type", "fixed")) continue; // 固定关节不需要关联
+
             auto hw = jnt->FirstChildElement("hardware");
 
             auto id = hw->IntAttribute("id", -1); // 对应的硬件ID，若没指定默认为-1

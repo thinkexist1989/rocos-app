@@ -59,7 +59,7 @@ namespace rocos {
             return grpc::Status::CANCELLED;
         }
 
-        double roll,pitch,yaw;
+        double roll, pitch, yaw;
 
         // 创建映射表
         std::map<int, std::string> enumMap;
@@ -74,7 +74,7 @@ namespace rocos {
         std::vector<urdf::LinkSharedPtr> links;
         robot_model->getLinks(links);
 
-        for(int i = 0; i < links.size(); i++) {
+        for (int i = 0; i < links.size(); i++) {
 
             Link link;
 
@@ -84,11 +84,12 @@ namespace rocos {
             std::cout << "    order: " << i << std::endl;
             link.set_order(i);
 
-            if(links[i]->parent_joint) {
+            if (links[i]->parent_joint) {
                 std::cout << "    type: " << enumMap[links[i]->parent_joint->type] << std::endl;
                 link.set_type(static_cast<JointType>(links[i]->parent_joint->type));
 
-                std::cout << "    translate: " << links[i]->parent_joint->parent_to_joint_origin_transform.position.x << ", "
+                std::cout << "    translate: " << links[i]->parent_joint->parent_to_joint_origin_transform.position.x
+                          << ", "
                           << links[i]->parent_joint->parent_to_joint_origin_transform.position.y << ", "
                           << links[i]->parent_joint->parent_to_joint_origin_transform.position.z << std::endl;
                 link.mutable_translate()->set_x(links[i]->parent_joint->parent_to_joint_origin_transform.position.x);
@@ -109,26 +110,33 @@ namespace rocos {
                 link.mutable_axis()->set_z(links[i]->parent_joint->axis.z);
             }
 
-            std::cout << "    translateLink: " << links[i]->visual->origin.position.x << ", " << links[i]->visual->origin.position.y << ", "
-                      << links[i]->visual->origin.position.z << std::endl;
-            link.mutable_translatelink()->set_x(links[i]->visual->origin.position.x);
-            link.mutable_translatelink()->set_y(links[i]->visual->origin.position.y);
-            link.mutable_translatelink()->set_z(links[i]->visual->origin.position.z);
+            if (links[i]->visual) {
+                std::cout << "    translateLink: " << links[i]->visual->origin.position.x << ", "
+                          << links[i]->visual->origin.position.y << ", "
+                          << links[i]->visual->origin.position.z << std::endl;
+                link.mutable_translatelink()->set_x(links[i]->visual->origin.position.x);
+                link.mutable_translatelink()->set_y(links[i]->visual->origin.position.y);
+                link.mutable_translatelink()->set_z(links[i]->visual->origin.position.z);
 
-            links[i]->visual->origin.rotation.getRPY(roll, pitch, yaw);
-            std::cout << "    rotateLink: " << roll << ", " << pitch << ", " << yaw << std::endl;
-            link.mutable_rotatelink()->set_x(roll);
-            link.mutable_rotatelink()->set_y(pitch);
-            link.mutable_rotatelink()->set_z(yaw);
+                links[i]->visual->origin.rotation.getRPY(roll, pitch, yaw);
+                std::cout << "    rotateLink: " << roll << ", " << pitch << ", " << yaw << std::endl;
+                link.mutable_rotatelink()->set_x(roll);
+                link.mutable_rotatelink()->set_y(pitch);
+                link.mutable_rotatelink()->set_z(yaw);
 
-            std::cout << "    mesh: " << std::dynamic_pointer_cast<urdf::Mesh>(links[i]->visual->geometry)->filename << std::endl;
-            std::filesystem::path mesh_path = std::dynamic_pointer_cast<urdf::Mesh>(links[i]->visual->geometry)->filename;
-            link.set_mesh(mesh_path.filename());
+                std::cout << "    mesh: " << std::dynamic_pointer_cast<urdf::Mesh>(links[i]->visual->geometry)->filename
+                          << std::endl;
+                std::filesystem::path mesh_path = std::dynamic_pointer_cast<urdf::Mesh>(
+                        links[i]->visual->geometry)->filename;
+                link.set_mesh(mesh_path.filename());
+
+
+            }
+
 
             *response->add_links() = link; // add link to response.links
 
         }
-
 
 
         return grpc::Status::OK;
@@ -142,7 +150,7 @@ namespace rocos {
         std::filesystem::path file_path(urdf_path.parent_path() / request->path());
 
         std::ifstream file(file_path, std::ios::binary); // 以二进制方式打开文件
-        if(!file.is_open()) {
+        if (!file.is_open()) {
             std::cout << "open file failed!" << std::endl;
             return grpc::Status::CANCELLED;
         }
@@ -516,17 +524,17 @@ namespace rocos {
                 std::cout << "Received MovePath command!" << std::endl;
             }
         }
-        //! Dragging Command
+            //! Dragging Command
         else if (request->command().has_dragging_command()) {
             auto dragging_command = request->command().dragging_command();
             robot_ptr_->Dragging(static_cast<Robot::DRAGGING_FLAG>(dragging_command.flag()),
                                  static_cast<Robot::DRAGGING_DIRRECTION>(dragging_command.dir()),
                                  dragging_command.max_speed(), dragging_command.max_acceleration());
         }
-        //! General Command
+            //! General Command
         else if (request->command().has_general_command()) {
             auto general_command = request->command().general_command();
-            if(general_command.has_set_work_mode()) {
+            if (general_command.has_set_work_mode()) {
                 robot_ptr_->setWorkMode(static_cast<Robot::WorkMode>(general_command.set_work_mode().value()));
             }
         }
