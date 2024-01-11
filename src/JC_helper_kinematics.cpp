@@ -2979,7 +2979,7 @@ namespace JC_helper
 
         current_flange = KDL::Frame{ };
 
-        PLOG_INFO << "笛卡尔空间点动初始化完成";
+//        PLOG_INFO << "笛卡尔空间点动初始化完成";
     }
 
     int SmartServo_Cartesian::update( KDL::JntArray& joint_vel, rocos::Robot* robot_ptr )
@@ -3099,7 +3099,7 @@ namespace JC_helper
 
                 if ( res == 0 && flag_stop )
                 {
-                    PLOG_INFO << "笛卡尔空间急停已完成";
+//                    PLOG_INFO << "笛卡尔空间急停已完成";
                     break;
                 }
             }
@@ -3354,7 +3354,7 @@ namespace JC_helper
 
                 if ( update_res == 0 && flag_stop )
                 {
-                    PLOG_INFO << "零空间急停已完成";
+//                    PLOG_INFO << "零空间急停已完成";
                     break;
                 }
             }
@@ -3985,12 +3985,13 @@ namespace JC_helper
 
             if ( res != ruckig::Result::Finished )
             {
-                PLOG_ERROR << "OTG 计算失败,停止运动";
+//                PLOG_ERROR << "OTG 计算失败,停止运动";
                 for ( int i = 0; i < _joint_num; ++i )
                     robot_ptr->joints_[ i ]->setPosition( robot_ptr->pos_[ i ] );
             }
-            else
-                PLOG_INFO << "关节空间急停已完成";
+            else {
+//                PLOG_INFO << "关节空间急停已完成";
+            }
         }
         catch ( const std::exception& e )
         {
