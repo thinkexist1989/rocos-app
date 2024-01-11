@@ -3140,7 +3140,7 @@ namespace JC_helper
                 *external_finished_flag_ptr = false;
         }
         else
-            PLOG_WARNING << "紧急停止中,不允许修改目标";
+//            PLOG_WARNING << "紧急停止中,不允许修改目标";
     }
 
     void SmartServo_Cartesian::Cartesian_stop( double max_vel, double max_acc, double max_jerk )

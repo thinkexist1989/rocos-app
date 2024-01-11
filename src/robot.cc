@@ -279,6 +279,8 @@ namespace rocos {
             default:
                 break;
         }
+
+        return true;
     }
 
     bool Robot::setRunState(RunState state) {
@@ -286,20 +288,19 @@ namespace rocos {
 
         switch (state) {
             case RunState::Disabled:
-                is_running_ = false;
                 is_running_motion = false;
                 break;
             case RunState::Stopped:
-                is_running_ = false;
                 is_running_motion = false;
                 break;
             case RunState::Running:
-                is_running_ = true;
                 is_running_motion = true;
                 break;
             default:
                 break;
         }
+
+        return true;
     }
 
 
@@ -447,7 +448,6 @@ namespace rocos {
     }
 
     void Robot::startMotionThread() {
-        is_running_ = true;
 //        setRunState(RunState::Running);
 
         otg_motion_thread_ =
