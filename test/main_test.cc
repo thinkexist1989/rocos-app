@@ -79,7 +79,7 @@ namespace rocos
         KDL::JntArray last_joints( _joint_num );
 
         int row_index = 1;
-
+        
         //**-------------------------------**//
 
         //** 程序初始化 **//
