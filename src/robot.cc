@@ -95,6 +95,12 @@ namespace rocos {
         startMotionThread();
     }
 
+
+    Robot::~Robot() {
+
+    }
+
+
     bool Robot::parseUrdf(const string &urdf_file_path,
                           const string &base_link,
                           const string &tip) {

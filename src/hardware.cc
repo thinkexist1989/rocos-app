@@ -23,7 +23,9 @@
 
 namespace rocos {
 
-    Hardware::~Hardware() = default;
+    Hardware::~Hardware() {
+
+    };
 
     Hardware::Hardware(const std::string &urdf_file_path) {
         _type = HW_ETHERCAT;

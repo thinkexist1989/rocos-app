@@ -94,6 +94,8 @@ namespace rocos {
                        const std::string &base_link = "base_link",
                        const std::string &tip = "link7");
 
+        ~Robot();
+
         bool parseUrdf(const std::string &urdf_file_path,
                        const std::string &base_link,
                        const std::string &tip);
