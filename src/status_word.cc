@@ -116,6 +116,8 @@ DriveState Statusword::getDriveState() const {
     driveState = DriveState::FaultReactionActive;
   } else if ((rawStatusword_ & 0b0000000001001111) == 0b0000000000001000) {
     driveState = DriveState::Fault;
+  }else {
+    driveState = DriveState::Fault;
   }
 
   return driveState;
