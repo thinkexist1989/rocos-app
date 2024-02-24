@@ -627,6 +627,21 @@ namespace rocos {
          * @return int
          */
         int servoL( const KDL::Frame& target_frame );
+     int moveJ_with_speed_scaling( const KDL::JntArray& target_pos, double max_vel, double max_acc, double max_jerk );
+
+        /**
+         * @brief 速度缩放函数，运动中每次循环需要调佣一次
+         *
+         * @return int
+         */
+        int speed_scaling( );
+
+        int set_target_speed_frcision( double i )
+        {
+            target_speed_fraction = i;
+            is_fraction_changed   = true;
+            return 0;
+        }
 
     public:
         void test( );  // 为了测试
@@ -694,6 +709,17 @@ namespace rocos {
 
         WorkMode work_mode_ {WorkMode::Position}; //机器人当前模式，默认为位置模式
         RunState run_state_ {RunState::Disabled}; //机器人当前状态，默认为下使能
+        std::shared_ptr< rocos::Trapezoid > T_speed_scaling_ptr{ nullptr };//速度缩放T型规划器
+        std::atomic< double > current_speed_fraction = 1;//当前的速度比例
+        std::atomic< double > target_speed_fraction  = 1;//期望的速度比例
+        std::atomic< double > current_speed_fraction_vel = 0;//当前的速度比例变化率
+        std::atomic< double > current_speed_fraction_acc = 0;//当前的速度比例变化率的变化率
+        std::atomic< bool > is_fraction_changed  = false;//标识是否需要重置规划器
+        double speed_scaling_dt  = 0;//规划器用时
+
+        //**  记录数据，不应该存在**//
+        std::ofstream speed_data_csv { "/home/jc/rocos-app/speed_scaling.csv" };
+        //**-------------------------------**//
 
     public:
         Kinematics kinematics_;
