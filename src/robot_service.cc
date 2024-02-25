@@ -260,6 +260,82 @@ namespace rocos {
         rotation->set_y(y);
         rotation->set_z(z);
         rotation->set_w(w);
+        //tool State
+        auto tool = robot_ptr_->getTool();
+        auto tool_state = response->mutable_robot_state()->mutable_tool_state();
+        auto tool_position = tool_state->mutable_pose()->mutable_position();
+        tool_position->set_x(tool.p.x());
+        tool_position->set_y(tool.p.y());
+        tool_position->set_z(tool.p.z());
+        auto tool_rotation = tool_state->mutable_pose()->mutable_rotation();
+        double tool_x, tool_y, tool_z, tool_w;
+        tool.M.GetQuaternion(tool_x, tool_y, tool_z, tool_w);
+        tool_rotation->set_x(tool_x);
+        tool_rotation->set_y(tool_y);
+        tool_rotation->set_z(tool_z);
+        tool_rotation->set_w(tool_w);
+        //object State
+        auto object = robot_ptr_->getObject();
+        auto object_state = response->mutable_robot_state()->mutable_obj_state();
+        auto object_position = object_state->mutable_pose()->mutable_position();
+        object_position->set_x(object.p.x());
+        object_position->set_y(object.p.y());
+        object_position->set_z(object.p.z());
+        auto object_rotation = object_state->mutable_pose()->mutable_rotation();
+        double object_x, object_y, object_z, object_w;
+        object.M.GetQuaternion(object_x, object_y, object_z, object_w);
+        object_rotation->set_x(object_x);
+        object_rotation->set_y(object_y);
+        object_rotation->set_z(object_z);
+        object_rotation->set_w(object_w);
+        //T_tool_state
+        auto T_tool = robot_ptr_->getT_tool_();
+        auto T_tool_state = response->mutable_robot_state()->mutable_tool_state();
+        auto T_tool_position = T_tool_state->mutable_pose()->mutable_position();
+        T_tool_position->set_x(T_tool.p.x());
+        T_tool_position->set_y(T_tool.p.y());
+        T_tool_position->set_z(T_tool.p.z());
+        auto T_tool_rotation = T_tool_state->mutable_pose()->mutable_rotation();
+        double T_tool_x, T_tool_y, T_tool_z, T_tool_w;
+        T_tool.M.GetQuaternion(T_tool_x, T_tool_y, T_tool_z, T_tool_w);
+        T_tool_rotation->set_x(T_tool_x);
+        T_tool_rotation->set_y(T_tool_y);
+        T_tool_rotation->set_z(T_tool_z);
+        T_tool_rotation->set_w(T_tool_w);
+        //T_obj_state
+        auto T_obj = robot_ptr_->getT_object_();
+        auto T_obj_state = response->mutable_robot_state()->mutable_obj_state();
+        auto T_obj_position = T_obj_state->mutable_pose()->mutable_position();
+        T_obj_position->set_x(T_obj.p.x());
+        T_obj_position->set_y(T_obj.p.y());
+        T_obj_position->set_z(T_obj.p.z());
+        auto T_obj_rotation = T_obj_state->mutable_pose()->mutable_rotation();
+        double T_obj_x, T_obj_y, T_obj_z, T_obj_w;
+        T_obj.M.GetQuaternion(T_obj_x, T_obj_y, T_obj_z, T_obj_w);
+        T_obj_rotation->set_x(T_obj_x);
+        T_obj_rotation->set_y(T_obj_y);
+        T_obj_rotation->set_z(T_obj_z);
+        T_obj_rotation->set_w(T_obj_w);
+        //pose_out state
+        auto pose_out = robot_ptr_->getPose_out();
+        auto pose_out_state = response->mutable_robot_state()->mutable_pose_out();
+        auto pose_out_position = pose_out_state->mutable_pose()->mutable_position();
+        pose_out_position->set_x(pose_out.p.x());
+        pose_out_position->set_y(pose_out.p.y());
+        pose_out_position->set_z(pose_out.p.z());
+        auto pose_out_rotation = pose_out_state->mutable_pose()->mutable_rotation();
+        double pose_out_x, pose_out_y, pose_out_z, pose_out_w;
+        pose_out.M.GetQuaternion(pose_out_x, pose_out_y, pose_out_z, pose_out_w);
+        pose_out_rotation->set_x(pose_out_x);
+        pose_out_rotation->set_y(pose_out_y);
+        pose_out_rotation->set_z(pose_out_z);
+        pose_out_rotation->set_w(pose_out_w);
+
+       
+
+
+
+
 
         return grpc::Status::OK;
     }
@@ -523,6 +599,7 @@ namespace rocos {
                 //! TODO: MovePath
                 std::cout << "Received MovePath command!" << std::endl;
             }
+            
         }
             //! Dragging Command
         else if (request->command().has_dragging_command()) {
@@ -538,6 +615,41 @@ namespace rocos {
                 robot_ptr_->setWorkMode(static_cast<Robot::WorkMode>(general_command.set_work_mode().value()));
             }
         }
+        else if(request->command().has_calibration_command()){
+            auto calibration_command = request->command().calibration_command();
+            if(calibration_command.has_set_pose_frame())
+            {
+                std::cout << "Received set_pose_frame command!" << std::endl;
+                auto pose_frame = calibration_command.set_pose_frame();
+                auto id=pose_frame.id();
+
+                Frame pose;
+                pose.p.x(pose_frame.pose().position().x());
+                pose.p.y(pose_frame.pose().position().y());
+                pose.p.z(pose_frame.pose().position().z());
+                pose.M=Rotation::Quaternion(pose_frame.pose().rotation().x(),
+                                            pose_frame.pose().rotation().y(),
+                                            pose_frame.pose().rotation().z(),
+                                            pose_frame.pose().rotation().w());
+                
+                robot_ptr_->set_pose_frame(id,pose);
+            }
+            else if(calibration_command.has_tool_calibration())
+            {
+                robot_ptr_->tool_calibration();
+            }
+            else if(calibration_command.has_set_tool_frame())
+            {
+                robot_ptr_->set_tool_frame();
+
+            }
+            else if(calibration_command.has_set_object_frame())
+            {
+                robot_ptr_->set_object_frame();
+            }
+
+        }
+      
 
         return grpc::Status::OK;
     }

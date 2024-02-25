@@ -202,7 +202,20 @@ message MoveL {
   double radius = 5;
   bool asynchronous = 6;
 }
+//sun
+message Set_pose_frame{
+  int32 id=1;
+  SE3Pose pose = 2;
+}
+message Set_tool_frame{
 
+}
+message Set_object_frame{
+
+}
+message Tool_calibration{
+ 
+}
 message MoveL_FK {
   JointArray q = 1;
   double speed = 2;
@@ -272,6 +285,15 @@ message MotionCommand {
     MovePath move_path = 7;
   }
 }
+//sun
+message CalibrationCommand {
+  oneof command {
+    Set_pose_frame set_pose_frame=1;
+    Set_tool_frame set_tool_frame=2;
+    Set_object_frame set_object_frame=3;
+    Tool_calibration tool_calibration=4;
+  }
+}
 
 /////// Dragging Command /////////////
 message DraggingCommand {
@@ -293,6 +315,7 @@ message RobotCommand {
     MotionCommand motion_command = 6;
     DraggingCommand dragging_command = 7;
     GeneralCommand general_command = 8;
+    CalibrationCommand calibration_command = 9;
   }
 }
 
