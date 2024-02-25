@@ -250,7 +250,6 @@ namespace rocos
         {
             joints_[id]->setUserUnitName(name);
         }
-
         /// 多关节运动
         /// \param target_pos 位置
         /// \param target_vel 速度
@@ -389,20 +388,32 @@ namespace rocos
             return flange_;
         }
         // sun
-        inline Frame getTool() { 
-            //tool_=flange_*T_tool_;
+        Frame getTool()
+        {
+            // tool_=flange_*T_tool_;
             std::lock_guard<std::mutex> lock(mtx); // 自动获取互斥锁
-            return tool_; }
+            tool_.p.x(flange_.p.x() + T_tool_.p.x());
+            tool_.p.y(flange_.p.y() + T_tool_.p.y());
+            tool_.p.z(flange_.p.z() + T_tool_.p.z());
+            tool_.M = flange_.M * T_tool_.M;
+            return tool_;
+        }
 
         // sun
-        inline Frame getObject() { 
+        Frame getObject()
+        {
             std::lock_guard<std::mutex> lock(mtx); // 自动获取互斥锁
-            return object_; }
+            // Object Reference
+            object_ = flange_ * T_object_;
+            return object_;
+        }
 
-        inline Frame getT_tool_(){
+        Frame getT_tool_()
+        {
             return T_tool_;
         }
-        inline Frame getT_object_(){
+        Frame getT_object_()
+        {
             return T_object_;
         }
 
@@ -430,10 +441,10 @@ namespace rocos
                 P_TB(i + 6, 0) = pose4.p.data[i] - pose3.p.data[i];
             }
             Eigen::Vector3d Pos = (R_EB.transpose() * R_EB).inverse() * R_EB.transpose() * P_TB;
-            //std::cout << "Pos" << Pos << std::endl;
-            // 测试pinv
+            // std::cout << "Pos" << Pos << std::endl;
+            //  测试pinv
 
-            //std::cout << "pinv_R_TB" << R_EB.completeOrthogonalDecomposition().pseudoInverse() << std::endl;
+            // std::cout << "pinv_R_TB" << R_EB.completeOrthogonalDecomposition().pseudoInverse() << std::endl;
             Eigen::MatrixXd pinv_R_TB = R_EB.completeOrthogonalDecomposition().pseudoInverse();
             Eigen::Vector3d Pos1 = pinv_R_TB * P_TB;
             std::cout << "Pos1" << Pos1 << std::endl;
@@ -499,16 +510,47 @@ namespace rocos
             std::cout << "工具系位置标定的误差" << error << std::endl;
         }
         // 设置工具系
-        void set_tool_frame()
+        void set_tool_frame(KDL::Frame &pose)
         {
-            //确定则设置T_tool_
-            T_tool_=pose_out;
-            //把T_tool_转换为RPY存放到yaml文件中
-   
+            // 确定则设置T_tool_
+            T_tool_ = pose;
+            // 把T_tool_转换为RPY存放到yaml文件中
+            std::vector<double> T_tool_rpy;
+            T_tool_rpy.push_back( T_tool_.p.x());
+           T_tool_rpy.push_back( T_tool_.p.y());
+           T_tool_rpy.push_back( T_tool_.p.z());
+           double roll ,pitch, yaw;
+            T_tool_.M.GetRPY(roll,pitch,yaw);
+            T_tool_rpy.push_back(roll);
+            T_tool_rpy.push_back(pitch);
+            T_tool_rpy.push_back(yaw);
+            
+          
+            
+            yaml_node["T_tool_"] = T_tool_rpy;
+            std::ofstream fout(yaml_path);
+            fout << yaml_node;
+            fout.close();
+            std::cout << "保存T_tool_成功" << std::endl;
         }
-        void set_object_frame()
+        void set_object_frame(KDL::Frame &pose)
         {
-            T_object_=pose_out;
+            T_object_ = pose;
+            std::vector<double> T_object_rpy;
+            T_object_rpy.push_back( T_object_.p.x());
+           T_object_rpy.push_back( T_object_.p.y());
+           T_object_rpy.push_back( T_object_.p.z());
+           double roll ,pitch, yaw;
+            T_object_.M.GetRPY(roll,pitch,yaw);
+            T_object_rpy.push_back(roll);
+            T_object_rpy.push_back(pitch);
+            T_object_rpy.push_back(yaw);
+            yaml_node["T_object_"] = T_object_rpy;
+            
+            std::ofstream fout(yaml_path);
+            fout << yaml_node;
+            fout.close();
+            std::cout << "保存T_object_成功" << std::endl;
         }
 
         void set_pose_frame(int id, KDL::Frame &pose_frame)
@@ -522,27 +564,27 @@ namespace rocos
             else if (id == 2)
             {
                 pose2 = pose_frame;
-                std::cout<<"pose2: "<<pose2.p.x()<<","<<pose2.p.y()<<","<<pose2.p.z()<<std::endl;
+                std::cout << "pose2: " << pose2.p.x() << "," << pose2.p.y() << "," << pose2.p.z() << std::endl;
             }
             else if (id == 3)
             {
                 pose3 = pose_frame;
-                std::cout<<"pose3: "<<pose3.p.x()<<","<<pose3.p.y()<<","<<pose3.p.z()<<std::endl;
+                std::cout << "pose3: " << pose3.p.x() << "," << pose3.p.y() << "," << pose3.p.z() << std::endl;
             }
             else if (id == 4)
             {
                 pose4 = pose_frame;
-                std::cout<<"pose4: "<<pose4.p.x()<<","<<pose4.p.y()<<","<<pose4.p.z()<<std::endl;
+                std::cout << "pose4: " << pose4.p.x() << "," << pose4.p.y() << "," << pose4.p.z() << std::endl;
             }
             else if (id == 5)
             {
                 pose5 = pose_frame;
-                std::cout<<"pose5: "<<pose5.p.x()<<","<<pose5.p.y()<<","<<pose5.p.z()<<std::endl;
+                std::cout << "pose5: " << pose5.p.x() << "," << pose5.p.y() << "," << pose5.p.z() << std::endl;
             }
             else if (id == 6)
             {
                 pose6 = pose_frame;
-                std::cout<<"pose6: "<<pose6.p.x()<<","<<pose6.p.y()<<","<<pose6.p.z()<<std::endl;
+                std::cout << "pose6: " << pose6.p.x() << "," << pose6.p.y() << "," << pose6.p.z() << std::endl;
             }
             else
             {
@@ -610,9 +652,6 @@ namespace rocos
 
             // Flange Reference
             JntToCart(q_in, flange_);
-            tool_= flange_*T_tool_;
-            // Object Reference
-            object_ = flange_ * T_object_;
 
             //            std::cout << "OK" << std::endl;
         }
@@ -963,7 +1002,9 @@ namespace rocos
         Frame flange_; //!< 法兰位置姿态
         Frame tool_;   //!< 工具位置姿态
         Frame object_; //!< 工件位置姿态
+        std::string yaml_path = "calibration.yaml";
         YAML::Node yaml_node;
+
         // 六点法标定
         Frame pose1;
         Frame pose2;
@@ -972,7 +1013,7 @@ namespace rocos
         Frame pose5;
         Frame pose6;
         Frame pose_out;
-        
+
         // 变换矩阵,记得从yaml文件中读取，以及写入到yaml文件中
         Frame T_tool_;
         Frame T_object_;

@@ -290,7 +290,7 @@ namespace rocos {
         object_rotation->set_w(object_w);
         //T_tool_state
         auto T_tool = robot_ptr_->getT_tool_();
-        auto T_tool_state = response->mutable_robot_state()->mutable_tool_state();
+        auto T_tool_state = response->mutable_robot_state()->mutable_t_tool();
         auto T_tool_position = T_tool_state->mutable_pose()->mutable_position();
         T_tool_position->set_x(T_tool.p.x());
         T_tool_position->set_y(T_tool.p.y());
@@ -304,7 +304,7 @@ namespace rocos {
         T_tool_rotation->set_w(T_tool_w);
         //T_obj_state
         auto T_obj = robot_ptr_->getT_object_();
-        auto T_obj_state = response->mutable_robot_state()->mutable_obj_state();
+        auto T_obj_state = response->mutable_robot_state()->mutable_t_object();
         auto T_obj_position = T_obj_state->mutable_pose()->mutable_position();
         T_obj_position->set_x(T_obj.p.x());
         T_obj_position->set_y(T_obj.p.y());
@@ -640,12 +640,29 @@ namespace rocos {
             }
             else if(calibration_command.has_set_tool_frame())
             {
-                robot_ptr_->set_tool_frame();
+                auto set_tool_frame = calibration_command.set_tool_frame();
+                Frame pose;
+                pose.p.x(set_tool_frame.pose().position().x());
+                pose.p.y(set_tool_frame.pose().position().y());
+                pose.p.z(set_tool_frame.pose().position().z());
+                pose.M=Rotation::Quaternion(
+                        set_tool_frame.pose().rotation().x(), set_tool_frame.pose().rotation().y(),
+                        set_tool_frame.pose().rotation().z(), set_tool_frame.pose().rotation().w());
+                robot_ptr_->set_tool_frame(pose);
 
             }
             else if(calibration_command.has_set_object_frame())
             {
-                robot_ptr_->set_object_frame();
+                auto set_object_frame = calibration_command.set_object_frame();
+                Frame pose;
+                pose.p.x(set_object_frame.pose().position().x());
+                pose.p.y(set_object_frame.pose().position().y());
+                pose.p.z(set_object_frame.pose().position().z());
+
+                pose.M = Rotation::Quaternion(
+                        set_object_frame.pose().rotation().x(), set_object_frame.pose().rotation().y(),
+                        set_object_frame.pose().rotation().z(), set_object_frame.pose().rotation().w());
+                robot_ptr_->set_object_frame(pose);
             }
 
         }

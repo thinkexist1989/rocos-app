@@ -28,7 +28,8 @@ namespace rocos {
     Robot::Robot(boost::shared_ptr<HardwareInterface> hw,
                  const std::string &urdf_file_path,
                  const std::string &base_link,
-                 const std::string &tip) : hw_interface_(hw), urdf_file_path_(urdf_file_path), pos_(MAX_JOINT_NUM),
+                 const std::string &tip
+                 ) : hw_interface_(hw), urdf_file_path_(urdf_file_path), pos_(MAX_JOINT_NUM),
                                            vel_(MAX_JOINT_NUM), acc_(MAX_JOINT_NUM) {
 
         parseUrdf(urdf_file_path, base_link, tip);
@@ -80,6 +81,25 @@ namespace rocos {
         //  {
         //      exit( 0 );
         //  }
+        //sun 工具系的初始化
+        yaml_node = YAML::LoadFile(yaml_path);
+        // 读取yaml文件
+        std::vector <double> tool_param=yaml_node["T_tool_"].as<std::vector<double>>();
+        
+        std::vector <double> object_param=yaml_node["T_object_"].as<std::vector<double>>();
+        
+        T_tool_.p.x(tool_param[0]);
+        T_tool_.p.y(tool_param[1]);
+        T_tool_.p.z(tool_param[2]);
+        T_tool_.M=KDL::Rotation::RPY(tool_param[3],tool_param[4],tool_param[5]);
+        T_object_.p.x(object_param[0]);
+        T_object_.p.y(object_param[1]);
+        T_object_.p.z(object_param[2]);
+        T_object_.M=KDL::Rotation::RPY(object_param[3],object_param[4],object_param[5]);
+        std::cout<<"tool_param: "<<T_tool_.p.z()<<std::endl;
+        std::cout<<"object_param: "<<T_object_.p.y()<<std::endl;
+  
+        
 
         // 解析逆运动学求解器初始化
         KDL::JntArray q_min(joints_.size());

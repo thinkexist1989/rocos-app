@@ -1,0 +1,5 @@
+# Calibration parameters
+# Transformation matrix of tool system relative to flange
+T_tool_ : [0.0, 0.0, 1.1, 0.0, 0.0, 0.0]
+# Transformation matrix of object system relative to flange
+T_object_ : [0.0, 1.0, 0.0, 0.0, 0.0, 0.0]

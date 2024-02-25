@@ -208,9 +208,11 @@ message Set_pose_frame{
   SE3Pose pose = 2;
 }
 message Set_tool_frame{
+  SE3Pose pose = 1;
 
 }
 message Set_object_frame{
+  SE3Pose pose = 2;
 
 }
 message Tool_calibration{
