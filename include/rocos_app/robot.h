@@ -392,10 +392,7 @@ namespace rocos
         {
             // tool_=flange_*T_tool_;
             std::lock_guard<std::mutex> lock(mtx); // 自动获取互斥锁
-            tool_.p.x(flange_.p.x() + T_tool_.p.x());
-            tool_.p.y(flange_.p.y() + T_tool_.p.y());
-            tool_.p.z(flange_.p.z() + T_tool_.p.z());
-            tool_.M = flange_.M * T_tool_.M;
+           tool_= flange_ * T_tool_;
             return tool_;
         }
 
