@@ -2241,7 +2241,7 @@ namespace rocos {
 
                 index = index - static_cast< int >( DRAGGING_FLAG::TOOL_X ) + 1;
                 index = index * static_cast< double >( dir );
-                _SmartServo_Cartesian.command(index, "base");
+                _SmartServo_Cartesian.command(index, "tool");
                 break;
 
 
@@ -2256,7 +2256,7 @@ namespace rocos {
 
                 index = index - static_cast< int >( DRAGGING_FLAG::OBJECT_X ) + 1;
                 index = index * static_cast< double >( dir );
-                _SmartServo_Cartesian.command(index, "base");
+                _SmartServo_Cartesian.command(index, "object");
                 break;
 
             case DRAGGING_FLAG::BASE_X:

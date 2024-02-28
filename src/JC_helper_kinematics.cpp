@@ -3005,12 +3005,27 @@ namespace JC_helper
         {
             Cartesian_vel.rot[ abs( _Cartesian_vel_index ) - 4 ] = sign( _Cartesian_vel_index ) * res_vel[ 0 ];
         }
-
+        //! 速度矢量的参考系默认为base系，参考点为flange
         if ( _reference_frame.compare( "flange" ) == 0 )
         {  //** 转变速度矢量的参考系，由flange系变为base系，但没有改变参考点（还是flange） **//
             FK_slover.JntToCart( vector_2_JntArray( robot_ptr->pos_ ), current_flange );
             Cartesian_vel = current_flange.M * Cartesian_vel;
         }
+        if ( _reference_frame.compare( "tool" ) == 0 )
+        {  //** 转变速度矢量的参考系，由flange系变为base系，但没有改变参考点（还是flange） **//
+            FK_slover.JntToCart( vector_2_JntArray( robot_ptr->pos_ ), current_flange );
+             KDL::Frame tool2flange=robot_ptr->getT_tool_();
+            current_flange=current_flange*tool2flange;
+            Cartesian_vel = current_flange.M * Cartesian_vel;
+        }
+         if ( _reference_frame.compare( "object" ) == 0 )
+        {  //** 转变速度矢量的参考系，由flange系变为base系，但没有改变参考点（还是flange） **//
+            FK_slover.JntToCart( vector_2_JntArray( robot_ptr->pos_ ), current_flange );
+             KDL::Frame object2flange=robot_ptr->getT_object_();
+            current_flange=current_flange*object2flange;
+            Cartesian_vel = current_flange.M * Cartesian_vel;
+        }
+
 
         output.pass_to_input( input );
 
