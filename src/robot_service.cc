@@ -642,7 +642,9 @@ namespace rocos {
             }
             else if(calibration_command.has_tool_calibration())
             {
-                robot_ptr_->tool_calibration();
+                auto frame_refence = calibration_command.tool_calibration();
+                auto frame=frame_refence.frame();
+                robot_ptr_->tool_calibration(frame);
             }
             else if(calibration_command.has_set_tool_frame())
             {

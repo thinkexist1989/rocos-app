@@ -421,12 +421,16 @@ namespace rocos
         void motionThreadHandler(); // 轨迹规划相关处理句柄
         // sun
     public:
-        void tool_calibration() // 工具标定
+        void tool_calibration(std::string frame) // 工具标定
         {
+            
             ErrorState=false;
             Eigen::MatrixXd R_EB(9, 3);
             Eigen::MatrixXd P_TB(9, 1);
-
+            
+            if (frame=="tool")
+            {
+       
             for (int i = 0; i < 3; i++)
             {
                 for (int j = 0; j < 3; j++)
@@ -511,6 +515,16 @@ namespace rocos
                 ErrorState = true;
                 std::cout<< "工具系标定失败" << std::endl;
             }
+                 
+            }
+            else if (frame=="object")
+            {
+                std::cout << "object 标定完成" << std::endl;
+                
+            }
+            else{
+                std::cout << "frame error,无效坐标系" << std::endl;
+            }
 
         }
         // 设置工具系
@@ -593,6 +607,24 @@ namespace rocos
                 pose6 = pose_frame;
                 std::cout << "pose6: " << pose6.p.x() << "," << pose6.p.y() << "," << pose6.p.z() << std::endl;
             }
+            else if (id == 7)
+            {
+                poseObject1 = pose_frame;
+                std::cout<<"poseObject1: "<<poseObject1.p.x()<<","<<poseObject1.p.y()<<","<<poseObject1.p.z()<<std::endl;
+            }
+            else if(id == 8)
+            {
+                poseObject2 = pose_frame;
+                std::cout << "poseObject2: " << poseObject2.p.x() << "," << poseObject2.p.y() << "," << poseObject2.p.z() << std::endl;
+            }
+
+            else if(id == 9)
+            {
+                poseObject3 = pose_frame;
+                std::cout << "poseObject3: " << poseObject3.p.x() << "," << poseObject3.p.y() << "," << poseObject3.p.z() << std::endl;
+            }
+
+            
             else
             {
                 // 处理无效的id
@@ -1024,6 +1056,10 @@ namespace rocos
         Frame pose5;
         Frame pose6;
         Frame pose_out;
+        Frame poseObject1;
+        Frame poseObject2;
+        Frame poseObject3;
+
 
         // 变换矩阵,记得从yaml文件中读取，以及写入到yaml文件中
         Frame T_tool_;
