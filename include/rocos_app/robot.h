@@ -446,11 +446,11 @@ namespace rocos
             // std::cout << "pinv_R_TB" << R_EB.completeOrthogonalDecomposition().pseudoInverse() << std::endl;
             Eigen::MatrixXd pinv_R_TB = R_EB.completeOrthogonalDecomposition().pseudoInverse();
             Eigen::Vector3d Pos1 = pinv_R_TB * P_TB;
-            std::cout << "Pos1" << Pos1 << std::endl;
+            // std::cout << "Pos1" << Pos1 << std::endl;
             // Calibration of rotation
             Eigen::Vector3d Vx{(pose5.p - pose4.p).data[0], (pose5.p - pose4.p).data[1], (pose5.p - pose4.p).data[2]};
             Eigen::Vector3d Vz{(pose6.p - pose4.p).data[0], (pose6.p - pose4.p).data[1], (pose6.p - pose4.p).data[2]};
-            std::cout << "Vx" << Vx << std::endl;
+            // std::cout << "Vx" << Vx << std::endl;
 
             Vx.normalize();
             Vz.normalize();
@@ -462,13 +462,13 @@ namespace rocos
             R_TB.block<3, 1>(0, 0) = Vx;
             R_TB.block<3, 1>(0, 1) = Vy;
             R_TB.block<3, 1>(0, 2) = Vz;
-            std::cout << "Vx" << Vx << std::endl;
-            std::cout << "Vy" << Vy << std::endl;
-            std::cout << "Vz" << Vz << std::endl;
+            // std::cout << "Vx" << Vx << std::endl;
+            // std::cout << "Vy" << Vy << std::endl;
+            // std::cout << "Vz" << Vz << std::endl;
 
             Eigen::Matrix3d R0_EB;
             KDL::Rotation pose4_Rotation = pose4.M;
-            std::cout << "pose4.m" << pose4.M.data[0] << "," << pose4.M.data[1] << "," << pose4.M.data[2] << "," << pose4.M.data[3] << "," << pose4.M.data[4] << "," << pose4.M.data[5] << "," << pose4.M.data[6] << "," << pose4.M.data[7] << "," << pose4.M.data[8] << std::endl;
+            // std::cout << "pose4.m" << pose4.M.data[0] << "," << pose4.M.data[1] << "," << pose4.M.data[2] << "," << pose4.M.data[3] << "," << pose4.M.data[4] << "," << pose4.M.data[5] << "," << pose4.M.data[6] << "," << pose4.M.data[7] << "," << pose4.M.data[8] << std::endl;
             for (int i = 0; i < 3; i++)
             {
                 for (int j = 0; j < 3; j++)
@@ -477,23 +477,23 @@ namespace rocos
                 }
             }
             // 打印R0_EB和R_TB
-            std::cout << "R0_EB" << R0_EB << std::endl;
-            std::cout << "R_TB" << R_TB << std::endl;
+            // std::cout << "R0_EB" << R0_EB << std::endl;
+            // std::cout << "R_TB" << R_TB << std::endl;
 
             Eigen::Matrix3d Rot = R0_EB.inverse() * R_TB;
-            std::cout << "R0_EB.inverse()" << R0_EB.inverse() << std::endl;
+            // std::cout << "R0_EB.inverse()" << R0_EB.inverse() << std::endl;
 
             pose_out.p = KDL::Vector(Pos(0), Pos(1), Pos(2));
             pose_out.M = KDL::Rotation(Rot(0, 0), Rot(0, 1), Rot(0, 2), Rot(1, 0), Rot(1, 1), Rot(1, 2), Rot(2, 0), Rot(2, 1), Rot(2, 2));
-            std::cout << "pose_out" << pose_out.M.data[0] << "," << pose_out.M.data[1] << "," << pose_out.M.data[2] << "," << pose_out.M.data[3] << "," << pose_out.M.data[4] << "," << pose_out.M.data[5] << "," << pose_out.M.data[6] << "," << pose_out.M.data[7] << "," << pose_out.M.data[8] << std::endl;
+            // std::cout << "pose_out" << pose_out.M.data[0] << "," << pose_out.M.data[1] << "," << pose_out.M.data[2] << "," << pose_out.M.data[3] << "," << pose_out.M.data[4] << "," << pose_out.M.data[5] << "," << pose_out.M.data[6] << "," << pose_out.M.data[7] << "," << pose_out.M.data[8] << std::endl;
             // 旋转矩阵转旋转向量
             Eigen::AngleAxisd rotation_vector2;
             rotation_vector2.fromRotationMatrix(Rot);
             double angle = rotation_vector2.angle();
             Eigen::Vector3d axis = rotation_vector2.axis();
 
-            std::cout << "axis" << axis[0] << "," << axis[1] << "," << axis[2] << std::endl;
-            std::cout << "angle" << angle << std::endl;
+            // std::cout << "axis" << axis[0] << "," << axis[1] << "," << axis[2] << std::endl;
+            // std::cout << "angle" << angle << std::endl;
             Eigen::Vector3d rotVector = axis * angle;
             // 旋转矩阵转RPY
             double roll1, pitch1, yaw1;
