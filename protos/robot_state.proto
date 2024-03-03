@@ -82,6 +82,11 @@ message T_object_{
 message Pose_out{
     SE3Pose pose = 1;
 }
+message CalibrationFeedback {
+    // The calibration data for the robot.
+    // This is a string that contains the calibration data for the robot.
+    bool ErrorState = 1;
+}
 
 // The current state of the robot.
 message RobotState {
@@ -100,6 +105,7 @@ message RobotState {
     T_tool_ t_tool = 7;
     T_object_ t_object = 8;
     Pose_out pose_out = 9;
+    CalibrationFeedback calibration_feedback = 10;
 
 
 }

@@ -151,6 +151,7 @@ namespace rocos
         }
         // 获取滤波后的数据
         inline double getJointTorqueFilter(int id) { return joints_[id]->getSecondaryPositionInCnt(); }
+        inline double getJointSecondaryPositionInCnt(int id) { return joints_[id]->getSecondaryPositionInCnt(); }
 
         inline void setJointPosition(int id, double pos)
         {
@@ -392,7 +393,7 @@ namespace rocos
         {
             // tool_=flange_*T_tool_;
             std::lock_guard<std::mutex> lock(mtx); // 自动获取互斥锁
-           tool_= flange_ * T_tool_;
+            tool_ = flange_ * T_tool_;
             return tool_;
         }
 
@@ -422,6 +423,7 @@ namespace rocos
     public:
         void tool_calibration() // 工具标定
         {
+            ErrorState=false;
             Eigen::MatrixXd R_EB(9, 3);
             Eigen::MatrixXd P_TB(9, 1);
 
@@ -505,6 +507,11 @@ namespace rocos
             double error = 0.0;
             error = (R_EB * Pos - P_TB).norm();
             std::cout << "工具系位置标定的误差" << error << std::endl;
+            if (std::isnan(error) || error > 0.1) {
+                ErrorState = true;
+                std::cout<< "工具系标定失败" << std::endl;
+            }
+
         }
         // 设置工具系
         void set_tool_frame(KDL::Frame &pose)
@@ -512,20 +519,23 @@ namespace rocos
             // 确定则设置T_tool_
             T_tool_ = pose;
             // 把T_tool_转换为RPY存放到yaml文件中
-            std::vector<double> T_tool_rpy;
-            T_tool_rpy.push_back( T_tool_.p.x());
-           T_tool_rpy.push_back( T_tool_.p.y());
-           T_tool_rpy.push_back( T_tool_.p.z());
-           double roll ,pitch, yaw;
-            T_tool_.M.GetRPY(roll,pitch,yaw);
-            T_tool_rpy.push_back(roll);
-            T_tool_rpy.push_back(pitch);
-            T_tool_rpy.push_back(yaw);
-            
-          
-            
+            std::vector<double> T_tool_rpy(6); // 初始化一个大小为6的数组，用于存储位置和RPY
+
+            // 将位置信息存入数组
+            T_tool_rpy[0] = T_tool_.p.x();
+            T_tool_rpy[1] = T_tool_.p.y();
+            T_tool_rpy[2] = T_tool_.p.z();
+
+            // 计算并存储RPY
+            double roll, pitch, yaw;
+            T_tool_.M.GetRPY(roll, pitch, yaw);
+            T_tool_rpy[3] = roll;
+            T_tool_rpy[4] = pitch;
+            T_tool_rpy[5] = yaw;
+
             yaml_node["T_tool_"] = T_tool_rpy;
             std::ofstream fout(yaml_path);
+            
             fout << yaml_node;
             fout.close();
             std::cout << "保存T_tool_成功" << std::endl;
@@ -534,16 +544,16 @@ namespace rocos
         {
             T_object_ = pose;
             std::vector<double> T_object_rpy;
-            T_object_rpy.push_back( T_object_.p.x());
-           T_object_rpy.push_back( T_object_.p.y());
-           T_object_rpy.push_back( T_object_.p.z());
-           double roll ,pitch, yaw;
-            T_object_.M.GetRPY(roll,pitch,yaw);
+            T_object_rpy.push_back(T_object_.p.x());
+            T_object_rpy.push_back(T_object_.p.y());
+            T_object_rpy.push_back(T_object_.p.z());
+            double roll, pitch, yaw;
+            T_object_.M.GetRPY(roll, pitch, yaw);
             T_object_rpy.push_back(roll);
             T_object_rpy.push_back(pitch);
             T_object_rpy.push_back(yaw);
             yaml_node["T_object_"] = T_object_rpy;
-            
+
             std::ofstream fout(yaml_path);
             fout << yaml_node;
             fout.close();
@@ -624,6 +634,10 @@ namespace rocos
         Frame getPose_out()
         {
             return pose_out;
+        }
+        bool getErrorStateOfCal()
+        {
+            return ErrorState;
         }
 
     protected:
@@ -1014,6 +1028,8 @@ namespace rocos
         // 变换矩阵,记得从yaml文件中读取，以及写入到yaml文件中
         Frame T_tool_;
         Frame T_object_;
+        //计算工具系和工件系的变换矩阵的标志位
+        bool ErrorState{false};
 
         std::vector<KDL::JntArray> traj_;
         std::atomic<int> tick_count{0};

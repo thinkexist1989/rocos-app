@@ -506,7 +506,8 @@ TEST_CASE("rocosAppMain") {
     }
     //**-------------------------------**//
 
-    Robot robot( hw,"robot.urdf","base_link","link_7" );
+    Robot robot( hw,"robot.urdf","base_link","link_7" );\
+
 
     auto robotService = RobotServiceImpl::getInstance( &robot );
 

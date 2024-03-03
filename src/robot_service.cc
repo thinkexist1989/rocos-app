@@ -330,6 +330,12 @@ namespace rocos {
         pose_out_rotation->set_y(pose_out_y);
         pose_out_rotation->set_z(pose_out_z);
         pose_out_rotation->set_w(pose_out_w);
+        //Calibration state
+        auto calibration_state_feedback = robot_ptr_->getErrorStateOfCal();
+        auto calibration_state = response->mutable_robot_state()->mutable_calibration_feedback();
+        calibration_state->set_errorstate(calibration_state_feedback);
+
+
 
        
 
