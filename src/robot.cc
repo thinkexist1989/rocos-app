@@ -2237,7 +2237,7 @@ namespace rocos {
             case DRAGGING_FLAG::TOOL_PITCH:
             case DRAGGING_FLAG::TOOL_YAW:
 
-                PLOG_WARNING << " 笛卡尔点动功能暂时不支持 {TOOL},替换为{BASE}";
+                // PLOG_WARNING << " 笛卡尔点动功能暂时不支持 {TOOL},替换为{BASE}";
 
                 index = index - static_cast< int >( DRAGGING_FLAG::TOOL_X ) + 1;
                 index = index * static_cast< double >( dir );
@@ -2252,7 +2252,7 @@ namespace rocos {
             case DRAGGING_FLAG::OBJECT_PITCH:
             case DRAGGING_FLAG::OBJECT_YAW:
 
-                PLOG_WARNING << " 笛卡尔点动功能暂时不支持 {OBJECT},替换为{BASE}";
+                // PLOG_WARNING << " 笛卡尔点动功能暂时不支持 {OBJECT},替换为{BASE}";
 
                 index = index - static_cast< int >( DRAGGING_FLAG::OBJECT_X ) + 1;
                 index = index * static_cast< double >( dir );
