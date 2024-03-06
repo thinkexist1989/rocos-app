@@ -3024,7 +3024,7 @@ namespace JC_helper
             KDL::Vector t_f_tool =  robot_ptr->getT_tool_( ).Inverse().p;
             FK_slover.JntToCart( vector_2_JntArray( robot_ptr->pos_ ), current_flange );
             current_flange = current_flange * robot_ptr->getT_tool_( );
-            Cartesian_vel.vel  = Cartesian_vel.vel + Cartesian_vel.rot * current_flange.M * t_f_tool;
+            Cartesian_vel.vel  = Cartesian_vel.vel + Cartesian_vel.rot * (current_flange.M * t_f_tool);
         }
         //**-------------------------------**//
 

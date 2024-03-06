@@ -2052,7 +2052,8 @@ namespace rocos {
         int res{-1};
         constexpr double vector_speed_scale{0.1};
         constexpr double rotation_speed_scale{0.2};
-        DRAGGING_motion_type motion_point_flag{DRAGGING_motion_type::BASE};
+        DRAGGING_motion_type motion_point_flag{DRAGGING_motion_type::FLANGE};
+        // DRAGGING_motion_type motion_point_flag{DRAGGING_motion_type::TOOL};
         //**-------------------------------**//
 
         //** 命令有效性检查 **//
