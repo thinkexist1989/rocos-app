@@ -452,16 +452,16 @@ namespace rocos
             Eigen::Vector3d Pos1 = pinv_R_TB * P_TB;
             // std::cout << "Pos1" << Pos1 << std::endl;
             // Calibration of rotation
+            // Calibration of rotation
             Eigen::Vector3d Vx{(pose5.p - pose4.p).data[0], (pose5.p - pose4.p).data[1], (pose5.p - pose4.p).data[2]};
-            Eigen::Vector3d Vz{(pose6.p - pose4.p).data[0], (pose6.p - pose4.p).data[1], (pose6.p - pose4.p).data[2]};
-            // std::cout << "Vx" << Vx << std::endl;
-
+            Eigen::Vector3d Vy{(pose6.p - pose4.p).data[0], (pose6.p - pose4.p).data[1], (pose6.p - pose4.p).data[2]};
+            // std::cout<<"Vx"<<Vx<<std::endl;
+   
             Vx.normalize();
-            Vz.normalize();
-
-            Eigen::Vector3d Vy = Vz.cross(Vx);
-            Vz = Vx.cross(Vy);
-
+            Vy.normalize();
+      
+            Eigen::Vector3d Vz = Vx.cross(Vy);
+            Vy = Vz.cross(Vx);
             Eigen::Matrix3d R_TB;
             R_TB.block<3, 1>(0, 0) = Vx;
             R_TB.block<3, 1>(0, 1) = Vy;

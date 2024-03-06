@@ -3020,45 +3020,51 @@ namespace JC_helper
             KDL::Frame tool2flange = robot_ptr->getT_tool_();
 
             KDL::Frame tool_base = current_flange * tool2flange;
-            Eigen::Vector3d angular_velocity(Cartesian_vel.rot.x(), Cartesian_vel.rot.y(), Cartesian_vel.rot.z());
+            // Eigen::Vector3d angular_velocity(Cartesian_vel.rot.x(), Cartesian_vel.rot.y(), Cartesian_vel.rot.z());
 
-            // 将KDL::Frame的旋转部分转换为Eigen::Matrix3d
-            Eigen::Matrix3d rotation;
-            for (int i = 0; i < 3; ++i)
-            {
-                for (int j = 0; j < 3; ++j)
-                {
-                    rotation(i, j) = current_flange.M(i, j);
-                }
-            }
-            Eigen::Matrix3d tool_rotation;
-            for (int i = 0; i < 3; ++i)
-            {
-                for (int j = 0; j < 3; ++j)
-                {
-                    tool_rotation(i, j) = tool2flange.M(i, j);
-                }
-            }
-            // 将KDL::Frame的位置部分转换为Eigen::Vector3d
-            Eigen::Vector3d position(-tool2flange.p.x(), -tool2flange.p.y(), -tool2flange.p.z());
+            // // 将KDL::Frame的旋转部分转换为Eigen::Matrix3d
+            // Eigen::Matrix3d rotation;
+            // for (int i = 0; i < 3; ++i)
+            // {
+            //     for (int j = 0; j < 3; ++j)
+            //     {
+            //         rotation(i, j) = current_flange.M(i, j);
+            //     }
+            // }
+            // Eigen::Matrix3d tool_rotation;
+            // for (int i = 0; i < 3; ++i)
+            // {
+            //     for (int j = 0; j < 3; ++j)
+            //     {
+            //         tool_rotation(i, j) = tool_base.M(i, j);
+            //     }
+            // }
+            // // 将KDL::Frame的位置部分转换为Eigen::Vector3d
+            // Eigen::Vector3d position(-tool2flange.p.x(), -tool2flange.p.y(), -tool2flange.p.z());
 
-            // 计算叉积
-            Eigen::Vector3d cross_product = rotation * ((tool_rotation * angular_velocity).cross(position));
-            KDL::Vector temp = KDL::Vector(cross_product(0), cross_product(1), cross_product(2));
+            // // 计算叉积
+            // Eigen::Vector3d cross_product = angular_velocity .cross(position);
+            // KDL::Vector temp = KDL::Vector(cross_product(0), cross_product(1), cross_product(2));
+            KDL::Vector t_f_tool =  robot_ptr->getT_tool_( ).Inverse().p;    
 
-            Cartesian_vel.vel = tool_base.M * Cartesian_vel.vel + temp;
+            Cartesian_vel.vel = tool_base.M*(Cartesian_vel.vel +Cartesian_vel.rot*t_f_tool);
+            Cartesian_vel.rot=tool_base.M*Cartesian_vel.rot; 
 
-            Cartesian_vel.rot = tool_base.M * Cartesian_vel.rot;
-
-            std::cout << "Cartesian_vel.vel:" << Cartesian_vel.vel << std::endl;
-            std::cout << "Cartesian_vel.rot:" << Cartesian_vel.rot << std::endl;
+            //  Cartesian_vel = current_flange.M * Cartesian_vel;
+            // std::cout << "Cartesian_vel.vel:" << Cartesian_vel.vel << std::endl;
+            // std::cout << "Cartesian_vel.rot:" << Cartesian_vel.rot << std::endl;
         }
         if (_reference_frame.compare("object") == 0)
-        { //** 转变速度矢量的参考系，由flange系变为base系，但没有改变参考点（还是flange） **//
+        { //** 转变速度矢量的参考系，由flange系变为base系，改变参考点（还是tool） **//
             FK_slover.JntToCart(vector_2_JntArray(robot_ptr->pos_), current_flange);
             KDL::Frame object2flange = robot_ptr->getT_object_();
-            current_flange = current_flange * object2flange;
+            KDL::Frame object_base = current_flange * object2flange;
             Cartesian_vel = current_flange.M * Cartesian_vel;
+            KDL::Vector t_f_tool =  robot_ptr->getT_object_().Inverse().p;    
+
+            Cartesian_vel.vel = object_base.M*(Cartesian_vel.vel +Cartesian_vel.rot*t_f_tool);
+            Cartesian_vel.rot=object_base.M*Cartesian_vel.rot; 
+
         }
 
         output.pass_to_input(input);
