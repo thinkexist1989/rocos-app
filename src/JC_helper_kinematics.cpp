@@ -3055,15 +3055,11 @@ namespace JC_helper
             // std::cout << "Cartesian_vel.rot:" << Cartesian_vel.rot << std::endl;
         }
         if (_reference_frame.compare("object") == 0)
-        { //** 转变速度矢量的参考系，由flange系变为base系，改变参考点（还是tool） **//
+        { //** 转变速度矢量的参考系，由flange系变为base系，改变参考点（还是object） **//
+        // objectt标定的就是工件相对于基座的位姿，所以不需要转换，移动就是沿着工件的坐标系移动，旋转就是绕工件的坐标系旋转，但是运动的点为末端法兰盘
             FK_slover.JntToCart(vector_2_JntArray(robot_ptr->pos_), current_flange);
-            KDL::Frame object2flange = robot_ptr->getT_object_();
-            KDL::Frame object_base = current_flange * object2flange;
-            Cartesian_vel = current_flange.M * Cartesian_vel;
-            KDL::Vector t_f_tool =  robot_ptr->getT_object_().Inverse().p;    
-
-            Cartesian_vel.vel = object_base.M*(Cartesian_vel.vel +Cartesian_vel.rot*t_f_tool);
-            Cartesian_vel.rot=object_base.M*Cartesian_vel.rot; 
+            KDL::Frame object2base = robot_ptr->getT_object_();
+            Cartesian_vel = object2base.M * Cartesian_vel;
 
         }
 

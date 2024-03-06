@@ -402,7 +402,7 @@ namespace rocos
         {
             std::lock_guard<std::mutex> lock(mtx); // 自动获取互斥锁
             // Object Reference
-            object_ = flange_ * T_object_;
+            object_ = T_object_;
             return object_;
         }
 
