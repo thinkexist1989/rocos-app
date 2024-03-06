@@ -2037,7 +2037,7 @@ namespace rocos {
         return 0;
     }
 
-    int Robot::Dragging(DRAGGING_FLAG flag, DRAGGING_DIRRECTION dir, double max_speed, double max_acceleration) {
+    int Robot::Dragging(DRAGGING_FLAG ref_frame_flag, DRAGGING_DIRRECTION dir, double max_speed, double max_acceleration) {
         //** 变量初始化 **//
         static std::atomic<bool> _dragging_finished_flag{true};
         static JC_helper::SmartServo_Joint _SmartServo_Joint{&_dragging_finished_flag};
@@ -2046,12 +2046,13 @@ namespace rocos {
         static std::shared_ptr<boost::thread> _thread_planning{nullptr};
         KDL::JntArray target_joint{static_cast< unsigned int >( jnt_num_ )};
         KDL::Frame target_frame{};
-        int index{static_cast< int >( flag )};
+        int index{static_cast< int >( ref_frame_flag )};
         static DRAGGING_TYPE index_type;
         static DRAGGING_TYPE last_index_type;
         int res{-1};
         constexpr double vector_speed_scale{0.1};
         constexpr double rotation_speed_scale{0.2};
+        DRAGGING_motion_type motion_point_flag{DRAGGING_motion_type::BASE};
         //**-------------------------------**//
 
         //** 命令有效性检查 **//
@@ -2173,7 +2174,7 @@ namespace rocos {
         //**-------------------------------**//
 
 
-        switch (flag) {
+        switch (ref_frame_flag) {
             case DRAGGING_FLAG::J0:
             case DRAGGING_FLAG::J1:
             case DRAGGING_FLAG::J2:
@@ -2201,7 +2202,10 @@ namespace rocos {
                 index = index - static_cast< int >( DRAGGING_FLAG::FLANGE_X ) + 1;
 
                 index = index * static_cast< double >( dir );
-                _SmartServo_Cartesian.command(index, "flange");
+                if ( motion_point_flag == DRAGGING_motion_type::TOOL )
+                    _SmartServo_Cartesian.command( index, "flange", "tool" );
+                else
+                    _SmartServo_Cartesian.command( index, "flange", "flange" );
                 break;
 
             case DRAGGING_FLAG::TOOL_X:
@@ -2211,11 +2215,14 @@ namespace rocos {
             case DRAGGING_FLAG::TOOL_PITCH:
             case DRAGGING_FLAG::TOOL_YAW:
 
-                PLOG_WARNING << " 笛卡尔点动功能暂时不支持 {TOOL},替换为{BASE}";
+                // PLOG_WARNING << " 笛卡尔点动功能暂时不支持 {TOOL},替换为{BASE}";
 
                 index = index - static_cast< int >( DRAGGING_FLAG::TOOL_X ) + 1;
                 index = index * static_cast< double >( dir );
-                _SmartServo_Cartesian.command(index, "base");
+                if ( motion_point_flag == DRAGGING_motion_type::TOOL )
+                    _SmartServo_Cartesian.command( index, "tool", "tool" );
+                else
+                    _SmartServo_Cartesian.command( index, "tool", "flange" );
                 break;
 
 
@@ -2230,7 +2237,10 @@ namespace rocos {
 
                 index = index - static_cast< int >( DRAGGING_FLAG::OBJECT_X ) + 1;
                 index = index * static_cast< double >( dir );
-                _SmartServo_Cartesian.command(index, "base");
+                if ( motion_point_flag == DRAGGING_motion_type::TOOL )
+                    _SmartServo_Cartesian.command( index, "base", "tool" );
+                else
+                    _SmartServo_Cartesian.command( index, "base", "flange" );
                 break;
 
             case DRAGGING_FLAG::BASE_X:

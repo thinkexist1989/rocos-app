@@ -3005,12 +3005,29 @@ namespace JC_helper
         {
             Cartesian_vel.rot[ abs( _Cartesian_vel_index ) - 4 ] = sign( _Cartesian_vel_index ) * res_vel[ 0 ];
         }
-
+        //** 变化参考坐标系为base **//
         if ( _reference_frame.compare( "flange" ) == 0 )
-        {  //** 转变速度矢量的参考系，由flange系变为base系，但没有改变参考点（还是flange） **//
+        {  
             FK_slover.JntToCart( vector_2_JntArray( robot_ptr->pos_ ), current_flange );
             Cartesian_vel = current_flange.M * Cartesian_vel;
+        }else if( _reference_frame.compare( "tool" ) == 0 )
+        {
+            FK_slover.JntToCart( vector_2_JntArray( robot_ptr->pos_ ), current_flange );
+            current_flange = current_flange * robot_ptr->getT_tool_( );
+            Cartesian_vel  = current_flange.M * Cartesian_vel;  // 先变化参考系为base
         }
+        //**-------------------------------**//
+
+        //** 变化运动点为flange **//
+        if ( _motion_point.compare( "tool" ) == 0 )
+        { 
+            KDL::Vector t_f_tool =  robot_ptr->getT_tool_( ).Inverse().p;
+            FK_slover.JntToCart( vector_2_JntArray( robot_ptr->pos_ ), current_flange );
+            current_flange = current_flange * robot_ptr->getT_tool_( );
+            Cartesian_vel.vel  = Cartesian_vel.vel + Cartesian_vel.rot * current_flange.M * t_f_tool;
+        }
+        //**-------------------------------**//
+
 
         output.pass_to_input( input );
 
@@ -3116,13 +3133,16 @@ namespace JC_helper
         robot_ptr->setRunState(rocos::Robot::RunState::Stopped);  // 机械臂运动已结束，可以执行其他离线类运动
     }
 
-    void SmartServo_Cartesian::command( int Cartesian_vel_index, const char* reference_frame )
+    void SmartServo_Cartesian::command( int Cartesian_vel_index, const char* reference_frame, const char*  motion_point )
     {
         if ( _Cartesian_vel_index == 0 )
             _Cartesian_vel_index = Cartesian_vel_index;
 
         if ( _reference_frame.empty( ) )
             _reference_frame = reference_frame;
+
+        if ( _motion_point.empty( ) )
+            _motion_point = motion_point;
 
         if ( !flag_stop )
         {
@@ -3134,6 +3154,10 @@ namespace JC_helper
             else if ( _reference_frame.compare( reference_frame ) != 0 )
             {
                 PLOG_ERROR << "参考坐标系变换，停止！";
+                Cartesian_stop( );
+            }else if ( _motion_point.compare( motion_point ) != 0 )
+            {
+                PLOG_ERROR << "运动点变换，停止！";
                 Cartesian_stop( );
             }
             else

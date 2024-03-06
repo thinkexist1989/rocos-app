@@ -555,6 +555,12 @@ namespace rocos {
             CARTESIAN = 1,
             NULLSPACE = 2
         };
+        enum class DRAGGING_motion_type : int
+        {
+            FLANGE     = 0,
+            TOOL = 1
+        };
+
 
         /**
          * @brief 拖动示教功能

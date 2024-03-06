@@ -283,6 +283,7 @@ namespace JC_helper
         std::atomic< bool >* external_finished_flag_ptr;
 
         std::string _reference_frame{ "" };
+        std::string _motion_point{ "" };
 
         KDL::ChainFkSolverPos_recursive FK_slover;  //! 因为flang_.M一直在刷新，实时读取有问题，暂时这么处理
         KDL::Frame current_flange{ };
@@ -302,7 +303,7 @@ namespace JC_helper
 
         void RunMotion( rocos::Robot* robot_ptr );
 
-        void command( int Cartesian_vel_index, const char* reference_frame );
+        void command( int Cartesian_vel_index, const char* reference_frame , const char* motion_point);
 
         void Cartesian_stop( double max_vel = 10, double max_acc = 50, double max_jerk = 180 );
 
