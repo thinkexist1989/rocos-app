@@ -423,109 +423,151 @@ namespace rocos
     public:
         void tool_calibration(std::string frame) // 工具标定
         {
-            
-            ErrorState=false;
+
+            ErrorState = false;
             Eigen::MatrixXd R_EB(9, 3);
             Eigen::MatrixXd P_TB(9, 1);
-            
-            if (frame=="tool")
+
+            if (frame == "tool")
             {
-       
-            for (int i = 0; i < 3; i++)
-            {
-                for (int j = 0; j < 3; j++)
+
+                for (int i = 0; i < 3; i++)
                 {
-                    R_EB(i, j) = pose1.M.data[i * 3 + j] - pose2.M.data[i * 3 + j];
-                    R_EB(i + 3, j) = pose2.M.data[i * 3 + j] - pose3.M.data[i * 3 + j];
-                    R_EB(i + 6, j) = pose3.M.data[i * 3 + j] - pose4.M.data[i * 3 + j];
+                    for (int j = 0; j < 3; j++)
+                    {
+                        R_EB(i, j) = pose1.M.data[i * 3 + j] - pose2.M.data[i * 3 + j];
+                        R_EB(i + 3, j) = pose2.M.data[i * 3 + j] - pose3.M.data[i * 3 + j];
+                        R_EB(i + 6, j) = pose3.M.data[i * 3 + j] - pose4.M.data[i * 3 + j];
+                    }
+                    P_TB(i, 0) = pose2.p.data[i] - pose1.p.data[i];
+                    P_TB(i + 3, 0) = pose3.p.data[i] - pose2.p.data[i];
+                    P_TB(i + 6, 0) = pose4.p.data[i] - pose3.p.data[i];
                 }
-                P_TB(i, 0) = pose2.p.data[i] - pose1.p.data[i];
-                P_TB(i + 3, 0) = pose3.p.data[i] - pose2.p.data[i];
-                P_TB(i + 6, 0) = pose4.p.data[i] - pose3.p.data[i];
-            }
-            Eigen::Vector3d Pos = (R_EB.transpose() * R_EB).inverse() * R_EB.transpose() * P_TB;
-            // std::cout << "Pos" << Pos << std::endl;
-            //  测试pinv
+                Eigen::Vector3d Pos = (R_EB.transpose() * R_EB).inverse() * R_EB.transpose() * P_TB;
+                // std::cout << "Pos" << Pos << std::endl;
+                //  测试pinv
 
-            // std::cout << "pinv_R_TB" << R_EB.completeOrthogonalDecomposition().pseudoInverse() << std::endl;
-            Eigen::MatrixXd pinv_R_TB = R_EB.completeOrthogonalDecomposition().pseudoInverse();
-            Eigen::Vector3d Pos1 = pinv_R_TB * P_TB;
-            // std::cout << "Pos1" << Pos1 << std::endl;
-            // Calibration of rotation
-            // Calibration of rotation
-            Eigen::Vector3d Vx{(pose5.p - pose4.p).data[0], (pose5.p - pose4.p).data[1], (pose5.p - pose4.p).data[2]};
-            Eigen::Vector3d Vy{(pose6.p - pose4.p).data[0], (pose6.p - pose4.p).data[1], (pose6.p - pose4.p).data[2]};
-            // std::cout<<"Vx"<<Vx<<std::endl;
-   
-            Vx.normalize();
-            Vy.normalize();
-      
-            Eigen::Vector3d Vz = Vx.cross(Vy);
-            Vy = Vz.cross(Vx);
-            Eigen::Matrix3d R_TB;
-            R_TB.block<3, 1>(0, 0) = Vx;
-            R_TB.block<3, 1>(0, 1) = Vy;
-            R_TB.block<3, 1>(0, 2) = Vz;
-            // std::cout << "Vx" << Vx << std::endl;
-            // std::cout << "Vy" << Vy << std::endl;
-            // std::cout << "Vz" << Vz << std::endl;
+                // std::cout << "pinv_R_TB" << R_EB.completeOrthogonalDecomposition().pseudoInverse() << std::endl;
+                Eigen::MatrixXd pinv_R_TB = R_EB.completeOrthogonalDecomposition().pseudoInverse();
+                Eigen::Vector3d Pos1 = pinv_R_TB * P_TB;
+                // std::cout << "Pos1" << Pos1 << std::endl;
+                // Calibration of rotation
+                // Calibration of rotation
+                Eigen::Vector3d Vx{(pose5.p - pose4.p).data[0], (pose5.p - pose4.p).data[1], (pose5.p - pose4.p).data[2]};
+                Eigen::Vector3d Vy{(pose6.p - pose4.p).data[0], (pose6.p - pose4.p).data[1], (pose6.p - pose4.p).data[2]};
+                // std::cout<<"Vx"<<Vx<<std::endl;
 
-            Eigen::Matrix3d R0_EB;
-            KDL::Rotation pose4_Rotation = pose4.M;
-            // std::cout << "pose4.m" << pose4.M.data[0] << "," << pose4.M.data[1] << "," << pose4.M.data[2] << "," << pose4.M.data[3] << "," << pose4.M.data[4] << "," << pose4.M.data[5] << "," << pose4.M.data[6] << "," << pose4.M.data[7] << "," << pose4.M.data[8] << std::endl;
-            for (int i = 0; i < 3; i++)
-            {
-                for (int j = 0; j < 3; j++)
+                Vx.normalize();
+                Vy.normalize();
+
+                Eigen::Vector3d Vz = Vx.cross(Vy);
+                Vy = Vz.cross(Vx);
+                Eigen::Matrix3d R_TB;
+                R_TB.block<3, 1>(0, 0) = Vx;
+                R_TB.block<3, 1>(0, 1) = Vy;
+                R_TB.block<3, 1>(0, 2) = Vz;
+                // std::cout << "Vx" << Vx << std::endl;
+                // std::cout << "Vy" << Vy << std::endl;
+                // std::cout << "Vz" << Vz << std::endl;
+
+                Eigen::Matrix3d R0_EB;
+                KDL::Rotation pose4_Rotation = pose4.M;
+                // std::cout << "pose4.m" << pose4.M.data[0] << "," << pose4.M.data[1] << "," << pose4.M.data[2] << "," << pose4.M.data[3] << "," << pose4.M.data[4] << "," << pose4.M.data[5] << "," << pose4.M.data[6] << "," << pose4.M.data[7] << "," << pose4.M.data[8] << std::endl;
+                for (int i = 0; i < 3; i++)
                 {
-                    R0_EB(i, j) = pose4_Rotation(i, j);
+                    for (int j = 0; j < 3; j++)
+                    {
+                        R0_EB(i, j) = pose4_Rotation(i, j);
+                    }
+                }
+                // 打印R0_EB和R_TB
+                // std::cout << "R0_EB" << R0_EB << std::endl;
+                // std::cout << "R_TB" << R_TB << std::endl;
+
+                Eigen::Matrix3d Rot = R0_EB.inverse() * R_TB;
+                // std::cout << "R0_EB.inverse()" << R0_EB.inverse() << std::endl;
+
+                pose_out.p = KDL::Vector(Pos(0), Pos(1), Pos(2));
+                pose_out.M = KDL::Rotation(Rot(0, 0), Rot(0, 1), Rot(0, 2), Rot(1, 0), Rot(1, 1), Rot(1, 2), Rot(2, 0), Rot(2, 1), Rot(2, 2));
+                // std::cout << "pose_out" << pose_out.M.data[0] << "," << pose_out.M.data[1] << "," << pose_out.M.data[2] << "," << pose_out.M.data[3] << "," << pose_out.M.data[4] << "," << pose_out.M.data[5] << "," << pose_out.M.data[6] << "," << pose_out.M.data[7] << "," << pose_out.M.data[8] << std::endl;
+                // 旋转矩阵转旋转向量
+                Eigen::AngleAxisd rotation_vector2;
+                rotation_vector2.fromRotationMatrix(Rot);
+                double angle = rotation_vector2.angle();
+                Eigen::Vector3d axis = rotation_vector2.axis();
+
+                // std::cout << "axis" << axis[0] << "," << axis[1] << "," << axis[2] << std::endl;
+                // std::cout << "angle" << angle << std::endl;
+                Eigen::Vector3d rotVector = axis * angle;
+                // 旋转矩阵转RPY
+                double roll1, pitch1, yaw1;
+                pose_out.M.GetRPY(roll1, pitch1, yaw1);
+
+                // 打印结果
+                std::cout << "工具系的位置" << pose_out.p.x() << "," << pose_out.p.y() << "," << pose_out.p.z() << std::endl;
+                std::cout << "工具系的旋转向量" << rotVector.x() / M_PI * 180 << "," << rotVector.y() / M_PI * 180 << "," << rotVector.z() / M_PI * 180 << std::endl;
+                std::cout << "工具系的RPY" << roll1 / M_PI * 180 << "," << pitch1 / M_PI * 180 << "," << yaw1 / M_PI * 180 << std::endl;
+                // 工具系位置标定的误差
+                double error = 0.0;
+                error = (R_EB * Pos - P_TB).norm();
+                std::cout << "工具系位置标定的误差" << error << std::endl;
+                if (std::isnan(error) || error > 0.1)
+                {
+                    ErrorState = true;
+                    std::cout << "工具系标定失败" << std::endl;
                 }
             }
-            // 打印R0_EB和R_TB
-            // std::cout << "R0_EB" << R0_EB << std::endl;
-            // std::cout << "R_TB" << R_TB << std::endl;
-
-            Eigen::Matrix3d Rot = R0_EB.inverse() * R_TB;
-            // std::cout << "R0_EB.inverse()" << R0_EB.inverse() << std::endl;
-
-            pose_out.p = KDL::Vector(Pos(0), Pos(1), Pos(2));
-            pose_out.M = KDL::Rotation(Rot(0, 0), Rot(0, 1), Rot(0, 2), Rot(1, 0), Rot(1, 1), Rot(1, 2), Rot(2, 0), Rot(2, 1), Rot(2, 2));
-            // std::cout << "pose_out" << pose_out.M.data[0] << "," << pose_out.M.data[1] << "," << pose_out.M.data[2] << "," << pose_out.M.data[3] << "," << pose_out.M.data[4] << "," << pose_out.M.data[5] << "," << pose_out.M.data[6] << "," << pose_out.M.data[7] << "," << pose_out.M.data[8] << std::endl;
-            // 旋转矩阵转旋转向量
-            Eigen::AngleAxisd rotation_vector2;
-            rotation_vector2.fromRotationMatrix(Rot);
-            double angle = rotation_vector2.angle();
-            Eigen::Vector3d axis = rotation_vector2.axis();
-
-            // std::cout << "axis" << axis[0] << "," << axis[1] << "," << axis[2] << std::endl;
-            // std::cout << "angle" << angle << std::endl;
-            Eigen::Vector3d rotVector = axis * angle;
-            // 旋转矩阵转RPY
-            double roll1, pitch1, yaw1;
-            pose_out.M.GetRPY(roll1, pitch1, yaw1);
-
-            // 打印结果
-            std::cout << "工具系的位置" << pose_out.p.x() << "," << pose_out.p.y() << "," << pose_out.p.z() << std::endl;
-            std::cout << "工具系的旋转向量" << rotVector.x() / M_PI * 180 << "," << rotVector.y() / M_PI * 180 << "," << rotVector.z() / M_PI * 180 << std::endl;
-            std::cout << "工具系的RPY" << roll1 / M_PI * 180 << "," << pitch1 / M_PI * 180 << "," << yaw1 / M_PI * 180 << std::endl;
-            // 工具系位置标定的误差
-            double error = 0.0;
-            error = (R_EB * Pos - P_TB).norm();
-            std::cout << "工具系位置标定的误差" << error << std::endl;
-            if (std::isnan(error) || error > 0.1) {
-                ErrorState = true;
-                std::cout<< "工具系标定失败" << std::endl;
-            }
-                 
-            }
-            else if (frame=="object")
+            else if (frame == "object")
             {
-                std::cout << "object 标定完成" << std::endl;
-                
+                Eigen::Vector3d Vx{(poseObject2.p - poseObject1.p).data[0], (poseObject2.p - poseObject1.p).data[1], (poseObject2.p - poseObject1.p).data[2]};
+                Eigen::Vector3d Vy{(poseObject3.p - poseObject1.p).data[0], (poseObject3.p - poseObject1.p).data[1], (poseObject3.p - poseObject1.p).data[2]};
+                Vx.normalize();
+                Vy.normalize();
+                Eigen::Vector3d Vz = Vx.cross(Vy);
+                Vy = Vz.cross(Vx);
+                Eigen::Matrix3d R_TB;
+                R_TB.block<3, 1>(0, 0) = Vx;
+                R_TB.block<3, 1>(0, 1) = Vy;
+                R_TB.block<3, 1>(0, 2) = Vz;
+                Eigen::Matrix3d R0_EB;
+                KDL::Rotation pose4_Rotation = pose4.M;
+                // std::cout << "pose4.m" << pose4.M.data[0] << "," << pose4.M.data[1] << "," << pose4.M.data[2] << "," << pose4.M.data[3] << "," << pose4.M.data[4] << "," << pose4.M.data[5] << "," << pose4.M.data[6] << "," << pose4.M.data[7] << "," << pose4.M.data[8] << std::endl;
+                for (int i = 0; i < 3; i++)
+                {
+                    for (int j = 0; j < 3; j++)
+                    {
+                        R0_EB(i, j) = pose4_Rotation(i, j);
+                    }
+                }
+                // 打印R0_EB和R_TB
+                // std::cout << "R0_EB" << R0_EB << std::endl;
+                // std::cout << "R_TB" << R_TB << std::endl;
+
+                Eigen::Matrix3d Rot = R0_EB.inverse() * R_TB;
+                 pose_out.p = KDL::Vector(poseObject1.p.x(), poseObject1.p.y(), poseObject1.p.z());
+                pose_out.M = KDL::Rotation(Rot(0, 0), Rot(0, 1), Rot(0, 2), Rot(1, 0), Rot(1, 1), Rot(1, 2), Rot(2, 0), Rot(2, 1), Rot(2, 2));
+                pose_out.M=pose_out.M*poseObject1.M;
+                double roll1, pitch1, yaw1;
+                pose_out.M.GetRPY(roll1, pitch1, yaw1);
+
+                // 打印结果
+                std::cout << "工件系的位置" << pose_out.p.x() << "," << pose_out.p.y() << "," << pose_out.p.z() << std::endl;
+                std::cout << "工件系的RPY" << roll1 / M_PI * 180 << "," << pitch1 / M_PI * 180 << "," << yaw1 / M_PI * 180 << std::endl;
+                 if (std::isnan(roll1) || std::isnan(pitch1) || std::isnan(yaw1)|| std::isnan(pose_out.p.x()) || std::isnan(pose_out.p.y()) || std::isnan(pose_out.p.z()))
+                {
+                    ErrorState = true;
+                    std::cout << "工件系标定失败" << std::endl;
+                }
+                else
+                {
+                    std::cout << "工件系标定成功" << std::endl;
+                }
+
             }
-            else{
+            else
+            {
                 std::cout << "frame error,无效坐标系" << std::endl;
             }
-
         }
         // 设置工具系
         void set_tool_frame(KDL::Frame &pose)
@@ -549,7 +591,7 @@ namespace rocos
 
             yaml_node["T_tool_"] = T_tool_rpy;
             std::ofstream fout(yaml_path);
-            
+
             fout << yaml_node;
             fout.close();
             std::cout << "保存T_tool_成功" << std::endl;
@@ -610,21 +652,20 @@ namespace rocos
             else if (id == 7)
             {
                 poseObject1 = pose_frame;
-                std::cout<<"poseObject1: "<<poseObject1.p.x()<<","<<poseObject1.p.y()<<","<<poseObject1.p.z()<<std::endl;
+                std::cout << "poseObject1: " << poseObject1.p.x() << "," << poseObject1.p.y() << "," << poseObject1.p.z() << std::endl;
             }
-            else if(id == 8)
+            else if (id == 8)
             {
                 poseObject2 = pose_frame;
                 std::cout << "poseObject2: " << poseObject2.p.x() << "," << poseObject2.p.y() << "," << poseObject2.p.z() << std::endl;
             }
 
-            else if(id == 9)
+            else if (id == 9)
             {
                 poseObject3 = pose_frame;
                 std::cout << "poseObject3: " << poseObject3.p.x() << "," << poseObject3.p.y() << "," << poseObject3.p.z() << std::endl;
             }
 
-            
             else
             {
                 // 处理无效的id
@@ -1060,11 +1101,10 @@ namespace rocos
         Frame poseObject2;
         Frame poseObject3;
 
-
         // 变换矩阵,记得从yaml文件中读取，以及写入到yaml文件中
         Frame T_tool_;
         Frame T_object_;
-        //计算工具系和工件系的变换矩阵的标志位
+        // 计算工具系和工件系的变换矩阵的标志位
         bool ErrorState{false};
 
         std::vector<KDL::JntArray> traj_;
