@@ -530,7 +530,7 @@ namespace rocos
                 R_TB.block<3, 1>(0, 1) = Vy;
                 R_TB.block<3, 1>(0, 2) = Vz;
                 Eigen::Matrix3d R0_EB;
-                KDL::Rotation pose4_Rotation = pose4.M;
+                KDL::Rotation pose4_Rotation = poseObject1.M;
                 // std::cout << "pose4.m" << pose4.M.data[0] << "," << pose4.M.data[1] << "," << pose4.M.data[2] << "," << pose4.M.data[3] << "," << pose4.M.data[4] << "," << pose4.M.data[5] << "," << pose4.M.data[6] << "," << pose4.M.data[7] << "," << pose4.M.data[8] << std::endl;
                 for (int i = 0; i < 3; i++)
                 {
@@ -546,7 +546,7 @@ namespace rocos
                 Eigen::Matrix3d Rot = R0_EB.inverse() * R_TB;
                  pose_out.p = KDL::Vector(poseObject1.p.x(), poseObject1.p.y(), poseObject1.p.z());
                 pose_out.M = KDL::Rotation(Rot(0, 0), Rot(0, 1), Rot(0, 2), Rot(1, 0), Rot(1, 1), Rot(1, 2), Rot(2, 0), Rot(2, 1), Rot(2, 2));
-                pose_out.M=pose_out.M*poseObject1.M;
+                pose_out.M=poseObject1.M*pose_out.M;
                 double roll1, pitch1, yaw1;
                 pose_out.M.GetRPY(roll1, pitch1, yaw1);
 
