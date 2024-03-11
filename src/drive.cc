@@ -59,9 +59,17 @@ namespace rocos {
 
         // make the state machine realize that a state change will have to happen
         //sun 关闭状态机
-        // conduct_state_change_ = true;
-        uint16_t Controlword = 0;
-        hw_interface_->setControlwordRaw(id_, Controlword);
+        conduct_state_change_ = true;
+        if(driveState == DriveState::SwitchOnDisabled) {
+            hw_interface_->setControlwordRaw(id_, 0);
+        }
+        else if(driveState == DriveState::OperationEnabled) {
+            ;
+            hw_interface_->setControlwordRaw(id_, 1);
+        }
+        else {
+            std::cout << "Not Supported State" << std::endl;
+        }
 
         // overwrite the target drive state
         target_drive_state_ = driveState;
@@ -91,7 +99,7 @@ namespace rocos {
             //sun 读取当前驱动器状态
            
             // break loop as soon as the state change was successful
-            if (state_change_successful_) {
+            if (current_drive_state_ == driveState) {
                 success = true;
                 break;
             }

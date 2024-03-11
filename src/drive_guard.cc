@@ -55,8 +55,8 @@ namespace rocos {
 
                 d->current_drive_state_ = d->hw_interface_->getDriverState(d->id_);
 
-                if (d->conduct_state_change_)
-                    d->engageStateMachine();
+                // if (d->conduct_state_change_)
+                //     d->engageStateMachine();
 
             }
 
