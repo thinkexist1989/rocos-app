@@ -58,7 +58,10 @@ namespace rocos {
         state_change_successful_ = false;
 
         // make the state machine realize that a state change will have to happen
-        conduct_state_change_ = true;
+        //sun 关闭状态机
+        // conduct_state_change_ = true;
+        uint16_t Controlword = 0;
+        hw_interface_->setControlwordRaw(id_, Controlword);
 
         // overwrite the target drive state
         target_drive_state_ = driveState;
@@ -85,6 +88,8 @@ namespace rocos {
         // during the waiting time the mutex MUST be unlocked!
 
         while (true) {
+            //sun 读取当前驱动器状态
+           
             // break loop as soon as the state change was successful
             if (state_change_successful_) {
                 success = true;
@@ -279,6 +284,7 @@ namespace rocos {
     }
 
     /// \brief 处理状态机，在DriveGuard线程中循环调用
+    //sun
     void Drive::engageStateMachine() {
 // locking the mutex
 //        boost::lock_guard<boost::recursive_mutex> lock(mutex_);
