@@ -816,10 +816,10 @@ namespace rocos {
 
     int Robot::MoveL(Frame pose, double speed, double acceleration, double time,
                      double radius, bool asynchronous, int max_running_count) {
-        if (pose == flange_) {
-            PLOG_ERROR << "设置的目标等于当前位姿";
-            return -1;
-        }
+        // if (pose == flange_) {
+        //     PLOG_ERROR << "设置的目标等于当前位姿";
+        //     return -1;
+        // }
 
         bool all_pos_mode{true};  //假设全部关节位置模式
         bool all_vel_mode{true};  //假设全部关节速度模式
@@ -912,12 +912,18 @@ namespace rocos {
                 traj_.clear();
 
                 PLOG_INFO << "---------------------------------------";
-
+                //sun
+                // 尝试改为解析解接口
                 for (const auto &target: traj_target) {
-                    if (kinematics_.CartToJnt(q_init, target, q_target) < 0) {
-                        PLOG_ERROR << " CartToJnt failed on the " << ik_count << " times";
+                     if (SRS_kinematics_.JC_cartesian_to_joint(target, q_init(2), q_init, q_target) < 0) {
+                        PLOG_ERROR << " JC_cartesian_to_joint failed on the " << ik_count << " times";
                         throw -1;
+
                     }
+                    // if (kinematics_.CartToJnt(q_init, target, q_target) < 0) {
+                    //     PLOG_ERROR << " CartToJnt failed on the " << ik_count << " times";
+                    //     throw -1;
+                    // }
                     //*防止奇异位置速度激增
                     for (int i = 0; i < jnt_num_; i++) {
                         if (abs(q_target(i) - q_init(i)) > max_step[i]) {
