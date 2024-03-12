@@ -31,7 +31,6 @@
 #include <vector>
 #include "kdl_parser/kdl_parser.hpp" //!< 解析URDF文件
 #include "gripper.hpp"
-#include "JC_helper_TCP.hpp"
 
 namespace rocos
 {

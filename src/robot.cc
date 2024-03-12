@@ -18,7 +18,6 @@
 // email: luoyang@sia.cn
 
 #include <rocos_app/robot.h>
-#include <rocos_app/JC_helper_authenticate.hpp>
 #include <kdl_parser/kdl_parser.hpp> // 用于将urdf文件解析为KDL::Tree
 
 #define  MAX_JOINT_NUM 50
@@ -29,8 +28,8 @@ namespace rocos {
                  const string &urdf_file_path,
                  const string &base_link,
                  const string &tip
-                 ) : hw_interface_(hw), urdf_file_path_(urdf_file_path), pos_(MAX_JOINT_NUM),
-                                           vel_(MAX_JOINT_NUM), acc_(MAX_JOINT_NUM) {
+    ) : hw_interface_(hw), urdf_file_path_(urdf_file_path), pos_(MAX_JOINT_NUM),
+        vel_(MAX_JOINT_NUM), acc_(MAX_JOINT_NUM) {
 
         parseUrdf(urdf_file_path, base_link, tip);
 
@@ -74,7 +73,7 @@ namespace rocos {
 
         static plog::ColorConsoleAppender<plog::TxtFormatter> consoleAppender;
         plog::init<0>(plog::debug,
-                      &consoleAppender);//终端显示                                                                      // Initialize the logger.
+                      &consoleAppender);//终端显示   // Initialize the logger.
 
         // 实现密匙加密
         //  if ( JC_helper::authentication( ) < 0 )
@@ -84,22 +83,22 @@ namespace rocos {
         //sun 工具系的初始化
         yaml_node = YAML::LoadFile(yaml_path);
         // 读取yaml文件
-        std::vector <double> tool_param=yaml_node["T_tool_"].as<std::vector<double>>();
-        
-        std::vector <double> object_param=yaml_node["T_object_"].as<std::vector<double>>();
-        
+        std::vector<double> tool_param = yaml_node["T_tool_"].as<std::vector<double>>();
+
+        std::vector<double> object_param = yaml_node["T_object_"].as<std::vector<double>>();
+
         T_tool_.p.x(tool_param[0]);
         T_tool_.p.y(tool_param[1]);
         T_tool_.p.z(tool_param[2]);
-        T_tool_.M=KDL::Rotation::RPY(tool_param[3],tool_param[4],tool_param[5]);
+        T_tool_.M = KDL::Rotation::RPY(tool_param[3], tool_param[4], tool_param[5]);
         T_object_.p.x(object_param[0]);
         T_object_.p.y(object_param[1]);
         T_object_.p.z(object_param[2]);
-        T_object_.M=KDL::Rotation::RPY(object_param[3],object_param[4],object_param[5]);
-        std::cout<<"tool_param: "<<T_tool_.p.z()<<std::endl;
-        std::cout<<"object_param: "<<T_object_.p.y()<<std::endl;
-  
-        
+        T_object_.M = KDL::Rotation::RPY(object_param[3], object_param[4], object_param[5]);
+        std::cout << "tool_param: " << T_tool_.p.z() << std::endl;
+        std::cout << "object_param: " << T_object_.p.y() << std::endl;
+
+
 
         // 解析逆运动学求解器初始化
         KDL::JntArray q_min(joints_.size());
@@ -915,7 +914,7 @@ namespace rocos {
                 //sun
                 // 尝试改为解析解接口
                 for (const auto &target: traj_target) {
-                     if (SRS_kinematics_.JC_cartesian_to_joint(target, q_init(2), q_init, q_target) < 0) {
+                    if (SRS_kinematics_.JC_cartesian_to_joint(target, q_init(2), q_init, q_target) < 0) {
                         PLOG_ERROR << " JC_cartesian_to_joint failed on the " << ik_count << " times";
                         throw -1;
 
@@ -2783,173 +2782,170 @@ namespace rocos {
         //**-------------------------------**//
         return 0;
     }
-int Robot::speed_scaling( )
-    {
-        //** 全局速度条规划器 **//
-        if ( is_fraction_changed && std::abs( target_speed_fraction - current_speed_fraction ) >= 0.0001 )
-        {
-                if ( T_speed_scaling_ptr == nullptr )
-                {
-                    T_speed_scaling_ptr.reset( new Trapezoid{ } );
-                }
 
-                speed_scaling_dt = 0;
-                T_speed_scaling_ptr->planTrapezoidProfile( 0, current_speed_fraction, target_speed_fraction, current_speed_fraction_vel, 0, 3.00, 8.0 );
-                if ( !T_speed_scaling_ptr->isValidMovement( ) || !( T_speed_scaling_ptr->getDuration( ) > 0 ) )
-                {
-                    PLOG_ERROR << "seed scaling is infeasible";
-                    setRunState( RunState::Stopped );
-                    exit( -1 );
-                }
-                is_fraction_changed = false;
-        }
-
-        if ( std::abs( target_speed_fraction - current_speed_fraction ) >= 0.0001 && T_speed_scaling_ptr != nullptr )
-        {
-                current_speed_fraction     = T_speed_scaling_ptr->pos( speed_scaling_dt );
-                current_speed_fraction_vel = T_speed_scaling_ptr->vel( speed_scaling_dt );
-                current_speed_fraction_acc = T_speed_scaling_ptr->acc( speed_scaling_dt );
-                speed_scaling_dt += 0.001;
-        }
-        //**-------------------------------**//
-
-        return 0;
-    }
+//    int Robot::speed_scaling() {
+//        //** 全局速度条规划器 **//
+//        if (is_fraction_changed && std::abs(target_speed_fraction - current_speed_fraction) >= 0.0001) {
+//            if (T_speed_scaling_ptr == nullptr) {
+//                T_speed_scaling_ptr.reset(new Trapezoid{});
+//            }
+//
+//            speed_scaling_dt = 0;
+//            T_speed_scaling_ptr->planTrapezoidProfile(0, current_speed_fraction, target_speed_fraction,
+//                                                      current_speed_fraction_vel, 0, 3.00, 8.0);
+//            if (!T_speed_scaling_ptr->isValidMovement() || !(T_speed_scaling_ptr->getDuration() > 0)) {
+//                PLOG_ERROR << "seed scaling is infeasible";
+//                setRunState(RunState::Stopped);
+//                exit(-1);
+//            }
+//            is_fraction_changed = false;
+//        }
+//
+//        if (std::abs(target_speed_fraction - current_speed_fraction) >= 0.0001 && T_speed_scaling_ptr != nullptr) {
+//            current_speed_fraction = T_speed_scaling_ptr->pos(speed_scaling_dt);
+//            current_speed_fraction_vel = T_speed_scaling_ptr->vel(speed_scaling_dt);
+//            current_speed_fraction_acc = T_speed_scaling_ptr->acc(speed_scaling_dt);
+//            speed_scaling_dt += 0.001;
+//        }
+//        //**-------------------------------**//
+//
+//        return 0;
+//    }
 
 
-int Robot::moveJ_with_speed_scaling( const KDL::JntArray& target_pos, double max_vel, double max_acc, double max_jerk )
-    {
-        //**  通过TCP实现动态调速，这是debug使用，不应该存在**//
-
-        static JC_helper::TCP_server speed_scaling_server;
-        static bool flag_TCP_server_init = false;
-        if ( !flag_TCP_server_init )
-        {
-                speed_scaling_server.init( );
-                std::thread( &JC_helper::TCP_server::RunServer, &speed_scaling_server ).detach( );  // 开启服务器
-                flag_TCP_server_init = true;
-        }
-        //**-------------------------------**//
-        //** 常规检查 **//
-        if ( CheckBeforeMove( target_pos, max_vel, max_acc, 0, 0 ) < 0 )
-        {
-                PLOG_ERROR << "given parameters is invalid";
-                return -1;
-        }
-
-        for ( int i{ 0 }; i < _joint_num; i++ )
-        {
-            if ( !( joints_[ i ]->getMode( ) == ModeOfOperation::CyclicSynchronousPositionMode  ) )
-            {
-                PLOG_ERROR << "moveJ_with_speed_scaling不支持关节[" << i << "]的当前模式 :" << static_cast< int >( joints_[ i ]->getMode( ) );
-                return -1;
-            }
-        }
-
-        if ( is_running_motion )  // 最大异步执行一条任务
-        {
-            PLOG_ERROR << " Motion is still running and waiting for it to finish";
-            return -1;
-        }
-        else
-        {
-            setRunState( RunState::Running );
-        }
-        //**-------------------------------**//
-
-        auto doubleS    = rocos::DoubleS{ };
-
-        //** 找到哪个关节的运动范围最大 **//
-        double max_step = 0;
-        std::vector< double > pos_offset(jnt_num_);
-        for ( int i = 0; i < jnt_num_; i++ )
-        {
-            pos_offset[ i ] = target_pos( i ) - pos_[ i ];
-            max_step        = max( max_step, std::abs( pos_offset[ i ] ) );
-        }
-        if ( std::abs( max_step ) < 1e-4 )
-        {
-            PLOG_ERROR << " The target pos is the current pos";
-            setRunState( RunState::Stopped );
-            return -1;
-        }
-        //**-------------------------------**//
-
-        doubleS.planDoubleSProfile( 0,  // t
-                                    0,  // p0
-                                    1,  // pf
-                                    0,  // v0
-                                    0,  // vf
-                                    max_vel / max_step, max_acc / max_step, max_jerk / max_step );
-
-        if ( !doubleS.isValidMovement( ) || !( doubleS.getDuration( ) > 0 ) )
-        {
-            PLOG_ERROR << "movej trajectory is infeasible";
-            setRunState( RunState::Stopped );
-            return -1;
-        }
-
-        //** 伺服控制 **//
-        double max_time =  doubleS.getDuration( ) ;
-        double dt       = 0;
-        std::vector< double > pos_init( jnt_num_ );
-        for ( int i = 0; i < jnt_num_; i++ )
-            pos_init[ i ] = pos_[ i ];
-
-        while ( dt <= max_time )
-        {
-            //**  通过TCP实现动态调速，这是debug使用，不应该存在**//
-            if ( speed_scaling_server.flag_receive )
-            {
-                // PLOG_DEBUG << "Received=" << &speed_scaling_server.receive_buff[ 0 ];
-                set_target_speed_frcision( std::stod( &speed_scaling_server.receive_buff[ 0 ] ) * 0.01 );
-                speed_scaling_server.flag_receive = false;
-            }
-            //**-------------------------------**//
-
-            speed_scaling();
-
-            double doubleS_pos             = doubleS.pos( dt );
-            double doubleS_vel             = doubleS.vel( dt ) * current_speed_fraction;
-            double doubleS_acc             = doubleS.acc( dt ) * std::pow( current_speed_fraction, 2 ) + doubleS.vel( dt ) * current_speed_fraction_vel;
-
-            //**  记录数据，不应该存在**//
-            static double last_doubleS_acc = doubleS_acc;
-
-            speed_data_csv << std::setprecision( 5 ) << std::fixed;
-            speed_data_csv << current_speed_fraction << ",";      // 记录数据，不应该存在
-            speed_data_csv << current_speed_fraction_vel << ",";  // 记录数据，不应该存在
-            speed_data_csv << current_speed_fraction_acc<< ",";  // 记录数据，不应该存在
-            speed_data_csv <<  doubleS.vel( dt ) << ",";  // 记录数据，不应该存在
-            speed_data_csv <<  doubleS_vel << ",";  // 记录数据，不应该存在
-            speed_data_csv <<  doubleS.acc( dt ) << ",";  // 记录数据，不应该存在
-            speed_data_csv << doubleS_acc << ",";         // 记录数据，不应该存在
-            speed_data_csv << doubleS.jerk( dt ) << ",";   // 记录数据，不应该存在
-            speed_data_csv << (doubleS_acc-last_doubleS_acc)/0.001 << ",";   // 记录数据，不应该存在
-            speed_data_csv << doubleS_acc << ",";    // 记录数据，不应该存在
-            speed_data_csv << last_doubleS_acc << std::endl;   // 记录数据，不应该存在
-   
-            last_doubleS_acc = doubleS_acc;
-            
-            //**-------------------------------**//
-
-            for ( int i = 0; i < jnt_num_; ++i )
-            {
-                pos_[ i ] = pos_init[ i ] + pos_offset[ i ] * doubleS_pos;
-                vel_[ i ] = pos_offset[ i ] * doubleS_vel;
-                acc_[ i ] = pos_offset[ i ] * doubleS_acc;
-                joints_[ i ]->setPosition( pos_[ i ] );  //! 都设置，自动根据模式选取位置或者速度伺服
-                joints_[ i ]->setVelocity( vel_[ i ] );  //!
-            }
-            dt += 0.001*current_speed_fraction;
-
-            hw_interface_->waitForSignal( 0 );
-        }
-        //**-------------------------------**//
-        setRunState( RunState::Stopped );
-        speed_data_csv.close();
-        return 0;
-    }
+//int Robot::moveJ_with_speed_scaling( const KDL::JntArray& target_pos, double max_vel, double max_acc, double max_jerk )
+//    {
+//        //**  通过TCP实现动态调速，这是debug使用，不应该存在**//
+//
+//        static JC_helper::TCP_server speed_scaling_server;
+//        static bool flag_TCP_server_init = false;
+//        if ( !flag_TCP_server_init )
+//        {
+//                speed_scaling_server.init( );
+//                std::thread( &JC_helper::TCP_server::RunServer, &speed_scaling_server ).detach( );  // 开启服务器
+//                flag_TCP_server_init = true;
+//        }
+//        //**-------------------------------**//
+//        //** 常规检查 **//
+//        if ( CheckBeforeMove( target_pos, max_vel, max_acc, 0, 0 ) < 0 )
+//        {
+//                PLOG_ERROR << "given parameters is invalid";
+//                return -1;
+//        }
+//
+//        for ( int i{ 0 }; i < _joint_num; i++ )
+//        {
+//            if ( !( joints_[ i ]->getMode( ) == ModeOfOperation::CyclicSynchronousPositionMode  ) )
+//            {
+//                PLOG_ERROR << "moveJ_with_speed_scaling不支持关节[" << i << "]的当前模式 :" << static_cast< int >( joints_[ i ]->getMode( ) );
+//                return -1;
+//            }
+//        }
+//
+//        if ( is_running_motion )  // 最大异步执行一条任务
+//        {
+//            PLOG_ERROR << " Motion is still running and waiting for it to finish";
+//            return -1;
+//        }
+//        else
+//        {
+//            setRunState( RunState::Running );
+//        }
+//        //**-------------------------------**//
+//
+//        auto doubleS    = rocos::DoubleS{ };
+//
+//        //** 找到哪个关节的运动范围最大 **//
+//        double max_step = 0;
+//        std::vector< double > pos_offset(jnt_num_);
+//        for ( int i = 0; i < jnt_num_; i++ )
+//        {
+//            pos_offset[ i ] = target_pos( i ) - pos_[ i ];
+//            max_step        = max( max_step, std::abs( pos_offset[ i ] ) );
+//        }
+//        if ( std::abs( max_step ) < 1e-4 )
+//        {
+//            PLOG_ERROR << " The target pos is the current pos";
+//            setRunState( RunState::Stopped );
+//            return -1;
+//        }
+//        //**-------------------------------**//
+//
+//        doubleS.planDoubleSProfile( 0,  // t
+//                                    0,  // p0
+//                                    1,  // pf
+//                                    0,  // v0
+//                                    0,  // vf
+//                                    max_vel / max_step, max_acc / max_step, max_jerk / max_step );
+//
+//        if ( !doubleS.isValidMovement( ) || !( doubleS.getDuration( ) > 0 ) )
+//        {
+//            PLOG_ERROR << "movej trajectory is infeasible";
+//            setRunState( RunState::Stopped );
+//            return -1;
+//        }
+//
+//        //** 伺服控制 **//
+//        double max_time =  doubleS.getDuration( ) ;
+//        double dt       = 0;
+//        std::vector< double > pos_init( jnt_num_ );
+//        for ( int i = 0; i < jnt_num_; i++ )
+//            pos_init[ i ] = pos_[ i ];
+//
+//        while ( dt <= max_time )
+//        {
+//            //**  通过TCP实现动态调速，这是debug使用，不应该存在**//
+//            if ( speed_scaling_server.flag_receive )
+//            {
+//                // PLOG_DEBUG << "Received=" << &speed_scaling_server.receive_buff[ 0 ];
+//                set_target_speed_frcision( std::stod( &speed_scaling_server.receive_buff[ 0 ] ) * 0.01 );
+//                speed_scaling_server.flag_receive = false;
+//            }
+//            //**-------------------------------**//
+//
+//            speed_scaling();
+//
+//            double doubleS_pos             = doubleS.pos( dt );
+//            double doubleS_vel             = doubleS.vel( dt ) * current_speed_fraction;
+//            double doubleS_acc             = doubleS.acc( dt ) * std::pow( current_speed_fraction, 2 ) + doubleS.vel( dt ) * current_speed_fraction_vel;
+//
+//            //**  记录数据，不应该存在**//
+//            static double last_doubleS_acc = doubleS_acc;
+//
+//            speed_data_csv << std::setprecision( 5 ) << std::fixed;
+//            speed_data_csv << current_speed_fraction << ",";      // 记录数据，不应该存在
+//            speed_data_csv << current_speed_fraction_vel << ",";  // 记录数据，不应该存在
+//            speed_data_csv << current_speed_fraction_acc<< ",";  // 记录数据，不应该存在
+//            speed_data_csv <<  doubleS.vel( dt ) << ",";  // 记录数据，不应该存在
+//            speed_data_csv <<  doubleS_vel << ",";  // 记录数据，不应该存在
+//            speed_data_csv <<  doubleS.acc( dt ) << ",";  // 记录数据，不应该存在
+//            speed_data_csv << doubleS_acc << ",";         // 记录数据，不应该存在
+//            speed_data_csv << doubleS.jerk( dt ) << ",";   // 记录数据，不应该存在
+//            speed_data_csv << (doubleS_acc-last_doubleS_acc)/0.001 << ",";   // 记录数据，不应该存在
+//            speed_data_csv << doubleS_acc << ",";    // 记录数据，不应该存在
+//            speed_data_csv << last_doubleS_acc << std::endl;   // 记录数据，不应该存在
+//
+//            last_doubleS_acc = doubleS_acc;
+//
+//            //**-------------------------------**//
+//
+//            for ( int i = 0; i < jnt_num_; ++i )
+//            {
+//                pos_[ i ] = pos_init[ i ] + pos_offset[ i ] * doubleS_pos;
+//                vel_[ i ] = pos_offset[ i ] * doubleS_vel;
+//                acc_[ i ] = pos_offset[ i ] * doubleS_acc;
+//                joints_[ i ]->setPosition( pos_[ i ] );  //! 都设置，自动根据模式选取位置或者速度伺服
+//                joints_[ i ]->setVelocity( vel_[ i ] );  //!
+//            }
+//            dt += 0.001*current_speed_fraction;
+//
+//            hw_interface_->waitForSignal( 0 );
+//        }
+//        //**-------------------------------**//
+//        setRunState( RunState::Stopped );
+//        speed_data_csv.close();
+//        return 0;
+//    }
 
 
 }  // namespace rocos

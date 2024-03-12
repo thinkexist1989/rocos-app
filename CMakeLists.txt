@@ -170,8 +170,7 @@ add_library(robot
         src/robot.cc
         src/JC_helper_kinematics.cpp
         src/JC_helper_dynamics.cpp
-        src/JC_helper_authenticate.cpp
-        )
+)
 target_include_directories(robot
         PUBLIC
         $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>
