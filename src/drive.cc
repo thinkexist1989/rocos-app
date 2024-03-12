@@ -62,10 +62,12 @@ namespace rocos {
         conduct_state_change_ = true;
         if(driveState == DriveState::SwitchOnDisabled) {
             hw_interface_->setControlwordRaw(id_, 0);
+            current_drive_state_ = DriveState::SwitchOnDisabled;
         }
         else if(driveState == DriveState::OperationEnabled) {
             ;
             hw_interface_->setControlwordRaw(id_, 1);
+            current_drive_state_ = DriveState::OperationEnabled;
         }
         else {
             std::cout << "Not Supported State" << std::endl;
