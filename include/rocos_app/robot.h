@@ -98,10 +98,10 @@ namespace rocos
             Running = 2
         };
 
-        explicit Robot(boost::shared_ptr<HardwareInterface> hw,
-                       const std::string &urdf_file_path = "robot.urdf",
-                       const std::string &base_link = "base_link",
-                       const std::string &tip = "link7"); // std::string yaml_path = "joint_impedance_control.yaml"
+        explicit Robot(HardwareInterface *hw,
+                       const string &urdf_file_path = "robot.urdf",
+                       const string &base_link = "base_link",
+                       const string &tip = "link7"); // std::string yaml_path = "joint_impedance_control.yaml"
 
         ~Robot();
 
@@ -111,7 +111,7 @@ namespace rocos
 
         bool parseDriveParamsFromUrdf(const std::string &urdf_file_path);
 
-        bool switchHW(boost::shared_ptr<HardwareInterface> hw); // 切换硬件指针
+        bool switchHW(HardwareInterface *hw); // 切换硬件指针
 
         // 机器人状态机相关
         inline WorkMode getWorkMode() { return work_mode_; }
@@ -1043,7 +1043,7 @@ namespace rocos
               ProfileType type = ProfileType::trapezoid);
 
     protected:
-        boost::shared_ptr<HardwareInterface> hw_interface_{nullptr};
+        HardwareInterface* hw_interface_{nullptr};
         std::vector<boost::shared_ptr<Drive>> joints_;
 
         std::string urdf_file_path_; // urdf文件路径

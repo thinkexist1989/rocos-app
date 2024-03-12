@@ -36,11 +36,11 @@ namespace rocos {
         thread_->join(); // 等待线程结束
     }
 
-    boost::shared_ptr<DriveGuard> DriveGuard::getInstance() {
+    DriveGuard * DriveGuard::getInstance() {
         if (instance_ == nullptr) {
             instance_.reset(new DriveGuard(), [](DriveGuard *t) { delete t; }); // 因为默认访问不了private 析构函数,需传入删除器
         }
-        return instance_;
+        return instance_.get();
     }
 
     void DriveGuard::addDrive(Drive *drive) {

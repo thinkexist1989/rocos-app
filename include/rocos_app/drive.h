@@ -38,7 +38,7 @@ namespace rocos {
         friend class DriveGuard;
 
     public:
-        Drive(boost::shared_ptr<HardwareInterface> hw, int id);
+        Drive(HardwareInterface *hw, int id);
 
         bool setDriverState(const DriveState &driveState, bool waitForState);
 
@@ -209,7 +209,7 @@ namespace rocos {
 
         bool is_enabled_{false};
 
-        boost::shared_ptr<DriveGuard> drive_guard_{nullptr};
+        DriveGuard* drive_guard_{nullptr};
 
     };
 }

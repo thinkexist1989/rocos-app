@@ -70,11 +70,11 @@ int main(int argc, char *argv[]) {
 
     //**-------------启动admittance_joint-----------**//
     // 初始化类
-    boost::shared_ptr<HardwareInterface> hw;
+    HardwareInterface* hw;
     if (FLAGS_sim)
-        hw = boost::make_shared<HardwareSim>(20);  // 仿真
+        hw = new HardwareSim(20);  // 仿真
     else
-        hw = boost::make_shared<Hardware>(FLAGS_urdf); // 真实机械臂
+        hw = new Hardware(FLAGS_urdf); // 真实机械臂
 
     Robot robot(hw, FLAGS_urdf, FLAGS_base, FLAGS_tip);
 

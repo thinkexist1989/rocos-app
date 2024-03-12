@@ -22,8 +22,8 @@
 
 namespace rocos {
 
-    Drive::Drive(boost::shared_ptr<HardwareInterface> hw, int id) : hw_interface_(hw),
-                                                                    id_(id) {
+    Drive::Drive(HardwareInterface *hw, int id) : hw_interface_(hw),
+                                                  id_(id) {
         if(id_ < 0) {
             std::cout << "[ERROR][rocos::Drive] Wrong hardware ID of joint" << std::endl;
             return;

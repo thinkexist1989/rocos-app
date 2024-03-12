@@ -25,10 +25,10 @@
 #define  EPS 1e-7
 
 namespace rocos {
-    Robot::Robot(boost::shared_ptr<HardwareInterface> hw,
-                 const std::string &urdf_file_path,
-                 const std::string &base_link,
-                 const std::string &tip
+    Robot::Robot(HardwareInterface *hw,
+                 const string &urdf_file_path,
+                 const string &base_link,
+                 const string &tip
                  ) : hw_interface_(hw), urdf_file_path_(urdf_file_path), pos_(MAX_JOINT_NUM),
                                            vel_(MAX_JOINT_NUM), acc_(MAX_JOINT_NUM) {
 
@@ -251,7 +251,7 @@ namespace rocos {
     }
 
     // TODO: 切换HW指针
-    bool Robot::switchHW(boost::shared_ptr<HardwareInterface> hw) { return false; }
+    bool Robot::switchHW(HardwareInterface *hw) { return false; }
 
 
     bool Robot::setWorkMode(WorkMode mode) {

@@ -43,7 +43,7 @@ namespace rocos {
         ~DriveGuard();
 
     public:
-        static boost::shared_ptr<DriveGuard> getInstance(); //获取句柄
+        static DriveGuard * getInstance(); //获取句柄
 
         void addDrive(Drive* drive);
 
