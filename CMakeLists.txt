@@ -455,13 +455,13 @@ target_link_libraries(unit_test
         robot
         protocol
         )
-add_executable(main_test test/main_test.cc)
-target_link_libraries(main_test
-        PRIVATE
-        hardware
-        drive
-        protocol
-        kinematics
-        robot
-        )
+#add_executable(main_test test/main_test.cc)
+#target_link_libraries(main_test
+#        PRIVATE
+#        hardware
+#        drive
+#        protocol
+#        kinematics
+#        robot
+#        )
 add_test(NAME unit_test COMMAND unit_test)

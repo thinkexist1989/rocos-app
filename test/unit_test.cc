@@ -161,7 +161,7 @@ TEST_CASE("Drive") {
     using namespace rocos;
     boost::shared_ptr<HardwareInterface> hw = boost::make_shared<Hardware>();
 
-    Drive drive(hw, 1);
+    Drive drive(hw.get(), 1);
 
     usleep(1000000);
     drive.setEnabled();
@@ -192,7 +192,7 @@ TEST_CASE("Async motion") {
     boost::shared_ptr<HardwareInterface> hw = boost::make_shared<Hardware>();
     std::vector<Drive *> drives;
     for (int i = 0; i < 4; i++) {
-        drives.push_back(new Drive(hw, i));
+        drives.push_back(new Drive(hw.get(), i));
         drives[i]->setMode(rocos::ModeOfOperation::CyclicSynchronousPositionMode);
     }
 
@@ -218,7 +218,7 @@ TEST_CASE("Async motion") {
 TEST_CASE("Sync motion") {
     using namespace rocos;
     boost::shared_ptr<HardwareInterface> hw = boost::make_shared<Hardware>();
-    Robot robot(hw);
+    Robot robot(hw.get());
 
     robot.setEnabled();
 
@@ -245,7 +245,7 @@ TEST_CASE("Robot Motion Thread") {
 //    boost::shared_ptr<HardwareInterface> hw = boost::make_shared<HardwareSim>(5);
     boost::shared_ptr<HardwareInterface> hw = boost::make_shared<Hardware>();
 
-    Robot robot(hw);
+    Robot robot(hw.get());
 
     robot.setEnabled();
 
@@ -270,7 +270,7 @@ TEST_CASE("gRPC communication") {
 //    boost::shared_ptr<HardwareInterface> hw = boost::make_shared<HardwareSim>(5);
     boost::shared_ptr<HardwareInterface> hw = boost::make_shared<Hardware>();
 
-    Robot robot(hw);
+    Robot robot(hw.get());
 
     auto robotService = RobotServiceImpl::getInstance(&robot);
 

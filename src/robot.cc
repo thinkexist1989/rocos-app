@@ -2792,6 +2792,7 @@ namespace rocos {
         return 0;
     }
 
+//    //TODO: 测试代码，未来要移除 by think
 //    int Robot::speed_scaling() {
 //        //** 全局速度条规划器 **//
 //        if (is_fraction_changed && std::abs(target_speed_fraction - current_speed_fraction) >= 0.0001) {
@@ -2820,8 +2821,8 @@ namespace rocos {
 //
 //        return 0;
 //    }
-
-
+//
+////TODO: 测试代码，未来要移除 by think
 //int Robot::moveJ_with_speed_scaling( const KDL::JntArray& target_pos, double max_vel, double max_acc, double max_jerk )
 //    {
 //        //**  通过TCP实现动态调速，这是debug使用，不应该存在**//
