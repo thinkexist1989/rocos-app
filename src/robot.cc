@@ -997,10 +997,18 @@ namespace rocos
         KDL::JntArray q_target(jnt_num_);
         std::vector<double> max_step;
         std::vector<KDL::Frame> traj_target;
+         KDL::Frame frame_init ;
         //! 不要传入flange_ !不要传入flange_ !不要传入flange_
         //! 实测发现：因为后台有线程不断写入，因此读取可能失败，造成轨迹规划失败的假象！！！
         // TODO 解决公共属性多线程互斥问题
-        KDL::Frame frame_init = flange_;
+        JntArray q_in(jnt_num_);
+        for( int i{0};i<jnt_num_;i++)
+        q_in(i) = pos_[i];
+        //            std::cout << q_in.data << std::endl;
+
+        // Flange Reference
+        JntToCart(q_in, frame_init);
+       
         int traj_count{0};
         //**-------------------------------**//
 
@@ -1051,7 +1059,8 @@ namespace rocos
                     {
                         if (abs(q_target(i) - q_init(i)) > max_step[i])
                         {
-                            PLOG_ERROR << "joint[" << i << "] speep is too  fast";
+                            
+                            PLOG_ERROR <<"Q_target(i)"<<q_target(i)<<"q_init(i)"<<q_init(i)<< "joint[" << i << "] speep is too  fast";
                             PLOG_ERROR << "target speed = " << abs(q_target(i) - q_init(i))
                                        << " and  max_step=" << max_step[i];
                             throw -2;

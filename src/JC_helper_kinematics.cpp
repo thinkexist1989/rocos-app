@@ -3649,13 +3649,32 @@ namespace JC_helper
 
             //! 腕部中心点在1关节轴线上奇异处理：
             if ( x_0_sw( 0 ) == 0 && x_0_sw( 1 ) == 0 )
+            {
+                std::cout<<"inter_T.p: "<<inter_T.p<<std::endl;
+                std::cout<<"last_joint: ";
+                for(int i = 0; i < 7; i++)
+                    std::cout<<last_joint(i)<<" ,";
+                std::cout<<std::endl;
+                std::cout<<"x_0_sw: "<<x_0_sw(0)<<x_0_sw(1)<<std::endl;
+
                 throw JC_exception{ "腕部中心点在1关节轴线上奇异", -3 };
+            }
+                
 
             JC_double thet_4_tem = acos( slover_utility::roundn( ( pow( x_0_sw.Norm( ), 2 ) - pow( d_se, 2 ) - pow( d_ew, 2 ) ) / ( 2 * d_se * d_ew ), 14 ) );
 
             //! 4关节奇异处理：thet4接近0时->acos(>1)->thet_4_tem=nan
             if ( std::isnan( thet_4_tem ) )
+            {
+                std::cout<<"inter_T.p: "<<inter_T.p<<std::endl;
+                std::cout<<"last_joint: ";
+                for(int i = 0; i < 7; i++)
+                    std::cout<<last_joint(i)<<" ,";
+                std::cout<<std::endl;
+                std::cout<<"thet_4_tem: "<<thet_4_tem<<std::endl;
                 throw JC_exception{ "关节4奇异", -1 };
+            }
+                
 
             for ( int reference_index = 0; reference_index < ( 2 + 2 * !( thet_4_tem == 0 ) ); reference_index++ )
             {
@@ -3697,7 +3716,17 @@ namespace JC_helper
                 KDL::Vector u_0_sw;
                 JC_double vct_len = x_0_sw.Norm( );
                 if ( vct_len < 1e-6 )
+                {
+                    std::cout<<"inter_T.p: "<<inter_T.p<<std::endl;
+                    std::cout<<"last_joint: ";
+                    for(int i = 0; i < 7; i++)
+                        std::cout<<last_joint(i)<<" ,";
+                    std::cout<<std::endl;
+                    std::cout<<"vct_len: "<<vct_len<<std::endl;
+                    
                     throw JC_exception{ "腕部点与肘部点太接近", -8 };
+                }
+                    
                 else
                     u_0_sw = x_0_sw / vct_len;
 
@@ -3789,7 +3818,17 @@ namespace JC_helper
 
                         //! 2关节奇异处理
                         if ( thet2 == 0 )
+                        {
+                            std::cout<<"inter_T.p: "<<inter_T.p<<std::endl;
+                            std::cout<<"last_joint: ";
+                            for(int i = 0; i < 7; i++)
+                                std::cout<<last_joint(i)<<" ,";
+                            std::cout<<std::endl;
+                            std::cout<<"thet2: "<<thet2<<std::endl;
+
                             throw JC_exception{ "2关节奇异", -4 };
+                            
+                        }
 
                         if ( invert_123 )
                             thet1 = thet1_tem + KDL::PI;
@@ -3826,7 +3865,17 @@ namespace JC_helper
 
                         //! 6关节奇异处理
                         if ( thet6 == 0 )
+                        {
+                            std::cout<<"inter_T.p: "<<inter_T.p<<std::endl;
+                            std::cout<<"last_joint: ";
+                            for(int i = 0; i < 7; i++)
+                                std::cout<<last_joint(i)<<" ,";
+                            std::cout<<std::endl;
+                            std::cout<<"thet6: "<<thet6<<std::endl;
+
                             throw JC_exception{ "6关节奇异", -5 };
+                        }
+                            
 
                         if ( invert_567 )
                             thet5 = thet5_tem + KDL::PI;
@@ -3856,12 +3905,26 @@ namespace JC_helper
                             if ( std::isnan( temp1[ i ] ) )
                             {
                                 std::stringstream string;
+                                std::cout<<"inter_T.p: "<<inter_T.p<<std::endl;
+                                std::cout<<"last_joint: ";
+                                for(int i = 0; i < 7; i++)
+                                    std::cout<<last_joint(i)<<" ,";
+                                std::cout<<std::endl;
+                                std::cout<<"temp1: "<<temp1[ i ] <<std::endl;
+
                                 string << "关节[" << i << "]=Nan,结果无效";
                                 throw JC_exception{ string.str( ).c_str( ), -6 };
                             }
                             else if ( isinf( temp1[ i ] ) )
                             {
+                              
                                 std::stringstream string;
+                                std::cout<<"inter_T.p: "<<inter_T.p<<std::endl;
+                                std::cout<<"last_joint: ";
+                                for(int i = 0; i < 7; i++)
+                                    std::cout<<last_joint(i)<<" ,";
+                                std::cout<<std::endl;
+                                std::cout<<"temp1: "<<temp1[ i ] <<std::endl;
                                 string << "关节[" << i << "]=Inf,结果无效";
                                 throw JC_exception{ string.str( ).c_str( ), -7 };
                             }
@@ -3887,6 +3950,11 @@ namespace JC_helper
             //** 预防无有效解 **//
             if ( res_thet.size( ) == 0 )
             {
+                std::cout<<"inter_T.p: "<<inter_T.p<<std::endl;
+                std::cout<<"last_joint: ";
+                for(int i = 0; i < 7; i++)
+                    std::cout<<last_joint(i)<<" ,";
+                std::cout<<std::endl;
                 throw JC_exception{ "无有效解", -9 };
             }
             //**-------------------------------**//

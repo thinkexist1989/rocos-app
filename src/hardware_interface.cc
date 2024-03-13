@@ -123,6 +123,7 @@ namespace rocos {
     }
 
     void HardwareInterface::waitForSignal(int id) {
+        //TODO:
         usleep(1000);
     }
 
