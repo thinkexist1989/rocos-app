@@ -883,7 +883,16 @@ namespace rocos {
         //!不要传入flange_ !不要传入flange_ !不要传入flange_
         //!实测发现：因为后台有线程不断写入，因此读取可能失败，造成轨迹规划失败的假象！！！
         //TODO 解决公共属性多线程互斥问题
-        KDL::Frame frame_init = flange_;
+
+        KDL::Frame frame_init;
+        JntArray q_in(jnt_num_);
+            for (int i{0}; i < jnt_num_; i++)
+                q_in(i) = pos_[i];
+            //            std::cout << q_in.data << std::endl;
+
+            // Flange Reference
+            JntToCart(q_in, frame_init);
+
         int traj_count{0};
         //**-------------------------------**//
 
