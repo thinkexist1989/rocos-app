@@ -35,7 +35,7 @@ namespace rocos {
 
     class Hardware : public HardwareInterface {
     public:
-        explicit Hardware(const std::string &urdf_file_path = "robot.urdf");
+        explicit Hardware(const std::string &urdf_file_path = "robot.urdf", int id = 0);
 
         ~Hardware() override;
 

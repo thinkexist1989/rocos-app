@@ -35,6 +35,7 @@ DEFINE_string(urdf, "robot.urdf", "Urdf file path");
 DEFINE_string(base, "base_link", "Base link name");
 DEFINE_string(tip, "link_7", "Tip link name");
 DEFINE_bool(sim, true, "Sim or not");
+DEFINE_int32(id, 0, "hardware id, only work for real hardware");
 
 bool isRuning = true;
 
@@ -74,7 +75,7 @@ int main(int argc, char *argv[]) {
     if (FLAGS_sim)
         hw = new HardwareSim(20);  // 仿真
     else
-        hw = new Hardware(FLAGS_urdf); // 真实机械臂
+        hw = new Hardware(FLAGS_urdf, FLAGS_id); // 真实机械臂
 
     Robot robot(hw, FLAGS_urdf, FLAGS_base, FLAGS_tip);
 
