@@ -29,12 +29,11 @@ namespace rocos {
     class Robot;
 
     class RobotServiceImpl final : public RobotService::Service {
-    private:
+    public:
         explicit RobotServiceImpl(Robot* robot);
         ~RobotServiceImpl() override;
 
-    public:
-        static boost::shared_ptr<RobotServiceImpl> getInstance(Robot* robot);
+        static RobotServiceImpl* getInstance(Robot* robot);
 
         grpc::Status GetRobotModel(::grpc::ServerContext *context, const ::google::protobuf::Empty *request,
                                    ::rocos::RobotModel *response) override;
@@ -59,7 +58,8 @@ namespace rocos {
         void serverThread(const std::string& address);
 
     private:
-        static boost::shared_ptr<RobotServiceImpl> instance_;
+        static std::vector<RobotServiceImpl*> instances;
+
         boost::shared_ptr<Robot> robot_ptr_ {nullptr};
 
         std::unique_ptr<grpc::Server> server_ptr_ {nullptr};

@@ -38,14 +38,9 @@ namespace rocos {
 
     RobotServiceImpl::~RobotServiceImpl() { server_ptr_->Shutdown(); }
 
-    boost::shared_ptr<RobotServiceImpl> RobotServiceImpl::getInstance(
-            Robot *robot) {
-        if (instance_ == nullptr) {
-            instance_.reset(new RobotServiceImpl(robot), [](RobotServiceImpl *t) {
-                delete t;
-            });  // 因为默认访问不了private 析构函数,需传入删除器
-        }
-        return instance_;
+    RobotServiceImpl* RobotServiceImpl::getInstance(Robot *robot) {
+        instances.push_back(new RobotServiceImpl(robot));
+        return instances.back();
     }
 
 
@@ -717,8 +712,7 @@ namespace rocos {
         is_thread_running_ = false;
     }
 
-    // 单例模式对象
-    boost::shared_ptr<RobotServiceImpl> RobotServiceImpl::instance_ = nullptr;
+    std::vector<RobotServiceImpl*> RobotServiceImpl::instances;
 
 
 }  // namespace rocos
