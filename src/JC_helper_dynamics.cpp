@@ -98,7 +98,7 @@ namespace JC_helper
 #pragma region //*弹簧阻尼质量系统
     spring_mass_dump::spring_mass_dump()
     {
-        for (int i{0}; i < _joint_num; i++)
+        for (int i{0}; i < jointNum; i++)
             B[i] = 2 * damp * sqrt(M[i] * K[i]);
     }
 
@@ -189,7 +189,7 @@ namespace JC_helper
     {
         damp += value;
 
-        for (int i{0}; i < _joint_num; i++)
+        for (int i{0}; i < jointNum; i++)
             B[i] = 2 * damp * sqrt(M[i] * K[i]);
 
         PLOG_DEBUG << "damp  = " << damp;
@@ -199,7 +199,7 @@ namespace JC_helper
     {
         if (abs(value) < 1e-3)
         {
-            for (int i{0}; i < _joint_num; i++)
+            for (int i{0}; i < jointNum; i++)
             {
                 B[i] = 50;
                 K[i] = 0;
@@ -207,7 +207,7 @@ namespace JC_helper
         }
         else
         {
-            for (int i{0}; i < _joint_num; i++)
+            for (int i{0}; i < jointNum; i++)
             {
                 K[i] = value;
                 B[i] = 2 * damp * sqrt(M[i] * K[i]);
@@ -434,27 +434,27 @@ namespace JC_helper
         //** 变量初始化 **//
         // std::unique_lock< std::mutex > lock_traj_joint( mutex_traj_joint, std::defer_lock );  //不上锁
         KDL::Frame frame_target;
-        KDL::JntArray _q_target(_joint_num);
-        KDL::JntArray _q_init(_joint_num);
+        KDL::JntArray _q_target(jointNum);
+        KDL::JntArray _q_init(jointNum);
         int_least64_t max_count{0};
         KDL::Twist admittance_vel;
-        KDL::JntArray joints_vel(_joint_num);
+        KDL::JntArray joints_vel(jointNum);
 
-        KDL::JntArray current_pos(_joint_num);
-        KDL::JntArray last_pos(_joint_num);
-        KDL::JntArray last_last_pos(_joint_num);
+        KDL::JntArray current_pos(jointNum);
+        KDL::JntArray last_pos(jointNum);
+        KDL::JntArray last_last_pos(jointNum);
 
         //**-------------------------------**//
 
         //** 程序初始化 **//
 
-        for (int i = 0; i < _joint_num; i++)
+        for (int i = 0; i < jointNum; i++)
         {
             _q_init(i) = robot_ptr->pos_[i];
             _q_target(i) = _q_init(i);
         }
 
-        for (int i = 0; i < _joint_num; i++)
+        for (int i = 0; i < jointNum; i++)
         {
             current_pos(i) = robot_ptr->pos_[i];
             last_pos(i) = current_pos(i);
@@ -514,7 +514,7 @@ namespace JC_helper
 
             //** csv打印 **//
             // out_joint_csv << std::to_string( traj_count * 0.001 ) << "\t,";
-            // for ( int i = 0; i < _joint_num - 1; i++ )
+            // for ( int i = 0; i < jointNum - 1; i++ )
             // {
             //     out_joint_csv << std::to_string( _q_target( i ) ) << "\t,";
             // }
@@ -550,30 +550,30 @@ namespace JC_helper
         //** 变量初始化 **//
         // std::unique_lock< std::mutex > lock_traj_joint( mutex_traj_joint, std::defer_lock );  //不上锁
         KDL::Frame frame_intep;
-        KDL::JntArray _q_target(_joint_num);
-        KDL::JntArray _q_init(_joint_num);
+        KDL::JntArray _q_target(jointNum);
+        KDL::JntArray _q_init(jointNum);
         std::vector<double> max_step;
         KDL::Twist admittance_vel;
-        KDL::JntArray joints_vel(_joint_num);
+        KDL::JntArray joints_vel(jointNum);
         KDL::Twist traj_vel;
         KDL::Twist Cartesian_vel;
 
-        KDL::JntArray current_pos(_joint_num);
-        KDL::JntArray last_pos(_joint_num);
-        KDL::JntArray last_last_pos(_joint_num);
+        KDL::JntArray current_pos(jointNum);
+        KDL::JntArray last_pos(jointNum);
+        KDL::JntArray last_last_pos(jointNum);
 
         //**-------------------------------**//
 
         //** 程序初始化 **//
 
-        for (int i = 0; i < _joint_num; i++)
+        for (int i = 0; i < jointNum; i++)
         {
             max_step.push_back(robot_ptr->max_vel_[i] * 0.001);
             _q_init(i) = robot_ptr->pos_[i];
             _q_target(i) = _q_init(i);
         }
 
-        for (int i = 0; i < _joint_num; i++)
+        for (int i = 0; i < jointNum; i++)
         {
             current_pos(i) = robot_ptr->pos_[i];
             last_pos(i) = current_pos(i);
@@ -659,7 +659,7 @@ namespace JC_helper
 
             //** csv打印 **//
             // out_joint_csv << std::to_string( traj_count * 0.001 ) << "\t,";
-            // for ( int i = 0; i < _joint_num - 1; i++ )
+            // for ( int i = 0; i < jointNum - 1; i++ )
             // {
             //     out_joint_csv << std::to_string( _q_target( i ) ) << "\t,";
             // }

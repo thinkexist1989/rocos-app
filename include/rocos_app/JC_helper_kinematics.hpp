@@ -58,7 +58,7 @@
 //  std::cout << BLUE << " hello world " << std::endl;
 
 //** 显式指定关节数量 **//
-extern size_t _joint_num;
+extern uint32_t jointNum;
 
 namespace rocos
 {
@@ -460,8 +460,8 @@ namespace JC_helper
 
     inline KDL::JntArray vector_2_JntArray( const std::vector< std::atomic< double > >& pos )
     {
-        KDL::JntArray _pos( _joint_num );
-        for ( int i = 0; i <_joint_num; i++ )
+        KDL::JntArray _pos(jointNum );
+        for (int i = 0; i < jointNum; i++ )
             _pos( i ) = pos[ i ];
         return _pos;
     }
@@ -469,7 +469,7 @@ namespace JC_helper
     inline void print_JntArray( const char* str, KDL::JntArray joints )
     {
         PLOG_DEBUG << str << ":";
-        for ( int i = 0; i < _joint_num; i++ )
+        for (int i = 0; i < jointNum; i++ )
             PLOG_DEBUG.printf( "[%d] = %f", i, joints( i ) * 180 / M_PI );
         PLOG_DEBUG;
     }

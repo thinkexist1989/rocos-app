@@ -35,7 +35,7 @@ namespace rocos {
 
 //        addAllJoints( ); // TODO: 这个应该直接加到参数解析里面，解析之后加入关节，顺序和主站顺序可能不一样
 
-        _joint_num = jnt_num_;
+        jointNum = jnt_num_;
 
         target_positions_.resize(jnt_num_);
         target_positions_prev_.resize(jnt_num_);
@@ -758,7 +758,7 @@ namespace rocos {
             return -1;
         }
 
-        for (int i{0}; i < _joint_num; i++) {
+        for (int i{0}; i < jointNum; i++) {
             if (!(joints_[i]->getMode() == ModeOfOperation::CyclicSynchronousPositionMode ||
                   joints_[i]->getMode() == ModeOfOperation::CyclicSynchronousVelocityMode)) {
                 PLOG_ERROR << "MoveJ不支持关节[" << i << "]的当前模式 :" << static_cast< int >( joints_[i]->getMode());
@@ -823,7 +823,7 @@ namespace rocos {
         bool all_pos_mode{true};  //假设全部关节位置模式
         bool all_vel_mode{true};  //假设全部关节速度模式
 
-        for (int i{0}; i < _joint_num; i++) {
+        for (int i{0}; i < jointNum; i++) {
             if (joints_[i]->getMode() != ModeOfOperation::CyclicSynchronousPositionMode)
                 all_pos_mode = false;
 
@@ -843,7 +843,7 @@ namespace rocos {
 
     int Robot::MoveL_pos(Frame pose, double speed, double acceleration, double time,
                          double radius, bool asynchronous, int max_running_count) {
-        for (int i{0}; i < _joint_num; i++) {
+        for (int i{0}; i < jointNum; i++) {
             if (joints_[i]->getMode() != ModeOfOperation::CyclicSynchronousPositionMode) {
                 PLOG_ERROR << " 需要关节[" << i << "]进入位置伺服模式";
                 return -1;
@@ -1000,7 +1000,7 @@ namespace rocos {
 
     int Robot::MoveL_vel(Frame pose, double speed, double acceleration, double time,
                          double radius, bool asynchronous, int max_running_count) {
-        for (int i{0}; i < _joint_num; i++) {
+        for (int i{0}; i < jointNum; i++) {
             if (joints_[i]->getMode() != ModeOfOperation::CyclicSynchronousVelocityMode) {
                 PLOG_ERROR << " 需要关节[" << i << "]进入速度伺服模式";
                 return -1;
@@ -1168,7 +1168,7 @@ namespace rocos {
         bool all_pos_mode{true};  //假设全部关节位置模式
         bool all_vel_mode{true};  //假设全部关节速度模式
 
-        for (int i{0}; i < _joint_num; i++) {
+        for (int i{0}; i < jointNum; i++) {
             if (joints_[i]->getMode() != ModeOfOperation::CyclicSynchronousPositionMode)
                 all_pos_mode = false;
 
@@ -1195,7 +1195,7 @@ namespace rocos {
         bool all_pos_mode{true};  //假设全部关节位置模式
         bool all_vel_mode{true};  //假设全部关节速度模式
 
-        for (int i{0}; i < _joint_num; i++) {
+        for (int i{0}; i < jointNum; i++) {
             if (joints_[i]->getMode() != ModeOfOperation::CyclicSynchronousPositionMode)
                 all_pos_mode = false;
 
@@ -1218,7 +1218,7 @@ namespace rocos {
     int Robot::MoveC_pos(Frame pose_via, Frame pose_to, double speed,
                          double acceleration, double time, double radius,
                          Robot::OrientationMode mode, bool asynchronous, int max_running_count) {
-        for (int i{0}; i < _joint_num; i++) {
+        for (int i{0}; i < jointNum; i++) {
             if (joints_[i]->getMode() != ModeOfOperation::CyclicSynchronousPositionMode) {
                 PLOG_ERROR << " 需要关节[" << i << "]进入位置伺服模式";
                 return -1;
@@ -1363,7 +1363,7 @@ namespace rocos {
     int Robot::MoveC_pos(const KDL::Frame &center, double theta, int axiz, double speed,
                          double acceleration, double time, double radius,
                          Robot::OrientationMode mode, bool asynchronous, int max_running_count) {
-        for (int i{0}; i < _joint_num; i++) {
+        for (int i{0}; i < jointNum; i++) {
             if (joints_[i]->getMode() != ModeOfOperation::CyclicSynchronousPositionMode) {
                 PLOG_ERROR << " 需要关节[" << i << "]进入位置伺服模式";
                 return -1;
@@ -1505,7 +1505,7 @@ namespace rocos {
     int Robot::MoveC_vel(Frame pose_via, Frame pose_to, double speed,
                          double acceleration, double time, double radius,
                          Robot::OrientationMode mode, bool asynchronous, int max_running_count) {
-        for (int i{0}; i < _joint_num; i++) {
+        for (int i{0}; i < jointNum; i++) {
             if (joints_[i]->getMode() != ModeOfOperation::CyclicSynchronousVelocityMode) {
                 PLOG_ERROR << " 需要关节[" << i << "]进入速度伺服模式";
                 return -1;
@@ -1659,7 +1659,7 @@ namespace rocos {
     int Robot::MoveC_vel(const KDL::Frame &center, double theta, int axiz, double speed,
                          double acceleration, double time, double radius,
                          Robot::OrientationMode mode, bool asynchronous, int max_running_count) {
-        for (int i{0}; i < _joint_num; i++) {
+        for (int i{0}; i < jointNum; i++) {
             if (joints_[i]->getMode() != ModeOfOperation::CyclicSynchronousVelocityMode) {
                 PLOG_ERROR << " 需要关节[" << i << "]进入速度伺服模式";
                 return -1;
@@ -1823,7 +1823,7 @@ namespace rocos {
                           std::vector<double> max_path_v, std::vector<double> max_path_a, bool asynchronous,
                           int max_running_count) {
 
-        for (int i{0}; i < _joint_num; i++) {
+        for (int i{0}; i < jointNum; i++) {
             if (joints_[i]->getMode() != ModeOfOperation::CyclicSynchronousPositionMode) {
                 PLOG_ERROR << " 需要关节[" << i << "]进入位置伺服模式";
                 return -1;
@@ -2616,7 +2616,7 @@ namespace rocos {
 
     int Robot::servoJ(const KDL::JntArray &target_pos) {
         //** 位置检查(解析求解器内置位置检查) **//
-        // for ( int i = 0; i < _joint_num; ++i )
+        // for ( int i = 0; i < jointNum; ++i )
         //     if ( target_pos( i ) > joints_[ i ]->getMaxPosLimit( ) || target_pos( i ) < joints_[ i ]->getMinPosLimit( ) )
         //     {
         //         PLOG_ERROR << "target pos [" << i << "]= " << target_pos( i ) * KDL::rad2deg << " is out of range ";
@@ -2626,7 +2626,7 @@ namespace rocos {
         //**-------------------------------**//
         //** 速度检查 **//
         Eigen::MatrixXd joint_offset = (target_pos.data - JC_helper::vector_2_JntArray(pos_).data).cwiseAbs();
-        for (int i = 0; i < _joint_num; ++i)
+        for (int i = 0; i < jointNum; ++i)
             if (joint_offset(i) > joints_[i]->getMaxVel() * 0.001) {
                 PLOG_ERROR << "target vel [" << i << "]= " << joint_offset(i) * KDL::rad2deg * 1000
                            << " deg/s is out of range ";
@@ -2635,7 +2635,7 @@ namespace rocos {
             }
         //**-------------------------------**//
         //** 位置伺服 **//
-        for (int i = 0; i < _joint_num; ++i) {
+        for (int i = 0; i < jointNum; ++i) {
             pos_[i] = target_pos(i);
             joints_[i]->setPosition(target_pos(i));
         }
@@ -2645,8 +2645,8 @@ namespace rocos {
     }
 
     int Robot::servoL(const KDL::Frame &target_frame) {
-        KDL::JntArray joint_in(_joint_num);
-        KDL::JntArray joint_out(_joint_num);
+        KDL::JntArray joint_in(jointNum);
+        KDL::JntArray joint_out(jointNum);
         joint_in = JC_helper::vector_2_JntArray(pos_);
         if (SRS_kinematics_.JC_cartesian_to_joint(target_frame, joint_in(2), joint_in, joint_out) < 0) {
             PLOG_ERROR << "逆解失败";
@@ -2713,18 +2713,18 @@ namespace rocos {
     // 下一时刻的位置next_pos = current_pos + next_vel*dt
     int Robot::sun_servoJ(const KDL::JntArray &target_pos, const KDL::JntArray &max_vel, const KDL::JntArray &max_acc,
                           double Gain, double lookhead) {
-        KDL::JntArray current_pose{_joint_num};
-        KDL::JntArray current_vel{_joint_num};
-        KDL::JntArray current_acc{_joint_num};
-        KDL::JntArray next_acc{_joint_num};
-        KDL::JntArray next_vel{_joint_num};
-        KDL::JntArray next_pos{_joint_num};
-        KDL::JntArray next_jerk{_joint_num};
+        KDL::JntArray current_pose{jointNum};
+        KDL::JntArray current_vel{jointNum};
+        KDL::JntArray current_acc{jointNum};
+        KDL::JntArray next_acc{jointNum};
+        KDL::JntArray next_vel{jointNum};
+        KDL::JntArray next_pos{jointNum};
+        KDL::JntArray next_jerk{jointNum};
         double dt = 0.001;
         double look_head2 = 0.6;
         int pre = 0;
         bool is_first = true; // 是否可以一次性到达目标位置，不可以一直循环，可以退出
-        for (int i = 0; i < _joint_num; ++i) {
+        for (int i = 0; i < jointNum; ++i) {
             current_pose(i) = pos_[i];
             current_vel(i) = vel_[i];
             current_acc(i) = acc_[i];
@@ -2736,11 +2736,11 @@ namespace rocos {
 
         }
 
-        //Eigen::Matrix<double, _joint_num, 1> joint_offset = (target_pos.data - JC_helper::vector_2_JntArray(pos_).data).cwiseAbs();
+        //Eigen::Matrix<double, jointNum, 1> joint_offset = (target_pos.data - JC_helper::vector_2_JntArray(pos_).data).cwiseAbs();
         // while (is_first)
 
         std::cout << "next_pose: ";
-        for (int i = 0; i < _joint_num; ++i) {
+        for (int i = 0; i < jointNum; ++i) {
             next_jerk(i) = (0 - current_vel(i)) * Gain + (0 - current_acc(i)) * look_head2 * Gain +
                            (target_pos(i) - current_pose(i)) * Gain + (0 - current_vel(i)) * lookhead * Gain;
             next_acc(i) = next_jerk(i) * 0.001;
@@ -2775,7 +2775,7 @@ namespace rocos {
             // current_vel(i) = next_vel(i);
         }
         std::cout << std::endl;
-        // if(pre==_joint_num)
+        // if(pre==jointNum)
         // {
         //     is_first=false;
         //     std::cout<<"over"<<std::endl;
@@ -2843,7 +2843,7 @@ namespace rocos {
 //                return -1;
 //        }
 //
-//        for ( int i{ 0 }; i < _joint_num; i++ )
+//        for ( int i{ 0 }; i < jointNum; i++ )
 //        {
 //            if ( !( joints_[ i ]->getMode( ) == ModeOfOperation::CyclicSynchronousPositionMode  ) )
 //            {

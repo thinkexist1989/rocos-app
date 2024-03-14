@@ -1010,21 +1010,22 @@ namespace rocos
          * @return int
          */
         int servoL(const KDL::Frame &target_frame);
-        int moveJ_with_speed_scaling(const KDL::JntArray &target_pos, double max_vel, double max_acc, double max_jerk);
+
+//        int moveJ_with_speed_scaling(const KDL::JntArray &target_pos, double max_vel, double max_acc, double max_jerk);
 
         /**
          * @brief 速度缩放函数，运动中每次循环需要调佣一次
          *
          * @return int
          */
-        int speed_scaling();
+//        int speed_scaling();
 
-        int set_target_speed_frcision(double i)
-        {
-            target_speed_fraction = i;
-            is_fraction_changed = true;
-            return 0;
-        }
+//        int set_target_speed_frcision(double i)
+//        {
+//            target_speed_fraction = i;
+//            is_fraction_changed = true;
+//            return 0;
+//        }
 
     public:
         void test(); // 为了测试

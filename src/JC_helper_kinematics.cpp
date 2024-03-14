@@ -2,7 +2,7 @@
 #include <rocos_app/robot.h>
 
 //** 显式指定关节数量 **//
-size_t _joint_num{0};
+uint32_t jointNum{0};
 
 namespace JC_helper
 {
@@ -1019,9 +1019,9 @@ namespace JC_helper
     SmartServo_Joint::SmartServo_Joint(std::atomic<bool> *finished_flag_ptr)
     {
         external_finished_flag_ptr = finished_flag_ptr;
-        otg = new ruckig::Ruckig<ruckig::DynamicDOFs>(_joint_num, 0.001);
-        input = new ruckig::InputParameter<ruckig::DynamicDOFs>(_joint_num);
-        output = new ruckig::OutputParameter<ruckig::DynamicDOFs>(_joint_num);
+        otg = new ruckig::Ruckig<ruckig::DynamicDOFs>(jointNum, 0.001);
+        input = new ruckig::InputParameter<ruckig::DynamicDOFs>(jointNum);
+        output = new ruckig::OutputParameter<ruckig::DynamicDOFs>(jointNum);
     }
 
     //! init()只负责轨迹的信息重置，运行状态Flag由各运动线程结束后{手动重置}
@@ -1030,7 +1030,7 @@ namespace JC_helper
         input->control_interface = ruckig::ControlInterface::Position;
         input->synchronization = ruckig::Synchronization::Phase;
 
-        for (int i = 0; i < _joint_num; i++)
+        for (int i = 0; i < jointNum; i++)
         {
             input->current_position[i] = q_init[i];
             input->current_velocity[i] = v_init[i];
@@ -1101,7 +1101,7 @@ namespace JC_helper
                 input->control_interface = ruckig::ControlInterface::Velocity;
                 input->synchronization = ruckig::Synchronization::None;
 
-                for (int i = 0; i < _joint_num; i++)
+                for (int i = 0; i < jointNum; i++)
                 {
                     input->target_velocity[i] = 0.0;
                     input->target_acceleration[i] = 0.0;
@@ -1130,7 +1130,7 @@ namespace JC_helper
                     input->control_interface = ruckig::ControlInterface::Velocity;
                     input->synchronization = ruckig::Synchronization::None;
 
-                    for (int i = 0; i < _joint_num; i++)
+                    for (int i = 0; i < jointNum; i++)
                     {
                         input->target_velocity[i] = 0.0;
                         input->target_acceleration[i] = 0.0;
@@ -1157,7 +1157,7 @@ namespace JC_helper
         {
             std::unique_lock<std::mutex> input_lock(input_mutex);
 
-            for (int i = 0; i < _joint_num; i++)
+            for (int i = 0; i < jointNum; i++)
             {
                 input->target_position[i] = q_target(i);
                 input->target_velocity[i] = 0.0;
@@ -2380,16 +2380,16 @@ namespace JC_helper
         std::unique_lock< std::mutex > lock_traj_joint( mutex_traj_joint, std::defer_lock );  //不上锁
         KDL::Frame frame_target;
         int count = 0;
-        KDL::JntArray _q_target( _joint_num );
+        KDL::JntArray _q_target( jointNum );
 
-        KDL::JntArray current_pos( _joint_num );
-        KDL::JntArray last_pos( _joint_num );
-        KDL::JntArray last_last_pos( _joint_num );
+        KDL::JntArray current_pos( jointNum );
+        KDL::JntArray last_pos( jointNum );
+        KDL::JntArray last_last_pos( jointNum );
 
         //**-------------------------------**//
 
         //** 程序初始化 **//
-        for ( int i = 0; i < _joint_num; i++ )
+        for ( int i = 0; i < jointNum; i++ )
         {
             current_pos( i )   = robot_ptr->pos_[ i ];
             last_pos( i )      = current_pos( i );
@@ -2474,13 +2474,13 @@ namespace JC_helper
         KDL::JntArray joint_command;
         int _tick_count{ robot_ptr->tick_count };
 
-        KDL::JntArray current_pos( _joint_num );
-        KDL::JntArray last_pos( _joint_num );
-        KDL::JntArray last_last_pos( _joint_num );
+        KDL::JntArray current_pos( jointNum );
+        KDL::JntArray last_pos( jointNum );
+        KDL::JntArray last_last_pos( jointNum );
         //**-------------------------------**//
 
         //** 程序初始化 **//
-        for ( int i = 0; i < _joint_num; i++ )
+        for ( int i = 0; i < jointNum; i++ )
         {
             current_pos( i )   = robot_ptr->pos_[ i ];
             last_pos( i )      = current_pos( i );
@@ -2519,7 +2519,7 @@ namespace JC_helper
             //**-------------------------------**//
 
             //** 位置伺服 **//
-            for ( int i = 0; i < _joint_num; ++i )
+            for ( int i = 0; i < jointNum; ++i )
             {
                 robot_ptr->pos_[ i ] = joint_command( i );
                 robot_ptr->joints_[ i ]->setPosition( joint_command( i ) );
@@ -2937,11 +2937,11 @@ namespace JC_helper
 
     SmartServo_Cartesian::SmartServo_Cartesian(std::atomic<bool> *finished_flag_ptr, const KDL::Chain &robot_chain) : _ik_vel{robot_chain}, FK_slover{robot_chain}
     {
-        joint_current.resize(_joint_num);
-        joint_target.resize(_joint_num);
-        joint_vel.resize(_joint_num);
-        joint_last_pos.resize(_joint_num);
-        joint_last_last_pos.resize(_joint_num);
+        joint_current.resize(jointNum);
+        joint_target.resize(jointNum);
+        joint_vel.resize(jointNum);
+        joint_last_pos.resize(jointNum);
+        joint_last_last_pos.resize(jointNum);
         external_finished_flag_ptr = finished_flag_ptr;
     }
 
@@ -2966,7 +2966,7 @@ namespace JC_helper
 
         KDL::SetToZero(joint_vel);
 
-        for (int i{0}; i < _joint_num; i++)
+        for (int i{0}; i < jointNum; i++)
         {
             joint_current(i) = robot_ptr->pos_[i];
             joint_target(i) = joint_current(i);
@@ -3007,14 +3007,14 @@ namespace JC_helper
             Cartesian_vel.rot[abs(_Cartesian_vel_index) - 4] = sign(_Cartesian_vel_index) * res_vel[0];
         }
         //! 速度矢量的参考系默认为base系，参考点为flange
-        if (_reference_frame.compare("flange") == 0)
+        if (_reference_frame == "flange")
         { //** 转变速度矢量的参考系，由flange系变为base系，但没有改变参考点（还是flange） **//
             FK_slover.JntToCart(vector_2_JntArray(robot_ptr->pos_), current_flange);
             Cartesian_vel = current_flange.M * Cartesian_vel;
             // std::cout<<"Cartesian_vel.vel:"<<Cartesian_vel.vel<<std::endl;
             // std::cout<<"Cartesian_vel.rot:"<<Cartesian_vel.rot<<std::endl;
         }
-        if (_reference_frame.compare("tool") == 0)
+        if (_reference_frame == "tool")
         { //** 转变速度矢量的参考系，由tool系变为base系，改变参考点（改为tool） **//
             FK_slover.JntToCart(vector_2_JntArray(robot_ptr->pos_), current_flange);
             KDL::Frame tool2flange = robot_ptr->getT_tool_();
@@ -3054,7 +3054,7 @@ namespace JC_helper
             // std::cout << "Cartesian_vel.vel:" << Cartesian_vel.vel << std::endl;
             // std::cout << "Cartesian_vel.rot:" << Cartesian_vel.rot << std::endl;
         }
-        if (_reference_frame.compare("object") == 0)
+        if (_reference_frame == "object")
         { //** 转变速度矢量的参考系，由flange系变为base系，改变参考点（还是object） **//
         // objectt标定的就是工件相对于基座的位姿，所以不需要转换，移动就是沿着工件的坐标系移动，旋转就是绕工件的坐标系旋转，但是运动的点为末端法兰盘
             FK_slover.JntToCart(vector_2_JntArray(robot_ptr->pos_), current_flange);
@@ -3093,7 +3093,7 @@ namespace JC_helper
             ; // 等待指令
         }
 
-        while (1)
+        while (true)
         {
             t_start = std::chrono::high_resolution_clock::now();
 
@@ -3182,7 +3182,7 @@ namespace JC_helper
                 PLOG_ERROR << "方向变换，停止！";
                 Cartesian_stop();
             }
-            else if (_reference_frame.compare(reference_frame) != 0)
+            else if (_reference_frame != reference_frame)
             {
                 PLOG_ERROR << "参考坐标系变换，停止！";
                 Cartesian_stop();
@@ -3212,20 +3212,20 @@ namespace JC_helper
 
 #pragma region //*零空间点动实现
 
-    SmartServo_Nullspace::SmartServo_Nullspace(std::atomic<bool> *finished_flag_ptr, const KDL::Chain &robot_chain) : jnt2jac(robot_chain), jac(_joint_num),
-                                                                                                                      U(Eigen::MatrixXd::Zero(6, _joint_num)),
-                                                                                                                      S(Eigen::VectorXd::Zero(_joint_num)),
-                                                                                                                      Sinv(Eigen::VectorXd::Zero(_joint_num)),
-                                                                                                                      V(Eigen::MatrixXd::Zero(_joint_num, _joint_num)),
-                                                                                                                      tmp(Eigen::VectorXd::Zero(_joint_num)),
+    SmartServo_Nullspace::SmartServo_Nullspace(std::atomic<bool> *finished_flag_ptr, const KDL::Chain &robot_chain) : jnt2jac(robot_chain), jac(jointNum),
+                                                                                                                      U(Eigen::MatrixXd::Zero(6, jointNum)),
+                                                                                                                      S(Eigen::VectorXd::Zero(jointNum)),
+                                                                                                                      Sinv(Eigen::VectorXd::Zero(jointNum)),
+                                                                                                                      V(Eigen::MatrixXd::Zero(jointNum, jointNum)),
+                                                                                                                      tmp(Eigen::VectorXd::Zero(jointNum)),
                                                                                                                       fk_slover(robot_chain)
 
     {
-        joint_current.resize(_joint_num);
-        joint_target.resize(_joint_num);
-        joint_vel.resize(_joint_num);
-        joint_last_pos.resize(_joint_num);
-        joint_last_last_pos.resize(_joint_num);
+        joint_current.resize(jointNum);
+        joint_target.resize(jointNum);
+        joint_vel.resize(jointNum);
+        joint_last_pos.resize(jointNum);
+        joint_last_last_pos.resize(jointNum);
         external_finished_flag_ptr = finished_flag_ptr;
     }
 
@@ -3250,7 +3250,7 @@ namespace JC_helper
 
         KDL::SetToZero(joint_vel);
 
-        for (int i{0}; i < _joint_num; i++)
+        for (int i{0}; i < jointNum; i++)
         {
             joint_current(i) = robot_ptr->pos_[i];
             joint_target(i) = joint_current(i);
@@ -3283,7 +3283,7 @@ namespace JC_helper
             return -1;
         }
 
-        for (int i = 0; i < _joint_num; ++i)
+        for (int i = 0; i < jointNum; ++i)
         {
             Sinv(i) = fabs(S(i)) < 0.00001 ? 0.0 : 1.0 / S(i);
         }
@@ -3300,12 +3300,12 @@ namespace JC_helper
 
         //** 判断当前位置下，能否进行零空间点动 **//
         int joint_index = 0;
-        for (; joint_index < _joint_num; joint_index++)
+        for (; joint_index < jointNum; joint_index++)
         {
             if (!null_space_jac.col(joint_index).isZero(1e-13))
                 break;
         }
-        if (joint_index == _joint_num)
+        if (joint_index == jointNum)
         {
             PLOG_ERROR << "当前构型下，无法进行臂角点动";
             return -1;
@@ -3458,11 +3458,11 @@ namespace JC_helper
     bool SmartServo_Nullspace::is_same_on_direction(const Eigen::Block<Eigen::Matrix<double, 7, 7>, 7, 1, true> &joint_vel)
     {
         // 如果不是7自由度直接退出
-        if (_joint_num != 7)
+        if (jointNum != 7)
             return false;
 
-        KDL::JntArray joint_target(_joint_num);
-        for (int i = 0; i < _joint_num; i++)
+        KDL::JntArray joint_target(jointNum);
+        for (int i = 0; i < jointNum; i++)
         {
             joint_target(i) = joint_vel(i) * servo_dt + joint_current(i);
         }
@@ -3667,7 +3667,7 @@ namespace JC_helper
         d_wt = std::abs(dof_7_robot.getSegment(6).getFrameToTip().p[1]);
         l_7_wt = {0, 0, d_wt};
 
-        for (int i = 0; i < _joint_num; i++)
+        for (int i = 0; i < jointNum; i++)
             if (pos_maximum(i) < pos_minimum(i))
             {
                 PLOG_ERROR << "关节[" << i << "] 的minimum大于maximum,请检查限位范围";
@@ -3991,17 +3991,17 @@ namespace JC_helper
     void Joint_stop(rocos::Robot *robot_ptr, const KDL::JntArray &current_pos, const KDL::JntArray &last_pos, const KDL::JntArray &last_last_pos)
     {
         //** 变量初始化 **//
-        ruckig::Ruckig<ruckig::DynamicDOFs> otg{_joint_num, 0.001};
-        ruckig::InputParameter<ruckig::DynamicDOFs> input(_joint_num);
-        ruckig::OutputParameter<ruckig::DynamicDOFs> output(_joint_num);
+        ruckig::Ruckig<ruckig::DynamicDOFs> otg{jointNum, 0.001};
+        ruckig::InputParameter<ruckig::DynamicDOFs> input(jointNum);
+        ruckig::OutputParameter<ruckig::DynamicDOFs> output(jointNum);
         ruckig::Result res;
         //**-------------------------------**//
 
         try
         {
-            KDL::JntArray current_vel(_joint_num);
-            KDL::JntArray last_vel(_joint_num);
-            KDL::JntArray current_acc(_joint_num);
+            KDL::JntArray current_vel(jointNum);
+            KDL::JntArray last_vel(jointNum);
+            KDL::JntArray current_acc(jointNum);
 
             KDL::Subtract(current_pos, last_pos, current_vel);
             KDL::Divide(current_vel, 0.001, current_vel);
@@ -4015,7 +4015,7 @@ namespace JC_helper
             input.control_interface = ruckig::ControlInterface::Velocity;
             input.synchronization = ruckig::Synchronization::None;
 
-            for (int i = 0; i < _joint_num; i++)
+            for (int i = 0; i < jointNum; i++)
             {
                 input.current_position[i] = robot_ptr->pos_[i];
                 input.current_velocity[i] = KDL::sign(current_vel(i)) * std::min(abs(current_vel(i)), robot_ptr->max_vel_[i]);
@@ -4039,7 +4039,7 @@ namespace JC_helper
             if (res != ruckig::Result::Finished)
             {
                 //                PLOG_ERROR << "OTG 计算失败,停止运动";
-                for (int i = 0; i < _joint_num; ++i)
+                for (int i = 0; i < jointNum; ++i)
                     robot_ptr->joints_[i]->setPosition(robot_ptr->pos_[i]);
             }
             else
@@ -4050,22 +4050,22 @@ namespace JC_helper
         catch (const std::exception &e)
         {
             PLOG_ERROR << e.what();
-            for (int i = 0; i < _joint_num; ++i)
+            for (int i = 0; i < jointNum; ++i)
                 robot_ptr->joints_[i]->setPosition(robot_ptr->pos_[i]);
         }
         catch (...)
         {
             PLOG_ERROR << "未知错误";
-            for (int i = 0; i < _joint_num; ++i)
+            for (int i = 0; i < jointNum; ++i)
                 robot_ptr->joints_[i]->setPosition(robot_ptr->pos_[i]);
         }
     }
 
     int check_vel_acc(const KDL::JntArray &current_pos, const KDL::JntArray &last_pos, const KDL::JntArray &last_last_pos, const double max_vel, const double max_acc)
     {
-        KDL::JntArray current_vel(_joint_num);
-        KDL::JntArray last_vel(_joint_num);
-        KDL::JntArray current_acc(_joint_num);
+        KDL::JntArray current_vel(jointNum);
+        KDL::JntArray last_vel(jointNum);
+        KDL::JntArray current_acc(jointNum);
 
         KDL::Subtract(current_pos, last_pos, current_vel);
         KDL::Divide(current_vel, 0.001, current_vel);
@@ -4076,7 +4076,7 @@ namespace JC_helper
         KDL::Subtract(current_vel, last_vel, current_acc);
         KDL::Divide(current_acc, 0.001, current_acc);
 
-        for (int i{0}; i < _joint_num; i++)
+        for (int i{0}; i < jointNum; i++)
         {
             if (abs(current_vel(i)) > max_vel)
             {
@@ -4097,36 +4097,10 @@ namespace JC_helper
         return 0;
     }
 
-    //    int safety_servo( rocos::Robot* robot_ptr, const std::array< double, 7 >& target_pos )
-    //    {
-    //        //** 伺服位置检查，无效则报错并程序终止 **//
-    //        for ( int i = 0; i < _joint_num; ++i )
-    //        {
-    //            if ( target_pos[ i ] > robot_ptr->joints_[ i ]->getMaxPosLimit( ) || target_pos[ i ] < robot_ptr->joints_[ i ]->getMinPosLimit( ) )
-    //            {
-    //                PLOG_ERROR << "target pos [" << i << "]= " << target_pos[ i ] * KDL::rad2deg << " is out of range ";
-    //                PLOG_ERROR << "program will be turn off after 4 seconds!!";
-    //                std::this_thread::sleep_for( std::chrono::duration< double >( 4 ) );
-    //                exit( -1 );
-    //            }
-    //        }
-    //        //**-------------------------------**//
-    //
-    //        //** 位置伺服 **//
-    //        for ( int i = 0; i < _joint_num; ++i )
-    //        {
-    //            robot_ptr->pos_[ i ] = target_pos[ i ];
-    //            robot_ptr->joints_[ i ]->setPosition( target_pos[ i ] );
-    //        }
-    //        robot_ptr->hw_interface_->waitForSignal( 0 );
-    //        //**-------------------------------**//
-    //        return 0;
-    //    }
-
     int safety_servo(rocos::Robot *robot_ptr, const std::vector<double> &target_pos)
     {
         //** 伺服位置检查，无效则报错并程序终止 **//
-        for (int i = 0; i < _joint_num; ++i)
+        for (int i = 0; i < jointNum; ++i)
         {
             if (target_pos[i] > robot_ptr->joints_[i]->getMaxPosLimit() || target_pos[i] < robot_ptr->joints_[i]->getMinPosLimit())
             {
@@ -4140,7 +4114,7 @@ namespace JC_helper
         //**-------------------------------**//
 
         //** 位置伺服 **//
-        for (int i = 0; i < _joint_num; ++i)
+        for (int i = 0; i < jointNum; ++i)
         {
             robot_ptr->pos_[i] = target_pos[i];
             robot_ptr->joints_[i]->setPosition(target_pos[i]);
@@ -4153,7 +4127,7 @@ namespace JC_helper
     int safety_servo(rocos::Robot *robot_ptr, const KDL::JntArray &target_pos)
     {
         //** 伺服位置检查，无效则报错并程序终止 **//
-        for (int i = 0; i < _joint_num; ++i)
+        for (int i = 0; i < jointNum; ++i)
         {
             if (target_pos(i) > robot_ptr->joints_[i]->getMaxPosLimit() || target_pos(i) < robot_ptr->joints_[i]->getMinPosLimit())
             {
@@ -4167,7 +4141,7 @@ namespace JC_helper
         //**-------------------------------**//
 
         //** 位置伺服 **//
-        for (int i = 0; i < _joint_num; ++i)
+        for (int i = 0; i < jointNum; ++i)
         {
             robot_ptr->pos_[i] = target_pos(i);
             robot_ptr->joints_[i]->setPosition(target_pos(i));
