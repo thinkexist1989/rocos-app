@@ -925,7 +925,11 @@ namespace rocos
             BASE_ROLL = 403,
             BASE_PITCH = 404,
             BASE_YAW = 405,
-            NULLSPACE = 500
+            NULLSPACE = 500,
+            RUNTO_MOVEJ =600,
+            RUNTO_MOVEL =700
+
+
         };
 
         enum class DRAGGING_DIRRECTION : int
@@ -1124,6 +1128,7 @@ namespace rocos
         std::ofstream speed_data_csv{"/home/jc/rocos-app/speed_scaling.csv"};
         //**-------------------------------**//
 
+         KDL::Frame RunTo_movel_target{};//RUNto当前的目标
     public:
         Kinematics kinematics_;
         friend void JC_helper::SmartServo_Joint::RunSmartServo(rocos::Robot *);

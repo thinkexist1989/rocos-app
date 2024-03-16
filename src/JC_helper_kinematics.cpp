@@ -3002,10 +3002,19 @@ namespace JC_helper
         {
             Cartesian_vel.vel[abs(_Cartesian_vel_index) - 1] = sign(_Cartesian_vel_index) * res_vel[0];
         }
-        else // 旋转
+        else if (abs(_Cartesian_vel_index) <= 6)// 旋转
         {
             Cartesian_vel.rot[abs(_Cartesian_vel_index) - 4] = sign(_Cartesian_vel_index) * res_vel[0];
+        }else //RunTo//TODO 考虑限制最大速度
+        {
+            FK_slover.JntToCart(vector_2_JntArray(robot_ptr->pos_), current_flange);
+            Cartesian_vel.vel = (robot_ptr->RunTo_movel_target.p - current_flange.p) * res_vel[0];
+            KDL::Rotation R_start_end = current_flange.M.Inverse() * robot_ptr->RunTo_movel_target.M;
+            KDL::Vector ration_axis;
+            double angle = R_start_end.GetRotAngle(ration_axis);
+            Cartesian_vel.rot = ration_axis * angle * res_vel[0];
         }
+
         //! 速度矢量的参考系默认为base系，参考点为flange
         if (_reference_frame == "flange")
         { //** 转变速度矢量的参考系，由flange系变为base系，但没有改变参考点（还是flange） **//

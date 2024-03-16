@@ -2094,7 +2094,7 @@ namespace rocos {
             return -1;
         }
 
-        if (index <= static_cast< int >( DRAGGING_FLAG::J6 ))  //当前命令类型为关节空间
+        if (index <= static_cast< int >( DRAGGING_FLAG::J6 ) || index == static_cast< int >( DRAGGING_FLAG::RUNTO_MOVEJ ))  //当前命令类型为关节空间
         {
             //只检查速度、加速度,关节位置指令这里不检查，如果超过范围，则为最大/小关节值
             if (CheckBeforeMove(JntArray{static_cast< unsigned int >( jnt_num_ )}, max_speed, max_acceleration, 0, 0) <
@@ -2103,14 +2103,14 @@ namespace rocos {
                 return -1;
             }
             //预防机械臂6个关节时，下发第7关节的控制命令
-            if (index >= jnt_num_) {
+            if (index == static_cast<int>(DRAGGING_FLAG::J6) && jnt_num_ < 7) {
                 PLOG_ERROR << " command flag= "
                            << " DRAGGING_FLAG::J6 "
                            << " is not allow because of the jnt_num_=" << jnt_num_;
                 return -1;
             }
             index_type = DRAGGING_TYPE::JOINT;
-        } else if (index <= static_cast< int >( DRAGGING_FLAG::BASE_YAW )) //当前命令类型为笛卡尔空间
+        } else if (index <= static_cast< int >( DRAGGING_FLAG::BASE_YAW )||index == static_cast< int >( DRAGGING_FLAG::RUNTO_MOVEL )) //当前命令类型为笛卡尔空间
         {
             //只检查速度、加速度,笛卡尔指令不检查
             if (CheckBeforeMove(flange_, max_speed, max_acceleration, 0, 0) < 0) {
@@ -2118,14 +2118,15 @@ namespace rocos {
                 return -1;
             }
             index_type = DRAGGING_TYPE::CARTESIAN;
-        } else if (index <= static_cast< int >( DRAGGING_FLAG::NULLSPACE ))  // 当前指令为零空间运动
+        } else if (index == static_cast< int >( DRAGGING_FLAG::NULLSPACE ))  // 当前指令为零空间运动
         {
             if (jnt_num_ < 7) {
                 PLOG_ERROR << "当前机械臂关节数量为:" << jnt_num_ << ",无法实现零空间点动";
                 return -1;
             }
             index_type = DRAGGING_TYPE::NULLSPACE;
-        } else  // 未定义指令
+        }
+        else  // 未定义指令
         {
             PLOG_ERROR << "未定义指令：" << index;
             return -1;
@@ -2176,24 +2177,26 @@ namespace rocos {
             _thread_planning.reset(
                     new boost::thread{&JC_helper::SmartServo_Joint::RunSmartServo, &_SmartServo_Joint, this});
         }
-            //笛卡尔空间点动指令
+        // 笛卡尔空间点动指令
         else if (_dragging_finished_flag && index_type == DRAGGING_TYPE::CARTESIAN) {
             if (_thread_planning) {
                 _thread_planning->join();
                 _thread_planning = nullptr;
             }
 
-            if (index % 10 <= 2)
+            if (index % 10 <= 2 && index != static_cast<int>(DRAGGING_FLAG::RUNTO_MOVEL))
                 // 笛卡尔空间位置点动
                 _SmartServo_Cartesian.init(this, max_speed * 0.4);
-            else
+            else if (index % 10 <= 5 && index != static_cast<int>(DRAGGING_FLAG::RUNTO_MOVEL))
                 // 笛卡尔空间姿态点动
                 _SmartServo_Cartesian.init(this, max_speed * 1.5);
+            else// 笛卡尔空间RunTo点动
+                _SmartServo_Cartesian.init(this, 0.1); //这里的0.1指的每个周期走剩余距离的10%
 
             _thread_planning.reset(
                     new boost::thread{&JC_helper::SmartServo_Cartesian::RunMotion, &_SmartServo_Cartesian, this});
         }
-            // 零空间点动指令
+        // 零空间点动指令
         else if (_dragging_finished_flag && index_type == DRAGGING_TYPE::NULLSPACE) {
             if (_thread_planning) {
                 _thread_planning->join();
@@ -2281,6 +2284,12 @@ namespace rocos {
 
             case DRAGGING_FLAG::NULLSPACE:
                 _SmartServo_Nullsapace.command(static_cast< int >( dir ));
+                break;
+
+            case DRAGGING_FLAG::RUNTO_MOVEL: //直线点动到目标点位
+                _SmartServo_Cartesian.command(index, "base");
+                break;
+            case DRAGGING_FLAG::RUNTO_MOVEJ: //关节点动到目标点位
                 break;
 
             default:
