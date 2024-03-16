@@ -585,7 +585,8 @@ namespace JC_helper
         //** 直线轨迹规划 **//
 
         std::vector<KDL::Frame> traj_target;
-        KDL::Frame frame_init = robot_ptr->flange_;
+        KDL::Frame frame_init;
+        JntToCart( JC_helper::vector_2_JntArray( robot_ptr->pos_ ), frame_init );
 
         if (link_trajectory(traj_target, frame_init, frame_target, max_path_v, max_path_a) < 0)
         {

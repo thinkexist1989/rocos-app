@@ -880,20 +880,9 @@ namespace rocos {
         KDL::JntArray q_target(jnt_num_);
         std::vector<double> max_step;
         std::vector<KDL::Frame> traj_target;
-        //!不要传入flange_ !不要传入flange_ !不要传入flange_
-        //!实测发现：因为后台有线程不断写入，因此读取可能失败，造成轨迹规划失败的假象！！！
-        //TODO 解决公共属性多线程互斥问题
-
         KDL::Frame frame_init;
-        JntArray q_in(jnt_num_);
-            for (int i{0}; i < jnt_num_; i++)
-                q_in(i) = pos_[i];
-            //            std::cout << q_in.data << std::endl;
-
-            // Flange Reference
-            JntToCart(q_in, frame_init);
-
-        int traj_count{0};
+        JntToCart(JC_helper::vector_2_JntArray(pos_),frame_init);
+        int traj_count{ 0 };
         //**-------------------------------**//
 
         for (int i = 0; i < jnt_num_; i++) {
@@ -1042,8 +1031,8 @@ namespace rocos {
         KDL::JntArray q_init(jnt_num_);
         KDL::JntArray joint_vel(jnt_num_);
         std::vector<KDL::Twist> vel_target;
-        //TODO 解决公共属性多线程互斥问题
-        KDL::Frame frame_current = flange_;
+        KDL::Frame frame_current ;
+        JntToCart(JC_helper::vector_2_JntArray(pos_),frame_current);
         KDL::ChainIkSolverVel_pinv _ik_vel{kinematics_.getChain()};
         //**-------------------------------**//
 
@@ -1259,7 +1248,8 @@ namespace rocos {
         traj_.clear();
         KDL::JntArray q_init(jnt_num_);
         KDL::JntArray q_target(jnt_num_);
-        KDL::Frame frame_init = flange_;
+        KDL::Frame frame_init;
+        JntToCart(JC_helper::vector_2_JntArray(pos_),frame_init);
         std::vector<double> max_step;
         bool orientation_fixed = mode == Robot::OrientationMode::FIXED;
         std::vector<KDL::Frame> traj_target;
@@ -1401,7 +1391,8 @@ namespace rocos {
         traj_.clear();
         KDL::JntArray q_init(jnt_num_);
         KDL::JntArray q_target(jnt_num_);
-        KDL::Frame frame_init = flange_;
+        KDL::Frame frame_init;
+        JntToCart( JC_helper::vector_2_JntArray( pos_ ), frame_init );
         std::vector<double> max_step;
         bool orientation_fixed = mode == Robot::OrientationMode::FIXED;
         std::vector<KDL::Frame> traj_target;
@@ -1546,7 +1537,8 @@ namespace rocos {
         //** 变量初始化 **//
         KDL::JntArray q_init(jnt_num_);
         KDL::JntArray joint_vel(jnt_num_);
-        KDL::Frame current_frame = flange_;
+        KDL::Frame current_frame;
+        JntToCart( JC_helper::vector_2_JntArray( pos_ ), current_frame );
         bool orientation_fixed = mode == Robot::OrientationMode::FIXED;
         std::vector<KDL::Twist> traj_vel_target;
         KDL::ChainIkSolverVel_pinv _ik_vel{kinematics_.getChain()};
@@ -1697,7 +1689,8 @@ namespace rocos {
         //** 变量初始化 **//
         KDL::JntArray q_init(jnt_num_);
         KDL::JntArray joint_vel(jnt_num_);
-        KDL::Frame current_frame = flange_;
+        KDL::Frame current_frame;
+        JntToCart( JC_helper::vector_2_JntArray( pos_ ), current_frame );
         bool orientation_fixed = mode == Robot::OrientationMode::FIXED;
         std::vector<KDL::Twist> traj_vel_target;
         KDL::ChainIkSolverVel_pinv _ik_vel{kinematics_.getChain()};
@@ -1844,7 +1837,8 @@ namespace rocos {
         //** 变量初始化 **//
         std::vector<KDL::Frame> traj_target;
         std::vector<int> traj_index;
-        KDL::Frame Cart_point = flange_;
+        KDL::Frame Cart_point;
+        JntToCart( JC_helper::vector_2_JntArray( pos_ ), Cart_point );
         std::vector<size_t> vector_size{point.size(), bound_dist.size(), max_path_v.size(), max_path_a.size()};
         std::vector<double> max_step;
         KDL::JntArray q_init(jnt_num_);
