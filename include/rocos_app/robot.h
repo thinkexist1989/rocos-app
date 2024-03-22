@@ -502,10 +502,10 @@ namespace rocos
                 double roll1, pitch1, yaw1;
                 pose_out.M.GetRPY(roll1, pitch1, yaw1);
 
-                // 打印结果
-                std::cout << "工具系的位置" << pose_out.p.x() << "," << pose_out.p.y() << "," << pose_out.p.z() << std::endl;
-                std::cout << "工具系的旋转向量" << rotVector.x() / M_PI * 180 << "," << rotVector.y() / M_PI * 180 << "," << rotVector.z() / M_PI * 180 << std::endl;
-                std::cout << "工具系的RPY" << roll1 / M_PI * 180 << "," << pitch1 / M_PI * 180 << "," << yaw1 / M_PI * 180 << std::endl;
+                // // 打印结果
+                // std::cout << "工具系的位置" << pose_out.p.x() << "," << pose_out.p.y() << "," << pose_out.p.z() << std::endl;
+                // std::cout << "工具系的旋转向量" << rotVector.x() / M_PI * 180 << "," << rotVector.y() / M_PI * 180 << "," << rotVector.z() / M_PI * 180 << std::endl;
+                // std::cout << "工具系的RPY" << roll1 / M_PI * 180 << "," << pitch1 / M_PI * 180 << "," << yaw1 / M_PI * 180 << std::endl;
                 // 工具系位置标定的误差
                 double error = 0.0;
                 error = (R_EB * Pos - P_TB).norm();
@@ -550,8 +550,8 @@ namespace rocos
                 pose_out.M.GetRPY(roll1, pitch1, yaw1);
 
                 // 打印结果
-                std::cout << "工件系的位置" << pose_out.p.x() << "," << pose_out.p.y() << "," << pose_out.p.z() << std::endl;
-                std::cout << "工件系的RPY" << roll1 / M_PI * 180 << "," << pitch1 / M_PI * 180 << "," << yaw1 / M_PI * 180 << std::endl;
+                // std::cout << "工件系的位置" << pose_out.p.x() << "," << pose_out.p.y() << "," << pose_out.p.z() << std::endl;
+                // std::cout << "工件系的RPY" << roll1 / M_PI * 180 << "," << pitch1 / M_PI * 180 << "," << yaw1 / M_PI * 180 << std::endl;
                  if (std::isnan(roll1) || std::isnan(pitch1) || std::isnan(yaw1)|| std::isnan(pose_out.p.x()) || std::isnan(pose_out.p.y()) || std::isnan(pose_out.p.z()))
                 {
                     ErrorState = true;
@@ -590,9 +590,12 @@ namespace rocos
 
             yaml_node["T_tool_"] = T_tool_rpy;
             std::ofstream fout(yaml_path);
+            std::ofstream fout1("../../config/calibration.yaml");
 
             fout << yaml_node;
+            fout1 << yaml_node;
             fout.close();
+            fout1.close();
             std::cout << "保存T_tool_成功" << std::endl;
         }
         void set_object_frame(KDL::Frame &pose)
@@ -610,8 +613,12 @@ namespace rocos
             yaml_node["T_object_"] = T_object_rpy;
 
             std::ofstream fout(yaml_path);
+            std::ofstream fout1("../../config/calibration.yaml");
+            
             fout << yaml_node;
+            fout1 << yaml_node;
             fout.close();
+            fout1.close();
             std::cout << "保存T_object_成功" << std::endl;
         }
 
@@ -696,6 +703,18 @@ namespace rocos
             else if (id == 6)
             {
                 return pose6;
+            }
+            else if (id == 7)
+            {
+                return poseObject1;
+            }
+            else if (id == 8)
+            {
+                return poseObject2;
+            }
+            else if (id == 9)
+            {
+                return poseObject3;
             }
             else
             {
