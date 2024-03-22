@@ -526,7 +526,13 @@ namespace rocos {
 
         // std::vector< double > dt( jnt_num_, 0.0 );  // delta T
         // double max_time = 0.0;
-
+        int index = 0;
+        int loop = 0;
+        std::vector<double> joint_torques;
+        joint_torques.resize(getJointNum());
+        JC_helper::admittance_joint *admittance_control = new JC_helper::admittance_joint{this};
+        bool last_flag_enable =false;
+        bool current_flag_enable =false;
         while (true) {  // while start
 
             hw_interface_->waitForSignal(9);
@@ -534,6 +540,49 @@ namespace rocos {
             //!< Update Flange State
             std::lock_guard<std::mutex> lock(mtx);  // 自动获取互斥锁
             updateCartesianInfo();
+
+            current_flag_enable=(joints_[0]->getDriveState() == DriveState::OperationEnabled);
+            if(current_flag_enable && !last_flag_enable)
+            {
+                boost::this_thread::sleep(boost::posix_time::milliseconds(500));
+                std::cout<<"使能变化，延时0.5s"<<std::endl;
+            }
+
+            if (joints_[0]->getDriveState() == DriveState::OperationEnabled && admittance_control->flag_collision_detection)
+            {
+
+                joint_torques = admittance_control->compensateGravity(this, 0, 0);
+
+                for (int j = 0; j < getJointNum(); j++)
+                {
+                    if (abs(joint_torques[j]) > admittance_control->joint_collision[j])
+                    {
+                        if (loop < 2)
+                        {
+
+                            index++;
+                        }
+
+                        loop = 0;
+                    }
+                }
+                if (loop > 20 & index > 5)
+                {
+                    index = 0;
+                }
+                if (index > 50)
+                {
+
+                    PLOG_INFO << "Collision happened!!: " << joint_torques[0] << " " << joint_torques[1] << " " << joint_torques[2] << " " << joint_torques[3] << " " << joint_torques[4] << " " << joint_torques[5] << " " << joint_torques[6] << std::endl;
+                    //setDisabled();
+                    index = 0;
+                }
+                loop++;
+            }
+            last_flag_enable=current_flag_enable;
+            // 在每次使能以后延时0.3s,使能时first_flag_enable=true，不使能时first_flag_enable=false，每次状态位从false变为true时，延时0.3s
+
+
 
             //     //! 屏蔽开始
             //    //!< Trajectory generating......

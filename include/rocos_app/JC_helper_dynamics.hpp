@@ -109,16 +109,16 @@ namespace JC_helper
         void set_k(double vaule);
     };
 
-    class admittance_joint
+       class admittance_joint
     {
     private:
         KDL::Vector gravity{0, 0, 9.81};
-        KDL::ChainIdSolver_RNE rne_solver;
+        KDL::ChainIdSolver_RNE* rne_solver;
 
         std::vector<double> Theory_torques;
         std::vector<double> Actual_torques;
-        std::vector<double> a_sensor;
-        std::vector<double> b_sensor;
+        // 质心
+        std::vector<double> mass_center;
         std::vector<double> K;
         std::vector<double> M;
         std::vector<double> B;
@@ -131,25 +131,39 @@ namespace JC_helper
         std::vector<double> q_min;
         std::vector<double> q_max;
         // yaml文件的路径
-        
+        std::vector<double> com_fext;
+
         YAML::Node yaml_node;
-        unsigned int  joint_num;
-         KDL::Wrenches external_forces;
+        YAML::Node yaml_node_collision;
+        unsigned int joint_num;
+        KDL::Wrenches external_forces;
 
     public:
-        admittance_joint(rocos::Robot *robot_ptr,std::string yaml_path = "joint_impedance_control.yaml");
+        std::vector<double> a_sensor;
+        std::vector<double> b_sensor;
+        std::vector<double> joint_collision;
+        bool flag_collision_detection;
+        KDL::Chain robotchain;
+        admittance_joint(rocos::Robot *robot_ptr, std::string yaml_path = "config/joint_impedance_control.yaml");
         ~admittance_joint();
         // 初始化参数，从yaml文件中读取及初始化q_min,q_max,因为从yaml中读取，所以不需要各个参数的set函数
         int init(string yaml_path);
         // 获取当前关节位置下的理论力矩
-        std::vector<double> get_theory_torques(rocos::Robot *robot_ptr, KDL::JntArray &joint, KDL::JntArray &joint_vel, KDL::JntArray &joint_acc);
+        void get_theory_torques(rocos::Robot *robot_ptr, KDL::JntArray &joint, KDL::JntArray &joint_vel, KDL::JntArray &joint_acc);
+        std::vector<double> compensateGravity(rocos::Robot *robot_ptr, double vel_factor = 1, double acc_factor = 1);
         // 获取当前关节位置下的实际力矩从基础函数getLoadTorque中获取
         // 设置关节的模拟外力矩
         void set_torque(int id, double tor_que);
         // 设置力矩缩放的参数
         double set_K_sensor(double x, double K = 1.0, double amplitude = 40.0);
+        KDL::Chain getModifiedChain(rocos::Robot *robot_ptr);
+       
         void Initialize(int joint_num)
         {
+            /**/
+            mass_center.resize(3);
+            joint_collision.resize(joint_num);
+            /*****/
             Theory_torques.resize(joint_num);
             Actual_torques.resize(joint_num);
             a_sensor.resize(joint_num);
@@ -164,13 +178,12 @@ namespace JC_helper
             joint_K.resize(joint_num);
             kesai.resize(joint_num);
             fext.resize(joint_num);
+            com_fext.resize(joint_num);
             ZeroOffset.resize(joint_num);
         };
-        //开始示教
-         void Runteaching(rocos::Robot *robot_ptr,bool *flag_admittance_joint_turnoff);
-
+        // 开始示教
+        void Runteaching(rocos::Robot *robot_ptr, bool *flag_admittance_joint_turnoff);
     };
-
     class admittance
     {
     private:
