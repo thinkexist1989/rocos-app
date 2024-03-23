@@ -282,7 +282,7 @@ namespace JC_helper
         // 在这里修改并返回您想要的 Chain 对象
         KDL::Chain originalChain = robot_ptr->kinematics_.getChain();
         KDL::Segment segment3;
-        yaml_node_collision = YAML::LoadFile("config/joint_impedance_control.yaml");
+        yaml_node_collision = YAML::LoadFile("joint_impedance_control.yaml");
 
         double mass = yaml_node_collision["mass"].as<double>();
         mass_center[0] = yaml_node_collision["mass_center"][0].as<double>();
