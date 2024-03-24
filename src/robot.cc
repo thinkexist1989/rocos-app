@@ -912,15 +912,15 @@ namespace rocos {
                 //sun
                 // 尝试改为解析解接口
                 for (const auto &target: traj_target) {
-                    // if (SRS_kinematics_.JC_cartesian_to_joint(target, q_init(2), q_init, q_target) < 0) {
-                    //     PLOG_ERROR << " JC_cartesian_to_joint failed on the " << ik_count << " times";
-                    //     throw -1;
-
-                    // }
-                    if (kinematics_.CartToJnt(q_init, target, q_target) < 0) {
-                        PLOG_ERROR << " CartToJnt failed on the " << ik_count << " times";
+                    if (SRS_kinematics_.JC_cartesian_to_joint_dir(target, q_init(2), q_init, q_target) < 0) {
+                        PLOG_ERROR << " JC_cartesian_to_joint failed on the " << ik_count << " times";
                         throw -1;
+
                     }
+                    // if (kinematics_.CartToJnt(q_init, target, q_target) < 0) {
+                    //     PLOG_ERROR << " CartToJnt failed on the " << ik_count << " times";
+                    //     throw -1;
+                    // }
                     //*防止奇异位置速度激增
                     for (int i = 0; i < jnt_num_; i++) {
                         if (abs(q_target(i) - q_init(i)) > max_step[i]) {
