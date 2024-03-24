@@ -425,7 +425,7 @@ namespace JC_helper
         bool is_same_on_direction( const Eigen::Block< Eigen::Matrix< double, 7, 7 >, 7, 1, true >& );
     };
 
-    typedef double JC_double;
+    using JC_double = double;
     class inverse_special_to_SRS
     {
     private:
@@ -444,7 +444,26 @@ namespace JC_helper
 
     public:
         int init( const KDL::Chain& dof_7_robot, const KDL::JntArray& pos_minimum, const KDL::JntArray& pos_maximum );
-        int JC_cartesian_to_joint( KDL::Frame inter_T, JC_double inter_joint_3, const KDL::JntArray& last_joint, KDL::JntArray& joint_out );
+        /**
+         * @brief 根据参考解，计算构型，然后8组解中根据构型选
+         * 
+         * @param inter_T 
+         * @param inter_joint_3 
+         * @param last_joint 
+         * @param joint_out 
+         * @return int 
+         */
+        int JC_cartesian_to_joint_dir( const  KDL::Frame inter_T, const JC_double inter_joint_3, const KDL::JntArray& last_joint, KDL::JntArray& joint_out ) const;
+       /**
+        * @brief 不计算构型，根据8组解和参考解最小误差选择(不推荐)
+        * 
+        * @param inter_T 
+        * @param inter_joint_3 
+        * @param last_joint 
+        * @param joint_out 
+        * @return int 
+        */
+        int JC_cartesian_to_joint( const  KDL::Frame inter_T, const JC_double inter_joint_3, const KDL::JntArray& last_joint, KDL::JntArray& joint_out ) const;
         class JC_exception : public std::exception
         {
         public:
