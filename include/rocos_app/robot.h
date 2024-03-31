@@ -1055,6 +1055,23 @@ namespace rocos
 
         int stop_joint_admittance_teaching();
 
+        KDL::Frame get_RunTo_target(int index)
+        {
+            KDL::Frame Cart_point;
+            KDL::JntArray q_target(7);
+            q_target(0) = 0 * M_PI / 180;
+            q_target(1) = -45 * M_PI / 180;
+            q_target(2) = 30 * M_PI / 180;
+            q_target(3) = -90 * M_PI / 180;
+            q_target(4) = 0 * M_PI / 180;
+            q_target(5) = 45 * M_PI / 180;
+            q_target(6) = 0 * M_PI / 180;
+            JntToCart(q_target, Cart_point);
+            // return  KDL::Frame {KDL::Rotation::RotZ(45 * KDL::deg2rad) * Cart_point.M, Cart_point.p + KDL::Vector{-0.2, 0, -0.2}};
+            static  KDL::Frame Runto_frame{KDL::Rotation::RotZ(45 * KDL::deg2rad) * Cart_point.M, Cart_point.p + KDL::Vector{-0.2, 0, -0.2}};
+            return Runto_frame;
+        }
+
     private:
         // TODO： 测试用MoveJ，阻塞运行，需要改为private
         void
@@ -1147,7 +1164,7 @@ namespace rocos
         std::ofstream speed_data_csv{"/home/jc/rocos-app/speed_scaling.csv"};
         //**-------------------------------**//
 
-         KDL::Frame RunTo_movel_target{};//RUNto当前的目标
+        std::uint64_t  RunTo_movel_target_index{0};//RUNto当前的目标id
     public:
         Kinematics kinematics_;
         friend void JC_helper::SmartServo_Joint::RunSmartServo(rocos::Robot *);

@@ -2945,19 +2945,37 @@ namespace JC_helper
         external_finished_flag_ptr = finished_flag_ptr;
     }
 
-    void SmartServo_Cartesian::init(rocos::Robot *robot_ptr, double target_vel, double max_vel, double max_acc, double max_jerk)
+    void SmartServo_Cartesian::init(rocos::Robot *robot_ptr, int flag, double target_vel, double max_vel, double max_acc, double max_jerk)
     {
         input.current_position[0] = 0;
         input.current_velocity[0] = 0;
         input.current_acceleration[0] = 0;
 
-        input.target_position[0] = target_vel;
-        input.target_velocity[0] = 0;
-        input.target_acceleration[0] = 0;
-
-        input.max_velocity[0] = max_vel;
-        input.max_acceleration[0] = max_acc;
-        input.max_jerk[0] = max_jerk;
+        if (flag >= 700) { //Runto情况-位置模型
+            FK_slover.JntToCart(vector_2_JntArray(robot_ptr->pos_),init_flange ); //需要记录开始位置
+            KDL::Frame  RunTo_target =   robot_ptr->get_RunTo_target(flag - 700);
+            double Plength = (RunTo_target.p - init_flange.p).Norm();
+            KDL::Rotation R_start_end = init_flange.M.Inverse() * RunTo_target.M;
+            KDL::Vector ration_axis;
+            double angle = R_start_end.GetRotAngle(ration_axis);
+            const double equivalent_radius = 0.1; 
+            double Rlength = equivalent_radius * abs(angle);
+            RunTo_length = std::max(Plength,Rlength);
+            input.target_position[0] = 1;
+            input.target_velocity[0] = 0;
+            input.target_acceleration[0] = 0;
+            input.max_velocity[0] = target_vel/RunTo_length;
+            input.max_acceleration[0] = max_vel/RunTo_length;
+            input.max_jerk[0] = max_acc/RunTo_length;
+        } else  // 点动情况 -速度模式
+        {
+            input.target_position[0] = target_vel;
+            input.target_velocity[0] = 0;
+            input.target_acceleration[0] = 0;
+            input.max_velocity[0] = max_vel;
+            input.max_acceleration[0] = max_acc;
+            input.max_jerk[0] = max_jerk;
+        }
 
         input.control_interface = ruckig::ControlInterface::Position;
         input.synchronization = ruckig::Synchronization::None;
@@ -2980,16 +2998,12 @@ namespace JC_helper
 
         current_flange = KDL::Frame{};
 
-        //        PLOG_INFO << "笛卡尔空间点动初始化完成";
+               PLOG_INFO << "笛卡尔空间点动初始化完成";
     }
 
     int SmartServo_Cartesian::update(KDL::JntArray &joint_vel, rocos::Robot *robot_ptr)
     {
-        KDL::SetToZero(joint_vel);
-        KDL::Twist Cartesian_vel{};
-
         res = otg.update(input, output);
-
         if (res != ruckig::Result::Working && res != ruckig::Result::Finished)
         {
             PLOG_ERROR << "OTG 计算失败";
@@ -2998,88 +3012,103 @@ namespace JC_helper
 
         const auto &res_vel = output.new_position;
 
-        if (abs(_Cartesian_vel_index) <= 3) // 移动
-        {
-            Cartesian_vel.vel[abs(_Cartesian_vel_index) - 1] = sign(_Cartesian_vel_index) * res_vel[0];
-        }
-        else if (abs(_Cartesian_vel_index) <= 6)// 旋转
-        {
-            Cartesian_vel.rot[abs(_Cartesian_vel_index) - 4] = sign(_Cartesian_vel_index) * res_vel[0];
-        }else //RunTo//TODO 考虑限制最大速度
-        {
-            FK_slover.JntToCart(vector_2_JntArray(robot_ptr->pos_), current_flange);
-            Cartesian_vel.vel = (robot_ptr->RunTo_movel_target.p - current_flange.p) * res_vel[0];
-            KDL::Rotation R_start_end = current_flange.M.Inverse() * robot_ptr->RunTo_movel_target.M;
-            KDL::Vector ration_axis;
-            double angle = R_start_end.GetRotAngle(ration_axis);
-            Cartesian_vel.rot = ration_axis * angle * res_vel[0];
-        }
+        KDL::SetToZero(joint_vel);
 
-        //! 速度矢量的参考系默认为base系，参考点为flange
-        if (_reference_frame == "flange")
-        { //** 转变速度矢量的参考系，由flange系变为base系，但没有改变参考点（还是flange） **//
-            FK_slover.JntToCart(vector_2_JntArray(robot_ptr->pos_), current_flange);
-            Cartesian_vel = current_flange.M * Cartesian_vel;
-            // std::cout<<"Cartesian_vel.vel:"<<Cartesian_vel.vel<<std::endl;
-            // std::cout<<"Cartesian_vel.rot:"<<Cartesian_vel.rot<<std::endl;
-        }
-        if (_reference_frame == "tool")
-        { //** 转变速度矢量的参考系，由tool系变为base系，改变参考点（改为tool） **//
-            FK_slover.JntToCart(vector_2_JntArray(robot_ptr->pos_), current_flange);
-            KDL::Frame tool2flange = robot_ptr->getT_tool_();
+        if (abs(_Cartesian_vel_index) <= 6)  // 点动
+        {
+            KDL::Twist Cartesian_vel{};
 
-            KDL::Frame tool_base = current_flange * tool2flange;
-            // Eigen::Vector3d angular_velocity(Cartesian_vel.rot.x(), Cartesian_vel.rot.y(), Cartesian_vel.rot.z());
+            if (abs(_Cartesian_vel_index) <= 3)  // 移动
+            {
+                Cartesian_vel.vel[abs(_Cartesian_vel_index) - 1] = sign(_Cartesian_vel_index) * res_vel[0];
 
-            // // 将KDL::Frame的旋转部分转换为Eigen::Matrix3d
-            // Eigen::Matrix3d rotation;
-            // for (int i = 0; i < 3; ++i)
-            // {
-            //     for (int j = 0; j < 3; ++j)
-            //     {
-            //         rotation(i, j) = current_flange.M(i, j);
-            //     }
+            } else  // 旋转
+            {
+                Cartesian_vel.rot[abs(_Cartesian_vel_index) - 4] = sign(_Cartesian_vel_index) * res_vel[0];
+            }
+            //! 速度矢量的参考系默认为base系，参考点为flange
+            if (_reference_frame == "flange") {  //** 转变速度矢量的参考系，由flange系变为base系，但没有改变参考点（还是flange） **//
+                FK_slover.JntToCart(vector_2_JntArray(robot_ptr->pos_), current_flange);
+                Cartesian_vel = current_flange.M * Cartesian_vel;
+                // std::cout<<"Cartesian_vel.vel:"<<Cartesian_vel.vel<<std::endl;
+                // std::cout<<"Cartesian_vel.rot:"<<Cartesian_vel.rot<<std::endl;
+            }
+            if (_reference_frame == "tool") {  //** 转变速度矢量的参考系，由tool系变为base系，改变参考点（改为tool） **//
+                FK_slover.JntToCart(vector_2_JntArray(robot_ptr->pos_), current_flange);
+                KDL::Frame tool2flange = robot_ptr->getT_tool_();
+
+                KDL::Frame tool_base = current_flange * tool2flange;
+                // Eigen::Vector3d angular_velocity(Cartesian_vel.rot.x(), Cartesian_vel.rot.y(), Cartesian_vel.rot.z());
+
+                // // 将KDL::Frame的旋转部分转换为Eigen::Matrix3d
+                // Eigen::Matrix3d rotation;
+                // for (int i = 0; i < 3; ++i)
+                // {
+                //     for (int j = 0; j < 3; ++j)
+                //     {
+                //         rotation(i, j) = current_flange.M(i, j);
+                //     }
+                // }
+                // Eigen::Matrix3d tool_rotation;
+                // for (int i = 0; i < 3; ++i)
+                // {
+                //     for (int j = 0; j < 3; ++j)
+                //     {
+                //         tool_rotation(i, j) = tool_base.M(i, j);
+                //     }
+                // }
+                // // 将KDL::Frame的位置部分转换为Eigen::Vector3d
+                // Eigen::Vector3d position(-tool2flange.p.x(), -tool2flange.p.y(), -tool2flange.p.z());
+
+                // // 计算叉积
+                // Eigen::Vector3d cross_product = angular_velocity .cross(position);
+                // KDL::Vector temp = KDL::Vector(cross_product(0), cross_product(1), cross_product(2));
+                KDL::Vector t_f_tool = robot_ptr->getT_tool_().Inverse().p;
+
+                Cartesian_vel.vel = tool_base.M * (Cartesian_vel.vel + Cartesian_vel.rot * t_f_tool);
+                Cartesian_vel.rot = tool_base.M * Cartesian_vel.rot;
+
+                //  Cartesian_vel = current_flange.M * Cartesian_vel;
+                // std::cout << "Cartesian_vel.vel:" << Cartesian_vel.vel << std::endl;
+                // std::cout << "Cartesian_vel.rot:" << Cartesian_vel.rot << std::endl;
+            }
+            if (_reference_frame == "object") {  //** 转变速度矢量的参考系，由flange系变为base系，改变参考点（还是object） **//
+                                                 // objectt标定的就是工件相对于基座的位姿，所以不需要转换，移动就是沿着工件的坐标系移动，旋转就是绕工件的坐标系旋转，但是运动的点为末端法兰盘
+                FK_slover.JntToCart(vector_2_JntArray(robot_ptr->pos_), current_flange);
+                KDL::Frame object2base = robot_ptr->getT_object_();
+                Cartesian_vel = object2base.M * Cartesian_vel;
+            }
+
+            //! 雅克比默认参考系为base,参考点为flange
+            if (_ik_vel.CartToJnt(joint_current, Cartesian_vel, joint_vel) != 0) {
+                PLOG_ERROR << "雅克比计算错误,错误号：" << _ik_vel.CartToJnt(joint_current, Cartesian_vel, joint_vel);
+                return -1;
+            }
+
+        } else  // Runto
+        {
+            KDL::Frame interp_frame{};
+            if (link_pos(init_flange, robot_ptr->get_RunTo_target(_Cartesian_vel_index - 700), res_vel[0], res_vel[0], interp_frame) < 0) {
+                PLOG_ERROR << "Runto目标点位不可达";
+                return -1;
+            }
+            KDL::JntArray q_target(7);
+            // if (robot_ptr->kinematics_.CartToJnt(joint_current, interp_frame, q_target) < 0) {
+            //     PLOG_ERROR << "Runto目标点位不可达";
+            //     return -1;
             // }
-            // Eigen::Matrix3d tool_rotation;
-            // for (int i = 0; i < 3; ++i)
-            // {
-            //     for (int j = 0; j < 3; ++j)
-            //     {
-            //         tool_rotation(i, j) = tool_base.M(i, j);
-            //     }
-            // }
-            // // 将KDL::Frame的位置部分转换为Eigen::Vector3d
-            // Eigen::Vector3d position(-tool2flange.p.x(), -tool2flange.p.y(), -tool2flange.p.z());
 
-            // // 计算叉积
-            // Eigen::Vector3d cross_product = angular_velocity .cross(position);
-            // KDL::Vector temp = KDL::Vector(cross_product(0), cross_product(1), cross_product(2));
-            KDL::Vector t_f_tool =  robot_ptr->getT_tool_( ).Inverse().p;    
+            if (robot_ptr->SRS_kinematics_.JC_cartesian_to_joint_dir(interp_frame, joint_current(2), joint_current, q_target) < 0) {
+                PLOG_ERROR << "Runto目标点位不可达";
+                return -1;
+            }
 
-            Cartesian_vel.vel = tool_base.M*(Cartesian_vel.vel +Cartesian_vel.rot*t_f_tool);
-            Cartesian_vel.rot=tool_base.M*Cartesian_vel.rot; 
-
-            //  Cartesian_vel = current_flange.M * Cartesian_vel;
-            // std::cout << "Cartesian_vel.vel:" << Cartesian_vel.vel << std::endl;
-            // std::cout << "Cartesian_vel.rot:" << Cartesian_vel.rot << std::endl;
-        }
-        if (_reference_frame == "object")
-        { //** 转变速度矢量的参考系，由flange系变为base系，改变参考点（还是object） **//
-        // objectt标定的就是工件相对于基座的位姿，所以不需要转换，移动就是沿着工件的坐标系移动，旋转就是绕工件的坐标系旋转，但是运动的点为末端法兰盘
-            FK_slover.JntToCart(vector_2_JntArray(robot_ptr->pos_), current_flange);
-            KDL::Frame object2base = robot_ptr->getT_object_();
-            Cartesian_vel = object2base.M * Cartesian_vel;
-
+            KDL::Subtract(q_target,joint_current,joint_vel);//这里求得是1ms的点位
+            KDL::Multiply(joint_vel,0.001,joint_vel);//这里转为标准单位1s的关节速度
         }
 
         output.pass_to_input(input);
-
-        //! 雅克比默认参考系为base,参考点为flange
-        if (_ik_vel.CartToJnt(joint_current, Cartesian_vel, joint_vel) != 0)
-        {
-            PLOG_ERROR << "雅克比计算错误,错误号：" << _ik_vel.CartToJnt(joint_current, Cartesian_vel, joint_vel);
-            return -1;
-        }
+   
 
         if (res == ruckig::Result::Working)
             return 1;
@@ -3117,7 +3146,8 @@ namespace JC_helper
                     _tick_count = robot_ptr->tick_count;
                 else
                 {
-                    //                    PLOG_WARNING << "点动指令时间间隔过长,停止";
+                    PLOG_WARNING << "点动指令时间间隔过长,停止";
+
                     Cartesian_stop(); // 速度目标设置为0
                 }
             }
@@ -3144,6 +3174,7 @@ namespace JC_helper
                     //! 急停状态下不用速度检查，因为会和笛卡尔急停冲突（笛卡尔急停会使得关节加速度超大，必触发关节急停保护）
                     flag_stop = true;
                     Joint_stop(robot_ptr, joint_current, joint_last_pos, joint_last_last_pos); // 关节空间急停
+                    PLOG_DEBUG<<"急停结束";
                     sleep(2);
                     break;
                 }
@@ -3208,13 +3239,24 @@ namespace JC_helper
     void SmartServo_Cartesian::Cartesian_stop(double max_vel, double max_acc, double max_jerk)
     {
         flag_stop = true;
-        input.target_position[0] = 0;
-        input.target_velocity[0] = 0;
-        input.target_acceleration[0] = 0;
+        if (_Cartesian_vel_index >= 700)  // Runto情况-位置模型
+        {
+            input.control_interface = ruckig::ControlInterface::Velocity;
+            input.target_velocity[0] = 0;
+            input.target_acceleration[0] = 0;
+            input.max_acceleration[0] = max_vel/RunTo_length;
+            input.max_jerk[0] = max_acc/RunTo_length;
 
-        input.max_velocity[0] = max_vel;
-        input.max_acceleration[0] = max_acc;
-        input.max_jerk[0] = max_jerk;
+        } else  // 点动情况
+        {
+            input.target_position[0] = 0;
+            input.target_velocity[0] = 0;
+            input.target_acceleration[0] = 0;
+
+            input.max_velocity[0] = max_vel;
+            input.max_acceleration[0] = max_acc;
+            input.max_jerk[0] = max_jerk;
+        }
     }
 
 #pragma endregion

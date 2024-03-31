@@ -2079,13 +2079,9 @@ namespace rocos {
         static JC_helper::SmartServo_Nullspace _SmartServo_Nullsapace{&_dragging_finished_flag, kinematics_.getChain()};
         static std::shared_ptr<boost::thread> _thread_planning{nullptr};
         KDL::JntArray target_joint{static_cast< unsigned int >( jnt_num_ )};
-        KDL::Frame target_frame{};
         int index{static_cast< int >( flag )};
         static DRAGGING_TYPE index_type;
         static DRAGGING_TYPE last_index_type;
-        int res{-1};
-        constexpr double vector_speed_scale{0.1};
-        constexpr double rotation_speed_scale{0.2};
         //**-------------------------------**//
 
         //** 命令有效性检查 **//
@@ -2117,6 +2113,25 @@ namespace rocos {
                 PLOG_ERROR << "given parameters is invalid";
                 return -1;
             }
+
+            if (index == static_cast<int>(DRAGGING_FLAG::RUNTO_MOVEL)) {
+                KDL::Frame flange;
+                kinematics_.JntToCart(JC_helper::vector_2_JntArray(pos_), flange);  // 需要记录开始位置
+                KDL::Frame RunTo_target = get_RunTo_target(RunTo_movel_target_index - index);
+                double Plength = (RunTo_target.p - flange.p).Norm();
+                KDL::Rotation R_start_end = flange.M.Inverse() * RunTo_target.M;
+                KDL::Vector ration_axis;
+                double angle = R_start_end.GetRotAngle(ration_axis);
+                const double equivalent_radius = 0.1;
+                double Rlength = equivalent_radius * abs(angle);
+                double remaim_RunTo_length = std::max(Plength, Rlength);
+                if (remaim_RunTo_length < 1e-3) {
+                    PLOG_INFO << "目标已到位";
+                    return -1;
+                }
+
+            }
+
             index_type = DRAGGING_TYPE::CARTESIAN;
         } else if (index == static_cast< int >( DRAGGING_FLAG::NULLSPACE ))  // 当前指令为零空间运动
         {
@@ -2186,12 +2201,12 @@ namespace rocos {
 
             if (index % 10 <= 2 && index != static_cast<int>(DRAGGING_FLAG::RUNTO_MOVEL))
                 // 笛卡尔空间位置点动
-                _SmartServo_Cartesian.init(this, max_speed * 0.4);
+                _SmartServo_Cartesian.init(this, index, max_speed * 0.4);
             else if (index % 10 <= 5 && index != static_cast<int>(DRAGGING_FLAG::RUNTO_MOVEL))
                 // 笛卡尔空间姿态点动
-                _SmartServo_Cartesian.init(this, max_speed * 1.5);
-            else// 笛卡尔空间RunTo点动
-                _SmartServo_Cartesian.init(this, 0.1); //这里的0.1指的每个周期走剩余距离的10%
+                _SmartServo_Cartesian.init(this, index, max_speed * 1.5);
+            else                                              // 笛卡尔空间RunTo点动
+                _SmartServo_Cartesian.init(this, index + RunTo_movel_target_index, max_speed);  //
 
             _thread_planning.reset(
                     new boost::thread{&JC_helper::SmartServo_Cartesian::RunMotion, &_SmartServo_Cartesian, this});
@@ -2287,9 +2302,10 @@ namespace rocos {
                 break;
 
             case DRAGGING_FLAG::RUNTO_MOVEL: //直线点动到目标点位
-                _SmartServo_Cartesian.command(index, "base");
+                _SmartServo_Cartesian.command(index + RunTo_movel_target_index, "base");
                 break;
             case DRAGGING_FLAG::RUNTO_MOVEJ: //关节点动到目标点位
+                //TODO
                 break;
 
             default:

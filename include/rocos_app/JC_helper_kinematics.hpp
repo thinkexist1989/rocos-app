@@ -286,12 +286,23 @@ namespace JC_helper
 
         KDL::ChainFkSolverPos_recursive FK_slover;  //! 因为flang_.M一直在刷新，实时读取有问题，暂时这么处理
         KDL::Frame current_flange{ };
+        KDL::Frame init_flange{ };
+        double RunTo_length=0;
 
         //**-------------------------------**//
     public:
         SmartServo_Cartesian( std::atomic< bool >*, const KDL::Chain& robot_chain );
-
-        void init( rocos::Robot* robot_ptr, double target_vel, double max_vel = 5, double max_acc = 20, double max_jerk = 60 );
+        /**
+         * @brief 笛卡尔点动和goto功能线程初始化
+         *
+         * @param robot_ptr
+         * @param flag 标准符号，用来区别是点动还是goto;goto的话数字为700+目标frame的id
+         * @param target_vel 点动和goto的最大移动速度
+         * @param max_vel
+         * @param max_acc
+         * @param max_jerk
+         */
+        void init(rocos::Robot *robot_ptr, int flag, double target_vel, double max_vel = 5, double max_acc = 20, double max_jerk = 60);
 
         /**
          * @brief  只有OTG正常计算，且不在奇异位置，joint_vel才会为有效值，其余情况通通为0
