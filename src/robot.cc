@@ -2078,7 +2078,6 @@ namespace rocos {
         static JC_helper::SmartServo_Cartesian _SmartServo_Cartesian{&_dragging_finished_flag, kinematics_.getChain()};
         static JC_helper::SmartServo_Nullspace _SmartServo_Nullsapace{&_dragging_finished_flag, kinematics_.getChain()};
         static std::shared_ptr<boost::thread> _thread_planning{nullptr};
-        KDL::JntArray target_joint{static_cast< unsigned int >( jnt_num_ )};
         int index{static_cast< int >( flag )};
         static DRAGGING_TYPE index_type;
         static DRAGGING_TYPE last_index_type;
@@ -2105,6 +2104,21 @@ namespace rocos {
                            << " is not allow because of the jnt_num_=" << jnt_num_;
                 return -1;
             }
+
+            //! 检查是否runto 目标已到位
+            if (index == static_cast<int>(DRAGGING_FLAG::RUNTO_MOVEJ)) {
+                KDL::JntArray remaim_RunTo_joint(jnt_num_);
+                KDL::Subtract(JC_helper::vector_2_JntArray(pos_), get_RunTo_joint_target(RunTo_movej_target_index), remaim_RunTo_joint);
+                double remaim_RunTo_length = 0;
+                for (int i = 0; i < jnt_num_; i++)
+                    if (remaim_RunTo_length < std::abs(remaim_RunTo_joint(i))) remaim_RunTo_length = std::abs(remaim_RunTo_joint(i));
+
+                if (remaim_RunTo_length < 1e-4) {
+                    PLOG_INFO << "目标已到位";
+                    return -1;
+                }
+            }
+
             index_type = DRAGGING_TYPE::JOINT;
         } else if (index <= static_cast< int >( DRAGGING_FLAG::BASE_YAW )||index == static_cast< int >( DRAGGING_FLAG::RUNTO_MOVEL )) //当前命令类型为笛卡尔空间
         {
@@ -2114,10 +2128,11 @@ namespace rocos {
                 return -1;
             }
 
+            //! 检查是否runto 目标已到位
             if (index == static_cast<int>(DRAGGING_FLAG::RUNTO_MOVEL)) {
                 KDL::Frame flange;
                 kinematics_.JntToCart(JC_helper::vector_2_JntArray(pos_), flange);  // 需要记录开始位置
-                KDL::Frame RunTo_target = get_RunTo_target(RunTo_movel_target_index - index);
+                KDL::Frame RunTo_target = get_RunTo_Car_target(RunTo_movel_target_index);
                 double Plength = (RunTo_target.p - flange.p).Norm();
                 KDL::Rotation R_start_end = flange.M.Inverse() * RunTo_target.M;
                 KDL::Vector ration_axis;
@@ -2129,7 +2144,6 @@ namespace rocos {
                     PLOG_INFO << "目标已到位";
                     return -1;
                 }
-
             }
 
             index_type = DRAGGING_TYPE::CARTESIAN;
@@ -2188,9 +2202,12 @@ namespace rocos {
                 _thread_planning->join();
                 _thread_planning = nullptr;
             }
-            _SmartServo_Joint.init(pos_, vel_, acc_, max_speed, max_acceleration, 4 * max_acceleration);
+            if ( index == static_cast< int >( DRAGGING_FLAG::RUNTO_MOVEJ ) )
+                _SmartServo_Joint.init( this, index + RunTo_movej_target_index, max_speed, max_speed, max_acceleration, 4 * max_acceleration );
+            else
+                _SmartServo_Joint.init( this, index, max_speed, max_speed, max_acceleration, 4 * max_acceleration );
             _thread_planning.reset(
-                    new boost::thread{&JC_helper::SmartServo_Joint::RunSmartServo, &_SmartServo_Joint, this});
+                new boost::thread{ &JC_helper::SmartServo_Joint::RunSmartServo, &_SmartServo_Joint, this } );
         }
         // 笛卡尔空间点动指令
         else if (_dragging_finished_flag && index_type == DRAGGING_TYPE::CARTESIAN) {
@@ -2234,13 +2251,9 @@ namespace rocos {
             case DRAGGING_FLAG::J5:
             case DRAGGING_FLAG::J6:
 
-                for (int i = 0; i < jnt_num_; i++)
-                    target_joint(i) = pos_[i];
-                target_joint(index) = std::min(target_joint(index) + static_cast< double >( dir ) * max_speed * 1.5,
-                                               joints_[index]->getMaxPosLimit());  //! 取最大速度1.5倍作为目标距离,不要太小
-                target_joint(index) = std::max(target_joint(index), joints_[index]->getMinPosLimit());
-                _SmartServo_Joint.command(target_joint);
-
+                index = index + 1;
+                index = index * static_cast< double >( dir );
+                _SmartServo_Joint.command(index);
                 break;
 
             case DRAGGING_FLAG::FLANGE_X:
@@ -2304,8 +2317,9 @@ namespace rocos {
             case DRAGGING_FLAG::RUNTO_MOVEL: //直线点动到目标点位
                 _SmartServo_Cartesian.command(index + RunTo_movel_target_index, "base");
                 break;
+
             case DRAGGING_FLAG::RUNTO_MOVEJ: //关节点动到目标点位
-                //TODO
+                _SmartServo_Joint.command(index + RunTo_movej_target_index);
                 break;
 
             default:

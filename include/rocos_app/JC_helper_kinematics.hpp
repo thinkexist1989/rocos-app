@@ -193,19 +193,34 @@ namespace JC_helper
     private:
         //** 这里都是关节smart servo 所需的全部变量 **//
         std::mutex input_mutex;
-        ruckig::Ruckig<ruckig::DynamicDOFs>* otg;
-        ruckig::InputParameter<ruckig::DynamicDOFs>* input;
-        ruckig::OutputParameter<ruckig::DynamicDOFs>* output;
+        ruckig::Ruckig< 1 > otg{ 0.001 };
+        ruckig::InputParameter< 1 > input;
+        ruckig::OutputParameter< 1 > output;
+        ruckig::Result res;
         //**-------------------------------**//
+        const double servo_dt = 0.001;
+        std::atomic< bool > flag_stop{ false };
 
-        std::atomic< bool > on_stop_trajectory{ false };
+        KDL::JntArray joint_current{ };
+        KDL::JntArray joint_target{ };
+        KDL::JntArray joint_vel{ };
+
+        KDL::JntArray joint_last_pos{ };
+        KDL::JntArray joint_last_last_pos{ };
+
+        int _joint_vel_index{ 0 };  // 1-7对应J1-J7
         std::atomic< bool >* external_finished_flag_ptr;
+
+        KDL::JntArray init_joint{ };
+        double RunTo_length = 0;
 
     public:
         SmartServo_Joint( std::atomic< bool >* finished_flag_ptr );
-        void init( const std::vector< std::atomic< double > >& q_init, const std::vector< std::atomic< double > >& v_init, const std::vector< std::atomic< double > >& a_init, double max_v, double max_a, double max_j );
+        void init( rocos::Robot* robot_ptr, int flag, double target_vel, double max_v, double max_a, double max_j );
+        int update( KDL::JntArray& joint_vel, rocos::Robot* robot_ptr );
         void RunSmartServo( rocos::Robot* robot_ptr );
-        void command( KDL::JntArray q_target );
+        void command( int joint_vel_index );
+        void joint_stop( double max_vel = 10, double max_acc = 50, double max_jerk = 180 );
     };
 
 #if 0 
