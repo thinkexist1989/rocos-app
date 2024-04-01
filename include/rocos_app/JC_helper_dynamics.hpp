@@ -107,6 +107,7 @@ namespace JC_helper
 
         void set_damp(double value);
         void set_k(double vaule);
+        
     };
 
        class admittance_joint
@@ -115,8 +116,8 @@ namespace JC_helper
         KDL::Vector gravity{0, 0, 9.81};
         KDL::ChainIdSolver_RNE* rne_solver;
 
-        std::vector<double> Theory_torques;
-        std::vector<double> Actual_torques;
+        // std::vector<double> Theory_torques;
+        // std::vector<double> Actual_torques;
         // 质心
         std::vector<double> mass_center;
         std::vector<double> K;
@@ -139,6 +140,8 @@ namespace JC_helper
         KDL::Wrenches external_forces;
 
     public:
+        std::vector<double> Theory_torques;
+        std::vector<double> Actual_torques;
         std::vector<double> a_sensor;
         std::vector<double> b_sensor;
         std::vector<double> joint_collision;

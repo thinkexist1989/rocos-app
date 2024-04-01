@@ -3046,10 +3046,10 @@ namespace JC_helper
             // Eigen::Vector3d cross_product = angular_velocity .cross(position);
             // KDL::Vector temp = KDL::Vector(cross_product(0), cross_product(1), cross_product(2));
             KDL::Vector t_f_tool =  robot_ptr->getT_tool_( ).Inverse().p;    
-
+            // Cartesian_vel  = tool_base.M * Cartesian_vel;  // 先变化参考系为base
             Cartesian_vel.vel = tool_base.M*(Cartesian_vel.vel +Cartesian_vel.rot*t_f_tool);
             Cartesian_vel.rot=tool_base.M*Cartesian_vel.rot; 
-
+    // Cartesian_vel.vel  = Cartesian_vel.vel + Cartesian_vel.rot * (current_flange.M * t_f_tool);
             //  Cartesian_vel = current_flange.M * Cartesian_vel;
             // std::cout << "Cartesian_vel.vel:" << Cartesian_vel.vel << std::endl;
             // std::cout << "Cartesian_vel.rot:" << Cartesian_vel.rot << std::endl;

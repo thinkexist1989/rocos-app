@@ -2668,19 +2668,24 @@ namespace rocos {
         //     }
         //**-------------------------------**//
         //** 速度检查 **//
-        Eigen::MatrixXd joint_offset = (target_pos.data - JC_helper::vector_2_JntArray(pos_).data).cwiseAbs();
+        KDL::JntArray tmp(target_pos);
+        Eigen::MatrixXd joint_offset_origin = (tmp.data - JC_helper::vector_2_JntArray(pos_).data);
+        Eigen::MatrixXd joint_offset = joint_offset_origin.cwiseAbs();
         for (int i = 0; i < jointNum; ++i)
             if (joint_offset(i) > joints_[i]->getMaxVel() * 0.001) {
                 PLOG_ERROR << "target vel [" << i << "]= " << joint_offset(i) * KDL::rad2deg * 1000
                            << " deg/s is out of range ";
-                hw_interface_->waitForSignal(0);
-                return -1;
+                // hw_interface_->waitForSignal(0);
+                // return -1;
+                double sign = joint_offset_origin(i)>= 0? 1:-1;
+                joint_offset_origin(i)=sign * joints_[i]->getMaxVel() * 0.001;
+                tmp.data(i) = JC_helper::vector_2_JntArray(pos_).data(i) + joint_offset_origin(i);
             }
         //**-------------------------------**//
         //** 位置伺服 **//
         for (int i = 0; i < jointNum; ++i) {
-            pos_[i] = target_pos(i);
-            joints_[i]->setPosition(target_pos(i));
+            pos_[i] = tmp(i);
+            joints_[i]->setPosition(tmp(i));
         }
         hw_interface_->waitForSignal(0);
         //**-------------------------------**//
