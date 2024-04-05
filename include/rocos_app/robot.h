@@ -1211,6 +1211,8 @@ namespace rocos
 
         friend int JC_helper::safety_servo(rocos::Robot *robot_ptr, const KDL::JntArray &target_pos);
 
+        friend int JC_helper::union_cartesian_to_joint( rocos::Robot* robot_ptr, const union_frame& var, const KDL::JntArray& joint_current, KDL::JntArray& q_target );
+
     private:
         JC_helper::ft_sensor my_ft_sensor;         // 6维力传感器
         bool flag_admittance_turnoff{false};       // 导纳开关

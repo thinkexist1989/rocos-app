@@ -912,15 +912,31 @@ namespace rocos {
                 //sun
                 // 尝试改为解析解接口
                 for (const auto &target: traj_target) {
-                    if (SRS_kinematics_.JC_cartesian_to_joint_dir(target, q_init(2), q_init, q_target) < 0) {
-                        PLOG_ERROR << " JC_cartesian_to_joint failed on the " << ik_count << " times";
-                        throw -1;
-
-                    }
+                    // if (SRS_kinematics_.JC_cartesian_to_joint_dir(target, q_init(2), q_init, q_target) < 0) {
+                    //     PLOG_ERROR << " JC_cartesian_to_joint failed on the " << ik_count << " times";
+                    //     throw -1;
+                    // }
                     // if (kinematics_.CartToJnt(q_init, target, q_target) < 0) {
                     //     PLOG_ERROR << " CartToJnt failed on the " << ik_count << " times";
                     //     throw -1;
                     // }
+
+                    int axis_num = getJointNum( );
+                    JC_helper::union_frame union_target_frame{ };
+                    if ( axis_num == 7 )  // 7自由度情况逆解
+                    {
+                        union_target_frame.target_7axis = std::pair< KDL::Frame, double >{ { target }, { q_init( 2 ) } };
+                    }
+                    else  // 其他自由度情况逆解
+                    {
+                        union_target_frame.target_6axis = target;
+                    }
+                    if ( union_cartesian_to_joint( this, union_target_frame, q_init, q_target ) < 0 )
+                    {
+                        PLOG_ERROR << " cartesian_to_joint failed on the " << ik_count << " times";
+                        throw -1;
+                    }
+
                     //*防止奇异位置速度激增
                     for (int i = 0; i < jnt_num_; i++) {
                         if (abs(q_target(i) - q_init(i)) > max_step[i]) {
@@ -2222,8 +2238,8 @@ namespace rocos {
             else if (index % 10 <= 5 && index != static_cast<int>(DRAGGING_FLAG::RUNTO_MOVEL))
                 // 笛卡尔空间姿态点动
                 _SmartServo_Cartesian.init(this, index, max_speed * 1.5);
-            else                                              // 笛卡尔空间RunTo点动
-                _SmartServo_Cartesian.init(this, index + RunTo_movel_target_index, max_speed);  //
+            else // 笛卡尔空间RunTo点动
+                _SmartServo_Cartesian.init( this, index + RunTo_movel_target_index, max_speed * 0.4 );  //
 
             _thread_planning.reset(
                     new boost::thread{&JC_helper::SmartServo_Cartesian::RunMotion, &_SmartServo_Cartesian, this});

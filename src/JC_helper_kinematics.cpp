@@ -3187,19 +3187,26 @@ namespace JC_helper
                 return -1;
             }
             KDL::JntArray q_target(7);
-            // if (robot_ptr->kinematics_.CartToJnt(joint_current, interp_frame, q_target) < 0) {
-            //     PLOG_ERROR << "Runto目标点位不可达";
-            //     return -1;
-            // }
 
-            if (robot_ptr->SRS_kinematics_.JC_cartesian_to_joint_dir(interp_frame, joint_current(2), joint_current, q_target) < 0) {
+            int axis_num = robot_ptr->getJointNum( );
+            union_frame target_frame{ };
+            if ( axis_num == 7 )  // 7自由度情况逆解
+            {
+                target_frame.target_7axis = std::pair< KDL::Frame, double >{ { interp_frame }, { joint_current( 2 ) } };
+            }
+            else  // 其他自由度情况逆解
+            {
+                target_frame.target_6axis = interp_frame;
+            }
+            if ( union_cartesian_to_joint( robot_ptr, target_frame, joint_current, q_target ) < 0 )
+            {
                 PLOG_ERROR << "Runto目标点位不可达";
                 return -1;
             }
 
-            KDL::Subtract(q_target,joint_current,joint_vel);//这里求得是1ms的点位
-            KDL::Divide(joint_vel,0.001,joint_vel);//这里转为标准单位1s的关节速度
-        }
+                KDL::Subtract( q_target, joint_current, joint_vel );  // 这里求得是1ms的点位
+                KDL::Divide( joint_vel, 0.001, joint_vel );           // 这里转为标准单位1s的关节速度
+            }
 
         output.pass_to_input(input);
    
@@ -4155,7 +4162,6 @@ namespace JC_helper
         }
     }
 
-
     int inverse_special_to_SRS::JC_cartesian_to_joint_dir(const KDL::Frame inter_T, const JC_double inter_joint_3, const KDL::JntArray &last_joint, KDL::JntArray &joint_out) const
     {
         // * 仿真环境设置
@@ -4469,6 +4475,42 @@ namespace JC_helper
             PLOG_ERROR << "未知错误";
             return -10;
         }
+    }
+
+    int union_cartesian_to_joint( rocos::Robot* robot_ptr, const union_frame& var, const KDL::JntArray& joint_current, KDL::JntArray& q_target )
+    {
+        int axis_num = robot_ptr->getJointNum( );
+        if ( axis_num == 7 )//7自由度情况逆解
+        {
+            KDL::Frame interp_frame = var.target_7axis.first;
+            double interp_J3        = var.target_7axis.second;
+
+            if ( robot_ptr->SRS_kinematics_.JC_cartesian_to_joint_dir( interp_frame, interp_J3, joint_current, q_target ) < 0 )
+            {
+                PLOG_ERROR << "目标点位不可达";
+                return -1;
+            }
+        }
+        else if ( axis_num == 6 )//6自由度情况逆解
+        {
+            KDL::Frame interp_frame = var.target_6axis;
+            if ( robot_ptr->kinematics_.CartToJnt( joint_current, interp_frame, q_target ) < 0 )
+            {
+                PLOG_ERROR << "目标点位不可达";
+                return -1;
+            }
+        }
+        else//其他自由度情况逆解
+        {
+            KDL::Frame interp_frame = var.target_6axis;
+            if ( robot_ptr->kinematics_.CartToJnt( joint_current, interp_frame, q_target ) < 0 )
+            {
+                PLOG_ERROR << "目标点位不可达";
+                return -1;
+            }
+        };
+
+        return 0;
     }
 
 #pragma endregion
