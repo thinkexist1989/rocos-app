@@ -491,6 +491,19 @@ namespace JC_helper
          * @return int
          */
         int JC_cartesian_to_joint_dir( const KDL::Frame inter_T, const JC_double inter_joint_3, const KDL::JntArray& last_joint, KDL::JntArray& joint_out ) const;
+        
+         /**
+         * @brief 根据参考解，计算构型，然后8组解中根据构型选
+         *
+         * @param inter_T
+         * @param arm_angle 臂角
+         * @param last_joint
+         * @param joint_out
+         * @return int
+         */
+        int JC_cartesian_to_joint_dir_arm_angle( const KDL::Frame inter_T, const JC_double arm_angle, const KDL::JntArray& last_joint, KDL::JntArray& joint_out ) const;
+        
+        
         /**
          * @brief 不计算构型，根据8组解和参考解最小误差选择(不推荐)
          *
@@ -501,6 +514,17 @@ namespace JC_helper
          * @return int
          */
         int JC_cartesian_to_joint( const KDL::Frame inter_T, const JC_double inter_joint_3, const KDL::JntArray& last_joint, KDL::JntArray& joint_out ) const;
+
+        /**
+         * @brief 求解臂角
+         *
+         * @param current_T 当前位姿
+         * @param current_joint 当前关节角
+         * @param arm_angle 返回的臂角
+         * @return int 0成功 -1失败
+         */
+        int get_arm_angle( const KDL::Frame current_T, const KDL::JntArray& current_joint, double& arm_angle );
+
         class JC_exception : public std::exception
         {
         public:

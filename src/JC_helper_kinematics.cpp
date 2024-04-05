@@ -3751,10 +3751,6 @@ namespace JC_helper
                 return x - 2 * KDL::PI;
             else if (x < -KDL::PI)
                 return 2 * KDL::PI + x;
-            else if (x == 2 * KDL::PI)
-                return 0;
-            else if (x == -2 * KDL::PI)
-                return 0;
             else
                 return x;
         }
@@ -4475,6 +4471,456 @@ namespace JC_helper
             PLOG_ERROR << "未知错误";
             return -10;
         }
+    }
+
+    int inverse_special_to_SRS::JC_cartesian_to_joint_dir_arm_angle(const KDL::Frame inter_T, const JC_double interp_arm_angle, const KDL::JntArray &last_joint, KDL::JntArray &joint_out) const
+    {
+        // * 仿真环境设置
+        //** 将DH坐标系转换为预定的标准DH **//
+        KDL::JntArray _last_joint{last_joint};
+        _last_joint(1) = joint_1_inverse * last_joint(1);
+        _last_joint(3) = joint_3_inverse * last_joint(3);
+        _last_joint(5) = joint_5_inverse * last_joint(5);
+        //**-------------------------------**//
+
+        std::vector<std::array<JC_double, 7>> res_thet; //!理论只有一组结果
+        //**-------------------------------**//
+
+        //** 计算构型**//
+        std::array<int ,3> status{};
+        status[ 0 ] = slover_utility::X_axit_1_6( _last_joint( 2 - 1 ), _last_joint( 3 - 1 ), _last_joint( 4 - 1 ), d_se, d_ew );
+        status[ 1 ] = slover_utility::JC_sign( slover_utility::JC_sign( _last_joint( 4 - 1 ) ) + 1 );
+        status[ 2 ] = slover_utility::JC_sign( slover_utility::JC_sign( _last_joint( 6 - 1 ) ) + 1 );
+        //**-------------------------------**//
+
+        try
+        {
+            KDL::Vector x_0_7 = inter_T.p;
+            KDL::Rotation r_0_7 = inter_T.M;
+            KDL::Vector x_0_sw = x_0_7 - l_0_bs - r_0_7 * l_7_wt;
+
+            //! 腕部中心点在1关节轴线上奇异处理：
+            if (x_0_sw(0) == 0 && x_0_sw(1) == 0)
+                throw JC_exception{"腕部中心点在1关节轴线上奇异", -3};
+
+            JC_double thet_4_tem = acos(slover_utility::roundn((pow(x_0_sw.Norm(), 2) - pow(d_se, 2) - pow(d_ew, 2)) / (2 * d_se * d_ew), 14));
+
+            //! 4关节奇异处理：thet4接近0时->acos(>1)->thet_4_tem=nan
+            if (std::isnan(thet_4_tem))
+                throw JC_exception{"关节4奇异", -1};
+
+            for (int reference_index = 0; reference_index < (2 + 2 * !(thet_4_tem == 0)); reference_index++)
+            {
+                JC_double thet_4 = 0;
+                JC_double thet_r_2 = 0;
+
+                switch (reference_index)
+                {
+                case 0:
+                    thet_4 = thet_4_tem;
+                    thet_r_2 = slover_thet2::f_thet2(d_se, d_ew, thet_4, x_0_sw(2));
+                    break;
+
+                case 1:
+                    thet_4 = thet_4_tem;
+                    thet_r_2 = slover_thet2::f_thet2_2(d_se, d_ew, thet_4, x_0_sw(2));
+                    break;
+
+                case 2:
+                    thet_4 = -thet_4_tem;
+                    thet_r_2 = slover_thet2::f_thet2(d_se, d_ew, thet_4, x_0_sw(2));
+                    break;
+
+                case 3:
+
+                    thet_4 = -thet_4_tem;
+                    thet_r_2 = slover_thet2::f_thet2_2(d_se, d_ew, thet_4, x_0_sw(2));
+                    break;
+
+                default:
+                    throw JC_exception{"switch 异常", -2};
+                    break;
+                }
+
+                JC_double thet_r_1 = slover_thet1::f_thet1(thet_r_2, d_se, d_ew, thet_4, x_0_sw(0), x_0_sw(1));
+
+                if ( status[ 1 ] != slover_utility::JC_sign( slover_utility::JC_sign( thet_4 ) + 1 ) )
+                continue;
+
+                if ( status[ 0 ] != slover_utility::X_axit_1_6( thet_r_2, 0, thet_4, d_se, d_ew ) )
+                continue;
+
+                Eigen::Matrix3d ref_r_0_3 = slover_utility::rot_matrix(thet_r_1, -KDL::PI_2) * slover_utility::rot_matrix(thet_r_2, KDL::PI_2) * slover_utility::rot_matrix(0, -KDL::PI_2);
+
+                KDL::Vector u_0_sw;
+                JC_double vct_len = x_0_sw.Norm();
+                if (vct_len < 1e-6)
+                    throw JC_exception{"腕部点与肘部点太接近", -8};
+                else
+                    u_0_sw = x_0_sw / vct_len;
+
+                Eigen::Matrix3d ssm_u_0_sw = slover_utility::ssm(u_0_sw(0), u_0_sw(1), u_0_sw(2));
+
+                Eigen::Matrix3d As = ssm_u_0_sw * ref_r_0_3;
+                Eigen::Matrix3d Bs = -1 * ssm_u_0_sw * As;
+                Eigen::Matrix3d Cs = (Eigen::Vector3d{u_0_sw(0), u_0_sw(1), u_0_sw(2)} * Eigen::RowVector3d{u_0_sw(0), u_0_sw(1), u_0_sw(2)}) * ref_r_0_3;
+
+                Eigen::Matrix3d r_3_4_transpose = slover_utility::rot_matrix(thet_4, KDL::PI_2).transpose();
+                Eigen::Matrix3d matrix_r_0_7 = slover_utility::rot_to_matrix(r_0_7);
+
+                Eigen::Matrix3d Aw = r_3_4_transpose * As.transpose() * matrix_r_0_7;
+                Eigen::Matrix3d Bw = r_3_4_transpose * Bs.transpose() * matrix_r_0_7;
+                Eigen::Matrix3d Cw = r_3_4_transpose * Cs.transpose() * matrix_r_0_7;
+
+         
+
+                JC_double invert_123 = 0;
+                JC_double invert_567 = 0;
+                JC_double thet1 = 0;
+                JC_double thet1_tem = 0;
+                JC_double thet2 = 0;
+                JC_double thet2_tem = 0;
+                JC_double thet3 = 0;
+                JC_double thet3_tem = 0;
+                JC_double thet4 = 0;
+                JC_double thet4_tem = 0;
+                JC_double thet5 = 0;
+                JC_double thet5_tem = 0;
+                JC_double thet6 = 0;
+                JC_double thet6_tem = 0;
+                JC_double thet7 = 0;
+                JC_double thet7_tem = 0;
+
+                {
+                    for (int inverst_index = 0; inverst_index < 4; inverst_index++)
+                    {
+                        switch (inverst_index)
+                        {
+                        case 0:
+                            invert_123 = 0;
+                            invert_567 = 0;
+                            break;
+
+                        case 1:
+                            invert_123 = 0;
+                            invert_567 = 1;
+                            break;
+
+                        case 2:
+                            invert_123 = 1;
+                            invert_567 = 0;
+                            break;
+
+                        case 3:
+                            invert_123 = 1;
+                            invert_567 = 1;
+                            break;
+
+                        default:
+                            throw JC_exception{"switch 异常", -2};
+                            break;
+                        }
+
+                        if (invert_123)
+                            thet2 = -1 * thet2_tem;
+                        else
+                        {
+                            JC_double sin_tem = slover_utility::roundn(-As(2, 1) * sin(interp_arm_angle) - Bs(2, 1) * cos(interp_arm_angle) - Cs(2, 1), 14);
+                            thet2 = acos(sin_tem);
+                            thet2_tem = thet2;
+                        }
+
+                        //! 2关节奇异处理
+                        if (thet2 == 0)
+                            throw JC_exception{"2关节奇异", -4};
+
+                        if (invert_123)
+                            thet1 = thet1_tem + KDL::PI;
+                        else
+                        {
+                            JC_double sin_tem = -As(1, 1) * sin(interp_arm_angle) - Bs(1, 1) * cos(interp_arm_angle) - Cs(1, 1);
+                            JC_double cos_tem = -As(0, 1) * sin(interp_arm_angle) - Bs(0, 1) * cos(interp_arm_angle) - Cs(0, 1);
+                            thet1 = atan2(sin_tem * sin(thet2), cos_tem * sin(thet2));
+                            thet1_tem = thet1;
+                        }
+
+                        if (invert_123)
+                            thet3 = thet3_tem + KDL::PI;
+                        else
+                        {
+                            JC_double sin_tem = As(2, 2) * sin(interp_arm_angle) + Bs(2, 2) * cos(interp_arm_angle) + Cs(2, 2);
+                            JC_double cos_tem = -As(2, 0) * sin(interp_arm_angle) - Bs(2, 0) * cos(interp_arm_angle) - Cs(2, 0);
+                            thet3 = atan2(sin_tem * sin(thet2), cos_tem * sin(thet2));
+                            thet3_tem = thet3;
+                        }
+
+                        //! 共32组结果，加上这个限定就16组，和臂角法刚好相等
+                        //! 这里主要判断两个arm_angle，哪一个是正确可以求解出inter_joint_3
+                        // if ( std::abs( slover_utility::my_convert( thet3 ) - inter_joint_3 ) > 1e-5 )
+                        //     continue;
+
+                        if ( status[ 0 ] != slover_utility::X_axit_1_6( thet2, thet3, thet_4, d_se, d_ew ) )
+                            continue;
+
+                        if (invert_567)
+                            thet6 = -1 * thet6_tem;
+                        else
+                        {
+                            JC_double sin_tem = slover_utility::roundn(Aw(2, 2) * sin(interp_arm_angle) + Bw(2, 2) * cos(interp_arm_angle) + Cw(2, 2), 14);
+                            thet6 = acos(sin_tem);
+                            thet6_tem = thet6;
+                        }
+
+                        //! 6关节奇异处理
+                        if (thet6 == 0)
+                            throw JC_exception{"6关节奇异", -5};
+
+                        if (invert_567)
+                            thet5 = thet5_tem + KDL::PI;
+                        else
+                        {
+                            JC_double sin_tem = Aw(1, 2) * sin(interp_arm_angle) + Bw(1, 2) * cos(interp_arm_angle) + Cw(1, 2);
+                            JC_double cos_tem = Aw(0, 2) * sin(interp_arm_angle) + Bw(0, 2) * cos(interp_arm_angle) + Cw(0, 2);
+                            thet5 = atan2(sin_tem * sin(thet6), cos_tem * sin(thet6));
+                            thet5_tem = thet5;
+                        }
+
+                        if (invert_567)
+                            thet7 = thet7_tem + KDL::PI;
+                        else
+                        {
+                            JC_double sin_tem = Aw(2, 1) * sin(interp_arm_angle) + Bw(2, 1) * cos(interp_arm_angle) + Cw(2, 1);
+                            JC_double cos_tem = -Aw(2, 0) * sin(interp_arm_angle) - Bw(2, 0) * cos(interp_arm_angle) - Cw(2, 0);
+                            thet7 = atan2(sin_tem * sin(thet6), cos_tem * sin(thet6));
+                            thet7_tem = thet7;
+                        }
+
+                        // if ( thet6 == 0 && invert_567 )
+                        //     continue;
+                        if ( status[ 2 ] != slover_utility::JC_sign( slover_utility::JC_sign( thet6 ) + 1 ) )
+                            continue;
+
+                        std::array<JC_double, 7> temp1{thet1, thet2, thet3, thet_4, thet5, thet6, thet7};
+
+                        for (int i = 0; i < 7; i++)
+                        {
+                            if (std::isnan(temp1[i]))
+                            {
+                                std::stringstream string;
+                                string << "关节[" << i << "]=Nan,结果无效";
+                                throw JC_exception{string.str().c_str(), -6};
+                            }
+                            else if (isinf(temp1[i]))
+                            {
+                                std::stringstream string;
+                                string << "关节[" << i << "]=Inf,结果无效";
+                                throw JC_exception{string.str().c_str(), -7};
+                            }
+                        }
+
+                        bool is_out_of_range{false};
+                        slover_utility::my_convert(temp1);
+                        for (int i = 0; i < 7; i++)
+                            if (temp1[i] > _pos_maximum(i) || temp1[i] < _pos_minimum(i))
+                            {
+                                // PLOG_WARNING << "关节[" << i << "]超出关节限定范围,结果无效";
+                                is_out_of_range = true;
+                                break;
+                            }
+
+                        if (!is_out_of_range)
+                            res_thet.emplace_back(temp1);
+                    }
+                }
+            }
+
+            // PLOG_DEBUG << "res_thet 的size = " << res_thet.size( );
+            //** 预防无有效解 **//
+            if ( res_thet.size( ) == 0 )
+            {
+                throw JC_exception{ "无有效解", -9 };
+            }
+            //**-------------------------------**//
+
+            //** 只可能有一组解 **//
+            if ( res_thet.size( ) != 1 )
+            {
+                throw JC_exception{ "结果多解无效", -10 };
+            }
+            //**-------------------------------**//
+
+
+            for (int i = 0; i < 7; i++)
+                joint_out(i) = res_thet.back()[i];
+
+            //** 将DH坐标系还原 **//
+            joint_out(1) = joint_1_inverse * joint_out(1);
+            joint_out(3) = joint_3_inverse * joint_out(3);
+            joint_out(5) = joint_5_inverse * joint_out(5);
+            //**-------------------------------**//
+
+            return 0;
+        }
+        catch (const JC_exception &error)
+        {
+            PLOG_ERROR << error.error_str << ", 错误号：" << error.error_code;
+            return error.error_code;
+        }
+        catch (...)
+        {
+            PLOG_ERROR << "未知错误";
+            return -10;
+        }
+    }
+
+    int inverse_special_to_SRS ::get_arm_angle( const KDL::Frame current_T, const KDL::JntArray& current_joint, double& arm_angle )
+    {
+        // * 仿真环境设置
+        //** 将DH坐标系转换为预定的标准DH **//
+        //*current_joint_3不需要处理
+        KDL::JntArray _current_joint{ current_joint };
+        _current_joint( 1 ) = joint_1_inverse * current_joint( 1 );
+        _current_joint( 3 ) = joint_3_inverse * current_joint( 3 );
+        _current_joint( 5 ) = joint_5_inverse * current_joint( 5 );
+        //**-------------------------------**//
+
+        //**-------------------------------**//
+
+        //** 计算构型**//
+        std::array< int, 3 > status{ };
+        status[ 0 ] = slover_utility::X_axit_1_6( _current_joint( 2 - 1 ), _current_joint( 3 - 1 ), _current_joint( 4 - 1 ), d_se, d_ew );
+        status[ 1 ] = slover_utility::JC_sign( slover_utility::JC_sign( _current_joint( 4 - 1 ) ) + 1 );
+        status[ 2 ] = slover_utility::JC_sign( slover_utility::JC_sign( _current_joint( 6 - 1 ) ) + 1 );
+        //**-------------------------------**//
+
+        KDL::Vector x_0_7   = current_T.p;
+        KDL::Rotation r_0_7 = current_T.M;
+        KDL::Vector x_0_sw  = x_0_7 - l_0_bs - r_0_7 * l_7_wt;
+        const JC_double current_joint_3 = current_joint(2);
+
+            //! 腕部中心点在1关节轴线上奇异处理：
+            if ( x_0_sw( 0 ) == 0 && x_0_sw( 1 ) == 0 )
+        {
+            PLOG_ERROR << "腕部中心点在1关节轴线上奇异";
+            return -1;
+        }
+
+        JC_double thet_4_tem = acos( slover_utility::roundn( ( pow( x_0_sw.Norm( ), 2 ) - pow( d_se, 2 ) - pow( d_ew, 2 ) ) / ( 2 * d_se * d_ew ), 14 ) );
+
+        //! 4关节奇异处理：thet4接近0时->acos(>1)->thet_4_tem=nan
+        if ( std::isnan( thet_4_tem ) )
+        {
+            PLOG_ERROR << "关节4奇异";
+            return -1;
+        }
+
+        for ( int reference_index = 0; reference_index < ( 2 + 2 * !( thet_4_tem == 0 ) ); reference_index++ )
+        {
+            JC_double thet_4   = 0;
+            JC_double thet_r_2 = 0;
+
+            switch ( reference_index )
+            {
+                case 0:
+                    thet_4   = thet_4_tem;
+                    thet_r_2 = slover_thet2::f_thet2( d_se, d_ew, thet_4, x_0_sw( 2 ) );
+                    break;
+
+                case 1:
+                    thet_4   = thet_4_tem;
+                    thet_r_2 = slover_thet2::f_thet2_2( d_se, d_ew, thet_4, x_0_sw( 2 ) );
+                    break;
+
+                case 2:
+                    thet_4   = -thet_4_tem;
+                    thet_r_2 = slover_thet2::f_thet2( d_se, d_ew, thet_4, x_0_sw( 2 ) );
+                    break;
+
+                case 3:
+
+                    thet_4   = -thet_4_tem;
+                    thet_r_2 = slover_thet2::f_thet2_2( d_se, d_ew, thet_4, x_0_sw( 2 ) );
+                    break;
+
+                default:
+                    PLOG_ERROR << "switch 异常";
+                    return -1;
+            }
+
+            JC_double thet_r_1 = slover_thet1::f_thet1( thet_r_2, d_se, d_ew, thet_4, x_0_sw( 0 ), x_0_sw( 1 ) );
+
+            if ( status[ 1 ] != slover_utility::JC_sign( slover_utility::JC_sign( thet_4 ) + 1 ) )
+                continue;
+
+            if ( status[ 0 ] != slover_utility::X_axit_1_6( thet_r_2, 0, thet_4, d_se, d_ew ) )
+                continue;
+
+            Eigen::Matrix3d ref_r_0_3 = slover_utility::rot_matrix( thet_r_1, -KDL::PI_2 ) * slover_utility::rot_matrix( thet_r_2, KDL::PI_2 ) * slover_utility::rot_matrix( 0, -KDL::PI_2 );
+
+            KDL::Vector u_0_sw;
+            JC_double vct_len = x_0_sw.Norm( );
+            if ( vct_len < 1e-6 )
+            {
+                PLOG_ERROR << "腕部点与肘部点太接近";
+                return -1;
+            }
+
+            u_0_sw = x_0_sw / vct_len;
+
+            Eigen::Matrix3d ssm_u_0_sw = slover_utility::ssm( u_0_sw( 0 ), u_0_sw( 1 ), u_0_sw( 2 ) );
+
+            Eigen::Matrix3d As = ssm_u_0_sw * ref_r_0_3;
+            Eigen::Matrix3d Bs = -1 * ssm_u_0_sw * As;
+            Eigen::Matrix3d Cs = ( Eigen::Vector3d{ u_0_sw( 0 ), u_0_sw( 1 ), u_0_sw( 2 ) } * Eigen::RowVector3d{ u_0_sw( 0 ), u_0_sw( 1 ), u_0_sw( 2 ) } ) * ref_r_0_3;
+
+            Eigen::Matrix3d r_3_4_transpose = slover_utility::rot_matrix( thet_4, KDL::PI_2 ).transpose( );
+            Eigen::Matrix3d matrix_r_0_7    = slover_utility::rot_to_matrix( r_0_7 );
+
+            Eigen::Matrix3d Aw = r_3_4_transpose * As.transpose( ) * matrix_r_0_7;
+            Eigen::Matrix3d Bw = r_3_4_transpose * Bs.transpose( ) * matrix_r_0_7;
+            Eigen::Matrix3d Cw = r_3_4_transpose * Cs.transpose( ) * matrix_r_0_7;
+
+            {
+                std::array< JC_double, 2 > arm_angle_temp{ 0, 0 };
+
+                JC_double a_n = As( 2, 2 );
+                JC_double b_n = Bs( 2, 2 );
+                JC_double c_n = Cs( 2, 2 );
+                JC_double a_d = -As( 2, 0 );
+                JC_double b_d = -Bs( 2, 0 );
+                JC_double c_d = -Cs( 2, 0 );
+
+                JC_double b         = tan( current_joint_3 ) * a_d - a_n;
+                JC_double a         = tan( current_joint_3 ) * b_d - b_n;
+                JC_double c         = c_n - tan( current_joint_3 ) * c_d;
+                arm_angle_temp[ 0 ] = 2 * atan2( ( b + sqrt( pow( b, 2 ) + pow( a, 2 ) - pow( c, 2 ) ) ), ( a + c ) );
+                arm_angle_temp[ 1 ] = 2 * atan2( ( b - sqrt( pow( b, 2 ) + pow( a, 2 ) - pow( c, 2 ) ) ), ( a + c ) );
+
+                JC_double sin_tem = As( 2, 2 ) * sin( arm_angle_temp[ 0 ] ) + Bs( 2, 2 ) * cos( arm_angle_temp[ 0 ] ) + Cs( 2, 2 );
+                JC_double cos_tem = -As( 2, 0 ) * sin( arm_angle_temp[ 0 ] ) - Bs( 2, 0 ) * cos( arm_angle_temp[ 0 ] ) - Cs( 2, 0 );
+                double thet3      = atan2( sin_tem, cos_tem );
+
+                if ( std::abs( slover_utility::my_convert( thet3 ) - current_joint_3 ) < 1e-5 )
+                {
+                    arm_angle = arm_angle_temp[ 0 ];
+                    return 0;
+                }
+
+                sin_tem = As( 2, 2 ) * sin( arm_angle_temp[ 1 ] ) + Bs( 2, 2 ) * cos( arm_angle_temp[ 1 ] ) + Cs( 2, 2 );
+                cos_tem = -As( 2, 0 ) * sin( arm_angle_temp[ 1 ] ) - Bs( 2, 0 ) * cos( arm_angle_temp[ 1 ] ) - Cs( 2, 0 );
+                thet3   = atan2( sin_tem, cos_tem );
+
+                if ( std::abs( slover_utility::my_convert( thet3 ) - current_joint_3 ) < 1e-5 )
+                {
+                    arm_angle = arm_angle_temp[ 1 ];
+                    return 0;
+                }
+
+                return -1;
+            }
+        }
+
+        return -1;
     }
 
     int union_cartesian_to_joint( rocos::Robot* robot_ptr, const union_frame& var, const KDL::JntArray& joint_current, KDL::JntArray& q_target )
