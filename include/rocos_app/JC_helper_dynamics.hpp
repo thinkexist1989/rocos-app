@@ -102,7 +102,7 @@ namespace JC_helper
 
         KDL::Rotation calculate_rotation();
 
-        int calculate(KDL::Frame &pos_offset, KDL::Twist &Cartesian_vel, double dt = 0.001);
+        int calculate(KDL::Frame &pos_offset, KDL::Twist &Cartesian_vel, double dt = DELTA_T);
 
         void set_force(double force_x, double force_y, double force_z);
 
