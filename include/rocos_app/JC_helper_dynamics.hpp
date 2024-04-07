@@ -20,6 +20,9 @@
 #include <kdl/chainiksolverpos_lma.hpp>
 #include <vector>
 #include <yaml-cpp/yaml.h>
+
+#define DELTA_T 0.001 // 1ms
+
 namespace rocos
 {
     class Robot;
@@ -88,7 +91,7 @@ namespace JC_helper
         std::vector<double> B{50., 50., 50., 50., 50., 50.};
         double damp{1};
 
-        double _dt{0.001};
+        double _dt {DELTA_T};
         KDL::Twist _Cartesian_vel;
 
     public:

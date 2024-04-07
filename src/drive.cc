@@ -19,6 +19,8 @@
 
 #include "include/rocos_app/drive.h"
 
+#define DELTA_T 0.001 // 1ms
+
 
 namespace rocos {
 
@@ -452,7 +454,7 @@ namespace rocos {
                 default:
                     std::cout << "Only Supported CSP and CSV" << std::endl;
             }
-            dt += 0.001;
+            dt += DELTA_T;
         }
 
         delete interp;

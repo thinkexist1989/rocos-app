@@ -24,6 +24,7 @@
 #define  MAX_JOINT_NUM 50
 #define  EPS 1e-7
 
+
 namespace rocos {
     Robot::Robot(boost::shared_ptr<HardwareInterface> hw,
                  const std::string &urdf_file_path,
@@ -381,7 +382,7 @@ namespace rocos {
                 }
             }
 
-            dt += 0.001;
+            dt += DELTA_T;
         }
 
         // delete pointer
@@ -579,7 +580,7 @@ namespace rocos {
             //      }
             //
             //      if (interp_[i]->isValidMovement()) {
-            //        dt[i] += 0.001;
+            //        dt[i] += DELTA_T;
             //        pos_[i] = interp_[i]->pos(dt[i]);  //当前位置更新
             //        vel_[i] = interp_[i]->vel((dt[i]));
             //        acc_[i] = interp_[i]->acc(dt[i]);
@@ -871,7 +872,7 @@ namespace rocos {
         for (int i = 0; i < jnt_num_; i++) {
             q_init(i) = pos_[i];
             q_target(i) = pos_[i];
-            max_step.push_back(max_vel_[i] * 0.001);
+            max_step.push_back(max_vel_[i] * DELTA_T);
         }
 
         if (JC_helper::link_trajectory(traj_target, frame_init, pose, speed, acceleration) < 0) {
@@ -1051,7 +1052,7 @@ namespace rocos {
                     //**-------------------------------**//
 
                     //** 位置保护，雅克比计算需要位置检查 **//
-                    q_init.data = q_init.data + joint_vel.data * 0.001;
+                    q_init.data = q_init.data + joint_vel.data * DELTA_T;
                     for (int i = 0; i < jnt_num_; i++) {
                         if (q_init(i) > joints_[i]->getMaxPosLimit() ||
                             q_init(i) < joints_[i]->getMinPosLimit()) {
@@ -1234,7 +1235,7 @@ namespace rocos {
         for (int i = 0; i < jnt_num_; i++) {
             q_init(i) = pos_[i];
             q_target(i) = pos_[i];
-            max_step.push_back(max_vel_[i] * 0.001);
+            max_step.push_back(max_vel_[i] * DELTA_T);
         }
 
         if (JC_helper::circle_trajectory(traj_target, frame_init, pose_via, pose_to, speed, acceleration,
@@ -1376,7 +1377,7 @@ namespace rocos {
         for (int i = 0; i < jnt_num_; i++) {
             q_init(i) = pos_[i];
             q_target(i) = pos_[i];
-            max_step.push_back(max_vel_[i] * 0.001);
+            max_step.push_back(max_vel_[i] * DELTA_T);
         }
 
         if (JC_helper::circle_trajectory(traj_target, frame_init, center, theta, axiz, speed, acceleration,
@@ -1556,7 +1557,7 @@ namespace rocos {
                     //**-------------------------------**//
 
                     //** 位置保护，雅克比计算需要位置检查 **//
-                    q_init.data = q_init.data + joint_vel.data * 0.001;
+                    q_init.data = q_init.data + joint_vel.data * DELTA_T;
                     for (int i = 0; i < jnt_num_; i++) {
                         if (q_init(i) > joints_[i]->getMaxPosLimit() ||
                             q_init(i) < joints_[i]->getMinPosLimit()) {
@@ -1708,7 +1709,7 @@ namespace rocos {
                     //**-------------------------------**//
 
                     //** 位置保护，雅克比计算需要位置检查 **//
-                    q_init.data = q_init.data + joint_vel.data * 0.001;
+                    q_init.data = q_init.data + joint_vel.data * DELTA_T;
                     for (int i = 0; i < jnt_num_; i++) {
                         if (q_init(i) > joints_[i]->getMaxPosLimit() ||
                             q_init(i) < joints_[i]->getMinPosLimit()) {
@@ -1822,7 +1823,7 @@ namespace rocos {
         for (int i = 0; i < jnt_num_; i++) {
             q_init(i) = pos_[i];
             q_target(i) = q_init(i);
-            max_step.push_back(max_vel_[i] * 0.001);
+            max_step.push_back(max_vel_[i] * DELTA_T);
         }
 
 
@@ -2355,7 +2356,7 @@ namespace rocos {
             i.reset(new DoubleS{});
 
         for (int i{0}; i < jnt_num_; i++) {
-            max_step.push_back(max_vel_[i] * 0.001);
+            max_step.push_back(max_vel_[i] * DELTA_T);
             target_pos.push_back(pos_[i]);
             init_pos.push_back(pos_[i]);
         }
@@ -2414,7 +2415,7 @@ namespace rocos {
                     init_pos[i] = target_pos[i];
             }
 
-            dt += 0.001;
+            dt += DELTA_T;
         }
         //**-------------------------------**//
 
@@ -2430,7 +2431,7 @@ namespace rocos {
                 joints_[i]->setPosition(pos_[i]);//!都设置，自动根据模式选取位置或者速度伺服
                 joints_[i]->setVelocity(vel_[i]);//!
             }
-            dt += 0.001;
+            dt += DELTA_T;
 
             hw_interface_->waitForSignal(0);
         }
@@ -2450,7 +2451,7 @@ namespace rocos {
                     joints_[i]->setPosition(waypoints(i));
                 } else if (joints_[i]->getMode() == ModeOfOperation::CyclicSynchronousVelocityMode) {
                     vel_[i] = waypoints(i);
-                    pos_[i] = pos_[i] + vel_[i] * 0.001;
+                    pos_[i] = pos_[i] + vel_[i] * DELTA_T;
                     joints_[i]->setVelocity(vel_[i]);
                     joints_[i]->setPosition(pos_[i]);
                 } else {
@@ -2593,7 +2594,7 @@ namespace rocos {
         //** 速度检查 **//
         Eigen::MatrixXd joint_offset = (target_pos.data - JC_helper::vector_2_JntArray(pos_).data).cwiseAbs();
         for (int i = 0; i < _joint_num; ++i)
-            if (joint_offset(i) > joints_[i]->getMaxVel() * 0.001) {
+            if (joint_offset(i) > joints_[i]->getMaxVel() * DELTA_T) {
                 PLOG_ERROR << "target vel [" << i << "]= " << joint_offset(i) * KDL::rad2deg * 1000
                            << " deg/s is out of range ";
                 hw_interface_->waitForSignal(0);
@@ -2686,7 +2687,7 @@ namespace rocos {
         KDL::JntArray next_vel{_joint_num};
         KDL::JntArray next_pos{_joint_num};
         KDL::JntArray next_jerk{_joint_num};
-        double dt = 0.001;
+        double dt = DELTA_T;
         double look_head2 = 0.6;
         int pre = 0;
         bool is_first = true; // 是否可以一次性到达目标位置，不可以一直循环，可以退出
@@ -2709,20 +2710,20 @@ namespace rocos {
         for (int i = 0; i < _joint_num; ++i) {
             next_jerk(i) = (0 - current_vel(i)) * Gain + (0 - current_acc(i)) * look_head2 * Gain +
                            (target_pos(i) - current_pose(i)) * Gain + (0 - current_vel(i)) * lookhead * Gain;
-            next_acc(i) = next_jerk(i) * 0.001;
+            next_acc(i) = next_jerk(i) * DELTA_T;
             //next_acc(i) = (target_pos(i) - current_pose(i)) * Gain +(0-current_vel(i) )* lookhead * Gain;
-            if (next_acc(i) > max_acc(i) * 0.001) {
-                next_acc(i) = max_acc(i) * 0.001;
-            } else if (next_acc(i) < -max_acc(i) * 0.001) {
-                next_acc(i) = -max_acc(i) * 0.001;
+            if (next_acc(i) > max_acc(i) * DELTA_T) {
+                next_acc(i) = max_acc(i) * DELTA_T;
+            } else if (next_acc(i) < -max_acc(i) * DELTA_T) {
+                next_acc(i) = -max_acc(i) * DELTA_T;
             }
 
             next_vel(i) = current_vel(i) + next_acc(i);
 
-            if (next_vel(i) > max_vel(i) * 0.001) {
-                next_vel(i) = max_vel(i) * 0.001;
-            } else if (next_vel(i) < -max_vel(i) * 0.001) {
-                next_vel(i) = -max_vel(i) * 0.001;
+            if (next_vel(i) > max_vel(i) * DELTA_T) {
+                next_vel(i) = max_vel(i) * DELTA_T;
+            } else if (next_vel(i) < -max_vel(i) * DELTA_T) {
+                next_vel(i) = -max_vel(i) * DELTA_T;
             }
             next_pos(i) = current_pose(i) + next_vel(i);
 

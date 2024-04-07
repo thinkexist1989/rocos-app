@@ -20,6 +20,8 @@
 #include <trac_ik/trac_ik.hpp>
 #include <vector>
 
+#define DELTA_T 0.001 // 1ms
+
 #define RESET "\033[0m"
 
 #define BLACK "\033[30m"              /* Black */
@@ -212,7 +214,7 @@ namespace JC_helper
     class OnlineDoubleS
     {
     private:
-        const double T_S{ 0.001 };
+        const double T_S{ DELTA };
 
         ruckig::Ruckig< 1 > otg;
         ruckig::InputParameter< 1 > input;
@@ -263,13 +265,13 @@ namespace JC_helper
     {
     private:
         //** 变量初始化 **//
-        ruckig::Ruckig< 1 > otg{ 0.001 };
+        ruckig::Ruckig< 1 > otg{ DELTA_T };
         ruckig::InputParameter< 1 > input;
         ruckig::OutputParameter< 1 > output;
         ruckig::Result res;
         KDL::Vector _vel{ };
         KDL::ChainIkSolverVel_pinv _ik_vel;
-        const double servo_dt = 0.001;
+        const double servo_dt = DELTA_T;
         std::atomic< bool > flag_stop{ false };
 
         KDL::JntArray joint_current{ };
@@ -376,12 +378,12 @@ namespace JC_helper
     {
     private:
         //** 变量初始化 **//
-        ruckig::Ruckig< 1 > otg{ 0.001 };
+        ruckig::Ruckig< 1 > otg{ DELTA_T };
         ruckig::InputParameter< 1 > input;
         ruckig::OutputParameter< 1 > output;
         ruckig::Result otg_res;
         KDL::ChainJntToJacSolver jnt2jac;
-        const double servo_dt = 0.001;
+        const double servo_dt = DELTA_T;
         std::atomic< bool > flag_stop{ false };
 
         KDL::JntArray joint_current{ };
