@@ -436,7 +436,7 @@ namespace rocos {
                 default:
                     std::cout << "Only Supported CSP and CSV" << std::endl;
             }
-            dt += 0.001;
+            dt += DELTA_T;
         }
 
         delete interp;

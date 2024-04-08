@@ -88,7 +88,7 @@ namespace JC_helper
         for (int i{0}; i < 3; i++)
             PLOG_DEBUG.printf("torque[ %d ] = %f ", i, force_torque.torque[i]);
 
-        std::this_thread::sleep_for(std::chrono::duration<double>(0.001));
+        std::this_thread::sleep_for(std::chrono::duration<double>(DELTA_T));
 
         return 0;
     }
@@ -237,7 +237,7 @@ namespace JC_helper
             joint_K[i] = yaml_node["joint_K"][i].as<double>();
             F_joint_stop[i] = yaml_node["F_joint_stop"][i].as<double>();
             ZeroOffset[i] = yaml_node["ZeroOffset"][i].as<double>();
-            pose_stop[i] = F_joint_stop[i] / M[i] * 0.001 * 0.001;
+            pose_stop[i] = F_joint_stop[i] / M[i] * DELTA_T * DELTA_T;
             q_max[i] = robot_ptr->joints_[i]->getMaxPosLimit();
             q_min[i] = robot_ptr->joints_[i]->getMinPosLimit();
         }
@@ -296,7 +296,7 @@ namespace JC_helper
         KDL::JntArray pose{joint_num};
         KDL::JntArray acc{joint_num};
         KDL::JntArray vel{joint_num};
-        double dt = 0.001;
+        double dt = DELTA_T;
         KDL::JntArray last_pose{joint_num};
         for (int i = 0; i < joint_num; i++)
         {
@@ -319,7 +319,7 @@ namespace JC_helper
             {
                 Actual_torques[i] = robot_ptr->getJointTorqueFilter(i);
 
-                fext[i] = Actual_torques[i] * 0.001 * a_sensor[i] + b_sensor[i] - Theory_torques[i];
+                fext[i] = Actual_torques[i] * DELTA_T * a_sensor[i] + b_sensor[i] - Theory_torques[i];
                 com_fext[i] = set_K_sensor(fext[i], joint_K[i]);
 
                 if (abs(com_fext[i]) < F_joint_stop[i])
@@ -491,7 +491,7 @@ namespace JC_helper
             //** 笛卡尔速度求解 **//
 
             _ik_vel.CartToJnt(_q_init, admittance_vel, joints_vel);
-            KDL::Multiply(joints_vel, 0.001, joints_vel);
+            KDL::Multiply(joints_vel, DELTA_T, joints_vel);
             KDL::Add(_q_init, joints_vel, _q_target);
             //**-------------------------------**//
 
@@ -513,7 +513,7 @@ namespace JC_helper
             //**-------------------------------**//
 
             //** csv打印 **//
-            // out_joint_csv << std::to_string( traj_count * 0.001 ) << "\t,";
+            // out_joint_csv << std::to_string( traj_count * DELTA_T ) << "\t,";
             // for ( int i = 0; i < jointNum - 1; i++ )
             // {
             //     out_joint_csv << std::to_string( _q_target( i ) ) << "\t,";
@@ -568,7 +568,7 @@ namespace JC_helper
 
         for (int i = 0; i < jointNum; i++)
         {
-            max_step.push_back(robot_ptr->max_vel_[i] * 0.001);
+            max_step.push_back(robot_ptr->max_vel_[i] * DELTA_T);
             _q_init(i) = robot_ptr->pos_[i];
             _q_target(i) = _q_init(i);
         }
@@ -626,7 +626,7 @@ namespace JC_helper
             //**-------------------------------**//
 
             //** 笛卡尔速度求解 **//
-            if (moveL_vel(traj_vel, traj_count * 0.001, traj_target.front(), traj_target.back(), max_path_v, max_path_a) < 0)
+            if (moveL_vel(traj_vel, traj_count * DELTA_T, traj_target.front(), traj_target.back(), max_path_v, max_path_a) < 0)
             {
                 PLOG_ERROR << "笛卡尔速度转关节速度失败";
                 on_stop_trajectory = true;
@@ -637,7 +637,7 @@ namespace JC_helper
             Cartesian_vel.rot = traj_vel.rot + admittance_vel.rot;
 
             _ik_vel.CartToJnt(_q_init, Cartesian_vel, joints_vel);
-            KDL::Multiply(joints_vel, 0.001, joints_vel);
+            KDL::Multiply(joints_vel, DELTA_T, joints_vel);
             KDL::Add(_q_init, joints_vel, _q_target);
             //**-------------------------------**//
 
@@ -659,7 +659,7 @@ namespace JC_helper
             //**-------------------------------**//
 
             //** csv打印 **//
-            // out_joint_csv << std::to_string( traj_count * 0.001 ) << "\t,";
+            // out_joint_csv << std::to_string( traj_count * DELTA_T ) << "\t,";
             // for ( int i = 0; i < jointNum - 1; i++ )
             // {
             //     out_joint_csv << std::to_string( _q_target( i ) ) << "\t,";
@@ -695,7 +695,7 @@ namespace JC_helper
         while (!FinishRunPlanningIK)
         {
             my_ft_sensor_ptr->getting_data(robot_ptr->flange_);
-            std::this_thread::sleep_for(std::chrono::duration<double>(0.001));
+            std::this_thread::sleep_for(std::chrono::duration<double>(DELTA_T));
         }
     }
 

@@ -249,7 +249,7 @@ namespace JC_helper
                     return -1;
                 }
                 traj.push_back(link_target);
-                dt = dt + 0.001;
+                dt = dt + DELTA_T;
             }
             //**-------------------------------**//
             return 0;
@@ -299,7 +299,7 @@ namespace JC_helper
                 return -1;
             }
             traj.push_back(interp_frame);
-            dt += 0.001;
+            dt += DELTA_T;
         }
         //**-------------------------------**//
 
@@ -349,7 +349,7 @@ namespace JC_helper
             }
 
             traj_vel.push_back(interp_vel);
-            dt += 0.001;
+            dt += DELTA_T;
         }
         //**-------------------------------**//
 
@@ -618,7 +618,7 @@ namespace JC_helper
                 traj.push_back(circular_target);
             }
 
-            t_total = t_total + 0.001;
+            t_total = t_total + DELTA_T;
         }
         //**-------------------------------**//
         return 0;
@@ -739,7 +739,7 @@ namespace JC_helper
                 traj.push_back(KDL::Frame(R_w_p1, center_ * KDL::Vector{radius * cos(s * theta13), radius * sin(s * theta13), 0}));
             else
                 traj.push_back(KDL::Frame(R_w_p1 * KDL::Rotation::Rot2(Rotation_axis, theta13 * s), center_ * KDL::Vector{radius * cos(s * theta13), radius * sin(s * theta13), 0}));
-            dt += 0.001;
+            dt += DELTA_T;
         }
         return 0;
     }
@@ -806,7 +806,7 @@ namespace JC_helper
                 traj.push_back(KDL::Frame(f_p1.M, center.p + KDL::Rotation::Rot2(rot_axiz, theta13 * s) * center_f_p1));
             else
                 traj.push_back(KDL::Frame(KDL::Rotation::Rot2(rot_axiz, theta13 * s) * f_p1.M, center.p + KDL::Rotation::Rot2(rot_axiz, theta13 * s) * center_f_p1));
-            dt += 0.001;
+            dt += DELTA_T;
         }
         return 0;
     }
@@ -891,7 +891,7 @@ namespace JC_helper
 
             traj_vel.push_back(interp_vel);
 
-            dt += 0.001;
+            dt += DELTA_T;
         }
         return 0;
     }
@@ -972,7 +972,7 @@ namespace JC_helper
 
             traj_vel.push_back(interp_vel);
 
-            dt += 0.001;
+            dt += DELTA_T;
         }
 
         return 0;
@@ -1009,7 +1009,7 @@ namespace JC_helper
         {
             s = doubleS.pos(dt);
             traj.push_back(KDL::Frame(f_r1 * KDL::Rotation::Rot2(ration_axis, angle * s), f_p));
-            dt += 0.001;
+            dt += DELTA_T;
         }
         return 0;
     }
@@ -1019,7 +1019,7 @@ namespace JC_helper
     SmartServo_Joint::SmartServo_Joint(std::atomic<bool> *finished_flag_ptr)
     {
         external_finished_flag_ptr = finished_flag_ptr;
-        otg = new ruckig::Ruckig<ruckig::DynamicDOFs>(jointNum, 0.001);
+        otg = new ruckig::Ruckig<ruckig::DynamicDOFs>(jointNum, DELTA_T);
         input = new ruckig::InputParameter<ruckig::DynamicDOFs>(jointNum);
         output = new ruckig::OutputParameter<ruckig::DynamicDOFs>(jointNum);
     }
@@ -1221,9 +1221,9 @@ namespace JC_helper
         double path_a{ 0 };
         int OnlineDoubleS_count{ 1 };
         bool flag_from_last_rotation{ false };
-        double t_last_rotation{ 0.001 };              //上段姿态运行时刻
+        double t_last_rotation{ DELTA_T };              //上段姿态运行时刻
         double dt_link{ 0 };                          //当前段段姿态运行时刻
-        constexpr double sleep_time{ 0.001 * 0.95 };  //最长睡眠时间为1ms,最高于这个值会导致运动不连续
+        constexpr double sleep_time{ DELTA_T * 0.95 };  //最长睡眠时间为1ms,最高于这个值会导致运动不连续
 
         //**-------------------------------**//
 
@@ -1303,12 +1303,12 @@ namespace JC_helper
                                 // PLOG_DEBUG << "dt_link =\n"
                                 //            << dt_link;
                                 // PLOG_DEBUG << "OnlineDoubleS_count =\n"
-                                //            << 0.001 * OnlineDoubleS_count;
+                                //            << DELTA_T * OnlineDoubleS_count;
 
                                 lock_traj_frame.lock( );
                                 traj_frame.push_back( path_p );
                                 lock_traj_frame.unlock( );
-                                dt_link = dt_link + 0.001;
+                                dt_link = dt_link + DELTA_T;
 
                                 OnlineDoubleS_count++;
 
@@ -1431,11 +1431,11 @@ namespace JC_helper
 
                             if ( flag_from_last_rotation )
                             {
-                                _last_rotaion_OnlineDoubleS.get_pos_vel_acc( t_last_rotation - 0.001, s_r, sd_r, sdd_r );
+                                _last_rotaion_OnlineDoubleS.get_pos_vel_acc( t_last_rotation - DELTA_T, s_r, sd_r, sdd_r );
                             }
                             else
                             {
-                                _rotaion_OnlineDoubleS.get_pos_vel_acc( dt_link - 0.001, s_r, sd_r, sdd_r );
+                                _rotaion_OnlineDoubleS.get_pos_vel_acc( dt_link - DELTA_T, s_r, sd_r, sdd_r );
                             }
 
                             if ( length_circle_link <= eps )  //!只旋转目标且不存在直线段了，不需要时间缩放
@@ -1524,8 +1524,8 @@ namespace JC_helper
                             Frame _last_target      = last_target;
                             Frame _last_last_target = last_last_target;
                             Frame _path_p           = path_p;
-                            t_last_rotation         = 0.001;
-                            dt_link                 = 0.001;
+                            t_last_rotation         = DELTA_T;
+                            dt_link                 = DELTA_T;
                             double next_remain_length{ 0 };
 
                             // PLOG_DEBUG << "target =\n"
@@ -1567,7 +1567,7 @@ namespace JC_helper
                                             }
 
                                             path_p.M = ratation_trajectory( _last_last_target.M, _last_target.M, s_r );
-                                            t_last_rotation += 0.001;
+                                            t_last_rotation += DELTA_T;
                                             flag_from_last_rotation = true;
                                         }
                                         else if ( dt_link <= ratation_duration )
@@ -1593,7 +1593,7 @@ namespace JC_helper
                                             else
                                                 path_p.M = ratation_trajectory( _last_target.M, _target.M, s_r );
 
-                                            dt_link += 0.001;
+                                            dt_link += DELTA_T;
                                             flag_from_last_rotation = false;
                                         }
                                         // PLOG_DEBUG << "dt_link =" << dt_link;
@@ -1711,14 +1711,14 @@ namespace JC_helper
                                         {
                                             _last_rotaion_OnlineDoubleS.get_pos_vel_acc( t_last_rotation, s_r, sd_r, sdd_r );
                                             path_p.M = ratation_trajectory( _last_last_target.M, _last_target.M, s_r );
-                                            t_last_rotation += 0.001;
+                                            t_last_rotation += DELTA_T;
                                             flag_from_last_rotation = true;
                                         }
                                         else if ( dt_link <= ratation_duration )
                                         {
                                             _rotaion_OnlineDoubleS.get_pos_vel_acc( dt_link, s_r, sd_r, sdd_r );
                                             path_p.M = ratation_trajectory( _last_target.M, _target.M, s_r );
-                                            dt_link += 0.001;
+                                            dt_link += DELTA_T;
                                             flag_from_last_rotation = false;
                                         }
                                         // PLOG_DEBUG << "dt_link =" << dt_link;
@@ -1843,9 +1843,9 @@ namespace JC_helper
                             double sdd_r{ 0 };
 
                             if ( flag_from_last_rotation )
-                                _last_rotaion_OnlineDoubleS.get_pos_vel_acc( t_last_rotation - 0.001, s_r, sd_r, sdd_r );
+                                _last_rotaion_OnlineDoubleS.get_pos_vel_acc( t_last_rotation - DELTA_T, s_r, sd_r, sdd_r );
                             else
-                                _rotaion_OnlineDoubleS.get_pos_vel_acc( dt_link - 0.001, s_r, sd_r, sdd_r );
+                                _rotaion_OnlineDoubleS.get_pos_vel_acc( dt_link - DELTA_T, s_r, sd_r, sdd_r );
 
                             _last_rotaion_OnlineDoubleS.calculate( s_r, 1, sd_r, 0, sdd_r, 0, 1e7, 1e7, 1e7, _OnlineDoubleS.get_duration( ) );
                             double last_ratation_duration{ _last_rotaion_OnlineDoubleS.get_duration( ) };
@@ -1859,7 +1859,7 @@ namespace JC_helper
                             Frame _last_last_target = last_last_target;
                             Frame _path_p           = path_p;
                             OnlineDoubleS_count     = 1;
-                            t_last_rotation         = 0.001;
+                            t_last_rotation         = DELTA_T;
                             double next_remain_length{ 0 };
 
                             while ( 1 )
@@ -1878,7 +1878,7 @@ namespace JC_helper
                                     {
                                         _last_rotaion_OnlineDoubleS.get_pos_vel_acc( t_last_rotation, s_r, sd_r, sdd_r );
                                         path_p.M = ratation_trajectory( _last_last_target.M, _last_target.M, s_r );
-                                        t_last_rotation += 0.001;
+                                        t_last_rotation += DELTA_T;
                                         flag_from_last_rotation = true;
                                     }
 
@@ -2024,9 +2024,9 @@ namespace JC_helper
                             if ( !( radio_angle >= 0 ) ) radio_angle = 0.5;                        // 0/0无效，这里为了规划成功，设置为0.5
 
                             if ( flag_from_last_rotation )
-                                _last_rotaion_OnlineDoubleS.get_pos_vel_acc( t_last_rotation - 0.001, s_r, sd_r, sdd_r );
+                                _last_rotaion_OnlineDoubleS.get_pos_vel_acc( t_last_rotation - DELTA_T, s_r, sd_r, sdd_r );
                             else
-                                _rotaion_OnlineDoubleS.get_pos_vel_acc( dt_link - 0.001, s_r, sd_r, sdd_r );
+                                _rotaion_OnlineDoubleS.get_pos_vel_acc( dt_link - DELTA_T, s_r, sd_r, sdd_r );
 
                             _last_rotaion_OnlineDoubleS.calculate( s_r, 1, sd_r, 0, sdd_r, 0, 1e7, 1e7, 1e7, _OnlineDoubleS.get_duration( ) * radio_angle );
                             double last_ratation_duration{ abs( remain_angle ) < eps ? 0 : _last_rotaion_OnlineDoubleS.get_duration( ) };
@@ -2044,8 +2044,8 @@ namespace JC_helper
                             double sd_p{ 0 };
                             double sdd_p{ 0 };
                             OnlineDoubleS_count = 1;
-                            t_last_rotation     = 0.001;
-                            dt_link             = 0.001;
+                            t_last_rotation     = DELTA_T;
+                            dt_link             = DELTA_T;
 
                             Frame _target           = target;
                             Frame _last_target      = last_target;
@@ -2068,14 +2068,14 @@ namespace JC_helper
                                     {
                                         _last_rotaion_OnlineDoubleS.get_pos_vel_acc( t_last_rotation, s_r, sd_r, sdd_r );
                                         path_p.M = ratation_trajectory( _last_last_target.M, _last_target.M, s_r );
-                                        t_last_rotation += 0.001;
+                                        t_last_rotation += DELTA_T;
                                         flag_from_last_rotation = true;
                                     }
                                     else if ( dt_link <= ratation_duration )
                                     {
                                         _rotaion_OnlineDoubleS.get_pos_vel_acc( dt_link, s_r, sd_r, sdd_r );
                                         path_p.M = ratation_trajectory( _last_target.M, _target.M, s_r );
-                                        dt_link += 0.001;
+                                        dt_link += DELTA_T;
                                         flag_from_last_rotation = false;
                                     }
 
@@ -2231,7 +2231,7 @@ namespace JC_helper
                                     {
                                         _last_rotaion_OnlineDoubleS.get_pos_vel_acc( t_last_rotation, s_r, sd_r, sdd_r );
                                         path_p.M = ratation_trajectory( F_base_circlestart.M, F_base_circleend.M, s_r );
-                                        t_last_rotation += 0.001;
+                                        t_last_rotation += DELTA_T;
                                         flag_from_last_rotation = true;
                                     }
                                     else if ( dt_link <= ratation_duration )
@@ -2239,7 +2239,7 @@ namespace JC_helper
                                         // link_flag = true;  //必需在直线段且上段姿态实现完，才能切换目标
                                         _rotaion_OnlineDoubleS.get_pos_vel_acc( dt_link, s_r, sd_r, sdd_r );
                                         path_p.M = ratation_trajectory( F_base_circleend.M, _target.M, s_r );
-                                        dt_link += 0.001;
+                                        dt_link += DELTA_T;
                                         flag_from_last_rotation = false;
                                     }
 
@@ -2559,7 +2559,7 @@ namespace JC_helper
             PLOG_INFO << "motion 结束";
 
         //!等待plannig规划线程完事以后，再统一把所有标志位归位
-        while ( !FinishPlanningFrame ) std::this_thread::sleep_for( std::chrono::duration< double >{ 0.001 } );
+        while ( !FinishPlanningFrame ) std::this_thread::sleep_for( std::chrono::duration< double >{ DELTA_T } );
 
         ( *external_finished_flag_ptr ) = true;   //这次smart servo已结束，等待下一次smart servo
         robot_ptr->is_running_motion    = false;  //机械臂运动已结束，可以执行其他离线类运动
@@ -3485,7 +3485,7 @@ namespace JC_helper
         ;
 
         for (int i = 0; i < 3; i++)
-            if (std::abs(SW(i)) > 0.001 && KDL::sign(SW(i)) != KDL::sign(axis(i)))
+            if (std::abs(SW(i)) > DELTA_T && KDL::sign(SW(i)) != KDL::sign(axis(i)))
             {
                 // GetRotAngle()计算的轴不是由1关节指向6关节
                 angle = -1 * angle;
@@ -4331,7 +4331,7 @@ namespace JC_helper
     void Joint_stop(rocos::Robot *robot_ptr, const KDL::JntArray &current_pos, const KDL::JntArray &last_pos, const KDL::JntArray &last_last_pos)
     {
         //** 变量初始化 **//
-        ruckig::Ruckig<ruckig::DynamicDOFs> otg{jointNum, 0.001};
+        ruckig::Ruckig<ruckig::DynamicDOFs> otg{jointNum, DELTA_T};
         ruckig::InputParameter<ruckig::DynamicDOFs> input(jointNum);
         ruckig::OutputParameter<ruckig::DynamicDOFs> output(jointNum);
         ruckig::Result res;
@@ -4344,13 +4344,13 @@ namespace JC_helper
             KDL::JntArray current_acc(jointNum);
 
             KDL::Subtract(current_pos, last_pos, current_vel);
-            KDL::Divide(current_vel, 0.001, current_vel);
+            KDL::Divide(current_vel, DELTA_T, current_vel);
 
             KDL::Subtract(last_pos, last_last_pos, last_vel);
-            KDL::Divide(last_vel, 0.001, last_vel);
+            KDL::Divide(last_vel, DELTA_T, last_vel);
 
             KDL::Subtract(current_vel, last_vel, current_acc);
-            KDL::Divide(current_acc, 0.001, current_acc);
+            KDL::Divide(current_acc, DELTA_T, current_acc);
 
             input.control_interface = ruckig::ControlInterface::Velocity;
             input.synchronization = ruckig::Synchronization::None;
@@ -4408,13 +4408,13 @@ namespace JC_helper
         KDL::JntArray current_acc(jointNum);
 
         KDL::Subtract(current_pos, last_pos, current_vel);
-        KDL::Divide(current_vel, 0.001, current_vel);
+        KDL::Divide(current_vel, DELTA_T, current_vel);
 
         KDL::Subtract(last_pos, last_last_pos, last_vel);
-        KDL::Divide(last_vel, 0.001, last_vel);
+        KDL::Divide(last_vel, DELTA_T, last_vel);
 
         KDL::Subtract(current_vel, last_vel, current_acc);
-        KDL::Divide(current_acc, 0.001, current_acc);
+        KDL::Divide(current_acc, DELTA_T, current_acc);
 
         for (int i{0}; i < jointNum; i++)
         {

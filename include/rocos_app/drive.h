@@ -32,6 +32,8 @@
 
 #include "interpolate.h"
 
+#define DELTA_T 0.001
+
 namespace rocos {
 
     class Drive {
