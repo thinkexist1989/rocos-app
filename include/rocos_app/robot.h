@@ -1050,7 +1050,7 @@ namespace rocos
         void test(); // 为了测试
 
         int stop_joint_admittance_teaching();
-
+        bool isEnabled();
     private:
         // TODO： 测试用MoveJ，阻塞运行，需要改为private
         void

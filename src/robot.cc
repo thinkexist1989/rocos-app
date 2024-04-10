@@ -2379,6 +2379,19 @@ namespace rocos {
         //**-------------------------------**//
         return 0;
     }
+    bool Robot::isEnabled()
+    {
+        for (int i = 0; i < jnt_num_; i++) {
+            //使能检查
+            if (joints_[i]->getDriveState() != DriveState::OperationEnabled) {
+                PLOG_ERROR << "joints[" << i << "]"
+                            << "is in OperationDisabled ";
+                return false;
+            }
+        }
+
+        return true;
+    }
 
     void Robot::RunMoveJ(JntArray q, double speed, double acceleration, double time, double radius) {
         //** 变量初始化 **//
@@ -2461,6 +2474,9 @@ namespace rocos {
         //** 伺服控制 **//
         dt = 0;
         while (dt <= max_time) {
+            if(!isEnabled())
+                goto Exit;
+
             for (int i = 0; i < jnt_num_; ++i) {
                 if (!need_plan_[i])
                     continue;
@@ -2472,18 +2488,23 @@ namespace rocos {
             }
             dt += DELTA_T;
 
+
             hw_interface_->waitForSignal(0);
         }
         //**-------------------------------**//
 
+        Exit:
         // is_running_motion = false;
         setRunState(RunState::Stopped);
     }
 
     void Robot::RunMoveL(const std::vector<KDL::JntArray> &traj) {
         std::cout << "No. of waypoints: " << traj.size() << std::endl;
-
+        
         for (const auto &waypoints: traj) {
+            if(!isEnabled())
+                goto Exit;
+
             for (int i = 0; i < jnt_num_; ++i) {
                 if (joints_[i]->getMode() == ModeOfOperation::CyclicSynchronousPositionMode) {
                     pos_[i] = waypoints(i);
@@ -2504,6 +2525,7 @@ namespace rocos {
             hw_interface_->waitForSignal(0);
         }
 
+        Exit:
         // is_running_motion = false;
         setRunState(RunState::Stopped);
     }
@@ -2512,6 +2534,9 @@ namespace rocos {
         std::cout << "No. of waypoints: " << traj.size() << std::endl;
 
         for (const auto &waypoints: traj) {
+            if(!isEnabled())
+                goto Exit;
+
             for (int i = 0; i < jnt_num_; ++i) {
                 pos_[i] = waypoints(i);
                 joints_[i]->setPosition(waypoints(i));
@@ -2519,6 +2544,7 @@ namespace rocos {
             hw_interface_->waitForSignal(0);
         }
 
+        Exit:
         // is_running_motion = false;
         setRunState(RunState::Stopped);
     }
