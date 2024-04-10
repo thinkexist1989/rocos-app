@@ -881,8 +881,8 @@ namespace rocos {
         std::vector<double> max_step;
         std::vector<KDL::Frame> traj_target;
         KDL::Frame frame_init;
-        JntToCart(JC_helper::vector_2_JntArray(pos_),frame_init);
-        int traj_count{ 0 };
+        JntToCart(JC_helper::vector_2_JntArray(pos_), frame_init);
+        int traj_count{0};
         //**-------------------------------**//
 
         for (int i = 0; i < jnt_num_; i++) {
@@ -1031,8 +1031,8 @@ namespace rocos {
         KDL::JntArray q_init(jnt_num_);
         KDL::JntArray joint_vel(jnt_num_);
         std::vector<KDL::Twist> vel_target;
-        KDL::Frame frame_current ;
-        JntToCart(JC_helper::vector_2_JntArray(pos_),frame_current);
+        KDL::Frame frame_current;
+        JntToCart(JC_helper::vector_2_JntArray(pos_), frame_current);
         KDL::ChainIkSolverVel_pinv _ik_vel{kinematics_.getChain()};
         //**-------------------------------**//
 
@@ -1249,7 +1249,7 @@ namespace rocos {
         KDL::JntArray q_init(jnt_num_);
         KDL::JntArray q_target(jnt_num_);
         KDL::Frame frame_init;
-        JntToCart(JC_helper::vector_2_JntArray(pos_),frame_init);
+        JntToCart(JC_helper::vector_2_JntArray(pos_), frame_init);
         std::vector<double> max_step;
         bool orientation_fixed = mode == Robot::OrientationMode::FIXED;
         std::vector<KDL::Frame> traj_target;
@@ -1392,7 +1392,7 @@ namespace rocos {
         KDL::JntArray q_init(jnt_num_);
         KDL::JntArray q_target(jnt_num_);
         KDL::Frame frame_init;
-        JntToCart( JC_helper::vector_2_JntArray( pos_ ), frame_init );
+        JntToCart(JC_helper::vector_2_JntArray(pos_), frame_init);
         std::vector<double> max_step;
         bool orientation_fixed = mode == Robot::OrientationMode::FIXED;
         std::vector<KDL::Frame> traj_target;
@@ -1538,7 +1538,7 @@ namespace rocos {
         KDL::JntArray q_init(jnt_num_);
         KDL::JntArray joint_vel(jnt_num_);
         KDL::Frame current_frame;
-        JntToCart( JC_helper::vector_2_JntArray( pos_ ), current_frame );
+        JntToCart(JC_helper::vector_2_JntArray(pos_), current_frame);
         bool orientation_fixed = mode == Robot::OrientationMode::FIXED;
         std::vector<KDL::Twist> traj_vel_target;
         KDL::ChainIkSolverVel_pinv _ik_vel{kinematics_.getChain()};
@@ -1690,7 +1690,7 @@ namespace rocos {
         KDL::JntArray q_init(jnt_num_);
         KDL::JntArray joint_vel(jnt_num_);
         KDL::Frame current_frame;
-        JntToCart( JC_helper::vector_2_JntArray( pos_ ), current_frame );
+        JntToCart(JC_helper::vector_2_JntArray(pos_), current_frame);
         bool orientation_fixed = mode == Robot::OrientationMode::FIXED;
         std::vector<KDL::Twist> traj_vel_target;
         KDL::ChainIkSolverVel_pinv _ik_vel{kinematics_.getChain()};
@@ -1838,7 +1838,7 @@ namespace rocos {
         std::vector<KDL::Frame> traj_target;
         std::vector<int> traj_index;
         KDL::Frame Cart_point;
-        JntToCart( JC_helper::vector_2_JntArray( pos_ ), Cart_point );
+        JntToCart(JC_helper::vector_2_JntArray(pos_), Cart_point);
         std::vector<size_t> vector_size{point.size(), bound_dist.size(), max_path_v.size(), max_path_a.size()};
         std::vector<double> max_step;
         KDL::JntArray q_init(jnt_num_);
@@ -2083,6 +2083,7 @@ namespace rocos {
         int index{static_cast< int >( flag )};
         static DRAGGING_TYPE index_type;
         static DRAGGING_TYPE last_index_type;
+        static DRAGGING_DIRRECTION last_dir;
         int res{-1};
         constexpr double vector_speed_scale{0.1};
         constexpr double rotation_speed_scale{0.2};
@@ -2141,11 +2142,22 @@ namespace rocos {
         last_index_type = index_type;
         //**-------------------------------**//
 
+        if(dir == DRAGGING_DIRRECTION::NONE) { //说明想要停止了
+            tick_count += 150; //超过100就会停止
+//            PLOG_INFO << "停止点动";
+            dir = last_dir;
+        }
+        else {
+            last_dir = dir;
+        }
+
         //** is_running_motion的作用：不允许其他运动异步运行时,执行dragging;不允许执行dragging时，执行其他离线类运动**//
         //** _dragging_finished_flag的作用：保证dragging 多次调用时，只初始化一次**//
         if (_dragging_finished_flag && is_running_motion) {
+
             PLOG_ERROR << "其他运动仍在运行，不允许执行点动功能";
             return -1;
+
         } else if (_dragging_finished_flag && !is_running_motion) {
             if (motion_thread_) {
                 motion_thread_->join();
