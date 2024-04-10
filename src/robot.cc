@@ -2143,7 +2143,7 @@ namespace rocos {
         //**-------------------------------**//
 
         if(dir == DRAGGING_DIRRECTION::NONE) { //说明想要停止了
-            tick_count += 150; //超过100就会停止
+            tick_count += 250; //超过100就会停止
 //            PLOG_INFO << "停止点动";
             dir = last_dir;
         }
