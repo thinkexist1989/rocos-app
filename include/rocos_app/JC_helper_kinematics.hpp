@@ -20,7 +20,7 @@
 #include <trac_ik/trac_ik.hpp>
 #include <vector>
 
-#define DELTA_T 0.001 // 1ms
+#define DELTA_T 0.002 // 1ms
 
 #define RESET "\033[0m"
 

@@ -21,7 +21,7 @@
 #include <vector>
 #include <yaml-cpp/yaml.h>
 
-#define DELTA_T 0.001 // 1ms
+#define DELTA_T 0.002 // 1ms
 
 namespace rocos
 {
