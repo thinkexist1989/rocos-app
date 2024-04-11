@@ -2673,8 +2673,8 @@ namespace rocos {
         Eigen::MatrixXd joint_offset = joint_offset_origin.cwiseAbs();
         for (int i = 0; i < jointNum; ++i)
             if (joint_offset(i) > joints_[i]->getMaxVel() * 0.001) {
-                PLOG_ERROR << "target vel [" << i << "]= " << joint_offset(i) * KDL::rad2deg * 1000
-                           << " deg/s is out of range ";
+                // PLOG_ERROR << "target vel [" << i << "]= " << joint_offset(i) * KDL::rad2deg * 1000
+                //            << " deg/s is out of range ";
                 // hw_interface_->waitForSignal(0);
                 // return -1;
                 double sign = joint_offset_origin(i)>= 0? 1:-1;
