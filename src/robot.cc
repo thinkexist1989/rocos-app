@@ -2132,6 +2132,7 @@ namespace rocos {
         int index{static_cast< int >( flag )};
         static DRAGGING_TYPE index_type;
         static DRAGGING_TYPE last_index_type;
+         static DRAGGING_DIRRECTION last_dir;
         int res{-1};
         constexpr double vector_speed_scale{0.1};
         constexpr double rotation_speed_scale{0.2};
@@ -2189,7 +2190,14 @@ namespace rocos {
         // 三种情况能通过检查：没改没完成、没改完成了、改了完成了
         last_index_type = index_type;
         //**-------------------------------**//
-
+        if(dir == DRAGGING_DIRRECTION::NONE) { //说明想要停止了
+            tick_count += 150; //超过100就会停止
+//            PLOG_INFO << "停止点动";
+            dir = last_dir;
+        }
+        else {
+            last_dir = dir;
+        }
         //** is_running_motion的作用：不允许其他运动异步运行时,执行dragging;不允许执行dragging时，执行其他离线类运动**//
         //** _dragging_finished_flag的作用：保证dragging 多次调用时，只初始化一次**//
         if (_dragging_finished_flag && is_running_motion) {
@@ -2416,7 +2424,19 @@ namespace rocos {
         //**-------------------------------**//
         return 0;
     }
+    bool Robot::isEnabled()
+    {
+        for (int i = 0; i < jnt_num_; i++) {
+            //使能检查
+            if (joints_[i]->getDriveState() != DriveState::OperationEnabled) {
+                PLOG_ERROR << "joints[" << i << "]"
+                            << "is in OperationDisabled ";
+                return false;
+            }
+        }
 
+        return true;
+    }
     void Robot::RunMoveJ(JntArray q, double speed, double acceleration, double time, double radius) {
         //** 变量初始化 **//
         double dt = 0.0;
@@ -2498,6 +2518,8 @@ namespace rocos {
         //** 伺服控制 **//
         dt = 0;
         while (dt <= max_time) {
+            if(!isEnabled())
+                goto Exit;
             for (int i = 0; i < jnt_num_; ++i) {
                 if (!need_plan_[i])
                     continue;
@@ -2512,16 +2534,18 @@ namespace rocos {
             hw_interface_->waitForSignal(0);
         }
         //**-------------------------------**//
-
+        Exit:
         // is_running_motion = false;
         setRunState(RunState::Stopped);
     }
 
     void Robot::RunMoveL(const std::vector<KDL::JntArray> &traj) {
         std::cout << "No. of waypoints: " << traj.size() << std::endl;
-
+        
         for (const auto &waypoints: traj) {
             for (int i = 0; i < jnt_num_; ++i) {
+                if(!isEnabled())
+                    goto Exit;
                 if (joints_[i]->getMode() == ModeOfOperation::CyclicSynchronousPositionMode) {
                     pos_[i] = waypoints(i);
                     joints_[i]->setPosition(waypoints(i));
@@ -2540,7 +2564,7 @@ namespace rocos {
 
             hw_interface_->waitForSignal(0);
         }
-
+        Exit:
         // is_running_motion = false;
         setRunState(RunState::Stopped);
     }
@@ -2549,13 +2573,15 @@ namespace rocos {
         std::cout << "No. of waypoints: " << traj.size() << std::endl;
 
         for (const auto &waypoints: traj) {
+             if(!isEnabled())
+                goto Exit;
             for (int i = 0; i < jnt_num_; ++i) {
                 pos_[i] = waypoints(i);
                 joints_[i]->setPosition(waypoints(i));
             }
             hw_interface_->waitForSignal(0);
         }
-
+        Exit:
         // is_running_motion = false;
         setRunState(RunState::Stopped);
     }

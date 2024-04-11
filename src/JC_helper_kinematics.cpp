@@ -1113,7 +1113,7 @@ namespace JC_helper
             }
 
             //** 50ms进行一次心跳检查,紧急停止时不需要检查 **//
-            if (((++count) > 100) && !on_stop_trajectory)
+            if (((++count) > 200) && !on_stop_trajectory)
             {
                 count = 0;
 
@@ -1134,9 +1134,12 @@ namespace JC_helper
                     {
                         input->target_velocity[i] = 0.0;
                         input->target_acceleration[i] = 0.0;
-                        input->max_velocity[i] = robot_ptr->joints_[i]->getMaxVel() * 0.2;
-                        input->max_acceleration[i] = robot_ptr->joints_[i]->getMaxAcc() * 0.02;
-                        input->max_jerk[i] = robot_ptr->joints_[i]->getMaxJerk() * 0.01;
+                        // input->max_velocity[i] = robot_ptr->joints_[i]->getMaxVel() * 0.2;
+                        // input->max_acceleration[i] = robot_ptr->joints_[i]->getMaxAcc() * 0.02;
+                        // input->max_jerk[i] = robot_ptr->joints_[i]->getMaxJerk() * 0.01;
+                        input->max_velocity[i] = 1.0;
+                        input->max_acceleration[i] = 3.0;
+                        input->max_jerk[i] = 35;
                     }
                     input_lock.unlock();
                 }
