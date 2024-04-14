@@ -112,6 +112,8 @@ namespace rocos {
             exit(-1);
 
         startMotionThread();
+
+        fsm_handle::start();
     }
 
 
@@ -755,6 +757,22 @@ namespace rocos {
 
         if (CheckBeforeMove(q, speed, acceleration, time, radius) < 0) {
             PLOG_ERROR << "given parameters is invalid";
+            return -1;
+        }
+
+        try  // 切换到STATE_MOVEJ
+        {
+            EVEN_MOVEJ even{ };
+            even.robot_prt                = this;
+            even.target_info.target_joint = q;
+            even.target_info.max_v        = speed;
+            even.target_info.max_a        = acceleration;
+            even.target_info.max_j        = acceleration * 10;
+            even.target_info.blend_radius = radius;
+            fsm_handle::dispatch( even );
+        }
+        catch ( ... )
+        {
             return -1;
         }
 
@@ -2502,11 +2520,21 @@ namespace rocos {
         //**-------------------------------**//
 
         //** 伺服控制 **//
+        std::unique_lock< std::mutex > motor_control( mtx_motor,std::defer_lock );  // 不上锁
+
         dt = 0;
-        while (dt <= max_time) {
+        while ( dt <= max_time )
+        {
+            if ( !motor_control.try_lock( ) )
+            {
+                return;
+            }
+
             for (int i = 0; i < jnt_num_; ++i) {
                 if (!need_plan_[i])
                     continue;
+
+              
 
                 pos_[i] = interp[i]->pos(dt);
                 vel_[i] = interp[i]->vel(dt);
@@ -2514,7 +2542,7 @@ namespace rocos {
                 joints_[i]->setVelocity(vel_[i]);//!
             }
             dt += 0.001;
-
+            motor_control.unlock( );//给其他动作打断机会，比如运动暂停
             hw_interface_->waitForSignal(0);
         }
         //**-------------------------------**//

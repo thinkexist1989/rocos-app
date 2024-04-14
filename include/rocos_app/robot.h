@@ -20,17 +20,18 @@
 #ifndef ROCOS_APP_ROBOT_H
 #define ROCOS_APP_ROBOT_H
 
+#include "JC_helper_FSM.hpp"
+#include "JC_helper_dynamics.hpp"
+#include "JC_helper_kinematics.hpp"
 #include "drive.h"
+#include "gripper.hpp"
 #include "hardware_interface.h"
 #include "interpolate.h"
+#include "kdl_parser/kdl_parser.hpp"  //!< 解析URDF文件
 #include "kinematics.h"
-#include "JC_helper_kinematics.hpp"
-#include "JC_helper_dynamics.hpp"
-#include <Eigen/StdVector> //!< Eigen官网说明 https://eigen.tuxfamily.org/dox/group__TopicStlContainers.html
+#include <Eigen/StdVector>            //!< Eigen官网说明 https://eigen.tuxfamily.org/dox/group__TopicStlContainers.html
 #include <boost/smart_ptr.hpp>
 #include <vector>
-#include "kdl_parser/kdl_parser.hpp" //!< 解析URDF文件
-#include "gripper.hpp"
 
 namespace rocos
 {
@@ -1213,13 +1214,16 @@ namespace rocos
 
         friend int JC_helper::union_cartesian_to_joint( rocos::Robot* robot_ptr, const union_frame& var, const KDL::JntArray& joint_current, KDL::JntArray& q_target );
 
-    private:
-        JC_helper::ft_sensor my_ft_sensor;         // 6维力传感器
-        bool flag_admittance_turnoff{false};       // 导纳开关
-        bool flag_admittance_joint_turnoff{false}; // 关节拖动开关
-        std::mutex mtx;                            // 互斥锁
+        friend struct STATE_MOVEJ ;
 
-        std::shared_ptr<std::thread> _thread_admittance_teaching{nullptr};
+    private:
+        JC_helper::ft_sensor my_ft_sensor;            // 6维力传感器
+        bool flag_admittance_turnoff{ false };        // 导纳开关
+        bool flag_admittance_joint_turnoff{ false };  // 关节拖动开关
+        std::mutex mtx;                               // 互斥锁
+        std::mutex mtx_motor;                         // 电机控制权
+
+        std::shared_ptr< std::thread > _thread_admittance_teaching{ nullptr };
     };
 
 } // namespace rocos

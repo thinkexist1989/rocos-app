@@ -63,6 +63,23 @@ extern uint32_t jointNum;
 namespace rocos
 {
     class Robot;
+    struct cart_info
+    {
+        KDL::Vector target_xyz{ };
+        KDL::Rotation target_rpy{ };
+        double max_v{ };         // m/s
+        double max_a{ };         // m/s^2
+        double max_j{ };         // m/s^3
+        double blend_radius{ };  // m
+    };
+    struct joint_info
+    {
+        KDL::JntArray target_joint{ };
+        double max_v{ };         // rad/s
+        double max_a{ };         // rad/s^2
+        double max_j{ };         // rad/s^3
+        double blend_radius{ };  // m
+    };
 
 }  // namespace rocos
 
