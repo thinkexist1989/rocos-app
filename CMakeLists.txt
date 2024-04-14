@@ -76,7 +76,7 @@ add_subdirectory(3rdparty/ruckig)
 add_subdirectory(3rdparty/plog)
 add_subdirectory(3rdparty/gripper)
 add_subdirectory(3rdparty/gflags)
-
+add_subdirectory(3rdparty/tinyfsm)
 
 ###########
 ## Build ##
@@ -170,6 +170,7 @@ add_library(robot
         src/robot.cc
         src/JC_helper_kinematics.cpp
         src/JC_helper_dynamics.cpp
+        src/JC_helper_FSM.cpp
 )
 target_include_directories(robot
         PUBLIC
@@ -184,6 +185,7 @@ target_link_libraries(robot
         $<BUILD_INTERFACE:rocos::kinematics>
         $<BUILD_INTERFACE:plog::plog>
         $<BUILD_INTERFACE:JC_helper::gripper>
+        $<BUILD_INTERFACE:FSM>
         OpenSSL::SSL
         )
 add_library(rocos::robot ALIAS robot)
@@ -259,6 +261,7 @@ target_link_libraries(protocol
         ${_GRPC_GRPCPP}
         ${_PROTOBUF_LIBPROTOBUF}
         $<BUILD_INTERFACE:rocos::robot>
+        z
         )
 add_library(rocos::protocol ALIAS protocol)
 
