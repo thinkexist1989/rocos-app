@@ -3192,7 +3192,7 @@ namespace JC_helper
             union_frame target_frame{ };
             if ( axis_num == 7 )  // 7自由度情况逆解
             {
-                target_frame.target_7axis = std::pair< KDL::Frame, double >{ { interp_frame }, { joint_current( 2 ) } };
+                target_frame.target_7axis = interp_frame;
             }
             else  // 其他自由度情况逆解
             {
@@ -4928,10 +4928,17 @@ namespace JC_helper
         int axis_num = robot_ptr->getJointNum( );
         if ( axis_num == 7 )//7自由度情况逆解
         {
-            KDL::Frame interp_frame = var.target_7axis.first;
-            double interp_J3        = var.target_7axis.second;
+            // KDL::Frame interp_frame = var.target_7axis.first;//TODO为以后做准备
+            // double interp_J3        = var.target_7axis.second;//TODO为以后做准备
+            // TODO为以后做准备
+            //  if ( robot_ptr->SRS_kinematics_.JC_cartesian_to_joint_dir( interp_frame, interp_J3, joint_current, q_target ) < 0 )
+            //  {
+            //      PLOG_ERROR << "目标点位不可达";
+            //      return -1;
+            //  }
 
-            if ( robot_ptr->SRS_kinematics_.JC_cartesian_to_joint_dir( interp_frame, interp_J3, joint_current, q_target ) < 0 )
+            KDL::Frame interp_frame = var.target_7axis;
+            if ( robot_ptr->kinematics_.CartToJnt( joint_current, interp_frame, q_target ) < 0 )
             {
                 PLOG_ERROR << "目标点位不可达";
                 return -1;

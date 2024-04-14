@@ -925,7 +925,7 @@ namespace rocos {
                     JC_helper::union_frame union_target_frame{ };
                     if ( axis_num == 7 )  // 7自由度情况逆解
                     {
-                        union_target_frame.target_7axis = std::pair< KDL::Frame, double >{ { target }, { q_init( 2 ) } };
+                        union_target_frame.target_7axis = target;
                     }
                     else  // 其他自由度情况逆解
                     {

@@ -541,8 +541,9 @@ namespace JC_helper
 
     union union_frame
     {
-        KDL::Frame target_6axis;
-        std::pair< KDL::Frame, double > target_7axis;
+        KDL::Frame target_6axis;//TODO为以后做准备
+        // std::pair< KDL::Frame, double > target_7axis;
+        KDL::Frame target_7axis;//TODO为以后做准备
     };
     /**
      * @brief 统一逆解接口
