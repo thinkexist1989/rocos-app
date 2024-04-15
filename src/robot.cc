@@ -2142,6 +2142,11 @@ namespace rocos {
         last_index_type = index_type;
         //**-------------------------------**//
 
+//        //如果下使能，就停止
+//        if(!isEnabled())
+//            dir = DRAGGING_DIRRECTION::NONE;
+
+
         if(dir == DRAGGING_DIRRECTION::NONE) { //说明想要停止了
             tick_count += 250; //超过100就会停止
 //            PLOG_INFO << "停止点动";

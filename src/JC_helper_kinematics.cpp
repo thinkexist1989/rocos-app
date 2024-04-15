@@ -1068,7 +1068,7 @@ namespace JC_helper
             PLOG_INFO << "waiting for command";
         }
 
-        while (true)
+        while (robot_ptr->isEnabled())
         {
             t_start = std::chrono::high_resolution_clock::now();
 
@@ -1078,11 +1078,6 @@ namespace JC_helper
 
             if (res == ruckig::Result::Finished)
             {
-                (*external_finished_flag_ptr) = true;                    // 这次smart servo已结束，等待下一次smart servo
-                                                                         //                robot_ptr->is_running_motion    = false;  // 机械臂运动已结束，可以执行其他离线类运动
-                robot_ptr->setRunState(rocos::Robot::RunState::Stopped); // 机械臂运动已结束，可以执行其他离线类运动
-                on_stop_trajectory = false;                              // 这个必须设为false,因为新线程仍然使用同一个对象数据成员
-                                                                         //                PLOG_INFO << "smart servo has finished";
                 break;
             }
             else if (res == ruckig::Result::Working)
@@ -1154,6 +1149,12 @@ namespace JC_helper
             //                PLOG_WARNING << "计算时间超时：" << duration.count( ) << "s" << std::endl;
             //            }
         }
+
+        (*external_finished_flag_ptr) = true;                    // 这次smart servo已结束，等待下一次smart servo
+        //                robot_ptr->is_running_motion    = false;  // 机械臂运动已结束，可以执行其他离线类运动
+        robot_ptr->setRunState(rocos::Robot::RunState::Stopped); // 机械臂运动已结束，可以执行其他离线类运动
+        on_stop_trajectory = false;                              // 这个必须设为false,因为新线程仍然使用同一个对象数据成员
+        //                PLOG_INFO << "smart servo has finished";
     }
 
     void SmartServo_Joint::command(KDL::JntArray q_target)
@@ -3098,7 +3099,7 @@ namespace JC_helper
             ; // 等待指令
         }
 
-        while (true)
+        while (robot_ptr->isEnabled())
         {
             t_start = std::chrono::high_resolution_clock::now();
 
