@@ -533,6 +533,15 @@ namespace rocos {
 
             //!< Update Flange State
             std::lock_guard<std::mutex> lock(mtx);  // 自动获取互斥锁
+
+            for(int i = 0; i< jnt_num_; i++)
+            {
+                if(joints_[i]->getDriveState() != DriveState::OperationEnabled) {
+                    pos_[i] = joints_[i]->getPosition();
+                    vel_[i] = 0;
+                }
+            }
+
             updateCartesianInfo();
 
             //     //! 屏蔽开始
