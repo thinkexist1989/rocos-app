@@ -747,12 +747,16 @@ namespace rocos
         //! 更新法兰系,工具系,工件系poseFlange
         void updateCartesianInfo()
         {
+
             JntArray q_in(jnt_num_);
-            for (int i{0}; i < jnt_num_; i++)
+            for (int i{0}; i < jnt_num_; i++) {
                 q_in(i) = pos_[i];
+            }
+
+                
             //            std::cout << q_in.data << std::endl;
 
-            // Flange Reference
+        
             JntToCart(q_in, flange_);
 
             //            std::cout << "OK" << std::endl;
