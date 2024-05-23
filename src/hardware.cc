@@ -27,9 +27,9 @@ namespace rocos {
 
     };
 
-    Hardware::Hardware(const std::string &urdf_file_path) {
+    Hardware::Hardware(const std::string &urdf_file_path,int id) {
         _type = HW_ETHERCAT;
-        ecPtr_ = EcatConfig::getInstance();
+        ecPtr_ = EcatConfig::getInstance(id);
 
         slave_num_ = ecPtr_->getSlaveNum();
 

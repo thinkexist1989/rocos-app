@@ -466,3 +466,14 @@ target_link_libraries(main_test
         robot
         )
 add_test(NAME unit_test COMMAND unit_test)
+add_executable(mul_arm test/mul_arm.cc)
+target_link_libraries(mul_arm
+        PRIVATE
+        hardware
+        drive
+        protocol
+        kinematics
+        robot
+        gflags::gflags
+        )
+

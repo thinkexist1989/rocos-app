@@ -35,11 +35,11 @@ DEFINE_string(urdf, "robot.urdf", "Urdf file path");
 DEFINE_string(base, "base_link", "Base link name");
 DEFINE_string(tip, "link_7", "Tip link name");
 DEFINE_bool(sim, true, "Sim or not");
-DEFINE_int32(id, 0, "hardware id, only work for real hardware");
+
 bool isRuning = true;
 
 rocos::Robot *robot_ptr = nullptr;
-
+rocos::Robot *robot_ptr1 = nullptr;
 void signalHandler(int signo) {
     if (signo == SIGINT) {
         std::cout << "\033[1;31m"
@@ -50,7 +50,7 @@ void signalHandler(int signo) {
         isRuning = false;
 
         robot_ptr->setDisabled();
-
+        robot_ptr1->setDisabled();
         exit(0);
     }
 }
@@ -70,21 +70,26 @@ int main(int argc, char *argv[]) {
 
     //**-------------启动admittance_joint-----------**//
     // 初始化类
+    // boost::shared_ptr<HardwareInterface> hw;
+    boost::shared_ptr<HardwareInterface> hw1;
+    int id=0;
+    int id1=1;
+    // hw = boost::make_shared<Hardware>(FLAGS_urdf,id); // 真实机械臂
+    hw1 = boost::make_shared<Hardware>(FLAGS_urdf,id1); // 真实机械臂
 
-    boost::shared_ptr<HardwareInterface> hw;
-    if (FLAGS_sim)
-        hw = boost::make_shared<HardwareSim>(20);  // 仿真
-    else
-        hw = boost::make_shared<Hardware>(FLAGS_urdf,FLAGS_id); // 真实机械臂
+    // Robot robot(hw, FLAGS_urdf, FLAGS_base, FLAGS_tip);
+    Robot robot1(hw1, FLAGS_urdf, FLAGS_base, FLAGS_tip);
 
-    Robot robot(hw, FLAGS_urdf, FLAGS_base, FLAGS_tip);
-
-    robot_ptr = &robot;
-
-    auto robotService = RobotServiceImpl::getInstance(&robot);
-
+    // robot_ptr = &robot;
+    robot_ptr1 = &robot1;
+    
+    // auto robotService = RobotServiceImpl::getInstance(&robot);
+    auto robotService1=RobotServiceImpl::getInstance(&robot1);
     //------------------------wait----------------------------------
-    robotService->runServer();
+    // robotService->runServer("127.0.0.1",true);
+     robotService1->runServer("170.170.170.170:12345",false);
+    
+    
 
     return 0;
 }
