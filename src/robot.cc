@@ -19,9 +19,22 @@
 
 #include <rocos_app/robot.h>
 #include <kdl_parser/kdl_parser.hpp> // 用于将urdf文件解析为KDL::Tree
+#include <bitset>
 
 #define  MAX_JOINT_NUM 50
 #define  EPS 1e-7
+
+#define BTN_BIT 16
+#define BTN_MASK (1 << BTN_BIT)
+#define BTN_PRESSED(b) ((b) & BTN_MASK)
+
+#define LED_CTRL_1_BIT   17
+#define LED_CTRL_2_BIT   19
+#define LED_OFF ((0 << LED_CTRL_1_BIT) | (0 << LED_CTRL_2_BIT))
+#define LED_RED ((0 << LED_CTRL_1_BIT) | (1 << LED_CTRL_2_BIT))
+#define LED_GREEN ((1 << LED_CTRL_1_BIT) | (0 << LED_CTRL_2_BIT))
+#define LED_YELLOW ((1 << LED_CTRL_1_BIT) | (1 << LED_CTRL_2_BIT))
+
 
 namespace rocos {
     Robot::Robot(HardwareInterface *hw,
@@ -157,7 +170,7 @@ namespace rocos {
 
     //! \brief 从URDF中解析驱动器相关参数，这个函数只在parseUrdf()内部调用，在调用前，已经解析好KDL::Chain
     //! \param urdf_file_path urdf文件路径
-    //! \return
+    //! \return 解析成功返回true，否则返回false
     bool Robot::parseDriveParamsFromUrdf(const string &urdf_file_path) {
         jnt_num_ = kinematics_.getChain().getNrOfJoints();
 
@@ -2837,6 +2850,33 @@ namespace rocos {
         //**-------------------------------**//
         return 0;
     }
+
+    bool Robot::isButtonPressed() const {
+        return btn_pressed_;
+    }
+
+    void Robot::setLED(int color) { // 0:off, 1:green, 2:red, 3:yellow
+        if(jnt_num_ == 7) {//如果是7关节TALON
+            switch (color) {
+                case COLOR_OFF:
+                    hw_interface_->setDigitalOutputsRaw(6, LED_OFF);
+                    break;
+                case COLOR_RED:
+                    hw_interface_->setDigitalOutputsRaw(6, LED_GREEN);
+                    break;
+                case COLOR_GREEN:
+                    hw_interface_->setDigitalOutputsRaw(6, LED_RED);
+                    break;
+                case COLOR_YELLOW:
+                    hw_interface_->setDigitalOutputsRaw(6, LED_YELLOW);
+                    break;
+                default:
+                    break;
+            }
+        }
+    }
+
+
 
 //    //TODO: 测试代码，未来要移除 by think
 //    int Robot::speed_scaling() {

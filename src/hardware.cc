@@ -213,6 +213,13 @@ namespace rocos {
                     pSecondaryVel_[id] = ecPtr_->findSlaveInputVarPtrByName<int32_t>(id, "Secondary velocity value");
                 }
 
+                auto digital_inputs = inputs->FirstChildElement("digital_inputs");
+                if(digital_inputs) {
+                    pDigitalInputs_[id] = ecPtr_->findSlaveInputVarPtrByName<int32_t>(id, digital_inputs->GetText());
+                } else {
+                    pDigitalInputs_[id] = ecPtr_->findSlaveInputVarPtrByName<int32_t>(id, "Digital Inputs");
+                }
+
 
             } else { // 全部采用默认值
                 pStatusword_[id] = ecPtr_->findSlaveInputVarPtrByName<uint16_t>(id, "Status word");
@@ -222,6 +229,7 @@ namespace rocos {
                 pLoadTor_[id] = ecPtr_->findSlaveInputVarPtrByName<int16_t>(id, "Analog Input 1");
                 pSecondaryPos_[id] = ecPtr_->findSlaveInputVarPtrByName<int32_t>(id, "Secondary position value");
                 pSecondaryVel_[id] = ecPtr_->findSlaveInputVarPtrByName<int32_t>(id, "Secondary velocity value");
+                pDigitalInputs_[id] = ecPtr_->findSlaveInputVarPtrByName<int32_t>(id, "Digital Inputs");
             }
 
             auto outputs = hw->FirstChildElement("outputs");
@@ -261,18 +269,33 @@ namespace rocos {
                     pTargetTor_[id] = ecPtr_->findSlaveOutputVarPtrByName<int16_t>(id, "Target torque");
                 }
 
+                auto digital_outputs = outputs->FirstChildElement("digital_outputs");
+                if(digital_outputs) {
+                    pDigitalOutputs_[id] = ecPtr_->findSlaveOutputVarPtrByName<int32_t>(id, digital_outputs->GetText());
+                } else {
+                    pDigitalOutputs_[id] = ecPtr_->findSlaveOutputVarPtrByName<int32_t>(id, "Digital Outputs");
+                }
+
             }else {
                 pControlword_[id] = ecPtr_->findSlaveOutputVarPtrByName<uint16_t>(id, "Control word");
                 pModeOfOp_[id] = ecPtr_->findSlaveOutputVarPtrByName<int8_t>(id, "Mode of operation");
                 pTargetPos_[id] = ecPtr_->findSlaveOutputVarPtrByName<int32_t>(id, "Target position");
                 pTargetVel_[id] = ecPtr_->findSlaveOutputVarPtrByName<int32_t>(id, "Target velocity");
                 pTargetTor_[id] = ecPtr_->findSlaveOutputVarPtrByName<int16_t>(id, "Target torque");
+                pDigitalOutputs_[id] = ecPtr_->findSlaveOutputVarPtrByName<int32_t>(id, "Digital Outputs");
             }
 
 
         }
     }
 
+    int32_t Hardware::getDigitalInputsRaw(int id) {
+        return pDigitalInputs_[id] ? *pDigitalInputs_[id] : (int32_t) 0;
+    }
+
+    void Hardware::setDigitalOutputsRaw(int id, int32_t value) {
+        if(pDigitalOutputs_[id]) *pDigitalOutputs_[id] = value;
+    }
 
 
 }

@@ -63,6 +63,8 @@ namespace rocos {
 
         int16_t getLoadTorqueRaw(int id) override;
 
+        int32_t getDigitalInputsRaw(int id) override;
+
         int32_t getSecondaryPositionRaw(int id) override;
 
         int32_t getSecondaryVelocityRaw(int id) override;
@@ -87,21 +89,27 @@ namespace rocos {
 
         void parseParamFormUrdf(const std::string &urdf_file_path);
 
+        void setDigitalOutputsRaw(int id, int32_t value) override;
+
+
     protected:
         EcatConfig* ecPtr_ {nullptr};
 
-        std::vector<int32_t *> pTargetPos_;
-        std::vector<int32_t *> pTargetVel_;
-        std::vector<int16_t *> pTargetTor_;
-        std::vector<int32_t *> pActualPos_;
-        std::vector<int32_t *> pActualVel_;
-        std::vector<int16_t *> pActualTor_;
-        std::vector<int16_t *> pLoadTor_;
-        std::vector<int32_t *> pSecondaryPos_;
-        std::vector<int32_t *> pSecondaryVel_;
-        std::vector<uint16_t *> pStatusword_;
-        std::vector<uint16_t *> pControlword_;
-        std::vector<int8_t *> pModeOfOp_;
+        std::vector<int32_t *> pTargetPos_;    // Target Position
+        std::vector<int32_t *> pTargetVel_;    // Target Velocity
+        std::vector<int16_t *> pTargetTor_;    // Target Torque
+        std::vector<int32_t *> pActualPos_;    // Actual Position Value
+        std::vector<int32_t *> pActualVel_;    // Actual Velocity Value
+        std::vector<int16_t *> pActualTor_;    // Actual Torque Value
+        std::vector<int16_t *> pLoadTor_;      // Load Torque Value
+        std::vector<int32_t *> pSecondaryPos_; // Secondary Position Value
+        std::vector<int32_t *> pSecondaryVel_; // Secondary Velocity Value
+        std::vector<uint16_t *> pStatusword_;  // Statusword
+        std::vector<uint16_t *> pControlword_; // Controlword
+        std::vector<int8_t *> pModeOfOp_;      // Modes of operation
+
+        std::vector<int32_t *> pDigitalInputs_; // Digital Inputs
+        std::vector<int32_t *> pDigitalOutputs_; // Digital Outputs
 
         int slave_num_ {0};
 

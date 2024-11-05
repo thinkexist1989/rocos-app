@@ -32,6 +32,12 @@
 #include "kdl_parser/kdl_parser.hpp" //!< 解析URDF文件
 #include "gripper.hpp"
 
+
+#define COLOR_OFF 0
+#define COLOR_RED 1
+#define COLOR_GREEN 2
+#define COLOR_YELLOW 3
+
 namespace rocos
 {
     //! Class Robot
@@ -1031,6 +1037,12 @@ namespace rocos
         int servoL(const KDL::Frame &target_frame);
 
 //        int moveJ_with_speed_scaling(const KDL::JntArray &target_pos, double max_vel, double max_acc, double max_jerk);
+
+
+        bool btn_pressed_{false};
+        bool isButtonPressed() const;
+
+        void setLED(int color); // 0:off, 1:green, 2:red, 3:yellow
 
         /**
          * @brief 速度缩放函数，运动中每次循环需要调佣一次

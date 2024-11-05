@@ -115,6 +115,10 @@ namespace rocos {
 
         virtual DriveState getDriverState(int id);
 
+        virtual int32_t getDigitalInputsRaw(int id);
+
+        virtual void setDigitalOutputsRaw(int id, int32_t value);
+
         /////////////////////Hardware Type//////////////////////
         virtual HWType getHardwareType();
 

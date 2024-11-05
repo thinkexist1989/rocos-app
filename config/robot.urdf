@@ -412,6 +412,7 @@
                 <load_torque_value>Analog Input 1</load_torque_value>
                 <secondary_position_value>Auxiliary position actual value</secondary_position_value>
                 <secondary_velocity_value>Secondary velocity value</secondary_velocity_value>
+                <digital_inputs>Digital Inputs</digital_inputs>
             </inputs>
             <outputs name="Outputs">
                 <control_word>Controlword</control_word>
@@ -419,6 +420,7 @@
                 <target_position>Target position</target_position>
                 <target_velocity>Target velocity</target_velocity>
                 <target_torque>Target torque</target_torque>
+                <digital_outputs>Digital Outputs</digital_outputs>
             </outputs>  
         </hardware>
     </joint>
