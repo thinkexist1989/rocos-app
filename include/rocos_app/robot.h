@@ -590,7 +590,7 @@ namespace rocos
 
             yaml_node["T_tool_"] = T_tool_rpy;
             std::ofstream fout(yaml_path);
-            std::ofstream fout1("../../config/calibration.yaml");
+            std::ofstream fout1("/opt/rocos/yaml/calibration.yaml");
 
             fout << yaml_node;
             fout1 << yaml_node;
@@ -613,7 +613,7 @@ namespace rocos
             yaml_node["T_object_"] = T_object_rpy;
 
             std::ofstream fout(yaml_path);
-            std::ofstream fout1("../../config/calibration.yaml");
+            std::ofstream fout1("/opt/rocos/yaml/calibration.yaml");
             
             fout << yaml_node;
             fout1 << yaml_node;
@@ -1105,7 +1105,7 @@ namespace rocos
         Frame flange_; //!< 法兰位置姿态
         Frame tool_;   //!< 工具位置姿态
         Frame object_; //!< 工件位置姿态
-        std::string yaml_path = "calibration.yaml";
+        std::string yaml_path = "/opt/rocos/yaml/calibration.yaml";
         YAML::Node yaml_node;
 
         // 六点法标定

@@ -81,11 +81,22 @@ namespace rocos {
         //      exit( 0 );
         //  }
         //sun 工具系的初始化
-        yaml_node = YAML::LoadFile(yaml_path);
-        // 读取yaml文件
-        std::vector<double> tool_param = yaml_node["T_tool_"].as<std::vector<double>>();
+         std::vector<double> tool_param={0,0,0,0,0,0};
+        std::vector<double> object_param={0,0,0,0,0,0};
+        try
+        {
+            yaml_node = YAML::LoadFile(yaml_path);
+            tool_param = yaml_node["T_tool_"].as<std::vector<double>>();
 
-        std::vector<double> object_param = yaml_node["T_object_"].as<std::vector<double>>();
+            object_param = yaml_node["T_object_"].as<std::vector<double>>();
+        }
+        catch (const std::exception &e)
+        {
+            std::cout<<"yaml文件读取失败"<<std::endl;
+        }
+        
+        // 读取yaml文件
+      
 
         T_tool_.p.x(tool_param[0]);
         T_tool_.p.y(tool_param[1]);
@@ -95,8 +106,8 @@ namespace rocos {
         T_object_.p.y(object_param[1]);
         T_object_.p.z(object_param[2]);
         T_object_.M = KDL::Rotation::RPY(object_param[3], object_param[4], object_param[5]);
-        std::cout << "tool_param: " << T_tool_.p.z() << std::endl;
-        std::cout << "object_param: " << T_object_.p.y() << std::endl;
+        // std::cout << "tool_param: " << T_tool_.p.z() << std::endl;
+        // std::cout << "object_param: " << T_object_.p.y() << std::endl;
 
 
 

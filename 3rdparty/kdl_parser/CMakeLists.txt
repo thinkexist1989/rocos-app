@@ -1,85 +1,33 @@
 cmake_minimum_required(VERSION 3.7.2)
-
 project(kdl_parser)
 
 set(CMAKE_CXX_STANDARD 14)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
-# set(CMAKE_INSTALL_PREFIX  /home/abc418/123/kdl_parser/output)
-# SET(EXECUTABLE_OUTPUT_PATH ${PROJECT_SOURCE_DIR}/output/bin)  
-find_package(catkin QUIET
-  COMPONENTS rosconsole cmake_modules
-)
 
-if(NOT catkin_FOUND)
-  # use local copies of FindTinyXML.cmake and FindTinyXML2.cmake from
-  # 'cmake_modules' (https://github.com/ros/cmake_modules)
-  list(APPEND CMAKE_MODULE_PATH ${CMAKE_CURRENT_LIST_DIR}/cmake)
-endif()
-
+# 设置CMake模块路径
 list(APPEND CMAKE_MODULE_PATH ${CMAKE_CURRENT_LIST_DIR}/cmake)
-find_package(Eigen3 QUIET)
-find_package(urdfdom REQUIRED)
+
+# 找到所需的依赖项，不查找ROS 2版本的urdf
+find_package(Eigen3 REQUIRED)
+find_package(urdfdom REQUIRED) # 仅查找非ROS版本
 find_package(TinyXML REQUIRED)
 find_package(TinyXML2 REQUIRED)
-find_package(rosconsole QUIET)
-find_package(urdf QUIET)
 
-if(urdf_FOUND)
-  add_definitions(-DHAS_URDF)
-  include_directories(${urdf_INCLUDE_DIRS})
-endif()
+# 添加包含路径
+include_directories(include ${TinyXML_INCLUDE_DIRS} ${TinyXML2_INCLUDE_DIRS} ${EIGEN3_INCLUDE_DIR})
 
-include_directories(include ${TinyXML_INCLUDE_DIRS} ${TinyXML2_INCLUDE_DIRS} ${urdfdom_INCLUDE_DIRS}   ${EIGEN3_INCLUDE_DIR} )
-
-
-
+# 添加库和可执行文件
 add_library(${PROJECT_NAME} SHARED src/kdl_parser.cpp)
-target_link_libraries(${PROJECT_NAME} PUBLIC ${TinyXML_LIBRARIES} ${TinyXML2_LIBRARIES} 
-)
-target_link_libraries(${PROJECT_NAME}  PUBLIC ${urdfdom_LIBRARIES}   ${EIGEN3_LIBRARIES}   orocos-kdl )
-target_include_directories( ${PROJECT_NAME}  PUBLIC  ${PROJECT_SOURCE_DIR}/include)
+target_link_libraries(${PROJECT_NAME} PUBLIC ${TinyXML_LIBRARIES} ${TinyXML2_LIBRARIES} ${urdfdom_LIBRARIES} ${EIGEN3_LIBRARIES} orocos-kdl)
+target_include_directories(${PROJECT_NAME} PUBLIC ${PROJECT_SOURCE_DIR}/include)
 
+add_executable(test_kdl_parser src/test_kdl_parser.cpp)
+target_link_libraries(test_kdl_parser PRIVATE ${PROJECT_NAME})
 
-
-if(urdf_FOUND)
-  target_link_libraries(${PROJECT_NAME}  PUBLIC ${urdf_LIBRARIES})
-endif()
-
-if(WIN32)
-  target_compile_definitions(${PROJECT_NAME} PRIVATE "KDL_PARSER_BUILDING_DLL")
-endif()
-
-add_executable(test_kdl_parser src/test_kdl_parser.cpp )
-target_link_libraries(test_kdl_parser  PRIVATE ${PROJECT_NAME})
-
-
-# Add support for installation
+# 安装指令
 include(GNUInstallDirs)
-include(CMakePackageConfigHelpers)
-
-set(${PROJECT_NAME}_INSTALL_CONFIGDIR ${CMAKE_INSTALL_PREFIX}/config)
-set(${PROJECT_NAME}_INSTALL_CMAKEDIR ${CMAKE_INSTALL_LIBDIR}/cmake/${PROJECT_NAME})
-
-# Install headers
 install(DIRECTORY include/${PROJECT_NAME} DESTINATION ${CMAKE_INSTALL_INCLUDEDIR})
-
-  install(TARGETS ${PROJECT_NAME}  test_kdl_parser
-          LIBRARY DESTINATION lib
-          ARCHIVE DESTINATION lib
-          RUNTIME DESTINATION bin
-          )
-  install(DIRECTORY include/${PROJECT_NAME}/
-          DESTINATION include)
-
-#install(TARGETS kdl_parser
-#        EXPORT kdl_parser-targets
-#        LIBRARY DESTINATION ${CMAKE_INSTALL_LIBDIR}  # 动态库安装路径
-#        ARCHIVE DESTINATION ${CMAKE_INSTALL_LIBDIR}  # 静态库安装路径
-#        RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR}  # 可执行文件安装路径
-#        PUBLIC_HEADER DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}  # 头文件安装路径
-#        )
-#
-#install(EXPORT kdl_parser-targets
-#        FILE kdl_parser-targets.cmake
-#        NAMESPACE kdl_parser::
-#        DESTINATION ${${PROJECT_NAME}_INSTALL_CMAKEDIR})
+install(TARGETS ${PROJECT_NAME} test_kdl_parser
+        LIBRARY DESTINATION lib
+        ARCHIVE DESTINATION lib
+        RUNTIME DESTINATION bin)

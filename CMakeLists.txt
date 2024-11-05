@@ -41,6 +41,7 @@ set(CMAKE_RUNTIME_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/bin)
 # rocos-app install path
 include(GNUInstallDirs)
 set(CMAKE_INSTALL_PREFIX /opt/rocos/app)
+SET(CMAKE_INSTALL_RPATH /opt/rocos/app)
 message(STATUS "INSTALL PREFIX: ${CMAKE_INSTALL_PREFIX}")
 #message(STATUS "INSTALL INCLUDE DIR: ${CMAKE_INSTALL_INCLUDEDIR}")
 #message(STATUS "INSTALL LIB DIR: ${CMAKE_INSTALL_LIBDIR}")
@@ -64,7 +65,7 @@ find_package(OpenSSL REQUIRED)
 find_package(rocos_ecm REQUIRED)
 
 find_package(orocos_kdl REQUIRED)
-
+# find_package(kdl_parser REQUIRED)
 ##################
 ##   3rdparty   ##
 ##################

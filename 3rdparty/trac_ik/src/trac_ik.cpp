@@ -401,6 +401,7 @@ namespace TRAC_IK
         start_time = boost::posix_time::microsec_clock::local_time();
 
         nl_solver->reset();
+    
         iksolver->reset();
 
         solutions.clear();

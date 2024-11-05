@@ -140,7 +140,7 @@ namespace JC_helper
          KDL::Wrenches external_forces;
 
     public:
-        admittance_joint(rocos::Robot *robot_ptr,std::string yaml_path = "joint_impedance_control.yaml");
+        admittance_joint(rocos::Robot *robot_ptr,std::string yaml_path = "/opt/rocos/yaml/joint_impedance_control.yaml");
         ~admittance_joint();
         // 初始化参数，从yaml文件中读取及初始化q_min,q_max,因为从yaml中读取，所以不需要各个参数的set函数
         int init(string yaml_path);
