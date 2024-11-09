@@ -60,6 +60,7 @@ namespace rocos
                 MOVE_P,
                 MOVE_C
             };
+          
 
         private:
             MoveType type_;
@@ -1043,6 +1044,8 @@ namespace rocos
         bool isButtonPressed() const;
 
         void setLED(int color); // 0:off, 1:green, 2:red, 3:yellow
+        // TODO: green led ->isrunning;yellow is dragging;off is disabled;red is stopped
+
 
         /**
          * @brief 速度缩放函数，运动中每次循环需要调佣一次
