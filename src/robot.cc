@@ -627,12 +627,15 @@ namespace rocos
                 {
                     std::cout << "Button is pressed!" << std::endl;
                     setLED(COLOR_YELLOW);          // 设置灯光颜色
+                    // setWorkMode(WorkMode::JntAdmitTeach) ;   // 设置工作模式
                     isButtonAlreadyPressed = true; // 记录按钮已按下
                 }
             }
             else
             {
                 isButtonAlreadyPressed = false; // 当按钮松开时重置状态
+                // setWorkMode(WorkMode::Position);
+                // setRunState(RunState::Stopped);
             }
 
             //     //! 屏蔽开始
