@@ -358,7 +358,7 @@ namespace rocos
             setLED(COLOR_OFF);
             break;
         case RunState::Stopped:
-            // setLED(COLOR_RED);
+            setLED(COLOR_RED);
             is_running_motion = false;
             break;
         case RunState::Running:
@@ -631,7 +631,7 @@ namespace rocos
                     if (isEnabled() )
                     {
                         setLED(COLOR_YELLOW);          // 设置灯光颜色
-                        // setWorkMode(WorkMode::JntAdmitTeach) ;   // 设置工作模式
+                        setWorkMode(WorkMode::JntAdmitTeach) ;   // 设置工作模式
                         isButtonAlreadyPressed = true; // 记录按钮已按下
                     }
                     else
@@ -642,13 +642,17 @@ namespace rocos
             }
             else
             {
-
+                if(work_mode_==WorkMode::JntAdmitTeach )
+                {
+                setWorkMode(WorkMode::Position);
+                setRunState(RunState::Stopped);
+                }
+                
+                
                 isButtonAlreadyPressed = false; // 当按钮松开时重置状态
-                // if(work_mode_ == WorkMode::JntAdmitTeach)
-                // {
-                //     setWorkMode(WorkMode::Position);
-                        // setRunState(RunState::Stopped);
-                // }
+               
+                    
+               
                 
             }
 
@@ -3222,13 +3226,32 @@ namespace rocos
         return 0;
     }
 
-    bool Robot::isButtonPressed() const
+    bool Robot::isButtonPressed() 
     {
+        // std::cout<<hw_interface_->getDigitalInputsRaw(6)<<std::endl;
+        if(hw_interface_->getDigitalInputsRaw(6)>=4063200 & hw_interface_->getDigitalInputsRaw(6)<=4064232)
+        {
+            // std::cout<<"is not pressed"<<std::endl;
+            set_btn_pressed(false);
+        }
+        else if (hw_interface_->getDigitalInputsRaw(6)>=4128700)
+        {
+            // std::cout<<"is  pressed"<<std::endl;
+            set_btn_pressed(true);
+        }
+        else{
+            std::cout<<"UNknown "<<std::endl;
+           
+            set_btn_pressed(false);
+        }
+        
+
         return btn_pressed_;
     }
 
     void Robot::setLED(int color)
     { // 0:off, 1:green, 2:red, 3:yellow
+    
         if (jnt_num_ == 7)
         { // 如果是7关节TALON
             switch (color)

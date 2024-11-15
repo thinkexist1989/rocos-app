@@ -366,7 +366,7 @@ namespace JC_helper
         PLOG_DEBUG.printf("pose = %f %f %f %f %f %f %f", pose(0), pose(1), pose(2), pose(3), pose(4), pose(5), pose(5));
         // 延时2s
         
-        std::this_thread::sleep_for(std::chrono::duration<double>(2));
+        // std::this_thread::sleep_for(std::chrono::duration<double>(2));
 
         while (!(*flag_admittance_joint_turnoff))
         {
@@ -416,12 +416,12 @@ namespace JC_helper
                 last_pose(i) = pose(i);
             }
             // 打印理论力矩和真实力矩Actual_torques[i] * 0.001 / sensitivity[i]
-            PLOG_DEBUG.printf( "Theory_torques = %f %f %f %f %f %f %f", Theory_torques[ 0 ], Theory_torques[ 1 ], Theory_torques[ 2 ], Theory_torques[ 3 ], Theory_torques[ 4 ], Theory_torques[ 5 ], Theory_torques[ 6 ] );
-            PLOG_DEBUG.printf( "Actual_torques = %f %f %f %f %f %f %f", Actual_torques[ 0 ]* 0.001 / sensitivity[0],Actual_torques[ 1 ]* 0.001 / sensitivity[1],Actual_torques[ 2 ]* 0.001 / sensitivity[2],Actual_torques[ 3 ]* 0.001 / sensitivity[3],Actual_torques[ 4 ]* 0.001 / sensitivity[4],Actual_torques[ 5 ]* 0.001 / sensitivity[5],Actual_torques[ 6 ]* 0.001 / sensitivity[6] );
-            PLOG_DEBUG.printf( "com_torques = %f %f %f %f %f %f %f", fext[ 0 ], fext[ 1 ], fext[ 2 ], fext[ 3 ], fext[ 4 ], fext[ 5 ], fext[ 6 ] );
+            // PLOG_DEBUG.printf( "Theory_torques = %f %f %f %f %f %f %f", Theory_torques[ 0 ], Theory_torques[ 1 ], Theory_torques[ 2 ], Theory_torques[ 3 ], Theory_torques[ 4 ], Theory_torques[ 5 ], Theory_torques[ 6 ] );
+            // PLOG_DEBUG.printf( "Actual_torques = %f %f %f %f %f %f %f", Actual_torques[ 0 ]* 0.001 / sensitivity[0],Actual_torques[ 1 ]* 0.001 / sensitivity[1],Actual_torques[ 2 ]* 0.001 / sensitivity[2],Actual_torques[ 3 ]* 0.001 / sensitivity[3],Actual_torques[ 4 ]* 0.001 / sensitivity[4],Actual_torques[ 5 ]* 0.001 / sensitivity[5],Actual_torques[ 6 ]* 0.001 / sensitivity[6] );
+            // PLOG_DEBUG.printf( "com_torques = %f %f %f %f %f %f %f", fext[ 0 ], fext[ 1 ], fext[ 2 ], fext[ 3 ], fext[ 4 ], fext[ 5 ], fext[ 6 ] );
             
-            usleep(1000000);
-            // robot_ptr->servoJ(q_target);
+            // usleep(1000000);
+            robot_ptr->servoJ(q_target);
         }
         robot_ptr->setRunState(rocos::Robot::RunState::Stopped);
         delete this;

@@ -1041,7 +1041,8 @@ namespace rocos
 
 
         bool btn_pressed_{false};
-        bool isButtonPressed() const;
+        inline void set_btn_pressed(bool flag  ){btn_pressed_=flag;}
+        bool isButtonPressed() ;
 
         void setLED(int color); // 0:off, 1:green, 2:red, 3:yellow
         // TODO: green led ->isrunning;yellow is dragging;off is disabled;red is stopped

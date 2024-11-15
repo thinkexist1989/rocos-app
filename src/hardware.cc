@@ -301,7 +301,16 @@ namespace rocos {
     }
 
     void Hardware::setDigitalOutputsRaw(int id, int32_t value) {
-        if(pDigitalOutputs_[id]) *pDigitalOutputs_[id] = value;
+        
+        if(pDigitalOutputs_[id]!=nullptr) 
+        {
+            *pDigitalOutputs_[id] = value;
+        }
+        else
+        {
+            std::cout<<"nullprt 6"<<std::endl;
+        }
+        
     }
 
 

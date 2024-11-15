@@ -154,6 +154,8 @@ namespace rocos {
     }
 
     void HardwareInterface::setDigitalOutputsRaw(int id, int32_t value) {
+        
+        
 
     }
 
