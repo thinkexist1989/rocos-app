@@ -3237,10 +3237,10 @@ namespace rocos
                 hw_interface_->setDigitalOutputsRaw(6, LED_OFF);
                 break;
             case COLOR_RED:
-                hw_interface_->setDigitalOutputsRaw(6, LED_GREEN);
+                hw_interface_->setDigitalOutputsRaw(6, LED_RED);
                 break;
             case COLOR_GREEN:
-                hw_interface_->setDigitalOutputsRaw(6, LED_RED);
+                hw_interface_->setDigitalOutputsRaw(6, LED_GREEN);
                 break;
             case COLOR_YELLOW:
                 hw_interface_->setDigitalOutputsRaw(6, LED_YELLOW);
