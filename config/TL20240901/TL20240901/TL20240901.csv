@@ -1,0 +1,78 @@
+Name,Address,Datatype,Type,BitOffset,BitSize
+Slave_1001 [Elmo Drive ].Inputs.Statusword,1001,UINT,IN,0,16
+Slave_1001 [Elmo Drive ].Inputs.Position actual value,1001,DINT,IN,16,32
+Slave_1001 [Elmo Drive ].Inputs.Velocity actual value,1001,DINT,IN,48,32
+Slave_1001 [Elmo Drive ].Inputs.Torque actual value,1001,INT,IN,80,16
+Slave_1001 [Elmo Drive ].Inputs.Analog Input 1,1001,INT,IN,96,16
+Slave_1001 [Elmo Drive ].Inputs.Auxiliary position actual value,1001,DINT,IN,112,32
+Slave_1002 [Elmo Drive ].Inputs.Statusword,1002,UINT,IN,144,16
+Slave_1002 [Elmo Drive ].Inputs.Position actual value,1002,DINT,IN,160,32
+Slave_1002 [Elmo Drive ].Inputs.Velocity actual value,1002,DINT,IN,192,32
+Slave_1002 [Elmo Drive ].Inputs.Torque actual value,1002,INT,IN,224,16
+Slave_1002 [Elmo Drive ].Inputs.Analog Input 1,1002,INT,IN,240,16
+Slave_1002 [Elmo Drive ].Inputs.Auxiliary position actual value,1002,DINT,IN,256,32
+Slave_1003 [Elmo Drive ].Inputs.Statusword,1003,UINT,IN,288,16
+Slave_1003 [Elmo Drive ].Inputs.Position actual value,1003,DINT,IN,304,32
+Slave_1003 [Elmo Drive ].Inputs.Velocity actual value,1003,DINT,IN,336,32
+Slave_1003 [Elmo Drive ].Inputs.Torque actual value,1003,INT,IN,368,16
+Slave_1003 [Elmo Drive ].Inputs.Analog Input 1,1003,INT,IN,384,16
+Slave_1003 [Elmo Drive ].Inputs.Auxiliary position actual value,1003,DINT,IN,400,32
+Slave_1004 [Elmo Drive ].Inputs.Statusword,1004,UINT,IN,432,16
+Slave_1004 [Elmo Drive ].Inputs.Position actual value,1004,DINT,IN,448,32
+Slave_1004 [Elmo Drive ].Inputs.Velocity actual value,1004,DINT,IN,480,32
+Slave_1004 [Elmo Drive ].Inputs.Torque actual value,1004,INT,IN,512,16
+Slave_1004 [Elmo Drive ].Inputs.Analog Input 1,1004,INT,IN,528,16
+Slave_1004 [Elmo Drive ].Inputs.Auxiliary position actual value,1004,DINT,IN,544,32
+Slave_1005 [Elmo Drive ].Inputs.Statusword,1005,UINT,IN,576,16
+Slave_1005 [Elmo Drive ].Inputs.Position actual value,1005,DINT,IN,592,32
+Slave_1005 [Elmo Drive ].Inputs.Velocity actual value,1005,DINT,IN,624,32
+Slave_1005 [Elmo Drive ].Inputs.Torque actual value,1005,INT,IN,656,16
+Slave_1005 [Elmo Drive ].Inputs.Analog Input 1,1005,INT,IN,672,16
+Slave_1005 [Elmo Drive ].Inputs.Auxiliary position actual value,1005,DINT,IN,688,32
+Slave_1006 [Elmo Drive ].Inputs.Statusword,1006,UINT,IN,720,16
+Slave_1006 [Elmo Drive ].Inputs.Position actual value,1006,DINT,IN,736,32
+Slave_1006 [Elmo Drive ].Inputs.Velocity actual value,1006,DINT,IN,768,32
+Slave_1006 [Elmo Drive ].Inputs.Torque actual value,1006,INT,IN,800,16
+Slave_1006 [Elmo Drive ].Inputs.Analog Input 1,1006,INT,IN,816,16
+Slave_1006 [Elmo Drive ].Inputs.Auxiliary position actual value,1006,DINT,IN,832,32
+Slave_1007 [Elmo Drive ].Inputs.Statusword,1007,UINT,IN,864,16
+Slave_1007 [Elmo Drive ].Inputs.Position actual value,1007,DINT,IN,880,32
+Slave_1007 [Elmo Drive ].Inputs.Velocity actual value,1007,DINT,IN,912,32
+Slave_1007 [Elmo Drive ].Inputs.Torque actual value,1007,INT,IN,944,16
+Slave_1007 [Elmo Drive ].Inputs.Analog Input 1,1007,INT,IN,960,16
+Slave_1007 [Elmo Drive ].Inputs.Auxiliary position actual value,1007,DINT,IN,976,32
+Slave_1001 [Elmo Drive ].Outputs.Controlword,1001,UINT,OUT,0,16
+Slave_1001 [Elmo Drive ].Outputs.Modes of operation,1001,SINT,OUT,16,8
+Slave_1001 [Elmo Drive ].Outputs.Target torque,1001,INT,OUT,24,16
+Slave_1001 [Elmo Drive ].Outputs.Target position,1001,DINT,OUT,40,32
+Slave_1001 [Elmo Drive ].Outputs.Target velocity,1001,DINT,OUT,72,32
+Slave_1002 [Elmo Drive ].Outputs.Controlword,1002,UINT,OUT,144,16
+Slave_1002 [Elmo Drive ].Outputs.Modes of operation,1002,SINT,OUT,160,8
+Slave_1002 [Elmo Drive ].Outputs.Target torque,1002,INT,OUT,168,16
+Slave_1002 [Elmo Drive ].Outputs.Target position,1002,DINT,OUT,184,32
+Slave_1002 [Elmo Drive ].Outputs.Target velocity,1002,DINT,OUT,216,32
+Slave_1003 [Elmo Drive ].Outputs.Controlword,1003,UINT,OUT,288,16
+Slave_1003 [Elmo Drive ].Outputs.Modes of operation,1003,SINT,OUT,304,8
+Slave_1003 [Elmo Drive ].Outputs.Target torque,1003,INT,OUT,312,16
+Slave_1003 [Elmo Drive ].Outputs.Target position,1003,DINT,OUT,328,32
+Slave_1003 [Elmo Drive ].Outputs.Target velocity,1003,DINT,OUT,360,32
+Slave_1004 [Elmo Drive ].Outputs.Controlword,1004,UINT,OUT,432,16
+Slave_1004 [Elmo Drive ].Outputs.Modes of operation,1004,SINT,OUT,448,8
+Slave_1004 [Elmo Drive ].Outputs.Target torque,1004,INT,OUT,456,16
+Slave_1004 [Elmo Drive ].Outputs.Target position,1004,DINT,OUT,472,32
+Slave_1004 [Elmo Drive ].Outputs.Target velocity,1004,DINT,OUT,504,32
+Slave_1005 [Elmo Drive ].Outputs.Controlword,1005,UINT,OUT,576,16
+Slave_1005 [Elmo Drive ].Outputs.Modes of operation,1005,SINT,OUT,592,8
+Slave_1005 [Elmo Drive ].Outputs.Target torque,1005,INT,OUT,600,16
+Slave_1005 [Elmo Drive ].Outputs.Target position,1005,DINT,OUT,616,32
+Slave_1005 [Elmo Drive ].Outputs.Target velocity,1005,DINT,OUT,648,32
+Slave_1006 [Elmo Drive ].Outputs.Controlword,1006,UINT,OUT,720,16
+Slave_1006 [Elmo Drive ].Outputs.Modes of operation,1006,SINT,OUT,736,8
+Slave_1006 [Elmo Drive ].Outputs.Target torque,1006,INT,OUT,744,16
+Slave_1006 [Elmo Drive ].Outputs.Target position,1006,DINT,OUT,760,32
+Slave_1006 [Elmo Drive ].Outputs.Target velocity,1006,DINT,OUT,792,32
+Slave_1007 [Elmo Drive ].Outputs.Controlword,1007,UINT,OUT,864,16
+Slave_1007 [Elmo Drive ].Outputs.Modes of operation,1007,SINT,OUT,880,8
+Slave_1007 [Elmo Drive ].Outputs.Target torque,1007,INT,OUT,888,16
+Slave_1007 [Elmo Drive ].Outputs.Target position,1007,DINT,OUT,904,32
+Slave_1007 [Elmo Drive ].Outputs.Target velocity,1007,DINT,OUT,936,32

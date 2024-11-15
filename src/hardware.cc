@@ -42,9 +42,12 @@ namespace rocos {
         pLoadTor_.resize(slave_num_, nullptr);
         pSecondaryPos_.resize(slave_num_, nullptr);
         pSecondaryVel_.resize(slave_num_, nullptr);
+        pDigitalInputs_.resize(slave_num_, nullptr);
+
         pStatusword_.resize(slave_num_, nullptr);
         pControlword_.resize(slave_num_, nullptr);
         pModeOfOp_.resize(slave_num_, nullptr);
+        pDigitalOutputs_.resize(slave_num_, nullptr);
 
         parseParamFormUrdf(urdf_file_path);
 
@@ -215,11 +218,14 @@ namespace rocos {
 
                 auto digital_inputs = inputs->FirstChildElement("digital_inputs");
                 if(digital_inputs) {
+                    
                     pDigitalInputs_[id] = ecPtr_->findSlaveInputVarPtrByName<int32_t>(id, digital_inputs->GetText());
+                    std::cout<<"000"<<std::endl;
                 } else {
+                    
                     pDigitalInputs_[id] = ecPtr_->findSlaveInputVarPtrByName<int32_t>(id, "Digital Inputs");
                 }
-
+                
 
             } else { // 全部采用默认值
                 pStatusword_[id] = ecPtr_->findSlaveInputVarPtrByName<uint16_t>(id, "Status word");
@@ -272,6 +278,7 @@ namespace rocos {
                 auto digital_outputs = outputs->FirstChildElement("digital_outputs");
                 if(digital_outputs) {
                     pDigitalOutputs_[id] = ecPtr_->findSlaveOutputVarPtrByName<int32_t>(id, digital_outputs->GetText());
+                    std::cout<<"1111"<<std::endl;
                 } else {
                     pDigitalOutputs_[id] = ecPtr_->findSlaveOutputVarPtrByName<int32_t>(id, "Digital Outputs");
                 }

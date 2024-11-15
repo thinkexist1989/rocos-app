@@ -358,7 +358,7 @@ namespace rocos
             setLED(COLOR_OFF);
             break;
         case RunState::Stopped:
-            setLED(COLOR_RED);
+            // setLED(COLOR_RED);
             is_running_motion = false;
             break;
         case RunState::Running:
@@ -599,7 +599,7 @@ namespace rocos
         // double max_time = 0.0;
 
         bool isButtonAlreadyPressed = false; // 跟踪按钮按下状态
-
+        // JC_helper::admittance_joint *admittance_control = new JC_helper::admittance_joint{this};
         while (true)
         { // while start
 
@@ -626,16 +626,30 @@ namespace rocos
                 if (!isButtonAlreadyPressed)
                 {
                     std::cout << "Button is pressed!" << std::endl;
-                    setLED(COLOR_YELLOW);          // 设置灯光颜色
-                    // setWorkMode(WorkMode::JntAdmitTeach) ;   // 设置工作模式
-                    isButtonAlreadyPressed = true; // 记录按钮已按下
+                    // TODO 模仿思灵，添加上电自检
+                    // 使能检查函数 检查理论力矩和真实力矩的误差范围
+                    if (isEnabled() )
+                    {
+                        setLED(COLOR_YELLOW);          // 设置灯光颜色
+                        // setWorkMode(WorkMode::JntAdmitTeach) ;   // 设置工作模式
+                        isButtonAlreadyPressed = true; // 记录按钮已按下
+                    }
+                    else
+                    {
+                        isButtonAlreadyPressed = false; // 记录按钮已按下
+                    }
                 }
             }
             else
             {
+
                 isButtonAlreadyPressed = false; // 当按钮松开时重置状态
-                // setWorkMode(WorkMode::Position);
-                // setRunState(RunState::Stopped);
+                // if(work_mode_ == WorkMode::JntAdmitTeach)
+                // {
+                //     setWorkMode(WorkMode::Position);
+                        // setRunState(RunState::Stopped);
+                // }
+                
             }
 
             //     //! 屏蔽开始
