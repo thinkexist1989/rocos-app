@@ -619,10 +619,8 @@ namespace rocos
 
             updateCartesianInfo();
 
-            if (isButtonPressed())
+            if (isButtonPressed()&& work_mode_==WorkMode::Position)
             {
-                // TODO 暂时屏蔽柔顺启动，只是灯光变化
-
                 if (!isButtonAlreadyPressed)
                 {
                     std::cout << "Button is pressed!" << std::endl;
@@ -632,11 +630,12 @@ namespace rocos
                     {
                         setLED(COLOR_YELLOW);          // 设置灯光颜色
                         setWorkMode(WorkMode::JntAdmitTeach) ;   // 设置工作模式
-                        isButtonAlreadyPressed = true; // 记录按钮已按下
+                        isButtonAlreadyPressed = true; // 按钮已按下
                     }
                     else
                     {
-                        isButtonAlreadyPressed = false; // 记录按钮已按下
+                        isButtonAlreadyPressed = false; // 按钮已按下
+                        std::cout << "Enable failed! " << std::endl;
                     }
                 }
             }
@@ -650,7 +649,7 @@ namespace rocos
                 
                 
                 isButtonAlreadyPressed = false; // 当按钮松开时重置状态
-               
+                
                     
                
                 

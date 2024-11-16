@@ -367,7 +367,13 @@ namespace JC_helper
         // 延时2s
         
         // std::this_thread::sleep_for(std::chrono::duration<double>(2));
-
+        if(!checkBeforAdmittance(robot_ptr))
+        {
+            *flag_admittance_joint_turnoff=true;
+            std::cout<<"The LoadTorque is not match "<<std::endl;
+            
+            
+        }
         while (!(*flag_admittance_joint_turnoff))
         {
             Theory_torques = get_theory_torques(robot_ptr, pose, vel, acc);
