@@ -601,7 +601,7 @@ namespace rocos
         bool isButtonAlreadyPressed = false; // 跟踪按钮按下状态
         // JC_helper::admittance_joint *admittance_control = new JC_helper::admittance_joint{this};
         while (true)
-        { // while start
+        { 
 
             hw_interface_->waitForSignal(9);
 
@@ -619,7 +619,7 @@ namespace rocos
 
             updateCartesianInfo();
 
-            if (isButtonPressed()&& work_mode_==WorkMode::Position)
+            if (isButtonPressed())
             {
                 if (!isButtonAlreadyPressed)
                 {
@@ -641,7 +641,7 @@ namespace rocos
             }
             else
             {
-                if(work_mode_==WorkMode::JntAdmitTeach )
+                if(work_mode_==WorkMode::JntAdmitTeach && isButtonAlreadyPressed)
                 {
                 setWorkMode(WorkMode::Position);
                 setRunState(RunState::Stopped);
