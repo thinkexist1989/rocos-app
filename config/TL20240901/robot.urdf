@@ -142,7 +142,9 @@
             xyz="0.000 0.009 -0.058"
             rpy="0 0 0" />
         <mass
-            value="3.685" />
+           
+             value="3.885" />
+              <!-- value="3.685" /> -->
         <inertia
             ixx="0.034"
             ixy="0"
@@ -199,6 +201,7 @@
             xyz="0.000 0.136 0.016"
             rpy="0 0 0" />
         <mass
+  
             value="3.185" />
         <inertia
             ixx="0.085"
@@ -371,7 +374,8 @@
             xyz="0.000 0.00 -0.032"
             rpy="0 0 0" />
         <mass
-            value="0.994" />
+            value="1.194" />
+             <!-- value="0.994" /> -->
         <inertia
             ixx="0.002"
             ixy="0"
@@ -421,7 +425,7 @@
                 <target_position>Target position</target_position>
                 <target_velocity>Target velocity</target_velocity>
                 <target_torque>Target torque</target_torque>
-                <digital_outputs>Digital outputs</digital_outputs>
+                <digital_outputs>Digital Outputs</digital_outputs>
             </outputs>  
         </hardware>
     </joint>
