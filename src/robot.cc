@@ -539,6 +539,9 @@ namespace rocos {
                 if(joints_[i]->getDriveState() != DriveState::OperationEnabled) {
                     pos_[i] = joints_[i]->getPosition();
                     vel_[i] = 0;
+
+                    joints_[i]->setPosition(pos_[i]);
+                    joints_[i]->setVelocity(vel_[i]);
                 }
             }
 
