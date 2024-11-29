@@ -220,9 +220,7 @@ namespace rocos {
                 if(digital_inputs) {
                     
                     pDigitalInputs_[id] = ecPtr_->findSlaveInputVarPtrByName<int32_t>(id, digital_inputs->GetText());
-                    std::cout<<"000"<<std::endl;
                 } else {
-                    
                     pDigitalInputs_[id] = ecPtr_->findSlaveInputVarPtrByName<int32_t>(id, "Digital Inputs");
                 }
                 
