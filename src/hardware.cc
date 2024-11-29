@@ -308,7 +308,7 @@ namespace rocos {
         }
         else
         {
-            std::cout<<"nullprt 6"<<std::endl;
+            // std::cout<<"nullprt 6"<<std::endl;//不做任何处理
         }
         
     }
