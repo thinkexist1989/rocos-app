@@ -276,7 +276,7 @@ namespace rocos {
                 auto digital_outputs = outputs->FirstChildElement("digital_outputs");
                 if(digital_outputs) {
                     pDigitalOutputs_[id] = ecPtr_->findSlaveOutputVarPtrByName<int32_t>(id, digital_outputs->GetText());
-                    std::cout<<"1111"<<std::endl;
+                    
                 } else {
                     pDigitalOutputs_[id] = ecPtr_->findSlaveOutputVarPtrByName<int32_t>(id, "Digital Outputs");
                 }
@@ -304,10 +304,7 @@ namespace rocos {
         {
             *pDigitalOutputs_[id] = value;
         }
-        else
-        {
-            // std::cout<<"nullprt 6"<<std::endl;//不做任何处理
-        }
+        
         
     }
 
