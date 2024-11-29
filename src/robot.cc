@@ -614,6 +614,9 @@ namespace rocos
                 {
                     pos_[i] = joints_[i]->getPosition();
                     vel_[i] = 0;
+
+                    joints_[i]->setPosition(pos_[i]); // 要把数据同步给共享内存
+                    joints_[i]->setVelocity(vel_[i]);
                 }
             }
 
