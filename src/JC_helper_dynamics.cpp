@@ -1,5 +1,6 @@
 #include <rocos_app/JC_helper_dynamics.hpp>
 #include <rocos_app/robot.h>
+#include "rocos_app/JC_helper_dynamics.hpp"
 /** 待处理问题：
  * 2. dragging 笛卡尔空间版 加入
  * 3. drggging 关节空间改进，允许给笛卡尔位姿
@@ -228,8 +229,11 @@ namespace JC_helper
         Initialize(joint_num);
         for (int i = 0; i < joint_num; i++)
         {
-            a_sensor[i] = yaml_node["a_sensor"][i].as<double>();
-            b_sensor[i] = yaml_node["b_sensor"][i].as<double>();
+            sensitivity[i]=yaml_node["sensitivity"][i].as<double>();
+            collection_force[i] = yaml_node["collection_force"][i].as<double>();
+            
+            // a_sensor[i] = yaml_node["a_sensor"][i].as<double>();
+            // b_sensor[i] = yaml_node["b_sensor"][i].as<double>();
             kesai[i] = yaml_node["kesai"][i].as<double>();
             K[i] = yaml_node["K"][i].as<double>();
             M[i] = yaml_node["M"][i].as<double>();
@@ -245,8 +249,7 @@ namespace JC_helper
         external_forces = KDL::Wrenches(robot_ptr->kinematics_.getChain().getNrOfSegments(), KDL::Wrench::Zero());
 
         // 打印admittance_joint参数
-        PLOG_INFO << "a_sensor = " << a_sensor[0] << " " << a_sensor[1] << " " << a_sensor[2] << " " << a_sensor[3] << " " << a_sensor[4] << " " << a_sensor[5] << " " << a_sensor[6];
-        PLOG_INFO << "b_sensor = " << b_sensor[0] << " " << b_sensor[1] << " " << b_sensor[2] << " " << b_sensor[3] << " " << b_sensor[4] << " " << b_sensor[5] << " " << b_sensor[6];
+        
         PLOG_INFO << "kesai = " << kesai[0] << " " << kesai[1] << " " << kesai[2] << " " << kesai[3] << " " << kesai[4] << " " << kesai[5] << " " << kesai[6];
         PLOG_INFO << "K = " << K[0] << " " << K[1] << " " << K[2] << " " << K[3] << " " << K[4] << " " << K[5] << " " << K[6];
         PLOG_INFO << "M = " << M[0] << " " << M[1] << " " << M[2] << " " << M[3] << " " << M[4] << " " << M[5] << " " << M[6];
@@ -274,6 +277,58 @@ namespace JC_helper
         // PLOG_DEBUG.printf( "Theory_torques = %f %f %f %f %f %f %f", Theory_torques[ 0 ], Theory_torques[ 1 ], Theory_torques[ 2 ], Theory_torques[ 3 ], Theory_torques[ 4 ], Theory_torques[ 5 ], Theory_torques[ 6 ] );
     }
 
+    std::vector<double> admittance_joint::compensateGravity(rocos::Robot *robot_ptr, double vel_factor, double acc_factor)
+    {
+        std::vector<double> torque;
+        torque.resize(joint_num);
+        KDL::JntArray joint(joint_num);
+        KDL::JntArray joint_vel(joint_num);
+        static KDL::JntArray joint_vel_last(joint_num);
+        static KDL::JntArray joint_pos_last(joint_num);
+        KDL::JntArray joint_acc(joint_num);
+
+        for (int i = 0; i < joint_num; i++)
+        {
+            joint(i) = robot_ptr->getJointPosition(i);
+            //'joint(i) = robot_ptr->pos_[i];
+            joint_vel(i) = robot_ptr->getJointVelocity(i) * vel_factor;
+            // joint_vel(i)=0;
+            joint_acc(i) = (joint_vel(i) - joint_vel_last(i)) * 1000 * acc_factor;
+            // joint_acc(i)=0;
+            // joint_acc(i)=robot_ptr->acc_[i];
+        }
+        // 获得理论力矩
+        get_theory_torques(robot_ptr, joint, joint_vel, joint_acc);
+        // 获得补偿后的力矩
+
+        for (int i = 0; i < joint_num; i++)
+        {
+            torque[i] = (robot_ptr->getJointTorqueFilter(i)) *0.001/sensitivity[i]- ZeroOffset[i]- Theory_torques[i];
+            // PLOG_INFO << "Jnt " << i << "=> thr_tor: " <<Theory_torques[i] <<" act_tor: "<<robot_ptr-> getJointTorqueFilter(i) * a_sensor[i]
+            //           << " ext_tor: " << robot_ptr->getJointTorqueFilter(i) * a_sensor[i] + b_sensor[i];
+
+            joint_vel_last(i) = joint_vel(i);
+            joint_pos_last(i) = joint(i);
+        }
+
+        return torque;
+    }
+    // 负载是否匹配
+    bool admittance_joint::checkBeforAdmittance(rocos::Robot *robot_ptr)
+    {
+        std::vector<double> joint_torques;
+        joint_torques.resize(joint_num);
+        joint_torques=compensateGravity(robot_ptr);
+        for(int i=0;i<joint_num;i++)
+        {
+            if(abs(joint_torques[i])>collection_force[i])
+            {
+                std::cout<<"The LoadTorque is not match "<<std::endl;
+                return false;
+            }
+        }
+        return true;
+    }
     double admittance_joint::set_K_sensor(double x, double K, double amplitude)
     {
         double y;
@@ -310,8 +365,15 @@ namespace JC_helper
 
         PLOG_DEBUG.printf("pose = %f %f %f %f %f %f %f", pose(0), pose(1), pose(2), pose(3), pose(4), pose(5), pose(5));
         // 延时2s
-        std::this_thread::sleep_for(std::chrono::duration<double>(2));
-
+        
+        // std::this_thread::sleep_for(std::chrono::duration<double>(2));
+        if(!checkBeforAdmittance(robot_ptr))
+        {
+            *flag_admittance_joint_turnoff=true;
+            std::cout<<"The LoadTorque is not match "<<std::endl;
+            
+            
+        }
         while (!(*flag_admittance_joint_turnoff))
         {
             Theory_torques = get_theory_torques(robot_ptr, pose, vel, acc);
@@ -319,7 +381,8 @@ namespace JC_helper
             {
                 Actual_torques[i] = robot_ptr->getJointTorqueFilter(i);
 
-                fext[i] = Actual_torques[i] * DELTA_T * a_sensor[i] + b_sensor[i] - Theory_torques[i];
+                fext[i] = Actual_torques[i] * 0.001 / sensitivity[i] -ZeroOffset[i] - Theory_torques[i];
+                
                 com_fext[i] = set_K_sensor(fext[i], joint_K[i]);
 
                 if (abs(com_fext[i]) < F_joint_stop[i])
@@ -358,9 +421,12 @@ namespace JC_helper
                 q_target(i) = pose(i);
                 last_pose(i) = pose(i);
             }
-            // 打印理论力矩和真实力矩
-            /// PLOG_DEBUG.printf( "Theory_torques = %f %f %f %f %f %f %f", Theory_torques[ 0 ], Theory_torques[ 1 ], Theory_torques[ 2 ], Theory_torques[ 3 ], Theory_torques[ 4 ], Theory_torques[ 5 ], Theory_torques[ 6 ] );
-            // PLOG_DEBUG.printf( "Actual_torques = %f %f %f %f %f %f %f", fext[ 0 ], fext[ 1 ], fext[ 2 ], fext[ 3 ], fext[ 4 ], fext[ 5 ], fext[ 6 ] );
+            //打印理论力矩和真实力矩Actual_torques[i] * 0.001 / sensitivity[i]
+            // PLOG_DEBUG.printf( "Theory_torques = %f %f %f %f %f %f %f", Theory_torques[ 0 ], Theory_torques[ 1 ], Theory_torques[ 2 ], Theory_torques[ 3 ], Theory_torques[ 4 ], Theory_torques[ 5 ], Theory_torques[ 6 ] );
+            // PLOG_DEBUG.printf( "Actual_torques = %f %f %f %f %f %f %f", Actual_torques[ 0 ]* 0.001 / sensitivity[0],Actual_torques[ 1 ]* 0.001 / sensitivity[1],Actual_torques[ 2 ]* 0.001 / sensitivity[2],Actual_torques[ 3 ]* 0.001 / sensitivity[3],Actual_torques[ 4 ]* 0.001 / sensitivity[4],Actual_torques[ 5 ]* 0.001 / sensitivity[5],Actual_torques[ 6 ]* 0.001 / sensitivity[6] );
+            // PLOG_DEBUG.printf( "com_torques = %f %f %f %f %f %f %f", fext[ 0 ], fext[ 1 ], fext[ 2 ], fext[ 3 ], fext[ 4 ], fext[ 5 ], fext[ 6 ] );
+            
+            // usleep(1000000);
             robot_ptr->servoJ(q_target);
         }
         robot_ptr->setRunState(rocos::Robot::RunState::Stopped);

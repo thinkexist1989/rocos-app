@@ -76,6 +76,7 @@ add_subdirectory(3rdparty/ruckig)
 add_subdirectory(3rdparty/plog)
 add_subdirectory(3rdparty/gripper)
 add_subdirectory(3rdparty/gflags)
+add_subdirectory(3rdparty/spdlog)
 
 
 ###########
@@ -105,8 +106,12 @@ set(DEP_LIBS
         Boost::chrono
         Boost::thread
         yaml-cpp
-
         )
+
+
+add_library(logger STATIC src/logger.cc)
+target_link_libraries(logger PUBLIC spdlog::spdlog_header_only)
+
 
 ######### Library Hardware ###############
 add_library(hardware
