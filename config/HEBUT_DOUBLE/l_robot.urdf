@@ -1,0 +1,558 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- This URDF was automatically created by SolidWorks to URDF Exporter! Originally created by Stephen Brawner (brawner@gmail.com) 
+     Commit Version: 1.6.0-4-g7f85cfe  Build Version: 1.6.7995.38578
+     For more information, please see http://wiki.ros.org/sw_urdf_exporter -->
+<robot
+  name="l_robot">
+  <link
+    name="base_link">
+    <inertial>
+      <origin
+        xyz="0.0288244297796101 9.15758418819429E-05 3.33337614415248E-06"
+        rpy="0 0 0" />
+      <mass
+        value="47.2278414825512" />
+      <inertia
+        ixx="20.2855091609073"
+        ixy="0.000126569938505645"
+        ixz="-0.00694088342846659"
+        iyy="20.9162008161584"
+        iyz="-0.000294535995843831"
+        izz="0.737345947031001" />
+    </inertial>
+    <visual>
+      <origin
+        xyz="0 0 0"
+        rpy="0 0 0" />
+      <geometry>
+        <mesh
+          filename="package://双臂_1SLDASM/meshes/base_link.STL" />
+      </geometry>
+      <material
+        name="">
+        <color
+          rgba="0.792156862745098 0.819607843137255 0.933333333333333 1" />
+      </material>
+    </visual>
+    <collision>
+      <origin
+        xyz="0 0 0"
+        rpy="0 0 0" />
+      <geometry>
+        <mesh
+          filename="package://双臂_1SLDASM/meshes/base_link.STL" />
+      </geometry>
+    </collision>
+  </link>
+  <link
+    name="l_link_1">
+    <inertial>
+      <origin
+        xyz="-9.15758418881289E-05 -0.0288244297796053 -0.322603333376142"
+        rpy="0 0 0" />
+      <mass
+        value="47.2278414825512" />
+      <inertia
+        ixx="20.9162008161584"
+        ixy="0.000126569938505517"
+        ixz="-0.000294535995801242"
+        iyy="20.2855091609073"
+        iyz="-0.00694088342850871"
+        izz="0.737345947031001" />
+    </inertial>
+    <visual>
+      <origin
+        xyz="0 0 0"
+        rpy="0 0 0" />
+      <geometry>
+        <mesh
+          filename="package://双臂_1SLDASM/meshes/l_link_1.STL" />
+      </geometry>
+      <material
+        name="">
+        <color
+          rgba="0.792156862745098 0.819607843137255 0.933333333333333 1" />
+      </material>
+    </visual>
+    <collision>
+      <origin
+        xyz="0 0 0"
+        rpy="0 0 0" />
+      <geometry>
+        <mesh
+          filename="package://双臂_1SLDASM/meshes/l_link_1.STL" />
+      </geometry>
+    </collision>
+  </link>
+  <joint
+    name="l_joint_1"
+    type="continuous">
+    <origin
+      xyz="0 0 0.322599999999998"
+      rpy="0 0 0" />
+    <parent
+      link="base_link" />
+    <child
+      link="l_link_1" />
+    <axis
+      xyz="0 0 1" />
+    <hardware id="0" type="driver">
+      <limit lower="-2.8274333882" upper="2.8274333882" effort="0" velocity="0" />
+      <transform ratio="1.0" offset_pos_cnt="0" cnt_per_unit="20860.7567" torque_per_unit="1.0" user_unit_name="rad"/>
+      <inputs name="Inputs">
+        <status_word>Statusword</status_word>
+        <position_actual_value>Position actual value</position_actual_value>
+        <velocity_actual_value>Velocity actual value</velocity_actual_value>
+        <!-- <torque_actual_value>Torque actual value</torque_actual_value> -->
+        <load_torque_value>Analog Input 1</load_torque_value>
+         <secondary_position_value>Auxiliary position actual value</secondary_position_value> 
+        <!--  <secondary_velocity_value>Secondary velocity value</secondary_velocity_value>  -->
+      </inputs>
+      <outputs name="Outputs">
+        <control_word>Controlword</control_word>
+        <mode_of_operation>Modes of operation</mode_of_operation>
+        <target_position>Target position</target_position>
+        <target_velocity>Target velocity</target_velocity>
+        <!-- <target_torque>Target torque</target_torque> -->
+      </outputs>
+    </hardware>
+  </joint>
+  <link
+    name="l_link_2">
+    <inertial>
+      <origin
+        xyz="-9.15758418881289E-05 -0.322603333376142 0.0288244297796049"
+        rpy="0 0 0" />
+      <mass
+        value="47.2278414825512" />
+      <inertia
+        ixx="20.9162008161584"
+        ixy="-0.000294535995801242"
+        ixz="-0.000126569938505517"
+        iyy="0.737345947031001"
+        iyz="0.00694088342848184"
+        izz="20.2855091609073" />
+    </inertial>
+    <visual>
+      <origin
+        xyz="0 0 0"
+        rpy="0 0 0" />
+      <geometry>
+        <mesh
+          filename="package://双臂_1SLDASM/meshes/l_link_2.STL" />
+      </geometry>
+      <material
+        name="">
+        <color
+          rgba="0.792156862745098 0.819607843137255 0.933333333333333 1" />
+      </material>
+    </visual>
+    <collision>
+      <origin
+        xyz="0 0 0"
+        rpy="0 0 0" />
+      <geometry>
+        <mesh
+          filename="package://双臂_1SLDASM/meshes/l_link_2.STL" />
+      </geometry>
+    </collision>
+  </link>
+  <joint
+    name="l_joint_2"
+    type="continuous">
+    <origin
+      xyz="0 0 0"
+      rpy="1.5707963267949 0 0" />
+    <parent
+      link="l_link_1" />
+    <child
+      link="l_link_2" />
+    <axis
+      xyz="0 0 1" />
+      <hardware id="1" type="driver">
+      <limit lower="-2.3038346126" upper="2.3038346126" effort="0" velocity="0" />
+      <transform ratio="1.0" offset_pos_cnt="0" cnt_per_unit="20860.7567" torque_per_unit="1.0" user_unit_name="rad"/>
+      <inputs name="Inputs">
+        <status_word>Statusword</status_word>
+        <position_actual_value>Position actual value</position_actual_value>
+        <velocity_actual_value>Velocity actual value</velocity_actual_value>
+        <!-- <torque_actual_value>Torque actual value</torque_actual_value> -->
+        <load_torque_value>Analog Input 1</load_torque_value>
+         <secondary_position_value>Auxiliary position actual value</secondary_position_value> 
+        <!--  <secondary_velocity_value>Secondary velocity value</secondary_velocity_value>  -->
+      </inputs>
+      <outputs name="Outputs">
+        <control_word>Controlword</control_word>
+        <mode_of_operation>Modes of operation</mode_of_operation>
+        <target_position>Target position</target_position>
+        <target_velocity>Target velocity</target_velocity>
+        <!-- <target_torque>Target torque</target_torque> -->
+      </outputs>
+    </hardware>
+  </joint>
+  <link
+    name="l_link_3">
+    <inertial>
+      <origin
+        xyz="-9.1575841880522E-05 -0.028824429779605 -0.724103333376146"
+        rpy="0 0 3.14" />
+      <mass
+        value="47.2278414825512" />
+      <inertia
+        ixx="20.9162008161584"
+        ixy="0.000126569938505649"
+        ixz="-0.000294535995829486"
+        iyy="20.2855091609073"
+        iyz="-0.00694088342853817"
+        izz="0.737345947031001" />
+    </inertial>
+    <visual>
+      <origin
+        xyz="0 0 0"
+        rpy="0 0 3.14" />
+      <geometry>
+        <mesh
+          filename="package://双臂_1SLDASM/meshes/l_link_3.STL" />
+      </geometry>
+      <material
+        name="">
+        <color
+          rgba="0.792156862745098 0.819607843137255 0.933333333333333 1" />
+      </material>
+    </visual>
+    <collision>
+      <origin
+        xyz="0 0 0"
+        rpy="0 0 0" />
+      <geometry>
+        <mesh
+          filename="package://双臂_1SLDASM/meshes/l_link_3.STL" />
+      </geometry>
+    </collision>
+  </link>
+  <joint
+    name="l_joint_3"
+    type="continuous">
+    <origin
+      xyz="0 0.401500000000004 0"
+      rpy="-1.57079632679489 0 0" />
+    <parent
+      link="l_link_2" />
+    <child
+      link="l_link_3" />
+    <axis
+      xyz="0 0 1" />
+    <hardware id="2" type="driver">
+      <limit lower="-2.7750735107" upper="2.7750735107" effort="0" velocity="0" />
+      <transform ratio="1.0" offset_pos_cnt="0" cnt_per_unit="20860.7567" torque_per_unit="1.0" user_unit_name="rad"/>
+      <inputs name="Inputs">
+        <status_word>Statusword</status_word>
+        <position_actual_value>Position actual value</position_actual_value>
+        <velocity_actual_value>Velocity actual value</velocity_actual_value>
+        <!-- <torque_actual_value>Torque actual value</torque_actual_value> -->
+        <load_torque_value>Analog Input 1</load_torque_value>
+         <secondary_position_value>Auxiliary position actual value</secondary_position_value> 
+        <!--  <secondary_velocity_value>Secondary velocity value</secondary_velocity_value>  -->
+      </inputs>
+      <outputs name="Outputs">
+        <control_word>Controlword</control_word>
+        <mode_of_operation>Modes of operation</mode_of_operation>
+        <target_position>Target position</target_position>
+        <target_velocity>Target velocity</target_velocity>
+        <!-- <target_torque>Target torque</target_torque> -->
+      </outputs>
+    </hardware>
+  </joint>
+  <link
+    name="l_link_4">
+    <inertial>
+      <origin
+        xyz="-9.15758418805165E-05 -0.724103333376146 0.0288244297796043"
+        rpy="0 3.14 0" />
+      <mass
+        value="47.2278414825512" />
+      <inertia
+        ixx="20.9162008161584"
+        ixy="-0.000294535995829484"
+        ixz="-0.000126569938505768"
+        iyy="0.737345947031001"
+        iyz="0.00694088342852134"
+        izz="20.2855091609073" />
+    </inertial>
+    <visual>
+      <origin
+        xyz="0 0 0"
+        rpy="0 -3.14 0" />
+      <geometry>
+        <mesh
+          filename="package://双臂_1SLDASM/meshes/l_link_4.STL" />
+      </geometry>
+      <material
+        name="">
+        <color
+          rgba="0.792156862745098 0.819607843137255 0.933333333333333 1" />
+      </material>
+    </visual>
+    <collision>
+      <origin
+        xyz="0 0 0"
+        rpy="0 0 0" />
+      <geometry>
+        <mesh
+          filename="package://双臂_1SLDASM/meshes/l_link_4.STL" />
+      </geometry>
+    </collision>
+  </link>
+  <joint
+    name="l_joint_4"
+    type="continuous">
+    <origin
+      xyz="0 0 0"
+      rpy="1.5707963267949 0 0" />
+    <parent
+      link="l_link_3" />
+    <child
+      link="l_link_4" />
+    <axis
+      xyz="0 0 1" />
+    <hardware id="3" type="driver">
+      <limit lower="-2.3038346126" upper="2.3038346126" effort="0" velocity="0" />
+      <transform ratio="1.0" offset_pos_cnt="0" cnt_per_unit="20860.7567" torque_per_unit="1.0" user_unit_name="rad"/>
+      <inputs name="Inputs">
+        <status_word>Statusword</status_word>
+        <position_actual_value>Position actual value</position_actual_value>
+        <velocity_actual_value>Velocity actual value</velocity_actual_value>
+        <!-- <torque_actual_value>Torque actual value</torque_actual_value> -->
+        <load_torque_value>Analog Input 1</load_torque_value>
+         <secondary_position_value>Auxiliary position actual value</secondary_position_value> 
+        <!--  <secondary_velocity_value>Secondary velocity value</secondary_velocity_value>  -->
+      </inputs>
+      <outputs name="Outputs">
+        <control_word>Controlword</control_word>
+        <mode_of_operation>Modes of operation</mode_of_operation>
+        <target_position>Target position</target_position>
+        <target_velocity>Target velocity</target_velocity>
+        <!-- <target_torque>Target torque</target_torque> -->
+      </outputs>
+    </hardware>
+  </joint>
+  <link
+    name="l_link_5">
+    <inertial>
+      <origin
+        xyz="-9.15758418803473E-05 -0.0288244297796049 -1.11560333337614"
+        rpy="0 0 3.14" />
+      <mass
+        value="47.2278414825512" />
+      <inertia
+        ixx="20.9162008161584"
+        ixy="0.00012656993850565"
+        ixz="-0.000294535995826327"
+        iyy="20.2855091609073"
+        iyz="-0.00694088342853653"
+        izz="0.737345947031001" />
+    </inertial>
+    <visual>
+      <origin
+        xyz="0 0 0"
+        rpy="0 0 3.14" />
+      <geometry>
+        <mesh
+          filename="package://双臂_1SLDASM/meshes/l_link_5.STL" />
+      </geometry>
+      <material
+        name="">
+        <color
+          rgba="0.792156862745098 0.819607843137255 0.933333333333333 1" />
+      </material>
+    </visual>
+    <collision>
+      <origin
+        xyz="0 0 0"
+        rpy="0 0 0" />
+      <geometry>
+        <mesh
+          filename="package://双臂_1SLDASM/meshes/l_link_5.STL" />
+      </geometry>
+    </collision>
+  </link>
+  <joint
+    name="l_joint_5"
+    type="continuous">
+    <origin
+      xyz="0 0.391499999999997 0"
+      rpy="-1.5707963267949 0 0" />
+    <parent
+      link="l_link_4" />
+    <child
+      link="l_link_5" />
+    <axis
+      xyz="0 0 1" />
+    <hardware id="4" type="driver">
+      <limit lower="-2.8274333882" upper="2.8274333882" effort="0" velocity="0" />
+      <transform ratio="1.0" offset_pos_cnt="0" cnt_per_unit="20860.7567" torque_per_unit="1.0" user_unit_name="rad"/>
+      <inputs name="Inputs">
+        <status_word>Statusword</status_word>
+        <position_actual_value>Position actual value</position_actual_value>
+        <velocity_actual_value>Velocity actual value</velocity_actual_value>
+        <!-- <torque_actual_value>Torque actual value</torque_actual_value> -->
+        <load_torque_value>Analog Input 1</load_torque_value>
+         <secondary_position_value>Auxiliary position actual value</secondary_position_value> 
+        <!--  <secondary_velocity_value>Secondary velocity value</secondary_velocity_value>  -->
+      </inputs>
+      <outputs name="Outputs">
+        <control_word>Controlword</control_word>
+        <mode_of_operation>Modes of operation</mode_of_operation>
+        <target_position>Target position</target_position>
+        <target_velocity>Target velocity</target_velocity>
+        <!-- <target_torque>Target torque</target_torque> -->
+      </outputs>
+    </hardware>
+  </joint>
+  <link
+    name="l_link_6">
+    <inertial>
+      <origin
+        xyz="-9.15758418802753E-05 -1.11560333337614 0.028824429779605"
+        rpy="0 3.14 0" />
+      <mass
+        value="47.2278414825512" />
+      <inertia
+        ixx="20.9162008161584"
+        ixy="-0.000294535995826309"
+        ixz="-0.000126569938507226"
+        iyy="0.737345947031001"
+        iyz="0.00694088342853817"
+        izz="20.2855091609073" />
+    </inertial>
+    <visual>
+      <origin
+        xyz="0 0 0"
+        rpy="0 3.14 0" />
+      <geometry>
+        <mesh
+          filename="package://双臂_1SLDASM/meshes/l_link_6.STL" />
+      </geometry>
+      <material
+        name="">
+        <color
+          rgba="0.792156862745098 0.819607843137255 0.933333333333333 1" />
+      </material>
+    </visual>
+    <collision>
+      <origin
+        xyz="0 0 0"
+        rpy="0 0 0" />
+      <geometry>
+        <mesh
+          filename="package://双臂_1SLDASM/meshes/l_link_6.STL" />
+      </geometry>
+    </collision>
+  </link>
+  <joint
+    name="l_joint_6"
+    type="continuous">
+    <origin
+      xyz="0 0 0"
+      rpy="1.5707963267949 0 0" />
+    <parent
+      link="l_link_5" />
+    <child
+      link="l_link_6" />
+    <axis
+      xyz="0 0 1" />
+    <hardware id="5" type="driver">
+      <limit lower="-2.0943951024" upper="2.0943951024" effort="0" velocity="0" />
+      <transform ratio="1.0" offset_pos_cnt="0" cnt_per_unit="2086075.670094" torque_per_unit="1.0" user_unit_name="rad"/>
+      <inputs name="Inputs">
+        <status_word>Statusword</status_word>
+        <position_actual_value>Position actual value</position_actual_value>
+        <velocity_actual_value>Velocity actual value</velocity_actual_value>
+        <!-- <torque_actual_value>Torque actual value</torque_actual_value> -->
+        <load_torque_value>Analog Input 1</load_torque_value>
+         <secondary_position_value>Auxiliary position actual value</secondary_position_value> 
+        <!--  <secondary_velocity_value>Secondary velocity value</secondary_velocity_value>  -->
+      </inputs>
+      <outputs name="Outputs">
+        <control_word>Controlword</control_word>
+        <mode_of_operation>Modes of operation</mode_of_operation>
+        <target_position>Target position</target_position>
+        <target_velocity>Target velocity</target_velocity>
+        <!-- <target_torque>Target torque</target_torque> -->
+      </outputs>
+    </hardware>
+  </joint>
+  <link
+    name="l_link_7">
+    <inertial>
+      <origin
+        xyz="-0.0213781158937068 -0.0193347433158388 -1.27320333337614"
+        rpy="0 0 0" />
+      <mass
+        value="47.2278414825512" />
+      <inertia
+        ixx="20.5714004829771"
+        ixy="-0.313967258043361"
+        ixz="-0.00533123763014897"
+        iyy="20.6303094940886"
+        iyz="-0.00445426981134439"
+        izz="0.737345947031001" />
+    </inertial>
+    <visual>
+      <origin
+        xyz="0 0 0"
+        rpy="0 0 0" />
+      <geometry>
+        <mesh
+          filename="package://双臂_1SLDASM/meshes/l_link_7.STL" />
+      </geometry>
+      <material
+        name="">
+        <color
+          rgba="0.792156862745098 0.819607843137255 0.933333333333333 1" />
+      </material>
+    </visual>
+    <collision>
+      <origin
+        xyz="0 0 0"
+        rpy="0 0 0" />
+      <geometry>
+        <mesh
+          filename="package://双臂_1SLDASM/meshes/l_link_7.STL" />
+      </geometry>
+    </collision>
+  </link>
+  <joint
+    name="l_joint_7"
+    type="continuous">
+    <origin
+      xyz="0 0.1576 0"
+      rpy="-1.5707963267949 0 0" />
+    <parent
+      link="l_link_6" />
+    <child
+      link="l_link_7" />
+    <axis
+      xyz="0 0 1" />
+    <hardware id="6" type="driver">
+      <limit lower="-2.8274333882" upper="2.8274333882" effort="0" velocity="0" />
+      <transform ratio="1.0" offset_pos_cnt="0" cnt_per_unit="2086075.670094" torque_per_unit="1.0" user_unit_name="rad"/>
+      <inputs name="Inputs">
+        <status_word>Statusword</status_word>
+        <position_actual_value>Position actual value</position_actual_value>
+        <velocity_actual_value>Velocity actual value</velocity_actual_value>
+        <!-- <torque_actual_value>Torque actual value</torque_actual_value> -->
+        <load_torque_value>Analog Input 1</load_torque_value>
+         <secondary_position_value>Auxiliary position actual value</secondary_position_value> 
+        <!--  <secondary_velocity_value>Secondary velocity value</secondary_velocity_value>  -->
+      </inputs>
+      <outputs name="Outputs">
+        <control_word>Controlword</control_word>
+        <mode_of_operation>Modes of operation</mode_of_operation>
+        <target_position>Target position</target_position>
+        <target_velocity>Target velocity</target_velocity>
+        <!-- <target_torque>Target torque</target_torque> -->
+      </outputs>
+    </hardware>
+  </joint>
+</robot>

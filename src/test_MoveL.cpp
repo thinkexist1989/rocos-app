@@ -70,7 +70,7 @@ void threadsave()
 {
 //    建立csv存储文件
 
-    outfile.open("MoveL.csv");
+    outfile.open("MoveLSync.csv");
     outfile << "time, x, y, z, r, p, y" << std::endl;
 
     while (isRuning)
@@ -86,6 +86,46 @@ void threadsave()
         outfile <<"right:"<< r_currentFrame.p.x() << "," << r_currentFrame.p.y() << "," << r_currentFrame.p.z() << "," << r << "," << p << "," << y << std::endl;
         usleep(1000000);
     }
+
+}
+void waitForMoveLCompletion(rocos::Robot *l_robot_ptr, rocos::Robot *r_robot_ptr)
+{
+
+    while(l_robot_ptr->getRunState()!=rocos::Robot::RunState::Stopped || r_robot_ptr->getRunState()!=rocos::Robot::RunState::Stopped)
+    {
+
+        if(l_robot_ptr->isThreadWaiting()&&r_robot_ptr->isThreadWaiting())
+        {
+            std::cout<<"both are waiting"<<std::endl;
+            l_robot_ptr->triggerSync();//按道理静态类条件变量，可以触发多个等待线程
+            usleep(10000);
+            // r_robot_ptr->triggerSync();
+        }
+        //左臂报错退出，右臂在等待，触发右臂
+        else if (l_robot_ptr->getRunState()==rocos::Robot::RunState::Stopped && r_robot_ptr->isThreadWaiting())
+        {
+            std::cout<<"left is stopped, right is waiting"<<std::endl;
+            r_robot_ptr->triggerSync();
+            usleep(10000);
+        }
+        //右臂报错退出，左臂在等待，触发左臂
+        else if (r_robot_ptr->getRunState()==rocos::Robot::RunState::Stopped && l_robot_ptr->isThreadWaiting())
+        {
+            std::cout<<"left is waiting, right is stopped"<<std::endl;
+            l_robot_ptr->triggerSync();
+            usleep(10000);
+        }
+        else
+        {
+            usleep(1000000);
+        }
+
+
+    }
+
+    std::cout<<"MoveL is completed"<<std::endl;
+
+
 
 }
 
@@ -180,36 +220,40 @@ int main(int argc, char *argv[])
     // initial Position
     KDL::Frame l_pose = KDL::Frame(KDL::Rotation::RPY(3.1415926, 0.00, 3.1415926), KDL::Vector(-0.560736, 0.00, 0.172071));
     KDL::Frame r_pose = KDL::Frame(KDL::Rotation::RPY(3.1415926, 0.00, 3.1415926), KDL::Vector(0.560736, 0.00, 0.172071));
-    l_robot_ptr->MoveL(l_pose, 0.05, 0.05, 0.0, 0.0, true);
-    r_robot_ptr->MoveL(r_pose, 0.05, 0.05, 0.0, 0.0, false);
-    // currentFrame.p.y(0.03);
-    sleep(1);
+    l_robot_ptr->MoveLSync(l_pose, 0.05, 0.05, 0.0, 0.0, true);
+    r_robot_ptr->MoveLSync(r_pose, 0.05, 0.05, 0.0, 0.0, true);
+    waitForMoveLCompletion(l_robot_ptr, r_robot_ptr);
+
     // start
     l_pose = KDL::Frame(KDL::Rotation::RPY(3.1415926, 0.00, 3.1415926), KDL::Vector(-0.560736, -0.20, 0.172071));
     r_pose = KDL::Frame(KDL::Rotation::RPY(3.1415926, 0.00, 3.1415926), KDL::Vector(0.560736, -0.20, 0.172071));
-    l_robot_ptr->MoveL(l_pose, 0.05, 0.05, 0.0, 0.0, true);
-    r_robot_ptr->MoveL(r_pose, 0.05, 0.05, 0.0, 0.0, false);
-    sleep(1);
+    l_robot_ptr->MoveLSync(l_pose, 0.05, 0.05, 0.0, 0.0, true);
+    r_robot_ptr->MoveLSync(r_pose, 0.05, 0.05, 0.0, 0.0, true);
+    waitForMoveLCompletion(l_robot_ptr, r_robot_ptr);
+
     // down
     l_pose = KDL::Frame(KDL::Rotation::RPY(3.1415926, 0.00, 3.1415926), KDL::Vector(-0.560736, -0.40, 0.172071));
     r_pose = KDL::Frame(KDL::Rotation::RPY(3.1415926, 0.00, 3.1415926), KDL::Vector(0.560736, -0.40, 0.172071));
-    l_robot_ptr->MoveL(l_pose, 0.05, 0.05, 0.0, 0.0, true);
-    r_robot_ptr->MoveL(r_pose, 0.05, 0.05, 0.0, 0.0, false);
-    sleep(1);
+    l_robot_ptr->MoveLSync(l_pose, 0.05, 0.05, 0.0, 0.0, true);
+    r_robot_ptr->MoveLSync(r_pose, 0.05, 0.05, 0.0, 0.0, true);
+    waitForMoveLCompletion(l_robot_ptr, r_robot_ptr);
+
 
     // up
     l_pose = KDL::Frame(KDL::Rotation::RPY(3.1415926, 0.00, 3.1415926), KDL::Vector(-0.560736, 0.30, 0.172071));
     r_pose = KDL::Frame(KDL::Rotation::RPY(3.1415926, 0.00, 3.1415926), KDL::Vector(0.560736, 0.30, 0.172071));
-    l_robot_ptr->MoveL(l_pose, 0.05, 0.05, 0.0, 0.0, true);
-    r_robot_ptr->MoveL(r_pose, 0.05, 0.05, 0.0, 0.0, false);
-    sleep(1);
+    l_robot_ptr->MoveLSync(l_pose, 0.05, 0.05, 0.0, 0.0, true);
+    r_robot_ptr->MoveLSync(r_pose, 0.05, 0.05, 0.0, 0.0, true);
+    waitForMoveLCompletion(l_robot_ptr, r_robot_ptr);
+
 
     // start
     l_pose = KDL::Frame(KDL::Rotation::RPY(3.1415926, 0.00, 3.1415926), KDL::Vector(-0.560736, -0.20, 0.172071));
     r_pose = KDL::Frame(KDL::Rotation::RPY(3.1415926, 0.00, 3.1415926), KDL::Vector(0.560736, -0.20, 0.172071));
-    l_robot_ptr->MoveL(l_pose, 0.05, 0.05, 0.0, 0.0, true);
-    r_robot_ptr->MoveL(r_pose, 0.05, 0.05, 0.0, 0.0, false);
-    sleep(1);
+    l_robot_ptr->MoveLSync(l_pose, 0.05, 0.05, 0.0, 0.0, true);
+    r_robot_ptr->MoveLSync(r_pose, 0.05, 0.05, 0.0, 0.0, true);
+    waitForMoveLCompletion(l_robot_ptr, r_robot_ptr);
+
     l_robotService->runServer("0.0.0.0:50001", false);
 
     l_robot_ptr->setDisabled();

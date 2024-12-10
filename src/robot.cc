@@ -24,6 +24,11 @@
 #define  EPS 1e-7
 
 namespace rocos {
+    //静态成员变量初始化
+    std::atomic<bool> Robot::is_sync{false};
+    std::condition_variable Robot::cond_var;
+    std::mutex Robot::sync_mutex_;
+
     Robot::Robot(HardwareInterface *hw,
                  const string &urdf_file_path,
                  const string &base_link,
@@ -860,6 +865,244 @@ namespace rocos {
         }
     }
 
+    int Robot::MoveLSync(Frame pose, double speed, double acceleration, double time, double radius, bool asynchronous,
+        int max_running_count)
+    {
+
+        bool all_pos_mode{true};  //假设全部关节位置模式
+
+        for (int i{0}; i < jointNum; i++) {
+            if (joints_[i]->getMode() != ModeOfOperation::CyclicSynchronousPositionMode)
+                all_pos_mode = false;
+        }
+
+        if (all_pos_mode)
+        {
+
+            return MoveLSync_pos(pose, speed, acceleration, time, radius, asynchronous, max_running_count);
+        }
+        else {
+            PLOG_ERROR << "某关节为既不是位置模式也不是速度模式！";
+            return -1;
+        }
+
+
+    }
+
+    void Robot::setSync(bool value)
+    {
+        is_sync.store(value);
+    }
+
+    bool Robot::getSync()
+    {
+        is_sync.load();
+    }
+
+    void Robot::waitForSync()
+    {
+        std::unique_lock<std::mutex> lock(sync_mutex_);
+        is_waiting.store(true);  // 标记线程正在等待
+        std::cout << "Waiting for sync...\n";
+        cond_var.wait(lock, []() { return is_sync.load(); }); // 等待条件触发
+        is_waiting.store(false);  // 标记线程不在等待
+        std::cout << "Sync received, exiting...\n";
+    }
+
+    void Robot::triggerSync()
+    {
+        {
+            std::lock_guard<std::mutex> lock(sync_mutex_);
+            is_sync.store(true); // 设置触发条件
+        }
+        cond_var.notify_all(); // 唤醒等待线程
+    }
+
+    bool Robot::isThreadWaiting()
+    {
+        return is_waiting.load();
+    }
+
+    void Robot::RunMoveLSync(const std::vector<KDL::JntArray>& traj)
+    {
+        std::cout << "No. of waypoints: " << traj.size() << std::endl;
+        waitForSync();
+
+        for (const auto &waypoints: traj) {
+            if(!isEnabled())
+                goto Exit;
+
+            for (int i = 0; i < jnt_num_; ++i) {
+                if (joints_[i]->getMode() == ModeOfOperation::CyclicSynchronousPositionMode) {
+                    pos_[i] = waypoints(i);
+                    joints_[i]->setPosition(waypoints(i));
+                } else if (joints_[i]->getMode() == ModeOfOperation::CyclicSynchronousVelocityMode) {
+                    vel_[i] = waypoints(i);
+                    pos_[i] = pos_[i] + vel_[i] * DELTA_T;
+                    joints_[i]->setVelocity(vel_[i]);
+                    joints_[i]->setPosition(pos_[i]);
+                } else {
+                    PLOG_ERROR << "关节[" << i << "] 不支持此模式 :" << static_cast<int> (joints_[i]->getMode());
+                    // is_running_motion = false;
+                    setRunState(RunState::Stopped);
+                    return;
+                }
+            }
+
+            hw_interface_->waitForSignal(0);
+        }
+
+        Exit:
+        // is_running_motion = false;
+        setSync(false);
+        setRunState(RunState::Stopped);
+
+    }
+
+
+    int Robot::MoveLSync_pos(Frame pose, double speed, double acceleration, double time, double radius,
+                             bool asynchronous, int max_running_count)
+    {
+         for (int i{0}; i < jointNum; i++) {
+            if (joints_[i]->getMode() != ModeOfOperation::CyclicSynchronousPositionMode) {
+                PLOG_ERROR << " 需要关节[" << i << "]进入位置伺服模式";
+                return -1;
+            }
+        }
+
+        if (max_running_count < 1) {
+            PLOG_ERROR << "max_running_count parameters must be greater than 0";
+            return -1;
+        }
+
+        if (CheckBeforeMove(pose, speed, acceleration, time, radius) < 0) {
+            PLOG_ERROR << "given parameters is invalid";
+            return -1;
+        }
+
+        if (is_running_motion)  //最大一条任务异步执行
+        {
+            PLOG_ERROR << " Motion is still running and waiting for it to finish";
+            return -1;
+        } else {
+            //is_running_motion = true;
+            setRunState(RunState::Running);
+        }
+
+        if (motion_thread_) {
+            motion_thread_->join();
+            motion_thread_ = nullptr;
+        }
+
+        //** 变量初始化 **//
+        traj_.clear();
+        KDL::JntArray q_init(jnt_num_);
+        KDL::JntArray q_target(jnt_num_);
+        std::vector<double> max_step;
+        std::vector<KDL::Frame> traj_target;
+        KDL::Frame frame_init;
+        JntToCart(JC_helper::vector_2_JntArray(pos_), frame_init);
+        int traj_count{0};
+        //**-------------------------------**//
+
+        for (int i = 0; i < jnt_num_; i++) {
+            q_init(i) = pos_[i];
+            q_target(i) = pos_[i];
+            max_step.push_back(max_vel_[i] * DELTA_T);
+        }
+
+        if (JC_helper::link_trajectory(traj_target, frame_init, pose, speed, acceleration) < 0) {
+            PLOG_ERROR << "link trajectory planning fail ";
+            //  is_running_motion =false;
+            setRunState(RunState::Stopped);
+
+            return -1;
+        }
+
+        //** 轨迹IK计算，计算失败，可以重新计算，有最大计算次数限制{max_running_count} **//
+        int ik_count{0};
+        for (; ik_count < max_running_count; ik_count++) {
+            try {
+                for (int i = 0; i < jnt_num_; i++) {
+                    q_init(i) = pos_[i];
+                }
+                traj_.clear();
+
+                PLOG_INFO << "---------------------------------------";
+                //sun
+                // 尝试改为解析解接口
+                for (const auto &target: traj_target) {
+                    if (SRS_kinematics_.JC_cartesian_to_joint_dir(target, q_init(2), q_init, q_target) < 0) {
+                        PLOG_ERROR << " JC_cartesian_to_joint failed on the " << ik_count << " times";
+                        throw -1;
+
+                    }
+                    // if (kinematics_.CartToJnt(q_init, target, q_target) < 0) {
+                    //     PLOG_ERROR << " CartToJnt failed on the " << ik_count << " times";
+                    //     throw -1;
+                    // }
+                    //*防止奇异位置速度激增
+                    for (int i = 0; i < jnt_num_; i++) {
+                        if (abs(q_target(i) - q_init(i)) > max_step[i]) {
+                            PLOG_ERROR << "joint[" << i << "] speep is too  fast";
+                            PLOG_ERROR << "target speed = " << abs(q_target(i) - q_init(i))
+                                       << " and  max_step=" << max_step[i];
+                            throw -2;
+                        }
+                    }
+                    //**-------------------------------**//
+                    q_init = q_target;
+                    traj_.push_back(q_target);
+
+                }
+                //在此处时，代表规划成功
+                break;
+
+            }
+            catch (int flag_error) {
+                switch (flag_error) {
+                    case -1:
+                        break;
+                    case -2:
+                        break;
+                    default:
+                        PLOG_ERROR << "Undefined error!";
+                        // is_running_motion = false;
+                        setRunState(RunState::Stopped);
+                        return -1;
+                }
+            }
+            catch (...) {
+                PLOG_ERROR << "Undefined error!";
+                // is_running_motion =false;
+                setRunState(RunState::Stopped);
+                return -1;
+            }
+
+        }
+
+        if (ik_count == max_running_count) {
+            PLOG_ERROR << "CartToJnt still failed even after " << max_running_count << " attempts";
+            // is_running_motion =false;
+            setRunState(RunState::Stopped);
+            return -1;
+        }
+
+        //**-------------------------------**//
+
+            if (asynchronous)  //异步执行
+            {
+                motion_thread_.reset(new boost::thread{&Robot::RunMoveLSync, this, std::ref(traj_)});
+                // is_running_motion = true;
+                setRunState(RunState::Running);
+            }
+
+
+        return 0;
+
+
+    }
+
     int Robot::MoveL_pos(Frame pose, double speed, double acceleration, double time,
                          double radius, bool asynchronous, int max_running_count) {
         for (int i{0}; i < jointNum; i++) {
@@ -1002,6 +1245,7 @@ namespace rocos {
             // is_running_motion = false;
             setRunState(RunState::Stopped);
         }
+
 
         return 0;
     }
@@ -2519,6 +2763,7 @@ namespace rocos {
 
     void Robot::RunMoveL(const std::vector<KDL::JntArray> &traj) {
         std::cout << "No. of waypoints: " << traj.size() << std::endl;
+
         
         for (const auto &waypoints: traj) {
             if(!isEnabled())
@@ -2546,6 +2791,7 @@ namespace rocos {
 
         Exit:
         // is_running_motion = false;
+
         setRunState(RunState::Stopped);
     }
 

@@ -32,6 +32,9 @@
 #include "kdl_parser/kdl_parser.hpp" //!< 解析URDF文件
 #include "gripper.hpp"
 
+#include <condition_variable> // 条件变量
+
+
 namespace rocos
 {
     //! Class Robot
@@ -793,6 +796,31 @@ namespace rocos
         //! \return 错误标志位,成功返回0
         int MoveL(Frame pose, double speed = 1.05, double acceleration = 1.4,
                   double time = 0.0, double radius = 0.0, bool asynchronous = false, int max_running_count = 1);
+        //! \brief 直线运动到指定位姿（支持位置和速度模式适用于双臂同步）
+        //! \param pose 位姿
+        //! \param speed 笛卡尔速度限制（leading axis）
+        //! \param acceleration 笛卡尔加速度限制
+        //! \param time 最短运行时间
+        //! \param radius 过渡半径
+        //! \param asynchronous 是否异步运行
+        //! \param max_running_count MoveL规划失败重新尝试规划的最大次数
+        //! \return 错误标志位,成功返回0
+        int MoveLSync(Frame pose, double speed = 0.5, double acceleration = 1.0,
+                      double time = 0.0, double radius = 0.0, bool asynchronous = false, int max_running_count = 1);
+        // 设置和获取同步状态
+        static void setSync(bool value);
+        static bool getSync();
+        void waitForSync() ;
+        static void triggerSync();
+        bool isThreadWaiting();
+        void RunMoveLSync(const std::vector<KDL::JntArray> &traj);
+
+
+
+
+        int MoveLSync_pos(Frame pose, double speed = 1.05, double acceleration = 1.4,
+                      double time = 0.0, double radius = 0.0, bool asynchronous = false, int max_running_count = 1);
+
 
         int MoveL_pos(Frame pose, double speed = 1.05, double acceleration = 1.4,
                       double time = 0.0, double radius = 0.0, bool asynchronous = false, int max_running_count = 1);
@@ -991,6 +1019,14 @@ namespace rocos
             hw_interface_->waitForSignal(5);
         }
     private:
+        //双臂同步信号标志位，静态成员变量
+        static  std::atomic<bool> is_sync;
+        std::atomic<bool> is_waiting{false};  // 标志变量
+        static std::condition_variable cond_var;
+        static std::mutex sync_mutex_;
+
+
+
         // 运动前检查数据有效性
         int CheckBeforeMove(const JntArray &q, double speed,
                             double acceleration, double time, double radius);
@@ -1171,6 +1207,7 @@ namespace rocos
         bool flag_admittance_turnoff{false};       // 导纳开关
         bool flag_admittance_joint_turnoff{false}; // 关节拖动开关
         std::mutex mtx;                            // 互斥锁
+
 
         std::shared_ptr<std::thread> _thread_admittance_teaching{nullptr};
     };
