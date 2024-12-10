@@ -133,8 +133,6 @@ namespace JC_helper
         std::vector<double> ZeroOffset;
         std::vector<double> q_min;
         std::vector<double> q_max;
-        std::vector<double> sensitivity;
-        std::vector<double> collection_force;
         // yaml文件的路径
         
         YAML::Node yaml_node;
@@ -149,9 +147,6 @@ namespace JC_helper
         // 获取当前关节位置下的理论力矩
         std::vector<double> get_theory_torques(rocos::Robot *robot_ptr, KDL::JntArray &joint, KDL::JntArray &joint_vel, KDL::JntArray &joint_acc);
         // 获取当前关节位置下的实际力矩从基础函数getLoadTorque中获取
-        std::vector<double> compensateGravity(rocos::Robot *robot_ptr, double vel_factor = 0, double acc_factor = 0);
-        // 检查理论力矩与实际值的偏差
-        bool checkBeforAdmittance(rocos::Robot *robot_ptr);
         // 设置关节的模拟外力矩
         void set_torque(int id, double tor_que);
         // 设置力矩缩放的参数
@@ -173,8 +168,6 @@ namespace JC_helper
             kesai.resize(joint_num);
             fext.resize(joint_num);
             ZeroOffset.resize(joint_num);
-            sensitivity.resize(joint_num);
-            collection_force.resize(joint_num);
         };
         //开始示教
          void Runteaching(rocos::Robot *robot_ptr,bool *flag_admittance_joint_turnoff);

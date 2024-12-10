@@ -32,12 +32,6 @@
 #include "kdl_parser/kdl_parser.hpp" //!< 解析URDF文件
 #include "gripper.hpp"
 
-
-#define COLOR_OFF 0
-#define COLOR_RED 1
-#define COLOR_GREEN 2
-#define COLOR_YELLOW 3
-
 namespace rocos
 {
     //! Class Robot
@@ -60,7 +54,6 @@ namespace rocos
                 MOVE_P,
                 MOVE_C
             };
-          
 
         private:
             MoveType type_;
@@ -993,7 +986,10 @@ namespace rocos
          * @return int
          */
         int servoJ(const KDL::JntArray &target_pos);
-
+        inline void waitfornextcycle()
+        {
+            hw_interface_->waitForSignal(5);
+        }
     private:
         // 运动前检查数据有效性
         int CheckBeforeMove(const JntArray &q, double speed,
@@ -1038,15 +1034,6 @@ namespace rocos
         int servoL(const KDL::Frame &target_frame);
 
 //        int moveJ_with_speed_scaling(const KDL::JntArray &target_pos, double max_vel, double max_acc, double max_jerk);
-
-
-        bool btn_pressed_{false};
-        inline void set_btn_pressed(bool flag  ){btn_pressed_=flag;}
-        bool isButtonPressed() ;
-
-        void setLED(int color); // 0:off, 1:green, 2:red, 3:yellow
-        // TODO: green led ->isrunning;yellow is dragging;off is disabled;red is stopped
-
 
         /**
          * @brief 速度缩放函数，运动中每次循环需要调佣一次

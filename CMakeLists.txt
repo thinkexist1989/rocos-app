@@ -23,7 +23,7 @@ email: luoyang@sia.cn
 ]]
 
 cmake_minimum_required(VERSION 3.10)
-project(rocos_app VERSION 1.0.5 DESCRIPTION "ROCOS Application Library")
+project(rocos_app VERSION 1.0.4 DESCRIPTION "ROCOS Application Library")
 
 list(APPEND CMAKE_PREFIX_PATH "/opt/rocos/ecm")
 list(APPEND CMAKE_PREFIX_PATH "/opt/grpc")
@@ -76,7 +76,6 @@ add_subdirectory(3rdparty/ruckig)
 add_subdirectory(3rdparty/plog)
 add_subdirectory(3rdparty/gripper)
 add_subdirectory(3rdparty/gflags)
-add_subdirectory(3rdparty/spdlog)
 
 
 ###########
@@ -106,12 +105,8 @@ set(DEP_LIBS
         Boost::chrono
         Boost::thread
         yaml-cpp
+
         )
-
-
-add_library(logger STATIC src/logger.cc)
-target_link_libraries(logger PUBLIC spdlog::spdlog_header_only)
-
 
 ######### Library Hardware ###############
 add_library(hardware
@@ -470,3 +465,13 @@ target_link_libraries(unit_test
 #        robot
 #        )
 add_test(NAME unit_test COMMAND unit_test)
+add_executable(test_movel src/test_MoveL.cpp)
+target_link_libraries(test_movel
+        PRIVATE
+        hardware
+        drive
+        protocol
+        kinematics
+        robot
+        gflags::gflags
+)

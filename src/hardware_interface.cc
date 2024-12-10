@@ -149,15 +149,5 @@ namespace rocos {
         waitForSignal(0);
     }
 
-    int32_t HardwareInterface::getDigitalInputsRaw(int id) {
-        return 0;
-    }
-
-    void HardwareInterface::setDigitalOutputsRaw(int id, int32_t value) {
-        
-        
-
-    }
-
 }
 
