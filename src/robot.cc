@@ -28,6 +28,8 @@ namespace rocos {
     std::atomic<bool> Robot::is_sync{false};
     std::condition_variable Robot::cond_var;
     std::mutex Robot::sync_mutex_;
+    std::vector<bool> Robot::thread_waiting_states_;
+    std::atomic<int> Robot::next_id_{0};//代表下一个机器人的id
 
     Robot::Robot(HardwareInterface *hw,
                  const string &urdf_file_path,
@@ -126,10 +128,22 @@ namespace rocos {
             exit(-1);
 
         startMotionThread();
+
+        //id_ = next_id_;
+        //next_id_++;
+        id_ = next_id_.fetch_add(1);//当前id_为next_id_的值，然后next_id_自增1.id_留着备用，当前机械臂的id
+        //thread_waiting_states_的size是next_id_的值，索引需要next_id_-
+        //初始为false
+        std::lock_guard<std::mutex> lock(sync_mutex_);
+        thread_waiting_states_.push_back(false); // 初始状态为 false
+
     }
 
 
     Robot::~Robot() {
+        //这一步多余，保护性写法
+        std::lock_guard<std::mutex> lock(sync_mutex_);
+        thread_waiting_states_[id_] = false; // 设置为 false，标记无效
 
     }
 
@@ -901,11 +915,17 @@ namespace rocos {
 
     void Robot::waitForSync()
     {
+
+
+        std::cout<<"id"<<id_<<std::endl;
         std::unique_lock<std::mutex> lock(sync_mutex_);
-        is_waiting.store(true);  // 标记线程正在等待
+
         std::cout << "Waiting for sync...\n";
+        thread_waiting_states_[id_] = true; // 可选：设置为 true，标记有效
+
         cond_var.wait(lock, []() { return is_sync.load(); }); // 等待条件触发
-        is_waiting.store(false);  // 标记线程不在等待
+        thread_waiting_states_[id_] = false; // 可选：设置为 true，标记有效
+
         std::cout << "Sync received, exiting...\n";
     }
 
@@ -920,7 +940,11 @@ namespace rocos {
 
     bool Robot::isThreadWaiting()
     {
-        return is_waiting.load();
+        // return is_waiting.load();
+        std::lock_guard<std::mutex> lock(sync_mutex_);
+        return std::all_of(thread_waiting_states_.begin(), thread_waiting_states_.end(), [](bool state) {
+            return state; // 检查所有状态是否为 true
+        });
     }
 
     void Robot::RunMoveLSync(const std::vector<KDL::JntArray>& traj)

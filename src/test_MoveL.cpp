@@ -96,30 +96,10 @@ void waitForMoveLCompletion(rocos::Robot *l_robot_ptr, rocos::Robot *r_robot_ptr
     {
 
 
-        if(l_robot_ptr->isThreadWaiting()&&r_robot_ptr->isThreadWaiting())
+        usleep(1000000);
+        if(l_robot_ptr->isThreadWaiting())
         {
-            std::cout<<"both are waiting"<<std::endl;
-            l_robot_ptr->triggerSync();//按道理静态类条件变量，可以触发多个等待线程
-            usleep(10000);
-            // r_robot_ptr->triggerSync();
-        }
-        //左臂报错退出，右臂在等待，触发右臂
-        else if (l_robot_ptr->getRunState()==rocos::Robot::RunState::Stopped && r_robot_ptr->isThreadWaiting())
-        {
-            std::cout<<"left is stopped, right is waiting"<<std::endl;
-            r_robot_ptr->triggerSync();
-            usleep(10000);
-        }
-        //右臂报错退出，左臂在等待，触发左臂
-        else if (r_robot_ptr->getRunState()==rocos::Robot::RunState::Stopped && l_robot_ptr->isThreadWaiting())
-        {
-            std::cout<<"left is waiting, right is stopped"<<std::endl;
             l_robot_ptr->triggerSync();
-            usleep(10000);
-        }
-        else
-        {
-            usleep(1000000);
         }
 
 
@@ -130,6 +110,7 @@ void waitForMoveLCompletion(rocos::Robot *l_robot_ptr, rocos::Robot *r_robot_ptr
 
 
 }
+
 
 int main(int argc, char *argv[])
 {
