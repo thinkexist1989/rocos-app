@@ -907,6 +907,7 @@ namespace rocos {
         }
         else {
             PLOG_ERROR << "某关节为既不是位置模式也不是速度模式！";
+            thread_waiting_states_[id_]=true;
             return -1;
         }
 
