@@ -810,10 +810,10 @@ namespace rocos
         // 设置和获取同步状态
         static void setSync(bool value);
         static bool getSync();
-        void waitForSync() ;
+
         static void triggerSync();
         bool isThreadWaiting();
-        void RunMoveLSync(const std::vector<KDL::JntArray> &traj);
+
 
 
 
@@ -1024,6 +1024,7 @@ namespace rocos
         std::atomic<bool> is_waiting{false};  // 标志变量
         static std::condition_variable cond_var;
         static std::mutex sync_mutex_;
+        void waitForSync() ;
 
 
 
@@ -1040,6 +1041,8 @@ namespace rocos
 
         // 实际movel执行线程
         void RunMoveL(const std::vector<KDL::JntArray> &traj);
+        //执行带同步信号的movel
+        void RunMoveLSync(const std::vector<KDL::JntArray> &traj);
 
         // 实际multimovel执行线程
         void RunMultiMoveL(const std::vector<KDL::JntArray> &traj);

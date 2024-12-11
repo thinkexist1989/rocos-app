@@ -90,10 +90,11 @@ void threadsave()
 }
 void waitForMoveLCompletion(rocos::Robot *l_robot_ptr, rocos::Robot *r_robot_ptr)
 {
+    usleep(1000000);
 
     while(l_robot_ptr->getRunState()!=rocos::Robot::RunState::Stopped || r_robot_ptr->getRunState()!=rocos::Robot::RunState::Stopped)
     {
-        usleep(1000000);
+
 
         if(l_robot_ptr->isThreadWaiting()&&r_robot_ptr->isThreadWaiting())
         {

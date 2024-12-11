@@ -1095,6 +1095,13 @@ namespace rocos {
                 motion_thread_.reset(new boost::thread{&Robot::RunMoveLSync, this, std::ref(traj_)});
                 // is_running_motion = true;
                 setRunState(RunState::Running);
+            }else  //同步执行
+            {
+                motion_thread_.reset(new boost::thread{&Robot::RunMoveL, this, std::ref(traj_)});
+                motion_thread_->join();
+                motion_thread_ = nullptr;
+                // is_running_motion = false;
+                setRunState(RunState::Stopped);
             }
 
 
