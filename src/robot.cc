@@ -28,6 +28,7 @@ namespace rocos {
     std::atomic<bool> Robot::is_sync{false};
     std::condition_variable Robot::cond_var;
     std::mutex Robot::sync_mutex_;
+    std::mutex Robot::thread_waiting_states_mutex_;
     std::vector<bool> Robot::thread_waiting_states_;
     std::atomic<int> Robot::next_id_{0};//代表下一个机器人的id
 
@@ -134,7 +135,7 @@ namespace rocos {
         id_ = next_id_.fetch_add(1);//当前id_为next_id_的值，然后next_id_自增1.id_留着备用，当前机械臂的id
         //thread_waiting_states_的size是next_id_的值，索引需要next_id_-
         //初始为false
-        std::lock_guard<std::mutex> lock(sync_mutex_);
+        std::lock_guard<std::mutex> lock(thread_waiting_states_mutex_);
         thread_waiting_states_.push_back(false); // 初始状态为 false
 
     }
@@ -142,7 +143,7 @@ namespace rocos {
 
     Robot::~Robot() {
         //这一步多余，保护性写法
-        std::lock_guard<std::mutex> lock(sync_mutex_);
+        std::lock_guard<std::mutex> lock(thread_waiting_states_mutex_);
         thread_waiting_states_[id_] = false; // 设置为 false，标记无效
 
     }
@@ -885,6 +886,8 @@ namespace rocos {
 
         bool all_pos_mode{true};  //假设全部关节位置模式
 
+        thread_waiting_states_[id_]=false;
+
         for (int i{0}; i < jointNum; i++) {
             if (joints_[i]->getMode() != ModeOfOperation::CyclicSynchronousPositionMode)
                 all_pos_mode = false;
@@ -892,8 +895,15 @@ namespace rocos {
 
         if (all_pos_mode)
         {
+            int ret=MoveLSync_pos(pose, speed, acceleration, time, radius, asynchronous, max_running_count);
+            if(ret!=0)
+            {
 
-            return MoveLSync_pos(pose, speed, acceleration, time, radius, asynchronous, max_running_count);
+                thread_waiting_states_[id_]=true;
+            }
+
+
+            return ret;
         }
         else {
             PLOG_ERROR << "某关节为既不是位置模式也不是速度模式！";
@@ -917,7 +927,7 @@ namespace rocos {
     {
 
 
-        std::cout<<"id"<<id_<<std::endl;
+        // std::cout<<"id"<<id_<<std::endl;
         std::unique_lock<std::mutex> lock(sync_mutex_);
 
         std::cout << "Waiting for sync...\n";
@@ -940,8 +950,8 @@ namespace rocos {
 
     bool Robot::isThreadWaiting()
     {
-        // return is_waiting.load();
-        std::lock_guard<std::mutex> lock(sync_mutex_);
+
+        std::lock_guard<std::mutex> lock(thread_waiting_states_mutex_);
         return std::all_of(thread_waiting_states_.begin(), thread_waiting_states_.end(), [](bool state) {
             return state; // 检查所有状态是否为 true
         });
@@ -1121,11 +1131,9 @@ namespace rocos {
                 setRunState(RunState::Running);
             }else  //同步执行
             {
-                motion_thread_.reset(new boost::thread{&Robot::RunMoveL, this, std::ref(traj_)});
-                motion_thread_->join();
-                motion_thread_ = nullptr;
-                // is_running_motion = false;
-                setRunState(RunState::Stopped);
+                //不允许同步执行
+                PLOG_ERROR << "MoveLSync_pos 不允许同步执行";
+                return -1;
             }
 
 

@@ -1027,6 +1027,7 @@ namespace rocos
         static std::vector<bool> thread_waiting_states_; // 静态等待状态数组
         static std::atomic<int> next_id_;                // 静态计数器
         static std::mutex sync_mutex_;
+        static std::mutex thread_waiting_states_mutex_;
         int id_;  // 当前对象的唯一 ID
 
 

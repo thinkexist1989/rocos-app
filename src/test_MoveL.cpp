@@ -190,7 +190,7 @@ int main(int argc, char *argv[])
     r_q(6) = 0.00 / 180.0 * M_PI;
     r_robot_ptr->MoveJ(r_q, 0.15, 0.15, 0.0, 0.0, false);
 
-
+    usleep(1000000);
 
     KDL::Frame currentFrame = l_robot_ptr->getFlange();
     std::cout << "currentFrame" << currentFrame.p.x() << "," << currentFrame.p.y() << "," << currentFrame.p.z() << "," << std::endl;
@@ -202,7 +202,7 @@ int main(int argc, char *argv[])
     std::thread th(threadsave);
     // initial Position
     KDL::Frame l_pose = KDL::Frame(KDL::Rotation::RPY(3.1415926, 0.00, 3.1415926), KDL::Vector(-0.560736, 0.00, 0.172071));
-    KDL::Frame r_pose = KDL::Frame(KDL::Rotation::RPY(3.1415926, 0.00, 3.1415926), KDL::Vector(0.560736, 0.00, 0.172071));
+    KDL::Frame r_pose = KDL::Frame(KDL::Rotation::RPY(3.1415926, 0.00, 3.1415926), KDL::Vector(0.560736, -0.10, 0.172071));
     l_robot_ptr->MoveLSync(l_pose, 0.05, 0.05, 0.0, 0.0, true);
     r_robot_ptr->MoveLSync(r_pose, 0.05, 0.05, 0.0, 0.0, true);
     waitForMoveLCompletion(l_robot_ptr, r_robot_ptr);
