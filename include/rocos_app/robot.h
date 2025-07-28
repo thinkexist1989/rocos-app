@@ -32,12 +32,6 @@
 #include "kdl_parser/kdl_parser.hpp" //!< 解析URDF文件
 #include "gripper.hpp"
 
-
-#define COLOR_OFF 0
-#define COLOR_RED 1
-#define COLOR_GREEN 2
-#define COLOR_YELLOW 3
-
 namespace rocos
 {
     //! Class Robot
@@ -60,7 +54,6 @@ namespace rocos
                 MOVE_P,
                 MOVE_C
             };
-          
 
         private:
             MoveType type_;
@@ -1039,15 +1032,6 @@ namespace rocos
 
 //        int moveJ_with_speed_scaling(const KDL::JntArray &target_pos, double max_vel, double max_acc, double max_jerk);
 
-
-        bool btn_pressed_{false};
-        inline void set_btn_pressed(bool flag  ){btn_pressed_=flag;}
-        bool isButtonPressed() ;
-
-        void setLED(int color); // 0:off, 1:green, 2:red, 3:yellow
-        // TODO: green led ->isrunning;yellow is dragging;off is disabled;red is stopped
-
-
         /**
          * @brief 速度缩放函数，运动中每次循环需要调佣一次
          *
@@ -1121,7 +1105,7 @@ namespace rocos
         Frame flange_; //!< 法兰位置姿态
         Frame tool_;   //!< 工具位置姿态
         Frame object_; //!< 工件位置姿态
-        std::string yaml_path = "/opt/rocos/yaml/calibration.yaml";
+        std::string yaml_path ="/opt/rocos/yaml/calibration.yaml";
         YAML::Node yaml_node;
 
         // 六点法标定
