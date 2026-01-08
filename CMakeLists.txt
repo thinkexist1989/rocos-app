@@ -152,6 +152,7 @@ add_library(rocos::drive ALIAS drive)
 add_library(kinematics
         SHARED
         src/kinematics.cc
+        
         )
 target_include_directories(kinematics
         PUBLIC
@@ -175,6 +176,7 @@ add_library(robot
         src/robot.cc
         src/JC_helper_kinematics.cpp
         src/JC_helper_dynamics.cpp
+        src/DHParamsLoader.cpp
 )
 target_include_directories(robot
         PUBLIC

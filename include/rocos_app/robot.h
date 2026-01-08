@@ -31,7 +31,7 @@
 #include <vector>
 #include "kdl_parser/kdl_parser.hpp" //!< 解析URDF文件
 #include "gripper.hpp"
-
+#include "DHParamsLoader.h"
 namespace rocos
 {
     //! Class Robot
@@ -1168,6 +1168,7 @@ namespace rocos
         bool flag_admittance_turnoff{false};       // 导纳开关
         bool flag_admittance_joint_turnoff{false}; // 关节拖动开关
         std::mutex mtx;                            // 互斥锁
+        DHParamsLoader loader;
 
         std::shared_ptr<std::thread> _thread_admittance_teaching{nullptr};
     };

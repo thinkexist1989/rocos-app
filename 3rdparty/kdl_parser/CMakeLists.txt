@@ -2,7 +2,7 @@ cmake_minimum_required(VERSION 3.7.2)
 
 project(kdl_parser)
 
-set(CMAKE_CXX_STANDARD 14)
+set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 # set(CMAKE_INSTALL_PREFIX  /home/abc418/123/kdl_parser/output)
 # SET(EXECUTABLE_OUTPUT_PATH ${PROJECT_SOURCE_DIR}/output/bin)  

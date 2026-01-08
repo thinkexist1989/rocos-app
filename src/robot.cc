@@ -137,11 +137,37 @@ namespace rocos {
             std::cerr << "[ERROR][rocos::robot] Could not extract urdf to kdl tree!" << std::endl;
             return false;
         }
-
-        if (!kinematics_.setChain(tree, base_link, tip)) {
-            std::cerr << "[ERROR][rocos::robot] Could not set kinematic chain!" << std::endl;
-            return false;
+        if (!loader.loadFromYAML("/opt/rocos/yaml/robotDH.yaml")) 
+        {
+            std::cerr << "Failed to load DH parameters!" << std::endl;
+            if (!kinematics_.setChain(tree, base_link, tip)) 
+            {
+                std::cerr << "[ERROR][rocos::robot] Could not set kinematic chain!" << std::endl;
+                return false;
+            }
         }
+        else {
+            // 打印DH参数信息
+            loader.printDHParameters();
+            // 获取构建的运动学链
+            Chain raw_chain = loader.getChain();
+            // Chain movable_chain;
+            // for (size_t i = 0; i < raw_chain.getNrOfSegments(); ++i) {
+            //     const Joint& j = raw_chain.getSegment(i).getJoint();
+            //     if (j.getType() != Joint::None) {          // 只保留可动
+            //         movable_chain.addSegment(raw_chain.getSegment(i));
+            //     }
+            // }
+
+
+            if(!kinematics_.setChain(raw_chain)) {
+                std::cerr << "[ERROR][rocos::robot] Could not set kinematic chain from DH parameters!" << std::endl;
+                return false;
+            }
+            std::cout<<"[INFO][rocos::robot] Kinematic chain set from DH parameters successfully." << std::endl;
+
+        }
+        
 
         if (!parseDriveParamsFromUrdf(urdf_file_path)) {
             std::cerr << "[ERROR][rocos::robot] Could not parse drive parameters!" << std::endl;
@@ -155,9 +181,12 @@ namespace rocos {
             q_min(i) = joints_[i]->getMinPosLimit();
             q_max(i) = joints_[i]->getMaxPosLimit();
         }
-
+        // std::cout<<"[INFO][rocos::robot] Kinematics initialized successfully." << std::endl;
+        std::cout<<"[INFO][rocos::robot] q_min: "<<q_min.data.transpose()<<std::endl;
+        std::cout<<"[INFO][rocos::robot] q_max: "<<q_max.data.transpose()<<std::endl;
         kinematics_.setPosLimits(q_min, q_max);
         kinematics_.Initialize(); //初始化，构建IK solver;
+        std::cout<<"[INFO][rocos::robot] Kinematics initialized successfully." << std::endl;
 
         return true;
     }
@@ -166,8 +195,11 @@ namespace rocos {
     //! \param urdf_file_path urdf文件路径
     //! \return
     bool Robot::parseDriveParamsFromUrdf(const string &urdf_file_path) {
+        std::cout << "[INFO][rocos::robot] Parsing drive parameters from urdf file: "
+                  << urdf_file_path << std::endl;
         jnt_num_ = kinematics_.getChain().getNrOfJoints();
-
+        // std::cout << "[INFO][rocos::robot] Parsing drive parameters from urdf file: "
+                //   << urdf_file_path << std::endl;
         // if (kinematics_.getChain().getNrOfJoints() > jnt_num_) {
         //     // if the number of joints in urdf is LESS than that in hardware, just warning but it's fine
         //     std::cout << "[WARNING][rocos::robot] the hardware slave number is more than joint number." << std::endl;
@@ -188,6 +220,8 @@ namespace rocos {
         for (auto element = robot->FirstChildElement("joint"); element; element = element->NextSiblingElement(
                 "joint")) {
             for (int i = 0; i < jnt_num_; ++i) {
+                // std::cout<<"Checking joint: " << element->Attribute("name") << " against kinematics joint: "
+                //           << kinematics_.getChain().getSegment(i).getJoint().getName() << std::endl;
                 if (element->Attribute("name") == kinematics_.getChain().getSegment(i).getJoint().getName()) {
                     std::cout << "Joint" << std::endl
                               << "- name: " << element->Attribute("name") << "\n";
