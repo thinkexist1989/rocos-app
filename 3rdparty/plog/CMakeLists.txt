@@ -1,4 +1,4 @@
-cmake_minimum_required(VERSION 3.0)
+cmake_minimum_required(VERSION 3.10)
 
 option(PLOG_BUILD_SAMPLES "Build plog's samples." OFF)
 

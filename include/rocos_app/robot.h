@@ -730,6 +730,10 @@ namespace rocos
         {
             return ErrorState;
         }
+        int CartToJnt(const JntArray &q_init, const Frame &p_in, JntArray &q_out)
+        {
+            return kinematics_.CartToJnt(q_init, p_in, q_out);
+        }
 
     protected:
         void addAllJoints();
@@ -739,10 +743,7 @@ namespace rocos
             return kinematics_.JntToCart(q_in, p_out);
         }
 
-        int CartToJnt(const JntArray &q_init, const Frame &p_in, JntArray &q_out)
-        {
-            return kinematics_.CartToJnt(q_init, p_in, q_out);
-        }
+        
 
         //! 更新法兰系,工具系,工件系poseFlange
         void updateCartesianInfo()
