@@ -1175,21 +1175,21 @@ namespace rocos
         struct Impl;
         std::unique_ptr<Impl> impl_;
 
+        //////////FSM Related function (INTERNAL) ///////////////
+    public:
         void on_fsm_init(); 
+
         void on_fsm_start();
+
         void on_fsm_run();
+
         void on_fsm_stop();
+
         void on_fsm_pause();
+
         void on_fsm_continue();
+
         void on_fsm_reset();
-
-        
-
-
-
-
-
-
 
     };
 

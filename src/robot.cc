@@ -55,34 +55,32 @@ struct EventServoReq {};   // 伺服事件
 namespace sml = boost::sml;
 
 const auto action_init = [](rocos::Robot& robot) {
-//   bonecutting->run_from_initializing();
+    robot.on_fsm_init();
 };  // INITIALIZING TO IDLE
 
 const auto action_start = [](rocos::Robot& robot) {
-//   bonecutting->run_from_starting();
+    robot.on_fsm_start();
 };  // STARTING TO RUNNING
 // RUNNING
 const auto action_run = [](rocos::Robot& robot) { 
-    // bonecutting->running_loop(); 
+    robot.on_fsm_run();
 };
 
 const auto action_pause = [](rocos::Robot& robot) { 
-    // bonecutting->pause_from_run(); 
+    robot.on_fsm_pause();
 };
 const auto action_continue = [](rocos::Robot& robot) { 
-    // bonecutting->run_from_pause(); 
+    robot.on_fsm_continue();
 };
 
 const auto action_stop = [](rocos::Robot& robot) { 
-    // bonecutting->stop_from_run(); 
+    robot.on_fsm_stop();
 };
 const auto action_reset = [](rocos::Robot& robot) { 
-    // bonecutting->run_from_unknown_transition(); 
+    robot.on_fsm_reset();
 };
 
 struct StateMachine {
-  // 初始化BoneCutting指针
-
   auto operator()() const noexcept {
     using namespace sml;
     return make_transition_table(
@@ -133,14 +131,11 @@ struct StateMachine {
         state<class PAUSING>      + event<EventErrorOccurred> = state<class ERROR_STATE>,
         state<class CONTINUING>   + event<EventErrorOccurred> = state<class ERROR_STATE>,
         state<class RESETTING>    + event<EventErrorOccurred> = state<class ERROR_STATE>
-        
-
     );
   }
 };
 
 }  // namespace
-
 
 namespace rocos {
     struct Robot::Impl {
@@ -322,17 +317,6 @@ namespace rocos {
         std::cout << "[INFO][rocos::robot] Parsing drive parameters from urdf file: "
                   << urdf_file_path << std::endl;
         jnt_num_ = kinematics_.getChain().getNrOfJoints();
-        // std::cout << "[INFO][rocos::robot] Parsing drive parameters from urdf file: "
-                //   << urdf_file_path << std::endl;
-        // if (kinematics_.getChain().getNrOfJoints() > jnt_num_) {
-        //     // if the number of joints in urdf is LESS than that in hardware, just warning but it's fine
-        //     std::cout << "[WARNING][rocos::robot] the hardware slave number is more than joint number." << std::endl;
-        //     return false;
-        // } else if (kinematics_.getChain().getNrOfJoints() < jnt_num_) {
-        //     // if the number of joints in urdf is GREATER than that in hardware, error occured and return
-        //     std::cerr << "[ERROR][rocos::robot] the hardware slave number is less than joint number." << std::endl;
-        //     return false;
-        // }
 
         joints_.clear(); // vector<Drive>清空
 
