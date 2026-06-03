@@ -1,0 +1,145 @@
+#
+# Copyright (c) 2016-2020 Jean Davy
+#
+# Distributed under the Boost Software License, Version 1.0.
+# (See accompanying file LICENSE_1_0.txt or copy at http://www.boost.org/LICENSE_1_0.txt)
+#
+add_executable(test_actions_defer actions_defer.cpp)
+add_test(test_actions_defer test_actions_defer)
+
+add_executable(test_actions_process actions_process.cpp)
+add_test(test_actions_process test_actions_process)
+
+add_executable(test_actions_process_n_defer actions_process_n_defer.cpp)
+add_test(test_actions_process_n_defer test_actions_process_n_defer)
+
+add_executable(test_composite composite.cpp)
+add_test(test_composite test_composite)
+
+# constexpr.cpp uses constexpr lambdas and static_assert without message (C++17)
+if(CMAKE_CXX_STANDARD GREATER_EQUAL 17)
+  add_executable(test_constexpr constexpr.cpp)
+  add_test(test_constexpr test_constexpr)
+endif()
+
+add_executable(test_dependencies dependencies.cpp)
+add_test(test_dependencies test_dependencies)
+
+add_executable(test_wrap wrap.cpp)
+add_test(test_wrap test_wrap)
+
+add_executable(test_deep_sm deep_sm.cpp)
+
+add_executable(test_issue_639_repro issue_639_repro.cpp)
+if(IS_COMPILER_OPTION_GCC_LIKE)
+  target_compile_options(test_issue_639_repro PRIVATE "-ftemplate-depth=100")
+endif()
+add_test(test_issue_639_repro test_issue_639_repro)
+
+add_executable(test_di di.cpp)
+add_test(test_di test_di)
+
+add_executable(test_dispatch_table dispatch_table.cpp)
+add_test(test_dispatch_table test_dispatch_table)
+
+add_executable(test_events events.cpp)
+add_test(test_events test_events)
+
+add_executable(test_exceptions exceptions.cpp)
+add_test(test_exceptions test_exceptions)
+if(IS_COMPILER_OPTION_GCC_LIKE)
+  target_compile_options(test_exceptions PRIVATE "-fexceptions")
+endif()
+
+add_executable(test_fwd fwd.cpp)
+add_test(test_fwd test_fwd)
+
+add_executable(test_history history.cpp)
+add_test(test_history test_history)
+
+add_executable(test_guards guards.cpp)
+add_test(test_guards test_guards)
+
+add_executable(test_orthogonal_regions orthogonal_regions.cpp)
+add_test(test_orthogonal_regions test_orthogonal_regions)
+
+add_executable(test_policies_logging policies_logging.cpp)
+add_test(test_policies_logging test_policies_logging)
+
+add_executable(test_policies_testing policies_testing.cpp)
+add_test(test_policies_testing test_policies_testing)
+
+add_executable(test_policies_dispatch policies_dispatch.cpp)
+add_test(test_policies_dispatch test_policies_dispatch)
+
+add_executable(test_policies_thread_safe policies_thread_safe.cpp)
+add_test(test_policies_thread_safe test_policies_thread_safe)
+target_link_libraries(test_policies_thread_safe -lpthread)
+
+add_executable(test_sizeof sizeof.cpp)
+add_test(test_sizeof test_sizeof)
+
+add_executable(test_state_machine state_machine.cpp)
+add_test(test_state_machine test_state_machine)
+
+add_executable(test_states states.cpp)
+add_test(test_states test_states)
+
+add_executable(test_transitions transitions.cpp)
+add_test(test_transitions test_transitions)
+
+add_executable(test_transition_table transition_table.cpp)
+add_test(test_transition_table test_transition_table)
+
+add_executable(test_unexpected_events unexpected_events.cpp)
+add_test(test_unexpected_events test_unexpected_events)
+
+add_executable(test_dont_instantiate_statemachine_class dont_instantiate_statemachine_class.cpp)
+add_test(test_dont_instantiate_statemachine_class test_dont_instantiate_statemachine_class)
+
+if(EXISTS ${CMAKE_CURRENT_SOURCE_DIR}/issue_437_explicit_deps.cpp)
+  add_executable(test_issue_437_explicit_deps issue_437_explicit_deps.cpp)
+  add_test(test_issue_437_explicit_deps test_issue_437_explicit_deps)
+endif()
+
+if(EXISTS ${CMAKE_CURRENT_SOURCE_DIR}/issue_384_544_anon_composite.cpp)
+  add_executable(test_issue_384_544_anon_composite issue_384_544_anon_composite.cpp)
+  add_test(test_issue_384_544_anon_composite test_issue_384_544_anon_composite)
+endif()
+
+if(EXISTS ${CMAKE_CURRENT_SOURCE_DIR}/issue_580_process_events.cpp)
+  add_executable(test_issue_580_process_events issue_580_process_events.cpp)
+  add_test(test_issue_580_process_events test_issue_580_process_events)
+endif()
+
+if(EXISTS ${CMAKE_CURRENT_SOURCE_DIR}/issue_685_transitions_sub_bloat.cpp)
+  add_executable(test_issue_685_transitions_sub_bloat issue_685_transitions_sub_bloat.cpp)
+  add_test(test_issue_685_transitions_sub_bloat test_issue_685_transitions_sub_bloat)
+endif()
+
+if(EXISTS ${CMAKE_CURRENT_SOURCE_DIR}/issue_253_defer_clear_on_exit.cpp)
+  add_executable(test_issue_253_defer_clear_on_exit issue_253_defer_clear_on_exit.cpp)
+  add_test(test_issue_253_defer_clear_on_exit test_issue_253_defer_clear_on_exit)
+endif()
+
+if(EXISTS ${CMAKE_CURRENT_SOURCE_DIR}/issue_643_clear_defer_action.cpp)
+  add_executable(test_issue_643_clear_defer_action issue_643_clear_defer_action.cpp)
+  add_test(test_issue_643_clear_defer_action test_issue_643_clear_defer_action)
+endif()
+
+if(EXISTS ${CMAKE_CURRENT_SOURCE_DIR}/issue_622_any_state_nested.cpp)
+  add_executable(test_issue_622_any_state_nested issue_622_any_state_nested.cpp)
+  add_test(test_issue_622_any_state_nested test_issue_622_any_state_nested)
+endif()
+
+if(EXISTS ${CMAKE_CURRENT_SOURCE_DIR}/issue_456_flush_queue.cpp)
+  add_executable(test_issue_456_flush_queue issue_456_flush_queue.cpp)
+  add_test(test_issue_456_flush_queue test_issue_456_flush_queue)
+endif()
+
+if(EXISTS ${CMAKE_CURRENT_SOURCE_DIR}/issue_629_action_wrap.cpp)
+  add_executable(test_issue_629_action_wrap issue_629_action_wrap.cpp)
+  add_test(test_issue_629_action_wrap test_issue_629_action_wrap)
+endif()
+
+add_subdirectory(errors)

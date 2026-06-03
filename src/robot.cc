@@ -19,9 +19,147 @@
 
 #include <rocos_app/robot.h>
 #include <kdl_parser/kdl_parser.hpp> // 用于将urdf文件解析为KDL::Tree
+#include <boost/sml.hpp>
 
 #define  MAX_JOINT_NUM 50
 #define  EPS 1e-7
+
+namespace {
+// 状态定义
+class UNKNOWN {};
+
+class INITIALIZING {};
+
+class IDLE {};
+
+class STARTING {};
+
+class RUNNING {};
+
+class STOPPING {};
+
+class PAUSING {};
+
+class PAUSED {};
+
+class CONTINUING {};
+
+class ERROR_STATE {};
+
+class RESUMING {};  // ✅ 必须定义
+class UNKNOWN_TRANSITION {};
+
+// 事件定义
+struct EventInit_REQ {};        // 初始化事件
+struct EventSuccess {};         // 启动任务
+struct EventStart_REQ {};       // 暂停任务
+struct EventStop_REQ {};        // 停止任务
+struct EventPause_REQ {};       // 暂停任务
+struct EventContinue_REQ {};    // 继续任务
+struct EventError_OCCURRED {};  // 发生错误
+
+struct EventResume_REQ {};  // 从错误状态恢复
+struct EventReset_REQ {};   // 未知状态
+
+namespace sml = boost::sml;
+
+rs::BoneCutting* bonecutting = nullptr; //TODO: 类要修改
+
+const auto action_init = []() {
+  bonecutting->run_from_initializing();
+};  // INITIALIZING TO IDLE
+
+const auto action_start = []() {
+  bonecutting->run_from_starting();
+};  // STARTING TO RUNNING
+// RUNNING
+const auto action_run = []() { bonecutting->running_loop(); };
+
+const auto action_pause = []() { bonecutting->pause_from_run(); };
+const auto action_continue = []() { bonecutting->run_from_pause(); };
+
+const auto action_stop = []() { bonecutting->stop_from_run(); };
+const auto action_reset = []() { bonecutting->run_from_unknown_transition(); };
+
+struct StateMachine {
+  // 初始化BoneCutting指针
+
+  auto operator()() const noexcept {
+    using namespace sml;
+    return make_transition_table(
+        // 初始化
+        *state<class UNKNOWN> + event<EventInit_REQ> =
+            state<class INITIALIZING>,
+        state<class INITIALIZING> + sml::on_entry<_> / action_init,
+
+        state<class INITIALIZING> + event<EventSuccess> = state<class IDLE>,
+        state<class IDLE> + event<EventStart_REQ> = state<class STARTING>,
+        state<class STARTING> + sml::on_entry<_> / action_start,
+        state<class STARTING> + event<EventSuccess> = state<class RUNNING>,
+
+        state<class RUNNING> + sml::on_entry<_> / action_run,
+        state<class RUNNING> + event<EventPause_REQ> = state<class PAUSING>,
+
+        state<class PAUSING> + sml::on_entry<_> / action_pause,
+        state<class PAUSING> + event<EventSuccess> =
+            state<class PAUSED>,  // 中间状态直接跳转
+
+        state<class PAUSED> + event<EventContinue_REQ> =
+            state<class CONTINUING>,
+
+        state<class CONTINUING> + sml::on_entry<_> / action_continue,
+        state<class CONTINUING> + event<EventSuccess> =
+            state<class RUNNING>,  // 中间状态直接跳转
+
+        state<class PAUSED> + event<EventStop_REQ> = state<class STOPPING>,
+        state<class RUNNING> + event<EventStop_REQ> = state<class STOPPING>,
+        state<class ERROR_STATE> + event<EventStop_REQ> = state<class STOPPING>,
+        state<class STOPPING> + sml::on_entry<_> / action_stop,
+        state<class STOPPING> + event<EventSuccess> = state<class IDLE>,
+
+        state<class ERROR_STATE> + event<EventReset_REQ> =
+            state<class UNKNOWN_TRANSITION>,
+        state<class UNKNOWN_TRANSITION> + sml::on_entry<_> / action_reset,
+        state<class UNKNOWN_TRANSITION> + event<EventSuccess> =
+            state<class UNKNOWN>,  // 中间状态直接跳转
+
+        // ANY STATE JUMP TO ERROR_STATE
+        state<class INITIALIZING> + event<EventError_OCCURRED> =
+            state<class ERROR_STATE>,
+        state<class IDLE> + event<EventError_OCCURRED> =
+            state<class ERROR_STATE>,
+        state<class STARTING> + event<EventError_OCCURRED> =
+            state<class ERROR_STATE>,
+        state<class RUNNING> + event<EventError_OCCURRED> =
+            state<class ERROR_STATE>,
+        state<class STOPPING> + event<EventError_OCCURRED> =
+            state<class ERROR_STATE>,
+        state<class PAUSING> + event<EventError_OCCURRED> =
+            state<class ERROR_STATE>,
+        state<class PAUSED> + event<EventError_OCCURRED> =
+            state<class ERROR_STATE>,
+        state<class CONTINUING> + event<EventError_OCCURRED> =
+            state<class ERROR_STATE>,
+        state<class ERROR_STATE> + event<EventError_OCCURRED> =
+            state<class ERROR_STATE>,
+        state<class RESUMING> + event<EventError_OCCURRED> =
+            state<class ERROR_STATE>,
+        state<class UNKNOWN> + event<EventError_OCCURRED> =
+            state<class ERROR_STATE>
+
+    );
+  }
+};
+
+sml::sm<StateMachine> sm{};  // 状态机
+}  // namespace
+
+
+
+
+
+
+
 
 namespace rocos {
     Robot::Robot(HardwareInterface *hw,

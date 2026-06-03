@@ -22,7 +22,7 @@ email: luoyang@sia.cn
 @Last modified: 2023.04.10
 ]]
 
-cmake_minimum_required(VERSION 3.10)
+cmake_minimum_required(VERSION 3.15)
 project(rocos_app VERSION 1.0.5 DESCRIPTION "ROCOS Application Library")
 
 list(APPEND CMAKE_PREFIX_PATH "/opt/rocos/ecm")
@@ -30,7 +30,7 @@ list(APPEND CMAKE_PREFIX_PATH "/opt/grpc")
 include(cmake/common.cmake) # gRPC
 
 # add_compile_options(-std=c++11)
-set(CMAKE_CXX_STANDARD 11)
+set(CMAKE_CXX_STANDARD 17)
 
 set(CMAKE_INCLUDE_CURRENT_DIR ON)
 
@@ -77,6 +77,7 @@ add_subdirectory(3rdparty/plog)
 add_subdirectory(3rdparty/gripper)
 add_subdirectory(3rdparty/gflags)
 add_subdirectory(3rdparty/spdlog)
+add_subdirectory(3rdparty/sml)
 
 
 ###########
@@ -192,6 +193,7 @@ target_link_libraries(robot
         $<BUILD_INTERFACE:plog::plog>
         $<BUILD_INTERFACE:JC_helper::gripper>
         OpenSSL::SSL
+        sml::sml
         )
 add_library(rocos::robot ALIAS robot)
 
