@@ -1171,6 +1171,26 @@ namespace rocos
         DHParamsLoader loader;
 
         std::shared_ptr<std::thread> _thread_admittance_teaching{nullptr};
+
+        struct Impl;
+        std::unique_ptr<Impl> impl_;
+
+        void on_fsm_init(); 
+        void on_fsm_start();
+        void on_fsm_run();
+        void on_fsm_stop();
+        void on_fsm_pause();
+        void on_fsm_continue();
+        void on_fsm_reset();
+
+        
+
+
+
+
+
+
+
     };
 
 } // namespace rocos
