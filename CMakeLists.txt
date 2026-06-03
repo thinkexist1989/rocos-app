@@ -110,9 +110,9 @@ set(DEP_LIBS
         )
 
 
-add_library(logger STATIC src/logger.cc)
+add_library(logger SHARED src/logger.cc)
 target_link_libraries(logger PUBLIC spdlog::spdlog_header_only)
-
+add_library(rocos::logger ALIAS logger)
 
 ######### Library Hardware ###############
 add_library(hardware
@@ -187,6 +187,7 @@ target_include_directories(robot
 target_link_libraries(robot
         PUBLIC
         ${DEP_LIBS}
+        $<BUILD_INTERFACE:rocos::logger>
         $<BUILD_INTERFACE:rocos::hardware>
         $<BUILD_INTERFACE:rocos::drive>
         $<BUILD_INTERFACE:rocos::kinematics>

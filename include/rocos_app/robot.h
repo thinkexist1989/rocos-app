@@ -20,6 +20,7 @@
 #ifndef ROCOS_APP_ROBOT_H
 #define ROCOS_APP_ROBOT_H
 
+#include "logger.h"
 #include "drive.h"
 #include "hardware_interface.h"
 #include "interpolate.h"
@@ -1174,6 +1175,8 @@ namespace rocos
 
         struct Impl;
         std::unique_ptr<Impl> impl_;
+
+        Logger::logger_ptr log_ptr_ = nullptr;
 
         //////////FSM Related function (INTERNAL) ///////////////
     public:

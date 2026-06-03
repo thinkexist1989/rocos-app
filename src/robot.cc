@@ -146,15 +146,14 @@ namespace rocos {
 
 
 
-
-
-
     Robot::Robot(HardwareInterface *hw,
                  const string &urdf_file_path,
                  const string &base_link,
                  const string &tip
     ) : hw_interface_(hw), urdf_file_path_(urdf_file_path), pos_(MAX_JOINT_NUM),
         vel_(MAX_JOINT_NUM), acc_(MAX_JOINT_NUM), impl_(std::make_unique<Impl>(*this)) {
+
+        log_ptr_ = Logger::getInstance("Robot");
 
         parseUrdf(urdf_file_path, base_link, tip);
 
@@ -192,7 +191,6 @@ namespace rocos {
                 interp_[i] = new DoubleS;
             }
         }
-//        kinematics_.initTechServo();
 
         static plog::ColorConsoleAppender<plog::TxtFormatter> consoleAppender;
         plog::init<0>(plog::debug,
@@ -242,6 +240,12 @@ namespace rocos {
 
 
     Robot::~Robot() {
+
+
+        if (log_ptr_) {
+            log_ptr_->flush();
+            log_ptr_.reset();
+        }
 
     }
 
