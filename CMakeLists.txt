@@ -26,9 +26,6 @@ cmake_minimum_required(VERSION 3.10)
 project(rocos_app VERSION 1.0.5 DESCRIPTION "ROCOS Application Library")
 
 list(APPEND CMAKE_PREFIX_PATH "/opt/rocos/ecm")
-list(APPEND CMAKE_PREFIX_PATH "/opt/grpc")
-include(cmake/common.cmake) # gRPC
-
 # add_compile_options(-std=c++11)
 set(CMAKE_CXX_STANDARD 11)
 
@@ -177,10 +174,13 @@ add_library(robot
         src/JC_helper_kinematics.cpp
         src/JC_helper_dynamics.cpp
         src/DHParamsLoader.cpp
+        src/robot_http_server.cc
 )
 target_include_directories(robot
         PUBLIC
         $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>
+        $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/3rdparty/httplib>
+        $<BUILD_INTERFACE:${CMAKE_SOURCE_DIR}/3rdparty/json>
         $<INSTALL_INTERFACE:include>
         )
 target_link_libraries(robot
@@ -196,89 +196,14 @@ target_link_libraries(robot
 add_library(rocos::robot ALIAS robot)
 
 
-################
-##    gRPC    ##
-################
-
-file(GLOB PROTO_FILES protos/*.proto) # protobuf
-file(GLOB GRPC_FILES protos/*_service.proto) # gRPC
-
-foreach (PFIL ${PROTO_FILES}) #protobuf gen
-    # Proto file
-    get_filename_component(PROTO_ABS ${PFIL} ABSOLUTE)
-    get_filename_component(PROTO_PATH ${PFIL} PATH)
-    get_filename_component(PROTO_NAME ${PFIL} NAME_WE)
-
-    # Generated sources
-    set(PROTO_SRC "${CMAKE_BINARY_DIR}/${PROTO_NAME}.pb.cc")
-    set(PROTO_HDR "${CMAKE_BINARY_DIR}/${PROTO_NAME}.pb.h")
-    add_custom_command(
-            OUTPUT "${PROTO_SRC}" "${PROTO_HDR}"
-            COMMAND ${_PROTOBUF_PROTOC}
-            ARGS --cpp_out "${CMAKE_BINARY_DIR}"
-            -I "${PROTO_PATH}"
-            "${PROTO_ABS}"
-            DEPENDS "${PROTO_ABS}"
-    )
-    list(APPEND PROTO_SRCS ${PROTO_SRC})
-    list(APPEND PROTO_HDRS ${PROTO_HDR})
-endforeach ()
-
-foreach (GFIL ${GRPC_FILES}) #grpc gen
-    # Proto file
-    get_filename_component(GRPC_ABS ${GFIL} ABSOLUTE)
-    get_filename_component(GRPC_PATH ${GFIL} PATH)
-    get_filename_component(GRPC_NAME ${GFIL} NAME_WE)
-
-    # Generated sources
-    set(GRPC_SRC "${CMAKE_BINARY_DIR}/${GRPC_NAME}.grpc.pb.cc")
-    set(GRPC_HDR "${CMAKE_BINARY_DIR}/${GRPC_NAME}.grpc.pb.h")
-    add_custom_command(
-            OUTPUT "${GRPC_SRC}" "${GRPC_HDR}"
-            COMMAND ${_PROTOBUF_PROTOC}
-            ARGS --grpc_out "${CMAKE_BINARY_DIR}"
-            -I "${GRPC_PATH}"
-            --plugin=protoc-gen-grpc="${_GRPC_CPP_PLUGIN_EXECUTABLE}"
-            "${GRPC_ABS}"
-            DEPENDS "${GRPC_ABS}"
-    )
-    list(APPEND GRPC_SRCS ${GRPC_SRC})
-    list(APPEND GRPC_HDRS ${GRPC_HDR})
-endforeach ()
-
-# Include generated *.pb.h files
-include_directories("${CMAKE_CURRENT_BINARY_DIR}")
-
-########## Library protocol #################
-
-add_library(protocol
-        SHARED
-        ${PROTO_SRCS}
-        ${PROTO_HDRS}
-        ${GRPC_SRCS}
-        ${GRPC_HRDS}
-        include/rocos_app/robot_service.h
-        src/robot_service.cc
-        )
-target_link_libraries(protocol
-        PUBLIC
-        ${_REFLECTION}
-        ${_GRPC_GRPCPP}
-        ${_PROTOBUF_LIBPROTOBUF}
-        $<BUILD_INTERFACE:rocos::robot>
-        )
-add_library(rocos::protocol ALIAS protocol)
-
-
-add_library(rocos_app
-        INTERFACE)
+# rocos_app convenience target (no protocol - replaced by HTTP server in robot library)
+add_library(rocos_app INTERFACE)
 target_link_libraries(rocos_app
         INTERFACE
         hardware
         drive
         kinematics
         robot
-        protocol
         )
 add_library(rocos::rocos_app ALIAS rocos_app)
 
@@ -293,10 +218,10 @@ target_link_libraries(rocosAppMain
         PRIVATE
         hardware
         drive
-        protocol
         kinematics
         robot
         gflags::gflags
+        pthread
         )
 
 
@@ -369,7 +294,7 @@ install(DIRECTORY include/rocos_app
 #        PUBLIC_HEADER DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}  # 头文件安装路径
 #        )
 
-install(TARGETS hardware drive kinematics robot protocol rocos_app rocosAppMain
+install(TARGETS hardware drive kinematics robot rocos_app rocosAppMain
         EXPORT rocos_app-targets
         LIBRARY DESTINATION ${CMAKE_INSTALL_LIBDIR}  # 动态库安装路径
         ARCHIVE DESTINATION ${CMAKE_INSTALL_LIBDIR}  # 静态库安装路径
@@ -418,16 +343,6 @@ install(EXPORT rocos_app-targets
         DESTINATION ${${PROJECT_NAME}_INSTALL_CMAKEDIR}
         )
 
-# Install grpc common.cmake files
-install(FILES cmake/common.cmake
-        DESTINATION ${${PROJECT_NAME}_INSTALL_CMAKEDIR}
-        )
-
-FILE(GLOB PROTO_FILE ${CMAKE_BINARY_DIR}/*.pb.h)
-install(FILES ${PROTO_FILE}
-        DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}/rocos_app
-        )
-
 
 configure_package_config_file(
         cmake/rocos_app-config.cmake.in
@@ -460,7 +375,6 @@ target_link_libraries(unit_test
         drive
         kinematics
         robot
-        protocol
         )
 #add_executable(main_test test/main_test.cc)
 #target_link_libraries(main_test
