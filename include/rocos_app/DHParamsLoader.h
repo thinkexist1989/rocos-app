@@ -10,6 +10,8 @@
 #include <memory>
 #include <iostream>
 
+#include <rocos_app/logger.h>
+
 struct DHParameters {
     std::string joint_name;
     double alpha;  // alpha(i-1)
@@ -125,6 +127,8 @@ private:
     // KDL::JntArray q_max_;
     bool is_standard_dh_ = false;
     bool is_mdh_ = false;
+
+    Logger::logger_ptr log_ptr_ = nullptr;
 };
 
 #endif // DHPARAMS_LOADER_H

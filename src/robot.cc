@@ -140,10 +140,17 @@ struct StateMachine {
 }  // namespace
 
 namespace rocos {
-    struct Robot::Impl {
-        sml::sm<StateMachine> sm;  // 状态机实例
+    class Robot::Impl {
+    public:
+        explicit Impl(Robot& owner) : sm_ {owner} {}
 
-        explicit Impl(Robot& owner) : sm {owner} {}
+        template<typename Event>
+        void process_event(const Event& event) {
+            sm_.process_event(event);
+        }
+
+    private:
+        sml::sm<StateMachine> sm_;  // 状态机实例
     };
 
     void Robot::on_fsm_init() {
@@ -189,14 +196,14 @@ namespace rocos {
         std::vector<double> object_param = {0, 0, 0, 0, 0, 0};
         try
         {
-            yaml_node = YAML::LoadFile(yaml_path);
+            yaml_node = YAML::LoadFile(cali_yaml_path_);
             tool_param = yaml_node["T_tool_"].as<std::vector<double>>();
 
             object_param = yaml_node["T_object_"].as<std::vector<double>>();
         }
         catch (const std::exception &e)
         {
-            log_ptr_->error("Failed to load yaml file: {}", e.what());
+            log_ptr_->error("Failed to load calibration yaml file: {} => {}. ",cali_yaml_path_, e.what());
         }
         T_tool_.p.x(tool_param[0]);
         T_tool_.p.y(tool_param[1]);
@@ -225,7 +232,7 @@ namespace rocos {
         startMotionThread();
 
 
-        impl_->sm.process_event(EventSuccess{});  // 模拟初始化成功事件
+        impl_->process_event(EventSuccess{});  // 模拟初始化成功事件
 
     }
     void Robot::on_fsm_start() {
@@ -256,19 +263,27 @@ namespace rocos {
 
         log_ptr_ = Logger::getInstance("Robot");
 
-        impl_->sm.process_event(EventInitReq{});  // 进入初始化状态
-
+        impl_->process_event(EventInitReq{});  // 进入初始化状态
 
     }
 
 
     Robot::~Robot() {
-
-
+        // Delete logger pointer
         if (log_ptr_) {
             log_ptr_->flush();
             log_ptr_.reset();
         }
+
+
+
+
+
+
+        // Delete FSM pack
+        impl_.reset();
+
+
 
     }
 

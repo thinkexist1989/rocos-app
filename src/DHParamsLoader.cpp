@@ -6,6 +6,8 @@ DHParamsLoader::DHParamsLoader() {
     robot_name_ = "Unknown";
     base_link_ = "base_link";
     tip_link_ = "tool0";
+
+    log_ptr_ = Logger::getInstance("DHParamsLoader");
 }
 
 DHParamsLoader::~DHParamsLoader() {
@@ -23,12 +25,10 @@ bool DHParamsLoader::loadFromYAML(const std::string& yaml_file) {
         is_standard_dh_ = (config["dh_convention"].as<std::string>("standard") == "standard");
         is_mdh_ = (config["dh_convention"].as<std::string>("standard") == "modified");
 
-        std::cout << "[INFO] Loading robot: " << robot_name_ << std::endl;
-        std::cout << "[INFO] Base link: " << base_link_ << std::endl;
-        std::cout << "[INFO] Tip link: " << tip_link_ << std::endl;
-        std::cout << "[INFO] DH Convention: " 
-                  << (is_standard_dh_ ? "Standard DH" : (is_mdh_ ? "Modified DH" : "Unknown")) 
-                  << std::endl;
+        log_ptr_->info("Loading robot: {}", robot_name_);
+        log_ptr_->info("Base link: {}", base_link_);
+        log_ptr_->info("Tip link: {}", tip_link_);
+        log_ptr_->info("DH Convention: {}", (is_standard_dh_ ? "Standard DH" : (is_mdh_ ? "Modified DH" : "Unknown")));
         
         // 清空已有的DH参数
         dh_params_.clear();
@@ -36,7 +36,7 @@ bool DHParamsLoader::loadFromYAML(const std::string& yaml_file) {
         // 读取DH参数
         YAML::Node dh_nodes = config["dh_parameters"];
         if (!dh_nodes) {
-            std::cerr << "[ERROR] No 'dh_parameters' found in YAML file!" << std::endl;
+            log_ptr_->error("No 'dh_parameters' found in YAML file!");
             return false;
         }
         
@@ -53,20 +53,22 @@ bool DHParamsLoader::loadFromYAML(const std::string& yaml_file) {
             
             
             dh_params_.push_back(dh);
-            std::cout << "[INFO] Loaded joint: " << dh.joint_name 
-                      << " (type: " << dh.type << ")" << std::endl;
+
+            log_ptr_->info("Loaded joint: {} (type: {})", dh.joint_name, dh.type);
+
         }
         
-        std::cout << "[INFO] Successfully loaded " << dh_params_.size() << " DH parameters" << std::endl;
+        log_ptr_->info("Successfully loaded {} DH parameters", dh_params_.size());
+
         
         // 构建运动学链
         return buildChainFromDH();
         
     } catch (const YAML::Exception& e) {
-        std::cerr << "[ERROR] Failed to load YAML file '" << yaml_file << "': " << e.what() << std::endl;
+        log_ptr_->error("Failed to load DH parameters yaml file : {} => {}", yaml_file, e.what());
         return false;
     } catch (const std::exception& e) {
-        std::cerr << "[ERROR] Exception while loading YAML: " << e.what() << std::endl;
+        log_ptr_->error("Exception while loading DH parameters yaml file : {} => {}", yaml_file, e.what());
         return false;
     }
 }
@@ -75,16 +77,12 @@ bool DHParamsLoader::buildChainFromDH() {
     chain_ = KDL::Chain();
     
     if (dh_params_.empty()) {
-        std::cerr << "[ERROR] No DH parameters available to build chain!" << std::endl;
+        log_ptr_->error("No DH parameters available to build chain!");
         return false;
     }
     
-    std::cout << "[INFO] Building kinematic chain from DH parameters..." << std::endl;
-    
-    // 添加基座标系
-    // chain_.addSegment(KDL::Segment(base_link_ + "_base", 
-    //                               KDL::Joint(KDL::Joint::None),
-    //                               KDL::Frame::Identity()));
+    log_ptr_->info("Building kinematic chain from {} DH parameters", dh_params_.size());
+
     
     // 为每个DH参数添加关节和连杆
     for (size_t i = 0; i < dh_params_.size(); ++i) {
@@ -102,20 +100,12 @@ bool DHParamsLoader::buildChainFromDH() {
         
         // 添加Segment到链中
         chain_.addSegment(KDL::Segment(dh.joint_name + "_link", joint, frame));
-    
-        
-        // std::cout << "[INFO] Added joint: " << dh.joint_name 
-        //           << " (a=" << dh.a << ", alpha=" << dh.alpha 
-        //           << ", d=" << dh.d << ", theta=" << dh.theta 
-        //           << ", offset=" << dh.offset << ")" << std::endl;
+
     }
 
     chain_.addSegment(KDL::Segment("end_effector", KDL::Joint(KDL::Joint::RotZ), KDL::Frame::Identity()));
-    // 初始化关节限位
-    // initializeJointLimits();
-    
-    std::cout << "[INFO] Successfully built kinematic chain with " 
-              << chain_.getNrOfJoints() << " joints" << std::endl;
+
+    log_ptr_->info("Successfully built kinematic chain with {} joints", chain_.getNrOfJoints());
     
     return true;
 }
@@ -128,8 +118,7 @@ KDL::Joint DHParamsLoader::createJoint(const DHParameters& dh) {
         // 使用预定义的平移关节类型，沿Z轴平移
         return KDL::Joint(dh.joint_name, KDL::Joint::TransZ);
     } else {
-        std::cerr << "[WARNING] Unknown joint type: " << dh.type 
-                  << ", using fixed joint instead." << std::endl;
+        log_ptr_->warn("Unknown joint type '{}' for joint '{}', using fixed joint instead.", dh.type, dh.joint_name);
         return KDL::Joint(dh.joint_name,KDL::Joint::None);
     }
 }
@@ -142,10 +131,9 @@ KDL::Frame DHParamsLoader::createFrame(const DHParameters& dh) {
     if (is_mdh_) {
         // 改进DH参数变换顺序 (Modified DH): 
         // RotX(alpha(i-1)) * TransX(a(i-1)) * RotZ(theta(i)) * TransZ(d(i))
-        
-        
-        // std::cout << "[DEBUG] Using Modified DH transformation for joint: " << dh.joint_name << std::endl;
+
         double q = dh.theta + dh.offset;   // 统一先算好
+
         // 1. 绕X轴旋转alpha(i-1)
         frame = frame * KDL::Frame(KDL::Rotation::RotX(dh.alpha));
         // 2. 沿X轴平移a(i-1)
@@ -154,17 +142,13 @@ KDL::Frame DHParamsLoader::createFrame(const DHParameters& dh) {
         frame = frame * KDL::Frame(KDL::Rotation::RotZ(q ));
         // 4. 沿Z轴平移d(i)
         frame = frame * KDL::Frame(KDL::Vector(0, 0, dh.d));
-        // std::cout << "[DEBUG] Modified DH Frame for joint: " << dh.joint_name << std::endl;
-        // printFrame(KDL::Frame::DH_Craig1989(dh.a, dh.alpha, dh.d, q ));
-        // printFrame(frame);
+
         return KDL::Frame::DH_Craig1989(dh.a, dh.alpha, dh.d, q );
     } 
     else if (is_standard_dh_) {
         // 标准DH参数变换顺序 (Standard DH):
         // RotZ(theta(i)) * TransZ(d(i)) * TransX(a(i)) * RotX(alpha(i))
-        
-        // std::cout << "[DEBUG] Using Standard DH transformation for joint: " << dh.joint_name << std::endl;
-        
+
         // 1. 绕Z轴旋转theta(i)
         frame = frame * KDL::Frame(KDL::Rotation::RotZ(dh.theta + dh.offset));
         // 2. 沿Z轴平移d(i)
@@ -173,15 +157,12 @@ KDL::Frame DHParamsLoader::createFrame(const DHParameters& dh) {
         frame = frame * KDL::Frame(KDL::Vector(dh.a, 0, 0));
         // 4. 绕X轴旋转alpha(i)
         frame = frame * KDL::Frame(KDL::Rotation::RotX(dh.alpha));
-        // std::cout << "[DEBUG] Standard DH Frame for joint: " << dh.joint_name << std::endl;
-        // printFrame(KDL::Frame::DH(dh.a, dh.alpha, dh.d, dh.theta + dh.offset));
 
-        
-        // printFrame(frame);
         return KDL::Frame::DH(dh.a, dh.alpha, dh.d, dh.theta + dh.offset);
     }
     else {
-        std::cerr << "[ERROR] Unknown DH convention! Using Modified DH as default." << std::endl;
+        log_ptr_->error("Unknown DH convention! Using Modified DH as default.");
+
         // 默认使用改进DH
         frame = frame * KDL::Frame(KDL::Rotation::RotX(dh.alpha));
         frame = frame * KDL::Frame(KDL::Vector(dh.a, 0, 0));
@@ -194,58 +175,37 @@ KDL::Frame DHParamsLoader::createFrame(const DHParameters& dh) {
     
 }
 
-// void DHParamsLoader::initializeJointLimits() {
-//     int joint_count = chain_.getNrOfJoints();
-//     q_min_.resize(joint_count);
-//     q_max_.resize(joint_count);
-    
-//     // 初始化默认限位
-//     for (int i = 0; i < joint_count; ++i) {
-//         q_min_(i) = -KDL::PI;
-//         q_max_(i) = KDL::PI;
-//     }
-    
-//     // 根据DH参数设置具体限位
-//     for (size_t i = 0; i < dh_params_.size() && i < static_cast<size_t>(joint_count); ++i) {
-//         if (dh_params_[i].limits.size() >= 2) {
-//             q_min_(i) = dh_params_[i].limits[0];
-//             q_max_(i) = dh_params_[i].limits[1];
-//         }
-//     }
-    
-//     std::cout << "[INFO] Initialized joint limits for " << joint_count << " joints" << std::endl;
-// }
 void DHParamsLoader::printFrame(const KDL::Frame& frame) const {
     // 1. 位置 (x,y,z)
-    std::cout << "位置 [m]:\n"
-              << std::fixed << std::setprecision(4)
-              << "  x = " << frame.p.x() << '\n'
-              << "  y = " << frame.p.y() << '\n'
-              << "  z = " << frame.p.z() << "\n\n";
+    log_ptr_->info("Frame Position [m]: x = {:.4f}, y = {:.4f}, z = {:.4f}", frame.p.x(), frame.p.y(), frame.p.z());
 
     // 2. 旋转矩阵 (3×3)
-    std::cout << "旋转矩阵:\n";
+    std::ostringstream ss;
+    ss << "Frame Rotation:\n";
+
     for (int i = 0; i < 3; ++i)          // 行
     {
         for (int j = 0; j < 3; ++j)      // 列
-            std::cout << std::setw(10) << frame.M(i, j) << ' ';
-        std::cout << '\n';
+            ss << std::setw(10) << frame.M(i, j) << ' ';
+        ss << '\n';
     }
+    log_ptr_->info(ss.str());
 }
 
 void DHParamsLoader::printDHParameters() const {
-    std::cout << "\n=== Robot DH Parameters ===" << std::endl;
-    std::cout << "Robot Name: " << robot_name_ << std::endl;
-    std::cout << "Base Link: " << base_link_ << std::endl;
-    std::cout << "Tip Link: " << tip_link_ << std::endl;
-    std::cout << "Number of Joints: " << dh_params_.size() << std::endl;
-    std::cout << "\nDH Parameters Table:" << std::endl;
-    std::cout << "----------------------------------------------------------------" << std::endl;
-    std::cout << "Joint Name           | Alpha     | a         | d         | Theta   | Offset   " << std::endl;
-    std::cout << "----------------------------------------------------------------" << std::endl;
+    std::ostringstream ss;
+    ss << "\n=== Robot DH Parameters ===" << std::endl;
+    ss << "Robot Name: " << robot_name_ << std::endl;
+    ss << "Base Link: " << base_link_ << std::endl;
+    ss << "Tip Link: " << tip_link_ << std::endl;
+    ss << "Number of Joints: " << dh_params_.size() << std::endl;
+    ss << "\nDH Parameters Table:" << std::endl;
+    ss << "----------------------------------------------------------------" << std::endl;
+    ss << "Joint Name           | Alpha     | a         | d         | Theta   | Offset   " << std::endl;
+    ss << "----------------------------------------------------------------" << std::endl;
     
     for (const auto& dh : dh_params_) {
-        std::cout << std::left << std::setw(20) << dh.joint_name << " | "
+        ss << std::left << std::setw(20) << dh.joint_name << " | "
                   << std::fixed << std::setprecision(4)
                   << std::setw(9) << dh.alpha << " | "
                   << std::setw(9) << dh.a << " | "
@@ -253,5 +213,7 @@ void DHParamsLoader::printDHParameters() const {
                   << std::setw(9) << dh.theta << " | "
                   << std::setw(9) << dh.offset  << std::endl;
     }
-    std::cout << "----------------------------------------------------------------" << std::endl;
+    ss << "----------------------------------------------------------------" << std::endl;
+
+    log_ptr_->info(ss.str());
 }

@@ -1,0 +1,58 @@
+robot_name: "Robot_pan"
+base_link: "base_link"
+tip_link: "tool0"
+dh_convention: "modified"
+
+# 改进DH参数表: alpha(i-1), a(i-1), d(i), theta(i)
+dh_parameters:
+  - joint_name: "joint_1"
+    alpha: 0.0
+    a: 0.0
+    d: 0.257175000
+    theta: 0
+    type: "revolute"
+    offset: -1.570796323794896
+   
+    
+  - joint_name: "joint_2"
+    alpha: 1.57134086952
+    a: 0.0
+    d: 0.16294680
+    theta: 0.0
+    type: "revolute"
+    offset: 1.570796323794896
+    
+  - joint_name: "joint_3"
+    alpha: 3.144121
+    a: 0.5841079
+    d: 0.1318177
+    theta: 0.0
+    type: "revolute"
+    offset: 1.570796323794896
+    
+  - joint_name: "joint_4"
+    alpha: 1.5712256
+    a: 0.0
+    d: 0.5222686
+    theta: 0.0
+    type: "revolute"
+    offset: 0
+    
+  - joint_name: "joint_5"
+    alpha: -1.569461149
+    a: 0.000
+    d: 0.00
+    theta: 0.0
+    type: "revolute"
+    offset: 0
+    
+  - joint_name: "joint_6"
+    alpha: 1.571756257
+    a: 0
+    d: 0.14070280
+    theta: 0.0
+    type: "revolute"
+    # offset: 1.85919482679
+    offset: 1.570796323794896
+    
+  

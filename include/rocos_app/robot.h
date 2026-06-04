@@ -592,7 +592,7 @@ namespace rocos
             T_tool_rpy[5] = yaw;
 
             yaml_node["T_tool_"] = T_tool_rpy;
-            std::ofstream fout(yaml_path);
+            std::ofstream fout(cali_yaml_path_);
             std::ofstream fout1("/opt/rocos/yaml/calibration.yaml");
 
             fout << yaml_node;
@@ -615,7 +615,7 @@ namespace rocos
             T_object_rpy.push_back(yaw);
             yaml_node["T_object_"] = T_object_rpy;
 
-            std::ofstream fout(yaml_path);
+            std::ofstream fout(cali_yaml_path_);
             std::ofstream fout1("/opt/rocos/yaml/calibration.yaml");
             
             fout << yaml_node;
@@ -733,10 +733,6 @@ namespace rocos
         {
             return ErrorState;
         }
-        int CartToJnt(const JntArray &q_init, const Frame &p_in, JntArray &q_out)
-        {
-            return kinematics_.CartToJnt(q_init, p_in, q_out);
-        }
 
     protected:
         void addAllJoints();
@@ -746,7 +742,10 @@ namespace rocos
             return kinematics_.JntToCart(q_in, p_out);
         }
 
-        
+        int CartToJnt(const JntArray &q_init, const Frame &p_in, JntArray &q_out)
+        {
+            return kinematics_.CartToJnt(q_init, p_in, q_out);
+        }
 
         //! 更新法兰系,工具系,工件系poseFlange
         void updateCartesianInfo()
@@ -1111,9 +1110,10 @@ namespace rocos
         Frame flange_; //!< 法兰位置姿态
         Frame tool_;   //!< 工具位置姿态
         Frame object_; //!< 工件位置姿态
-        std::string yaml_path ="/opt/rocos/yaml/calibration.yaml";
+        std::string cali_yaml_path_ ="/opt/rocos/yaml/calibration.yaml";
         YAML::Node yaml_node;
 
+        //TODO: 这些要封装成Calibration类
         // 六点法标定
         Frame pose1;
         Frame pose2;
@@ -1132,6 +1132,7 @@ namespace rocos
         // 计算工具系和工件系的变换矩阵的标志位
         bool ErrorState{false};
 
+
         std::vector<KDL::JntArray> traj_;
         std::atomic<int> tick_count{0};
 
@@ -1146,40 +1147,41 @@ namespace rocos
         double speed_scaling_dt = 0;                                    // 规划器用时
 
         //**  记录数据，不应该存在**//
-        std::ofstream speed_data_csv{"/home/jc/rocos-app/speed_scaling.csv"};
+        // std::ofstream speed_data_csv{"/home/jc/rocos-app/speed_scaling.csv"};
         //**-------------------------------**//
 
     public:
         Kinematics kinematics_;
         Dynamics dynamics_;
 
+
+        //TODO: 所有的JC_helper类都需要处理掉
         friend void JC_helper::SmartServo_Joint::RunSmartServo(rocos::Robot *);
-
         friend class JC_helper::SmartServo_Cartesian;
-
         friend class JC_helper::SmartServo_Nullspace;
-
         friend void JC_helper::Joint_stop(rocos::Robot *robot_ptr, const KDL::JntArray &current_pos, const KDL::JntArray &last_pos, const KDL::JntArray &last_last_pos);
-
         friend class JC_helper::admittance;
         // 声明友元类
         friend class JC_helper::admittance_joint;
-
-        //        friend int JC_helper::safety_servo( rocos::Robot* robot_ptr, const std::array< double, 7 >& target_pos );
-
         friend int JC_helper::safety_servo(rocos::Robot *robot_ptr, const std::vector<double> &target_pos);
-
         friend int JC_helper::safety_servo(rocos::Robot *robot_ptr, const KDL::JntArray &target_pos);
+
+
         friend class RobotHttpServer; // 允许 Server 直接访问 Robot 的私有/保护成员
+        //TODO: ================================
+
     private:
-        JC_helper::ft_sensor my_ft_sensor;         // 6维力传感器
-        bool flag_admittance_turnoff{false};       // 导纳开关
-        bool flag_admittance_joint_turnoff{false}; // 关节拖动开关
+        JC_helper::ft_sensor my_ft_sensor;         //TODO: 6维力传感器
+
+        bool flag_admittance_turnoff{false};       //TODO: 导纳开关
+        bool flag_admittance_joint_turnoff{false}; //TODO: 关节拖动开关
+
         std::mutex mtx;                            // 互斥锁
         DHParamsLoader loader;
 
-        std::shared_ptr<std::thread> _thread_admittance_teaching{nullptr};
+        std::shared_ptr<std::thread> _thread_admittance_teaching{nullptr}; //TODO: 线程都要检查
 
+        //// 机器人状态机封装
         struct Impl;
         std::unique_ptr<Impl> impl_;
 
