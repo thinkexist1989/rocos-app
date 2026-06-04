@@ -28,31 +28,31 @@
 
 namespace {
 // 状态定义
-class UNKNOWN {};      // 未知状态，初始状态
-class IDLE {};         // 空闲状态，机器人处于停止状态，等待启动命令
-class PAUSED {};       // 暂停状态，机器人暂停在当前位置，等待继续或停止命令
-class RUNNING {};      // 运行状态，机器人正在执行运动
-class ERROR_STATE {};  // 错误状态，任何状态发生错误都转到这个状态
-class SERVOING {};     // 伺服状态，用于高速udp伺服指令发送
+class UNKNOWN       {};     // 未知状态，初始状态
+class IDLE          {};     // 空闲状态，机器人处于停止状态，等待启动命令
+class PAUSED        {};     // 暂停状态，机器人暂停在当前位置，等待继续或停止命令
+class RUNNING       {};     // 运行状态，机器人正在执行运动
+class ERROR_STATE   {};     // 错误状态，任何状态发生错误都转到这个状态
+class SERVOING      {};     // 伺服状态，用于高速udp伺服指令发送
 
 // 中间状态定义
-class INITIALIZING {}; // 初始化状态，机器人正在初始化
-class STARTING {};     // 启动状态，机器人正在启动
-class STOPPING {};
-class PAUSING {};
-class CONTINUING {};
-class RESETTING {};
+class INITIALIZING  {};     // 初始化状态，机器人正在初始化
+class STARTING      {};     // 启动状态，机器人正在启动
+class STOPPING      {};
+class PAUSING       {};
+class CONTINUING    {};
+class RESETTING     {};
 
 // 事件定义
-struct EventInitReq {};        // 初始化事件
-struct EventSuccess {};         // 启动任务
-struct EventStartReq {};       // 暂停任务
-struct EventStopReq {};        // 停止任务
-struct EventPauseReq {};       // 暂停任务
-struct EventContinueReq {};    // 继续任务
-struct EventErrorOccurred {};  // 发生错误
-struct EventResetReq {};   // 未知状态
-struct EventServoReq {};   // 伺服事件
+struct EventInitReq        {};        // 初始化请求
+struct EventSuccess        {};        // 成功事件
+struct EventStartReq       {};        // 启动请求
+struct EventStopReq        {};        // 停止请求
+struct EventPauseReq       {};        // 暂停请求
+struct EventContinueReq    {};        // 继续请求
+struct EventErrorOccurred  {};        // 发生错误
+struct EventResetReq       {};        // 恢复请求
+struct EventServoReq       {};        // 伺服请求
 
 namespace sml = boost::sml;
 
@@ -283,8 +283,6 @@ namespace rocos {
         // Delete FSM pack
         impl_.reset();
 
-
-
     }
 
 
@@ -463,16 +461,16 @@ namespace rocos {
     }
 
 
-    void Robot::addAllJoints() {
-        jnt_num_ = hw_interface_->getSlaveNumber();
-        joints_.clear();
-        for (int i = 0; i < jnt_num_; i++) {
-            joints_.push_back(boost::make_shared<Drive>(hw_interface_, i));
-            joints_[i]->setMode(ModeOfOperation::CyclicSynchronousPositionMode);
-        }
-    }
+    // void Robot::addAllJoints() {
+    //     jnt_num_ = hw_interface_->getSlaveNumber();
+    //     joints_.clear();
+    //     for (int i = 0; i < jnt_num_; i++) {
+    //         joints_.push_back(boost::make_shared<Drive>(hw_interface_, i));
+    //         joints_[i]->setMode(ModeOfOperation::CyclicSynchronousPositionMode);
+    //     }
+    // }
 
-    // TODO: 切换HW指针
+    // TODO: 切换HW指针，目前未实现
     bool Robot::switchHW(HardwareInterface *hw) { return false; }
 
 
@@ -498,7 +496,7 @@ namespace rocos {
         for (int i = 0; i < 10; i++)
             hw_interface_->waitForSignal(5);
 
-        // 机器人只能在停止状态切换工作模式
+        //TODO: 机器人只能在停止状态切换工作模式，有状态机，需要删掉
         if (getRunState() == RunState::Running) {
             log_ptr_->error("Robot is not stopped!");
             return false;
@@ -549,87 +547,6 @@ namespace rocos {
         }
 
         return true;
-    }
-
-
-    // TODO: 测试用MoveJ，阻塞运行，需要改为private
-    void Robot::moveJ(const std::vector<double> &pos,
-                      const std::vector<double> &max_vel,
-                      const std::vector<double> &max_acc,
-                      const std::vector<double> &max_jerk,
-                      Robot::Synchronization sync, ProfileType type) {
-        if (pos.size() != jnt_num_ || max_vel.size() != jnt_num_ ||
-            max_acc.size() != jnt_num_ || max_jerk.size() != jnt_num_) {
-            log_ptr_->error("MoveJ => Error Input Vector Size!");
-            return;
-        }
-
-        std::vector<R_INTERP_BASE *> interp(jnt_num_);
-
-        double max_time = 0.0;
-
-        // Start trajectory generation....
-        for (int i = 0; i < jnt_num_; i++) {
-            auto p0 = joints_[i]->getPosition();
-            switch (type) {
-                case trapezoid:
-                    interp[i] = new Trapezoid;
-                    reinterpret_cast< Trapezoid * >( interp[i] )->planTrapezoidProfile(0, p0, pos[i], 0, 0, max_vel[i],
-                                                                                       max_acc[i]);
-                    break;
-                case doubleS:
-                    interp[i] = new DoubleS;
-                    reinterpret_cast< DoubleS * >( interp[i] )->planDoubleSProfile(0, p0, pos[i], 0, 0, max_vel[i],
-                                                                                   max_acc[i], max_jerk[i]);
-                    break;
-                default:
-                    log_ptr_->error("Not Supported Profile Type");
-                    return;
-            }
-
-            max_time = max(max_time, interp[i]->getDuration());
-        }
-
-        // Sync scaling....
-        if (sync == SYNC_TIME) {
-            for_each(interp.begin(), interp.end(),
-                     [=](R_INTERP_BASE *p) { p->scaleToDuration(max_time); });
-        } else if (sync == SYNC_PHASE) {
-
-            log_ptr_->warn("Phase sync has not implemented...instead of time sync.");
-
-            for_each(interp.begin(), interp.end(),
-                     [=](R_INTERP_BASE *p) { p->scaleToDuration(max_time); });
-        }
-
-        // Start moving....
-        double dt = 0.0;
-        while (dt <= max_time) {
-            hw_interface_->waitForSignal(9);
-
-            for (int i = 0; i < jnt_num_; i++) {
-                if (!interp[i]->isValidMovement()) {
-                    continue;
-                }
-                switch (joints_[i]->getMode()) {
-                    case ModeOfOperation::CyclicSynchronousPositionMode:
-                        joints_[i]->setPosition(interp[i]->pos(dt));
-                        break;
-                    case ModeOfOperation::CyclicSynchronousVelocityMode:
-                        joints_[i]->setVelocity(interp[i]->vel(dt));
-                        break;
-                    default:
-                        log_ptr_->error("Only Supported CSP and CSV");
-                }
-            }
-
-            dt += DELTA_T;
-        }
-
-        // delete pointer
-        for (auto &p: interp) {
-            delete p;
-        }
     }
 
     void Robot::setEnabled() {
@@ -894,6 +811,7 @@ namespace rocos {
 
     /////// Motion Command /////////////
 
+    //TODO: ======================MoveJ调用逻辑===========================
     int Robot::MoveJ(JntArray q, double speed, double acceleration, double time,
                      double radius, bool asynchronous) {
 
@@ -960,7 +878,9 @@ namespace rocos {
         }
         return MoveJ(q_target, speed, acceleration, time, radius, asynchronous);
     }
+    //TODO: =========================MoveJ===============================
 
+    //TODO: ======================MoveL调用逻辑===========================
     int Robot::MoveL(Frame pose, double speed, double acceleration, double time,
                      double radius, bool asynchronous, int max_running_count) {
 
@@ -1037,8 +957,8 @@ namespace rocos {
 
         if (JC_helper::link_trajectory(traj_target, frame_init, pose, speed, acceleration) < 0) {
             log_ptr_->error("link trajectory planning fail ");
-            //  is_running_motion =false;
-            setRunState(RunState::Stopped);
+
+            setRunState(RunState::Stopped); //TODO: RunState
 
             return -1;
         }
@@ -1109,15 +1029,15 @@ namespace rocos {
         if (asynchronous)  //异步执行
         {
             motion_thread_.reset(new boost::thread{&Robot::RunMoveL, this, std::ref(traj_)});
-            // is_running_motion = true;
-            setRunState(RunState::Running);
+
+            setRunState(RunState::Running); //TODO: RunState
         } else  //同步执行
         {
             motion_thread_.reset(new boost::thread{&Robot::RunMoveL, this, std::ref(traj_)});
             motion_thread_->join();
             motion_thread_ = nullptr;
-            // is_running_motion = false;
-            setRunState(RunState::Stopped);
+
+            setRunState(RunState::Stopped); //TODO: RunState
         }
 
         return 0;
@@ -1147,13 +1067,14 @@ namespace rocos {
             return -1;
         }
 
-        if (is_running_motion)  //最大一条任务异步执行
+        if (is_running_motion)  //最大一条任务异步执行 //TODO: RunState
         {
             log_ptr_->error(" Motion is still running and waiting for it to finish");
             return -1;
         } else {
-            // is_running_motion = true;
-            setRunState(RunState::Running);
+
+            setRunState(RunState::Running); //TODO: RunState
+
         }
 
         if (motion_thread_) {
@@ -1174,8 +1095,9 @@ namespace rocos {
 
         if (JC_helper::link_trajectory(vel_target, frame_current, pose, speed, acceleration) < 0) {
             log_ptr_->error("link trajectory planning fail ");
-            //  is_running_motion =false;
-            setRunState(RunState::Stopped);
+
+            setRunState(RunState::Stopped); //TODO: RunState
+
             return -1;
         }
 
@@ -1236,15 +1158,15 @@ namespace rocos {
                         break;
                     default:
                         log_ptr_->error("Undefined error!");
-                        // is_running_motion = false;
-                        setRunState(RunState::Stopped);
+                        setRunState(RunState::Stopped); //TODO: RunState
+
                         return -1;
                 }
             }
             catch (...) {
                 log_ptr_->error("Undefined error!");
-                // is_running_motion =false;
-                setRunState(RunState::Stopped);
+                setRunState(RunState::Stopped); //TODO: RunState
+
                 return -1;
             }
 
@@ -1252,8 +1174,9 @@ namespace rocos {
 
         if (ik_count == max_running_count) {
             log_ptr_->error("CartToJnt still failed even after {} attempts", max_running_count);
-            // is_running_motion =false;
-            setRunState(RunState::Stopped);
+
+            setRunState(RunState::Stopped); //TODO: RunState
+
             return -1;
         }
 
@@ -1262,20 +1185,23 @@ namespace rocos {
         if (asynchronous)  //异步执行
         {
             motion_thread_.reset(new boost::thread{&Robot::RunMoveL, this, std::ref(traj_)});
-            // is_running_motion = true;
-            setRunState(RunState::Running);
+
+            setRunState(RunState::Running); //TODO: RunState
+
         } else  //同步执行
         {
             motion_thread_.reset(new boost::thread{&Robot::RunMoveL, this, std::ref(traj_)});
             motion_thread_->join();
             motion_thread_ = nullptr;
-            // is_running_motion = false;
-            setRunState(RunState::Stopped);
+
+            setRunState(RunState::Stopped); //TODO: RunState
+
         }
 
         return 0;
     }
 
+    //TODO: ========================MoveL=============================
 
     int Robot::MoveL_FK(JntArray q, double speed, double acceleration, double time,
                         double radius, bool asynchronous) {
@@ -1289,6 +1215,8 @@ namespace rocos {
         return MoveL(target, speed, acceleration, time, radius, asynchronous);
     }
 
+
+    //TODO: ======================MoveC调用逻辑===========================
     int Robot::MoveC(Frame pose_via, Frame pose_to, double speed,
                      double acceleration, double time, double radius,
                      Robot::OrientationMode mode, bool asynchronous, int max_running_count) {
@@ -1935,6 +1863,9 @@ namespace rocos {
         return 0;
     }
 
+    //TODO: ======================MoveC===========================
+
+
 
     int Robot::MoveP(Frame pose, double speed, double acceleration, double time,
                      double radius, bool asynchronous) {
@@ -2386,6 +2317,7 @@ namespace rocos {
         return 0;
     }
 
+    //TODO: 这些检查要在状态机中完成及确认，执行逻辑中，不应该继续判断，直接执行
     int Robot::CheckBeforeMove(const JntArray &q, double speed, double acceleration,
                                double time, double radius) {
         //** 数据有效性检查  **//
@@ -2456,6 +2388,8 @@ namespace rocos {
         //**-------------------------------**//
         return 0;
     }
+
+
     bool Robot::isEnabled()
     {
         for (int i = 0; i < jnt_num_; i++) {

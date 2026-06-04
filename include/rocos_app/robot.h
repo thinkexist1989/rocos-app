@@ -93,7 +93,7 @@ namespace rocos
             CartImp = 4
         };
 
-        enum class RunState
+        enum class RunState //TODO: 有状态机，需要删掉
         {
             Disabled = 0,
             Stopped = 1,
@@ -113,13 +113,15 @@ namespace rocos
 
         bool parseDriveParamsFromUrdf(const std::string &urdf_file_path);
 
-        bool switchHW(HardwareInterface *hw); // 切换硬件指针
+        bool switchHW(HardwareInterface *hw); //TODO: 切换硬件指针
 
         // 机器人状态机相关
         inline WorkMode getWorkMode() { return work_mode_; }
         bool setWorkMode(WorkMode mode);
-        inline RunState getRunState() { return run_state_; }
-        bool setRunState(RunState state);
+
+
+        inline RunState getRunState() { return run_state_; } //TODO: 用状态机了，不需要这个状态
+        bool setRunState(RunState state);//TODO: 用状态机了，不需要这个状态
 
         void setEnabled();
 
@@ -735,7 +737,7 @@ namespace rocos
         }
 
     protected:
-        void addAllJoints();
+        // void addAllJoints();
 
         int JntToCart(const JntArray &q_in, Frame &p_out)
         {
@@ -1050,19 +1052,9 @@ namespace rocos
 //        }
 
     public:
-        void test(); // 为了测试
 
         int stop_joint_admittance_teaching();
         bool isEnabled();
-    private:
-        // TODO： 测试用MoveJ，阻塞运行，需要改为private
-        void
-        moveJ(const std::vector<double> &pos,
-              const std::vector<double> &max_vel,
-              const std::vector<double> &max_acc,
-              const std::vector<double> &max_jerk,
-              Synchronization sync = SYNC_TIME,
-              ProfileType type = ProfileType::trapezoid);
 
     protected:
         HardwareInterface* hw_interface_{nullptr};
