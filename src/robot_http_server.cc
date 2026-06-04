@@ -162,10 +162,11 @@ void RobotHttpServer::registerRoutes() {
 
     
     // 修改后：去掉 ".*",
-server_->set_post_routing_handler([](const httplib::Request&, httplib::Response& res) {
+    server_->set_post_routing_handler([](const httplib::Request&, httplib::Response& res) {
     if (res.body.empty() && res.status == 0) {
         res.status = 404;
-        res.set_content(R"({"success":false,"code":404,"message":"endpoint not found","data":null})", "application/json");
+        // 按照设计文档，业务错误码使用 4 位编码；这里统一返回通用参数错误码 1001
+        res.set_content(R"({"success":false,"code":1001,"message":"endpoint not found","data":null})", "application/json");
     }
 });
 }
@@ -379,6 +380,13 @@ void RobotHttpServer::handleGetRobotInfo(const httplib::Request& req, httplib::R
         ji["unit_name"] = robot_->getJointUserUnitName(i);
         ji["zero_offset"] = robot_->getJointPosZeroOffset(i);
         joint_infos.push_back(ji);
+        spdlog::info("Joint {}: cnt_per_unit={}, torque_per_unit={}, ratio={}, unit_name={}, zero_offset={}",
+                     ji["name"].get<std::string>(),
+                     ji["cnt_per_unit"].get<double>(),
+                     ji["torque_per_unit"].get<double>(),
+                     ji["ratio"].get<double>(),
+                     ji["unit_name"].get<std::string>(),
+                     ji["zero_offset"].get<int32_t>());
     }
 
     nlohmann::json data;

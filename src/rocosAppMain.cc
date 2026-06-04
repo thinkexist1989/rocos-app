@@ -102,16 +102,16 @@ int main(int argc, char *argv[]) {
         std::cout << frame << std::endl;
         
 
-        KDL::JntArray q_init(jnt_num_);//当前初始关节角
-        KDL::JntArray q_target(jnt_num_);//求解出来的关节角
-        for (int i = 0; i < jnt_num_; i++) {
-            q_init.data[i] = robot.getJointPosition(i);
-            q_target.data[i] = robot.getJointPosition(i);
-        }
-        if (robot.CartToJnt(q_init, frame, q_target) < 0) {
-            PLOG_ERROR << " CartToJnt failed";
-            return -1;
-        }
+        // KDL::JntArray q_init(jnt_num_);//当前初始关节角
+        // KDL::JntArray q_target(jnt_num_);//求解出来的关节角
+        // for (int i = 0; i < jnt_num_; i++) {
+        //     q_init.data[i] = robot.getJointPosition(i);
+        //     q_target.data[i] = robot.getJointPosition(i);
+        // }
+        // if (robot.CartToJnt(q_init, frame, q_target) < 0) {
+        //     PLOG_ERROR << " CartToJnt failed";
+        //     return -1;
+        // }
 
     //------------------------wait----------------------------------
     httpServer.runAsync(FLAGS_http_host, FLAGS_http_port);
