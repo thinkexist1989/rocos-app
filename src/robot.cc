@@ -20,6 +20,7 @@
 #include <rocos_app/robot.h>
 #include <kdl_parser/kdl_parser.hpp> // 用于将urdf文件解析为KDL::Tree
 #include <boost/sml.hpp>
+#include <iomanip>
 #include <sstream>
 
 #define  MAX_JOINT_NUM 50
@@ -145,7 +146,30 @@ namespace rocos {
         explicit Impl(Robot& owner) : sm {owner} {}
     };
 
+    void Robot::on_fsm_init() {
+        log_ptr_->info("Robot is initializing...");
 
+        impl_->sm.process_event(EventSuccess{});  // 模拟初始化成功事件
+
+    }
+    void Robot::on_fsm_start() {
+
+    }
+    void Robot::on_fsm_run() {
+
+    }
+    void Robot::on_fsm_stop() {
+
+    }
+    void Robot::on_fsm_pause() {
+
+    }
+    void Robot::on_fsm_continue() {
+
+    }
+    void Robot::on_fsm_reset() {
+
+    }
 
     Robot::Robot(HardwareInterface *hw,
                  const string &urdf_file_path,
@@ -231,6 +255,11 @@ namespace rocos {
             exit(-1);
 
         startMotionThread();
+
+
+        impl_->sm.process_event(EventInitReq{});  // 触发状态机初始化事件
+
+
     }
 
 
@@ -296,14 +325,6 @@ namespace rocos {
             q_max(i) = joints_[i]->getMaxPosLimit();
         }
 
-        std::ostringstream ss;
-        ss << q_min.data.transpose();
-        log_ptr_->info("q_min: {}", ss.str());
-        ss.str("");
-        ss.clear();
-        ss << q_max.data.transpose();
-        log_ptr_->info("q_max: {}", ss.str());
-
         kinematics_.setPosLimits(q_min, q_max);
         kinematics_.Initialize(); //初始化，构建IK solver;
         
@@ -320,6 +341,25 @@ namespace rocos {
         jnt_num_ = kinematics_.getChain().getNrOfJoints();
 
         joints_.clear(); // vector<Drive>清空
+        std::ostringstream joint_table;
+        joint_table << "\n"
+                    << std::left
+                    << std::setw(4) << "idx"
+                    << std::setw(20) << "name"
+                    << std::setw(6) << "id"
+                    << std::setw(10) << "lower"
+                    << std::setw(10) << "upper"
+                    << std::setw(9) << "vel"
+                    << std::setw(9) << "acc"
+                    << std::setw(9) << "jerk"
+                    << std::setw(10) << "ratio"
+                    << std::setw(9) << "offset"
+                    << std::setw(13) << "cnt/unit"
+                    << std::setw(16) << "torque/unit"
+                    << "unit\n"
+                    << std::string(125, '-') << "\n"
+                    << std::fixed << std::setprecision(4);
+        int parsed_joint_idx = 0;
 
         tinyxml2::XMLDocument xml_doc;
         xml_doc.LoadFile(urdf_file_path.c_str()); // 解析urdf文件
@@ -331,68 +371,67 @@ namespace rocos {
             for (int i = 0; i < jnt_num_; ++i) {
 
                 if (element->Attribute("name") == kinematics_.getChain().getSegment(i).getJoint().getName()) {
-                    log_ptr_->info("Joint\n- name: {}", element->Attribute("name"));
+                    const auto *joint_name = element->Attribute("name");
 
                     auto hw = element->FirstChildElement("hardware");
 
                     auto id = hw->IntAttribute("id", -1); // 对应的硬件ID，若没指定默认为-1
-                    log_ptr_->info("- id: {}", id);
 
                     auto jnt_ptr = boost::make_shared<Drive>(hw_interface_, id); //获取相应硬件指针
 
-                    jnt_ptr->setName(element->Attribute("name")); //设置驱动器名称
+                    jnt_ptr->setName(joint_name); //设置驱动器名称
                     jnt_ptr->setMode(ModeOfOperation::CyclicSynchronousPositionMode); //驱动器模式设置为CSP
 
                     auto limit = hw->FirstChildElement("limit");
 
-                    jnt_ptr->setMinPosLimit(limit->DoubleAttribute("lower", -M_PI));
-                    jnt_ptr->setMaxPosLimit(limit->DoubleAttribute("upper", M_PI));
-                    jnt_ptr->setMaxVel(limit->DoubleAttribute("vel", 1.0));
-                    jnt_ptr->setMaxAcc(limit->DoubleAttribute("acc", 10.0));
-                    jnt_ptr->setMaxJerk(limit->DoubleAttribute("jerk", 100.0));
+                    const auto lower = limit->DoubleAttribute("lower", -M_PI);
+                    const auto upper = limit->DoubleAttribute("upper", M_PI);
+                    const auto vel = limit->DoubleAttribute("vel", 1.0);
+                    const auto acc = limit->DoubleAttribute("acc", 10.0);
+                    const auto jerk = limit->DoubleAttribute("jerk", 100.0);
 
-                    log_ptr_->info("- limits: \n"
-                                   "----- lower: {}\n"
-                                   "----- upper: {}\n"
-                                   "----- vel: {}\n"
-                                   "----- acc: {}\n"
-                                   "----- jerk: {}",
-                                   limit->DoubleAttribute("lower", -M_PI),
-                                   limit->DoubleAttribute("upper", M_PI),
-                                   limit->DoubleAttribute("vel", 1.0),
-                                   limit->DoubleAttribute("acc", 10.0),
-                                   limit->DoubleAttribute("jerk", 100.0));
+                    jnt_ptr->setMinPosLimit(lower);
+                    jnt_ptr->setMaxPosLimit(upper);
+                    jnt_ptr->setMaxVel(vel);
+                    jnt_ptr->setMaxAcc(acc);
+                    jnt_ptr->setMaxJerk(jerk);
 
                     auto trans = hw->FirstChildElement("transform");
 
-                    jnt_ptr->setRatio(trans->DoubleAttribute("ratio", 1.0));
-                    jnt_ptr->setPosZeroOffset(trans->IntAttribute("offset_pos_cnt", 0));
-                    jnt_ptr->setCntPerUnit(trans->DoubleAttribute("cnt_per_unit", 1.0));
-                    jnt_ptr->setTorquePerUnit(trans->DoubleAttribute("torque_per_unit", 1.0));
+                    const auto ratio = trans->DoubleAttribute("ratio", 1.0);
+                    const auto offset_pos_cnt = trans->IntAttribute("offset_pos_cnt", 0);
+                    const auto cnt_per_unit = trans->DoubleAttribute("cnt_per_unit", 1.0);
+                    const auto torque_per_unit = trans->DoubleAttribute("torque_per_unit", 1.0);
+                    const auto *user_unit_name = trans->Attribute("user_unit_name") ? trans->Attribute("user_unit_name") : "rad";
 
-                    log_ptr_->info("- transform: \n"
-                                   "----- ratio: {}\n"
-                                   "----- offset_pos_cnt: {}\n"
-                                   "----- cnt_per_unit: {}\n"
-                                   "----- torque_per_unit: {}",
-                                   trans->DoubleAttribute("ratio", 1.0),
-                                   trans->IntAttribute("offset_pos_cnt", 0),
-                                   trans->DoubleAttribute("cnt_per_unit", 1.0),
-                                   trans->DoubleAttribute("torque_per_unit", 1.0));
+                    jnt_ptr->setRatio(ratio);
+                    jnt_ptr->setPosZeroOffset(offset_pos_cnt);
+                    jnt_ptr->setCntPerUnit(cnt_per_unit);
+                    jnt_ptr->setTorquePerUnit(torque_per_unit);
+                    jnt_ptr->setUserUnitName(user_unit_name);
 
-
-                    if (trans->Attribute("user_unit_name")) {
-                        jnt_ptr->setUserUnitName(trans->Attribute("user_unit_name"));
-                        log_ptr_->info("----- user_unit_name: {}", trans->Attribute("user_unit_name"));
-                    } else {
-                        jnt_ptr->setUserUnitName(trans->Attribute("rad"));
-                        log_ptr_->info("----- user_unit_name: {}", "rad");
-                    }
+                    joint_table << std::left
+                                << std::setw(4) << parsed_joint_idx
+                                << std::setw(20) << joint_name
+                                << std::setw(6) << id
+                                << std::setw(10) << lower
+                                << std::setw(10) << upper
+                                << std::setw(9) << vel
+                                << std::setw(9) << acc
+                                << std::setw(9) << jerk
+                                << std::setw(10) << ratio
+                                << std::setw(9) << offset_pos_cnt
+                                << std::setw(13) << cnt_per_unit
+                                << std::setw(16) << torque_per_unit
+                                << user_unit_name << "\n";
+                    ++parsed_joint_idx;
 
                     joints_.push_back(jnt_ptr); // 将对应ID的hardware放入joints数组
                 }
             }
         }
+
+        log_ptr_->info("All joint parameters:{}", joint_table.str());
 
         return true;
     }

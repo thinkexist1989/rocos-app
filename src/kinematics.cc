@@ -56,13 +56,12 @@ namespace rocos {
 
         if(!tree_.getChain(base_link, tip, chain_)) {
             // 从KDL::Tree获取运动链失败
-            std::cerr << "[ERROR][rocos::Kinematics] Could not get chain from kdl tree!" << std::endl;
+            std::cerr << "[ERROR][rocos::Kinematics] Could not get chain from kdl tree!" << std::endl; //TODO:
             return false;
         }
 
         q_min_.resize(chain_.getNrOfJoints());
         q_max_.resize(chain_.getNrOfJoints());
-//        Initialize(); // 不要在这里初始化，要等q_min，q_max都初始化完毕再初始化
 
         return true;
     }
@@ -78,7 +77,6 @@ namespace rocos {
 
         q_min_.resize(chain_.getNrOfJoints());
         q_max_.resize(chain_.getNrOfJoints());
-//        Initialize(); // 不要在这里初始化，要等q_min，q_max都初始化完毕再初始化
 
         return true;
     }
@@ -87,8 +85,6 @@ namespace rocos {
         // 初始化正运动学求解器
         fk_solver_.reset(new KDL::ChainFkSolverPos_recursive(chain_));
         //初始化逆运动学求解器
-        std::cout<<"[INFO][rocos::Kinematics] chain has "<<chain_.getNrOfJoints()<<" joints."<<std::endl;
-        std::cout<<"[INFO][rocos::Kinematics] q_min_: "<<q_min_.data.transpose()<<std::endl;
         ik_solver_.reset(new TRAC_IK::TRAC_IK(chain_, q_min_, q_max_ ,0.005,7e-7));
     }
 
