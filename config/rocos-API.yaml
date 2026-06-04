@@ -1,0 +1,897 @@
+openapi: 3.0.0
+info:
+  title: ROCOS 机器人控制 REST API
+  description: 替代 gRPC 的 HTTP/JSON 机器人控制器接口，支持多语言、跨平台低门槛集成。
+  version: 1.0.0
+
+tags:
+  - name: 机器人状态与信息
+    description: 获取机器人关节状态、硬件信息及模型
+  - name: 基础控制
+    description: 机器人使能与工作模式切换
+  - name: 空间运动控制 (Motion)
+    description: 关节空间与笛卡尔空间的各类移动指令
+  - name: 单轴/多轴控制
+    description: 底层单轴和多轴的直接控制与同步
+  - name: 拖拽示教
+    description: 开启和停止机器人的拖拽模式
+  - name: 标定与坐标系
+    description: 工具、工件及位姿坐标系的标定
+
+paths:
+  # ==========================================
+  # 机器人状态与信息
+  # ==========================================
+  /api/robot/state:
+    get:
+      tags: [机器人状态与信息]
+      summary: 获取机器人完整状态
+      description: 包含关节状态、笛卡尔位姿（法兰、工具、工件）及硬件总线状态
+      responses:
+        '200':
+          description: 成功获取机器人状态
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/StandardResponse'
+                  - type: object
+                    properties:
+                      data:
+                        $ref: '#/components/schemas/RobotStateData'
+
+  /api/robot/info:
+    get:
+      tags: [机器人状态与信息]
+      summary: 获取机器人信息
+      description: 获取关节传动比、脉冲数、零点偏移等参数
+      responses:
+        '200':
+          description: 成功
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/StandardResponse'
+                  - type: object
+                    properties:
+                      data:
+                        $ref: '#/components/schemas/RobotInfoData'
+
+  /api/robot/model:
+    get:
+      tags: [机器人状态与信息]
+      summary: 获取机器人 URDF 模型结构
+      responses:
+        '200':
+          description: 成功
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/StandardResponse'
+                  - type: object
+                    properties:
+                      data:
+                        $ref: '#/components/schemas/RobotModelData'
+
+  /api/robot/model/mesh:
+    get:
+      tags: [机器人状态与信息]
+      summary: 获取连杆 3D Mesh 文件 (STL)
+      parameters:
+        - name: path
+          in: query
+          required: true
+          schema:
+            type: string
+          description: "STL文件的相对路径，例如: link1.stl"
+      responses:
+        '200':
+          description: 二进制文件流
+          content:
+            application/octet-stream:
+              schema:
+                type: string
+                format: binary
+
+  # ==========================================
+  # 基础控制
+  # ==========================================
+  /api/robot/enabled:
+    get:
+      tags: [基础控制]
+      summary: 查询使能状态
+      responses:
+        '200':
+          description: 成功
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/StandardResponse'
+                  - type: object
+                    properties:
+                      data:
+                        $ref: '#/components/schemas/RobotEnabledData'
+
+  /api/robot/enable:
+    post:
+      tags: [基础控制]
+      summary: 全局使能机器人
+      responses:
+        '200':
+          description: 使能成功
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/StandardResponse'
+
+  /api/robot/disable:
+    post:
+      tags: [基础控制]
+      summary: 全局下电/关闭使能
+      responses:
+        '200':
+          description: 禁用成功
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/StandardResponse'
+
+  /api/robot/workmode:
+    post:
+      tags: [基础控制]
+      summary: 设置工作模式
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [mode]
+              properties:
+                mode:
+                  type: string
+                  enum: [position, ee_admit_teach, jnt_admit_teach, jnt_imp, cart_imp]
+      responses:
+        '200':
+          description: 模式切换成功
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/StandardResponse'
+
+  # ==========================================
+  # 空间运动控制 (Motion)
+  # ==========================================
+  /api/move/joint:
+    post:
+      tags: [空间运动控制 (Motion)]
+      summary: 关节空间运动 (MoveJ)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [joints]
+              properties:
+                joints:
+                  type: array
+                  items: { type: number }
+                  description: 目标关节角度（弧度）数组
+                speed: { type: number, default: 1.05 }
+                acceleration: { type: number, default: 1.4 }
+                time: { type: number, default: 0.0 }
+                radius: { type: number, default: 0.0 }
+                asynchronous: { type: boolean, default: false }
+      responses:
+        '200':
+          description: 运动请求已受理 (返回 data 视 asynchronous 参数而定)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MoveResponse'
+
+  /api/move/joint_ik:
+    post:
+      tags: [空间运动控制 (Motion)]
+      summary: 笛卡尔位姿逆解运动 (MoveJ_IK)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [pose]
+              properties:
+                pose: { $ref: '#/components/schemas/Pose' }
+                speed: { type: number, default: 1.05 }
+                acceleration: { type: number, default: 1.4 }
+                time: { type: number, default: 0.0 }
+                radius: { type: number, default: 0.0 }
+                asynchronous: { type: boolean, default: false }
+      responses:
+        '200':
+          description: 成功
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MoveResponse'
+
+  /api/move/linear:
+    post:
+      tags: [空间运动控制 (Motion)]
+      summary: 笛卡尔直线运动 (MoveL)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [pose]
+              properties:
+                pose: { $ref: '#/components/schemas/Pose' }
+                speed: { type: number, default: 1.05 }
+                acceleration: { type: number, default: 1.4 }
+                time: { type: number, default: 0.0 }
+                radius: { type: number, default: 0.0 }
+                asynchronous: { type: boolean, default: false }
+      responses:
+        '200':
+          description: 成功
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MoveResponse'
+
+  /api/move/linear_fk:
+    post:
+      tags: [空间运动控制 (Motion)]
+      summary: 关节空间直线运动 (MoveL_FK)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [joints]
+              properties:
+                joints:
+                  type: array
+                  items: { type: number }
+                speed: { type: number, default: 1.05 }
+                acceleration: { type: number, default: 1.4 }
+                time: { type: number, default: 0.0 }
+                radius: { type: number, default: 0.0 }
+                asynchronous: { type: boolean, default: false }
+      responses:
+        '200':
+          description: 成功
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MoveResponse'
+
+  /api/move/circle:
+    post:
+      tags: [空间运动控制 (Motion)]
+      summary: 笛卡尔圆弧运动 (MoveC)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [pose_via, pose_to]
+              properties:
+                pose_via: { $ref: '#/components/schemas/Pose' }
+                pose_to: { $ref: '#/components/schemas/Pose' }
+                speed: { type: number, default: 0.25 }
+                acceleration: { type: number, default: 1.2 }
+                time: { type: number, default: 0.0 }
+                radius: { type: number, default: 0.0 }
+                mode: { type: string, enum: [UNCONSTRAINED, FIXED], default: UNCONSTRAINED }
+                asynchronous: { type: boolean, default: false }
+      responses:
+        '200':
+          description: 成功
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MoveResponse'
+
+  /api/move/path:
+    post:
+      tags: [空间运动控制 (Motion)]
+      summary: 路径点运动 (MoveP)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [pose]
+              properties:
+                pose: { $ref: '#/components/schemas/Pose' }
+                speed: { type: number, default: 1.05 }
+                acceleration: { type: number, default: 1.4 }
+                time: { type: number, default: 0.0 }
+                radius: { type: number, default: 0.0 }
+                asynchronous: { type: boolean, default: false }
+      responses:
+        '200':
+          description: 成功
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MoveResponse'
+
+  /api/move/pathway:
+    post:
+      tags: [空间运动控制 (Motion)]
+      summary: 多路点路径运动 (MovePath)
+      description: "Not Implemented in the current server implementation. See server docs and implementation for details."
+      x-not-implemented: true
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [waypoints]
+              properties:
+                waypoints:
+                  type: array
+                  items: { type: object }
+                asynchronous: { type: boolean, default: false }
+      responses:
+        '200':
+          description: 成功
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MoveResponse'
+        '501':
+          description: Not Implemented in server implementation
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/StandardResponse'
+
+  /api/move/stop:
+    post:
+      tags: [空间运动控制 (Motion)]
+      summary: 停止运动
+      responses:
+        '200':
+          description: 成功停止
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/StandardResponse'
+
+  /api/move/status:
+    get:
+      tags: [空间运动控制 (Motion)]
+      summary: 查询异步任务状态
+      description: 供上层任务编排系统进行状态追踪和错误恢复
+      parameters:
+        - name: task_id
+          in: query
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: 返回任务详情状态
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/StandardResponse'
+                  - type: object
+                    properties:
+                      data:
+                        $ref: '#/components/schemas/TaskStatusData'
+
+  # ==========================================
+  # 单轴/多轴控制
+  # ==========================================
+  /api/axis/single/enable:
+    post:
+      tags: [单轴/多轴控制]
+      summary: 单轴使能
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [id]
+              properties:
+                id: { type: integer, description: "关节序号(从0开始)" }
+      responses:
+        '200':
+          description: 成功
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/StandardResponse'
+
+  /api/axis/single/disable:
+    post:
+      tags: [单轴/多轴控制]
+      summary: 单轴禁用
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [id]
+              properties:
+                id: { type: integer }
+      responses:
+        '200':
+          description: 成功
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/StandardResponse'
+
+  /api/axis/single/move:
+    post:
+      tags: [单轴/多轴控制]
+      summary: 单轴运动
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [id, pos]
+              properties:
+                id: { type: integer }
+                pos: { type: number, description: "目标位置" }
+                max_vel: { type: number, default: -1.0 }
+                max_acc: { type: number, default: -1.0 }
+                max_jerk: { type: number, default: -1.0 }
+                least_time: { type: number, default: -1.0 }
+                raw_data: { type: boolean, default: false }
+      responses:
+        '200':
+          description: 成功
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/StandardResponse'
+
+  /api/axis/single/stop:
+    post:
+      tags: [单轴/多轴控制]
+      summary: 单轴停止
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [id]
+              properties:
+                id: { type: integer }
+      responses:
+        '200':
+          description: 成功
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/StandardResponse'
+
+  /api/axis/multi/enable:
+    post:
+      tags: [单轴/多轴控制]
+      summary: 多轴统一使能
+      responses:
+        '200':
+          description: 成功
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/StandardResponse'
+
+  /api/axis/multi/disable:
+    post:
+      tags: [单轴/多轴控制]
+      summary: 多轴统一下电
+      responses:
+        '200':
+          description: 成功
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/StandardResponse'
+
+  /api/axis/multi/move:
+    post:
+      tags: [单轴/多轴控制]
+      summary: 多轴底层控制运动
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [target_pos, max_vel, max_acc, max_jerk]
+              properties:
+                target_pos: { type: array, items: { type: number } }
+                max_vel: { type: array, items: { type: number } }
+                max_acc: { type: array, items: { type: number } }
+                max_jerk: { type: array, items: { type: number } }
+                least_time: { type: number, default: -1.0 }
+      responses:
+        '200':
+          description: 成功
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/StandardResponse'
+
+  /api/axis/multi/stop:
+    post:
+      tags: [单轴/多轴控制]
+      summary: 多轴统一停止
+      responses:
+        '200':
+          description: 成功
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/StandardResponse'
+
+  /api/axis/multi/sync:
+    post:
+      tags: [单轴/多轴控制]
+      summary: 设置多轴同步模式
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [sync]
+              properties:
+                sync:
+                  type: string
+                  enum: [none, time, phase]
+      responses:
+        '200':
+          description: 成功
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/StandardResponse'
+
+  # ==========================================
+  # 拖拽示教
+  # ==========================================
+  /api/drag/start:
+    post:
+      tags: [拖拽示教]
+      summary: 启动拖拽示教
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [flag, direction]
+              properties:
+                flag:
+                  type: string
+                  enum: [J0, J1, J2, J3, J4, J5, J6, TOOL_X, TOOL_Y, TOOL_Z, TOOL_ROLL, TOOL_PITCH, TOOL_YAW, FLANGE_X, FLANGE_Y, FLANGE_Z, FLANGE_ROLL, FLANGE_PITCH, FLANGE_YAW, OBJECT_X, OBJECT_Y, OBJECT_Z, OBJECT_ROLL, OBJECT_PITCH, OBJECT_YAW, BASE_X, BASE_Y, BASE_Z, BASE_ROLL, BASE_PITCH, BASE_YAW, NULLSPACE]
+                direction:
+                  type: string
+                  enum: [POSITIVE, NEGATIVE, NONE]
+                max_speed: { type: number, default: 1.0 }
+                max_acceleration: { type: number, default: 2.0 }
+      responses:
+        '200':
+          description: 成功
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/StandardResponse'
+
+  /api/drag/stop:
+    post:
+      tags: [拖拽示教]
+      summary: 停止拖拽示教
+      responses:
+        '200':
+          description: 成功
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/StandardResponse'
+
+  # ==========================================
+  # 标定与坐标系
+  # ==========================================
+  /api/calibration/pose:
+    post:
+      tags: [标定与坐标系]
+      summary: 设置标定点位 (Set Pose Frame)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [id, pose]
+              properties:
+                id: { type: integer, description: "点位序号" }
+                pose: { $ref: '#/components/schemas/Pose' }
+      responses:
+        '200':
+          description: 成功
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/StandardResponse'
+
+  /api/calibration/tool:
+    post:
+      tags: [标定与坐标系]
+      summary: 手动设置工具坐标系
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [pose]
+              properties:
+                pose: { $ref: '#/components/schemas/Pose' }
+      responses:
+        '200':
+          description: 成功
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/StandardResponse'
+
+  /api/calibration/object:
+    post:
+      tags: [标定与坐标系]
+      summary: 手动设置工件坐标系
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [pose]
+              properties:
+                pose: { $ref: '#/components/schemas/Pose' }
+      responses:
+        '200':
+          description: 成功
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/StandardResponse'
+
+  /api/calibration/run:
+    post:
+      tags: [标定与坐标系]
+      summary: 执行标定计算
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [frame]
+              properties:
+                frame:
+                  type: string
+                  enum: [tool, object]
+      responses:
+        '200':
+          description: 标定成功或失败 (详见错误码 4001-4004)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/StandardResponse'
+
+  /api/calibration/result:
+    get:
+      tags: [标定与坐标系]
+      summary: 获取标定结果
+      responses:
+        '200':
+          description: 成功
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/StandardResponse'
+                  - type: object
+                    properties:
+                      data:
+                        $ref: '#/components/schemas/CalibrationResultData'
+
+components:
+  schemas:
+    # 基础标准响应体
+    StandardResponse:
+      type: object
+      required: [success, code, message]
+      properties:
+        success:
+          type: boolean
+          description: 请求是否成功
+        code:
+          type: integer
+          description: "业务状态码。0: 成功, 1xxx: 参数错误, 2xxx: 运动规划错误, 3xxx: 状态错误, 4xxx: 标定错误, 5xxx: 异步任务错误"
+        message:
+          type: string
+          description: 状态描述信息
+        data:
+          type: object
+          nullable: true
+          description: 具体业务数据
+
+    # 位姿结构
+    Pose:
+      type: object
+      properties:
+        position:
+          type: object
+          properties:
+            x: { type: number, default: 0.0 }
+            y: { type: number, default: 0.0 }
+            z: { type: number, default: 0.0 }
+        orientation:
+          type: object
+          properties:
+            x: { type: number, default: 0.0 }
+            y: { type: number, default: 0.0 }
+            z: { type: number, default: 0.0 }
+            w: { type: number, default: 1.0 }
+
+    Vector3:
+      type: object
+      properties:
+        x: { type: number, default: 0.0 }
+        y: { type: number, default: 0.0 }
+        z: { type: number, default: 0.0 }
+
+    NullableVector3:
+      type: object
+      properties:
+        x: { type: number, nullable: true, default: 0.0 }
+        y: { type: number, nullable: true, default: 0.0 }
+        z: { type: number, nullable: true, default: 0.0 }
+
+    CalibrationResultPose:
+      type: object
+      properties:
+        position: { $ref: '#/components/schemas/NullableVector3' }
+        orientation:
+          type: object
+          properties:
+            x: { type: number, default: 0.0 }
+            y: { type: number, default: 0.0 }
+            z: { type: number, default: 0.0 }
+            w: { type: number, default: 1.0 }
+
+    RobotEnabledData:
+      type: object
+      properties:
+        enabled: { type: boolean, example: true }
+
+    # /api/robot/info 返回的数据域
+    RobotInfoData:
+      type: object
+      properties:
+        joint_infos:
+          type: array
+          items:
+            type: object
+            properties:
+              name: { type: string, example: "Slave_1000[ SIM ]" }
+              cnt_per_unit: { type: number, example: 156455.678 }
+              torque_per_unit: { type: number, example: 1.0 }
+              ratio: { type: number, example: 1.0 }
+              unit_name: { type: string, example: "rad" }
+              zero_offset: { type: integer, example: 0 }
+
+    # /api/robot/state 返回的数据域
+    RobotStateData:
+      type: object
+      properties:
+        joint_states:
+          type: array
+          items:
+            type: object
+            properties:
+              name: { type: string, example: "Slave_1000[ SIM ]" }
+              position: { type: number, example: 0.0 }
+              velocity: { type: number, example: 0.0 }
+              torque: { type: number, example: 0.0 }
+              load_torque: { type: number, example: 0.0 }
+              status: { type: integer, example: 2, description: "0: disabled, 1: fault, 2: enabled" }
+        flange: { $ref: '#/components/schemas/Pose' }
+        tool: { $ref: '#/components/schemas/Pose' }
+        object: { $ref: '#/components/schemas/Pose' }
+        hw_state:
+          type: object
+          properties:
+            hw_type: { type: integer, example: 1, description: "1: simulation, 2: EtherCAT" }
+            current_cycle_time: { type: number, example: 1006.8407922546279 }
+            min_cycle_time: { type: number, example: 990.153963721232 }
+            max_cycle_time: { type: number, example: 1009.6510057264206 }
+            slave_num: { type: integer, example: 20 }
+
+    # /api/robot/model 返回的数据域
+    RobotModelData:
+      type: object
+      properties:
+        name: { type: string, example: "talon" }
+        links:
+          type: array
+          items:
+            type: object
+            properties:
+              name: { type: string, example: "link_1" }
+              order: { type: integer, example: 1 }
+              type: { type: string, example: "continuous" }
+              mesh: { type: string, example: "link_1.STL" }
+              axis: { $ref: '#/components/schemas/Vector3' }
+              translate: { $ref: '#/components/schemas/Vector3' }
+              rotate: { $ref: '#/components/schemas/Vector3' }
+              translateLink: { $ref: '#/components/schemas/Vector3' }
+              rotateLink: { $ref: '#/components/schemas/Vector3' }
+
+    CalibrationResultData:
+      type: object
+      properties:
+        error_state: { type: boolean, example: false }
+        pose: { $ref: '#/components/schemas/CalibrationResultPose' }
+
+    # 异步任务追踪的数据域
+    TaskStatusData:
+      type: object
+      properties:
+        task_id: { type: string, example: "a1b2c3d4-e5f6-7890-abcd-ef1234567890" }
+        type: { type: string, example: "MoveJ" }
+        status: { type: string, enum: [RUNNING, COMPLETED, FAILED, STOPPED], example: "COMPLETED" }
+        result: { type: integer, example: 0 }
+        message: { type: string, example: "ok" }
+        create_time: { type: string, format: date-time, example: "2025-06-03T14:30:00Z" }
+        finish_time: { type: string, format: date-time, example: "2025-06-03T14:30:02Z" }
+
+    # 运动指令返回体 (兼容同步与异步)
+    MoveResponse:
+      allOf:
+        - $ref: '#/components/schemas/StandardResponse'
+        - type: object
+          properties:
+            data:
+              nullable: true
+              oneOf:
+                - type: object
+                  description: 异步执行时 (asynchronous=true) 返回的数据
+                  required: [task_id]
+                  properties:
+                    task_id: { type: string, example: "task_1" }
+                    status: { type: string, example: "RUNNING" }
+                    message: { type: string, example: "task created" }
+                - type: object
+                  description: 同步执行时 (asynchronous=false) 返回的数据
+                  properties:
+                    result: { type: integer, example: 0 }
+                    message: { type: string, example: "ok" }

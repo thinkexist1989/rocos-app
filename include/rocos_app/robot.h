@@ -733,6 +733,10 @@ namespace rocos
         {
             return ErrorState;
         }
+        int CartToJnt(const JntArray &q_init, const Frame &p_in, JntArray &q_out)
+        {
+            return kinematics_.CartToJnt(q_init, p_in, q_out);
+        }
 
     protected:
         void addAllJoints();
@@ -742,10 +746,7 @@ namespace rocos
             return kinematics_.JntToCart(q_in, p_out);
         }
 
-        int CartToJnt(const JntArray &q_init, const Frame &p_in, JntArray &q_out)
-        {
-            return kinematics_.CartToJnt(q_init, p_in, q_out);
-        }
+        
 
         //! 更新法兰系,工具系,工件系poseFlange
         void updateCartesianInfo()
@@ -1169,7 +1170,7 @@ namespace rocos
         friend int JC_helper::safety_servo(rocos::Robot *robot_ptr, const std::vector<double> &target_pos);
 
         friend int JC_helper::safety_servo(rocos::Robot *robot_ptr, const KDL::JntArray &target_pos);
-
+        friend class RobotHttpServer; // 允许 Server 直接访问 Robot 的私有/保护成员
     private:
         JC_helper::ft_sensor my_ft_sensor;         // 6维力传感器
         bool flag_admittance_turnoff{false};       // 导纳开关

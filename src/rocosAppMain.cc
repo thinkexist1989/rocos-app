@@ -27,7 +27,7 @@
 #include <fstream>
 #include <iostream>
 #include <rocos_app/robot.h>
-#include <rocos_app/robot_service.h>
+#include <rocos_app/robot_http_server.h>
 #include <string>
 #include <gflags/gflags.h>
 
@@ -36,6 +36,8 @@ DEFINE_string(base, "base_link", "Base link name");
 DEFINE_string(tip, "link_7", "Tip link name");
 DEFINE_bool(sim, true, "Sim or not");
 DEFINE_int32(id, 0, "hardware id, only work for real hardware");
+DEFINE_string(http_host, "0.0.0.0", "HTTP server listen host");
+DEFINE_int32(http_port, 8080, "HTTP server listen port");
 
 bool isRuning = true;
 
@@ -81,10 +83,44 @@ int main(int argc, char *argv[]) {
 
     robot_ptr = &robot;
 
-    auto robotService = RobotServiceImpl::getInstance(&robot);
+    rocos::RobotHttpServer httpServer(&robot);
+
+
+        int jnt_num_=robot.getJointNum();
+        //参数可以直接flange读取Frame getFlange()，读取回来就是Frame类型
+        KDL::Frame frame=robot.getFlange();//放求解的笛卡尔姿态
+        
+        // KDL::Frame frame(
+        // KDL::Rotation::RPY(roll, pitch, yaw),  // 旋转矩阵
+        // KDL::Vector(x, y, z)                   // 平移向量
+        // );
+        // // 2. 如果只有位置、没有旋转
+        // KDL::Frame frame_pos_only(KDL::Vector(x, y, z));  // 默认 R = Identity
+        // // 3. 如果只有旋转、没有位置
+        // KDL::Frame frame_rot_only(KDL::Rotation::RPY(roll, pitch, yaw));  // p = 0
+        // ========== 验证输出 ==========
+        std::cout << frame << std::endl;
+        
+
+        // KDL::JntArray q_init(jnt_num_);//当前初始关节角
+        // KDL::JntArray q_target(jnt_num_);//求解出来的关节角
+        // for (int i = 0; i < jnt_num_; i++) {
+        //     q_init.data[i] = robot.getJointPosition(i);
+        //     q_target.data[i] = robot.getJointPosition(i);
+        // }
+        // if (robot.CartToJnt(q_init, frame, q_target) < 0) {
+        //     PLOG_ERROR << " CartToJnt failed";
+        //     return -1;
+        // }
 
     //------------------------wait----------------------------------
-    robotService->runServer();
+    httpServer.runAsync(FLAGS_http_host, FLAGS_http_port);
+    // Keep main thread alive
+    std::cout << "\033[1;32m" << "[HTTP Server] Running on "
+          << FLAGS_http_host << ":" << FLAGS_http_port << "\033[0m" << std::endl;
+    while (isRuning) {
+        std::this_thread::sleep_for(std::chrono::seconds(1));
+    }
 
     return 0;
 }

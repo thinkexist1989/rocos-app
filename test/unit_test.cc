@@ -26,7 +26,7 @@
 #include <rocos_app/ethercat/hardware_sim.h>
 #include <rocos_app/drive.h>
 #include <rocos_app/robot.h>
-#include <rocos_app/robot_service.h>
+#include<rocos_app/robot_http_server.h>
 #include <rocos_app/kinematics.h>
 
 
@@ -265,17 +265,27 @@ TEST_CASE("Robot Motion Thread") {
 }
 
 
-TEST_CASE("gRPC communication") {
+#include <rocos_app/robot_http_server.h> // 确保引入了新的头文件
+
+// 建议将测试名称也同步修改为 HTTP
+TEST_CASE("HTTP communication") {
     using namespace rocos;
-//    boost::shared_ptr<HardwareInterface> hw = boost::make_shared<HardwareSim>(5);
+//  boost::shared_ptr<HardwareInterface> hw = boost::make_shared<HardwareSim>(5);
     boost::shared_ptr<HardwareInterface> hw = boost::make_shared<Hardware>();
 
     Robot robot(hw.get());
 
-    auto robotService = RobotServiceImpl::getInstance(&robot);
+    // 实例化新的 HTTP 服务器
+    RobotHttpServer httpServer(&robot);
 
-    robotService->runServer();
-
+    // 运行服务器 (默认阻塞运行在 0.0.0.0:8080)
+    httpServer.run("0.0.0.0", 8080); 
+    
+    // 💡 提示：如果你的测试用例需要在服务器启动后继续执行后续的断言(ASSERT)或请求模拟，
+    // 请改用异步运行方法：
+    // httpServer.runAsync("0.0.0.0", 8080);
+    // ... 在这里写测试的请求逻辑 ...
+    // httpServer.stop();
 }
 
 TEST_CASE("Kinematics") {
