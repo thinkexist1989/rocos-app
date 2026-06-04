@@ -165,11 +165,33 @@ target_link_libraries(kinematics
         Eigen3::Eigen
         orocos-kdl
         $<BUILD_INTERFACE:nlopt>
-#        $<BUILD_INTERFACE:orocos-kdl>
         $<BUILD_INTERFACE:trac_ik>
-        $<BUILD_INTERFACE:ruckig::ruckig>
-        )
+        $<BUILD_INTERFACE:rocos::logger>
+)
 add_library(rocos::kinematics ALIAS kinematics)
+
+########## Library dynamics #################
+add_library(dynamics
+        SHARED
+        src/dynamics.cc
+
+)
+target_include_directories(dynamics
+        PUBLIC
+        $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>
+        $<INSTALL_INTERFACE:include>
+)
+target_link_libraries(dynamics
+        PUBLIC
+        Eigen3::Eigen
+        orocos-kdl
+        $<BUILD_INTERFACE:rocos::logger>
+
+)
+add_library(rocos::dynamics ALIAS dynamics)
+
+
+
 
 ########## Library robot #################
 add_library(robot
@@ -191,8 +213,10 @@ target_link_libraries(robot
         $<BUILD_INTERFACE:rocos::hardware>
         $<BUILD_INTERFACE:rocos::drive>
         $<BUILD_INTERFACE:rocos::kinematics>
+        $<BUILD_INTERFACE:rocos::dynamics>
         $<BUILD_INTERFACE:plog::plog>
         $<BUILD_INTERFACE:JC_helper::gripper>
+        $<BUILD_INTERFACE:ruckig::ruckig>
         OpenSSL::SSL
         sml::sml
         )

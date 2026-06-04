@@ -149,38 +149,7 @@ namespace rocos {
     void Robot::on_fsm_init() {
         log_ptr_->info("Robot is initializing...");
 
-        impl_->sm.process_event(EventSuccess{});  // 模拟初始化成功事件
-
-    }
-    void Robot::on_fsm_start() {
-
-    }
-    void Robot::on_fsm_run() {
-
-    }
-    void Robot::on_fsm_stop() {
-
-    }
-    void Robot::on_fsm_pause() {
-
-    }
-    void Robot::on_fsm_continue() {
-
-    }
-    void Robot::on_fsm_reset() {
-
-    }
-
-    Robot::Robot(HardwareInterface *hw,
-                 const string &urdf_file_path,
-                 const string &base_link,
-                 const string &tip
-    ) : hw_interface_(hw), urdf_file_path_(urdf_file_path), pos_(MAX_JOINT_NUM),
-        vel_(MAX_JOINT_NUM), acc_(MAX_JOINT_NUM), impl_(std::make_unique<Impl>(*this)) {
-
-        log_ptr_ = Logger::getInstance("Robot");
-
-        parseUrdf(urdf_file_path, base_link, tip);
+        parseUrdf(urdf_file_path_, base_link_, tip_);
 
         jointNum = jnt_num_;
 
@@ -188,9 +157,7 @@ namespace rocos {
         target_positions_prev_.resize(jnt_num_);
         target_velocities_.resize(jnt_num_);
         target_torques_.resize(jnt_num_);
-        // pos_.resize(jnt_num_);
-        // vel_.resize(jnt_num_);
-        // acc_.resize(jnt_num_);
+
         max_vel_.resize(jnt_num_);
         max_acc_.resize(jnt_num_);
         max_jerk_.resize(jnt_num_);
@@ -206,8 +173,8 @@ namespace rocos {
 
             target_torques_[i] = joints_[i]->getTorque();
 
-            max_vel_[i] = joints_[i]->getMaxVel();
-            max_acc_[i] = joints_[i]->getMaxAcc();
+            max_vel_[i]  = joints_[i]->getMaxVel();
+            max_acc_[i]  = joints_[i]->getMaxAcc();
             max_jerk_[i] = joints_[i]->getMaxJerk();
 
             if (profile_type_ == trapezoid) {
@@ -235,6 +202,7 @@ namespace rocos {
         T_tool_.p.y(tool_param[1]);
         T_tool_.p.z(tool_param[2]);
         T_tool_.M = KDL::Rotation::RPY(tool_param[3], tool_param[4], tool_param[5]);
+
         T_object_.p.x(object_param[0]);
         T_object_.p.y(object_param[1]);
         T_object_.p.z(object_param[2]);
@@ -251,13 +219,44 @@ namespace rocos {
             q_max(i) = joints_[i]->getMaxPosLimit();
         }
 
-        if (SRS_kinematics_.init(kinematics_.getChain(), q_min, q_max) < 0)
-            exit(-1);
+        // if (SRS_kinematics_.init(kinematics_.getChain(), q_min, q_max) < 0)
+        //     exit(-1);
 
         startMotionThread();
 
 
-        impl_->sm.process_event(EventInitReq{});  // 触发状态机初始化事件
+        impl_->sm.process_event(EventSuccess{});  // 模拟初始化成功事件
+
+    }
+    void Robot::on_fsm_start() {
+
+    }
+    void Robot::on_fsm_run() {
+
+    }
+    void Robot::on_fsm_stop() {
+
+    }
+    void Robot::on_fsm_pause() {
+
+    }
+    void Robot::on_fsm_continue() {
+
+    }
+    void Robot::on_fsm_reset() {
+
+    }
+
+    Robot::Robot(HardwareInterface *hw,
+                 const string &urdf_file_path,
+                 const string &base_link,
+                 const string &tip
+    ) : hw_interface_(hw), urdf_file_path_(urdf_file_path), base_link_(base_link), tip_(tip), pos_(MAX_JOINT_NUM),
+        vel_(MAX_JOINT_NUM), acc_(MAX_JOINT_NUM), impl_(std::make_unique<Impl>(*this)) {
+
+        log_ptr_ = Logger::getInstance("Robot");
+
+        impl_->sm.process_event(EventInitReq{});  // 进入初始化状态
 
 
     }
@@ -308,7 +307,6 @@ namespace rocos {
             log_ptr_->info("Kinematic chain set from DH parameters successfully.");
 
         }
-        
 
         if (!parseDriveParamsFromUrdf(urdf_file_path)) {
 
@@ -329,6 +327,19 @@ namespace rocos {
         kinematics_.Initialize(); //初始化，构建IK solver;
         
         log_ptr_->info("Kinematics initialized successfully.");
+
+
+        //TODO: 临时加入 by think
+        if (!dynamics_.setChain(tree, base_link, tip))
+        {
+            log_ptr_->error("Could not set dynamics chain!");
+            return false;
+        }
+        dynamics_.Initialize();
+
+        log_ptr_->info("Dynamics initialized successfully.");
+
+
 
         return true;
     }
@@ -2715,15 +2726,22 @@ namespace rocos {
     }
 
     int Robot::servoL(const KDL::Frame &target_frame) {
-        KDL::JntArray joint_in(jointNum);
-        KDL::JntArray joint_out(jointNum);
-        joint_in = JC_helper::vector_2_JntArray(pos_);
-        if (SRS_kinematics_.JC_cartesian_to_joint(target_frame, joint_in(2), joint_in, joint_out) < 0) {
-            log_ptr_->error("逆解失败");
+
+        JntArray q_init(jnt_num_);
+        JntArray q_out(jnt_num_);
+        for (int i = 0; i < jnt_num_; i++) {
+            q_init.data[i] = pos_[i];
+            q_out.data[i] = pos_[i];
+        }
+
+        if (kinematics_.CartToJnt(q_init, target_frame, q_out) < 0) {
+            log_ptr_->error("MoveL逆解失败");
             hw_interface_->waitForSignal(0);
             return -1;
-        } else
-            return servoJ(joint_out);
+        }
+        else
+            return servoJ(q_out);
+
     }
 
     int Robot::joint_admittance_teaching(bool asynchronous) {

@@ -21,6 +21,15 @@
 #define ROCOS_APP_DYNAMICS_H
 
 #include <kdl/chain.hpp>
+#include <kdl/frames.hpp>
+#include <kdl/jntarray.hpp>
+#include <kdl/tree.hpp>
+#include <memory>
+
+#include <kdl/chainidsolver.hpp>
+#include <kdl/chainfdsolver.hpp>
+
+#include <rocos_app/logger.h>
 
 namespace rocos {
   using namespace KDL;
@@ -29,26 +38,30 @@ namespace rocos {
   public:
     Dynamics();
     Dynamics(const KDL::Chain& chain);
-
-
-
-
-
-
     ~Dynamics();
 
 
+    bool setChain(const KDL::Chain& chain);
+    bool setChain(const KDL::Tree& tree, const std::string& base_link, const std::string& tip);
+
+
+    int FwdDyn(const JntArray &q, const JntArray &q_dot, const JntArray &torques, const Wrenches& f_ext,JntArray &q_dotdot); //这个是fd
+    int InvDyn(const JntArray &q, const JntArray &q_dot, const JntArray &q_dotdot, const Wrenches& f_ext,JntArray &torques); //这个是id
+
+    const KDL::Chain& getChain() { return chain_; } //返回运动链
+
+    void Initialize();
+
+private:
+    KDL::Tree  tree_;
+    KDL::Chain chain_;
+
+    std::unique_ptr<KDL::ChainFdSolver> fd_solver_;
+    std::unique_ptr<KDL::ChainIdSolver> id_solver_;
+
+    Logger::logger_ptr log_ptr_ = nullptr;
 
   };
-
-
-
-
-
-
-
-
-
 
 }
 

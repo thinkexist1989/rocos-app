@@ -25,6 +25,8 @@
 #include "hardware_interface.h"
 #include "interpolate.h"
 #include "kinematics.h"
+#include "dynamics.h"
+
 #include "JC_helper_kinematics.hpp"
 #include "JC_helper_dynamics.hpp"
 #include <Eigen/StdVector> //!< Eigen官网说明 https://eigen.tuxfamily.org/dox/group__TopicStlContainers.html
@@ -1067,6 +1069,8 @@ namespace rocos
         std::vector<boost::shared_ptr<Drive>> joints_;
 
         std::string urdf_file_path_; // urdf文件路径
+        std::string base_link_;
+        std::string tip_;
 
         std::vector<double> target_positions_;      // 当前目标位置
         std::vector<double> target_positions_prev_; // 上一次的目标位置
@@ -1100,7 +1104,7 @@ namespace rocos
             nullptr};                                             // otg在线规划线程
         boost::shared_ptr<boost::thread> motion_thread_{nullptr}; // 执行motion线程
 
-        JC_helper::inverse_special_to_SRS SRS_kinematics_;
+        // JC_helper::inverse_special_to_SRS SRS_kinematics_; //TODO:
 
         // sun
         Frame flange_; //!< 法兰位置姿态
@@ -1146,6 +1150,8 @@ namespace rocos
 
     public:
         Kinematics kinematics_;
+        Dynamics dynamics_;
+
         friend void JC_helper::SmartServo_Joint::RunSmartServo(rocos::Robot *);
 
         friend class JC_helper::SmartServo_Cartesian;
