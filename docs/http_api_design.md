@@ -306,17 +306,20 @@ int main(int argc, char* argv[]) {
       "status": "ENABLED"
     }
   ],
-  "flange_pose": { "position": { "x":0, "y":0, "z":0 }, "orientation": { "x":0, "y":0, "z":0, "w":1 } },
-  "tool_pose": { "position": { "x":0, "y":0, "z":0 }, "orientation": { "x":0, "y":0, "z":0, "w":1 } },
-  "object_pose": { "position": { "x":0, "y":0, "z":0 }, "orientation": { "x":0, "y":0, "z":0, "w":1 } },
-  "hardware": {
-    "type": "ETHERCAT",
-    "cycle_time_avg": 0.001,
-    "cycle_time_max": 0.003,
-    "slave_count": 8
+  "flange": { "position": { "x":0, "y":0, "z":0 }, "orientation": { "x":0, "y":0, "z":0, "w":1 } },
+  "tool": { "position": { "x":0, "y":0, "z":0 }, "orientation": { "x":0, "y":0, "z":0, "w":1 } },
+  "object": { "position": { "x":0, "y":0, "z":0 }, "orientation": { "x":0, "y":0, "z":0, "w":1 } },
+  "hw_state": {
+    "hw_type": 0,
+    "min_cycle_time": 0.0005,
+    "max_cycle_time": 0.003,
+    "current_cycle_time": 0.001,
+    "slave_num": 8
   }
 }
 ```
+
+  > 注意：当前服务器实现（`src/robot_http_server.cc`）在 `GET /api/robot/state` 返回字段命名与设计文档略有差异：实现使用 `flange` (而非 `flange_pose`)、`tool`/`object` 而非 `tool_pose`/`object_pose`，以及 `hw_state` (而非 `hardware`)。已在规范中保留设计命名，但建议在发布版本中统一为一套命名 —— 当前变更流程为：以实现为准，文档标注 Not Implemented/字段差异，后续由产品/开发决定是否修改实现以匹配设计。
 
 ### 6.2 `POST /api/move/joint`
 

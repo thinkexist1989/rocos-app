@@ -94,7 +94,9 @@
 
 ---
 
+本仓库状态：已将 `src/robot_http_server.cc` 中大量短码替换为设计的四位业务码（详见 `docs/robot_http_server_changed_codes_table.md`），并在 OpenAPI (`config/rocos-API.yaml`) 将 `/api/move/pathway` 标注为 Not Implemented（服务器返回业务码 `2004` 并在描述中注明）。
+
 实现引用：`src/robot_http_server.cc`
 设计规范引用：`docs/http_api_design.md`
 
-若要我现在开始自动替换并构建验证，请回复“替换并构建”。
+若要我现在开始自动替换剩余短码并构建验证，请回复“替换并构建”。

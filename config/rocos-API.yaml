@@ -332,6 +332,8 @@ paths:
     post:
       tags: [空间运动控制 (Motion)]
       summary: 多路点路径运动 (MovePath)
+      description: "Not Implemented in the current server implementation. See server docs and implementation for details."
+      x-not-implemented: true
       requestBody:
         required: true
         content:
@@ -351,6 +353,12 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/MoveResponse'
+        '501':
+          description: Not Implemented in server implementation
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/StandardResponse'
 
   /api/move/stop:
     post:

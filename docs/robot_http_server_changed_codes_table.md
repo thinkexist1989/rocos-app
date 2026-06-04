@@ -33,6 +33,12 @@
 | 标定接口 (`handleCalibrationRun`) | 400 | 4004 | 无效 frame -> 标定类错误码 4004
 | 标定接口 (`handleCalibrationRun`) | 500 | 4002 | 标定计算失败 -> 4002
 
+本次变更已把 `src/robot_http_server.cc` 中的大部分短码替换为设计文档的四位业务码，并把未实现的 `/api/move/pathway` 在 OpenAPI 中标注为 Not Implemented（见 `config/rocos-API.yaml`）。
+
+如果你希望，我可以：
+- 继续把剩余尚未替换的位置全部统一并运行构建验证（需要你允许我执行构建命令）；
+- 或保留当前实现为准，仅把文档继续同步并生成 PR 补丁供审核。
+
 说明：
 - 表中 "旧 code" 一栏通常是原代码中使用带 HTTP 语义的短码（400/404/500/501），"新 code" 按照 `docs/http_api_design.md` 中的四位业务码规范替换为 1xxx/2xxx/3xxx/4xxx/5xxx 分段。
 - 对于已在代码中保留且符合设计文档的业务码（如 `2001`, `2004`, `5001`），在表中标注为保持不变。

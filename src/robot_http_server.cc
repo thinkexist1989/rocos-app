@@ -400,7 +400,7 @@ void RobotHttpServer::handleGetRobotModel(const httplib::Request& req, httplib::
 
     urdf::ModelInterfaceSharedPtr robot_model = urdf::parseURDFFile(getUrdfPath());
     if (!robot_model) {
-        sendJson(res, false, 500, "Could not parse robot model");
+        sendJson(res, false, 1001, "Could not parse robot model");
         return;
     }
 
@@ -493,7 +493,7 @@ void RobotHttpServer::handleGetLinkMesh(const httplib::Request& req, httplib::Re
     spdlog::info("GET /api/robot/model/mesh path={}", path);
 
     if (path.empty()) {
-        sendJson(res, false, 400, "Missing 'path' query parameter");
+        sendJson(res, false, 1001, "Missing 'path' query parameter");
         return;
     }
 
@@ -506,7 +506,7 @@ void RobotHttpServer::handleGetLinkMesh(const httplib::Request& req, httplib::Re
     std::ifstream file(file_path, std::ios::binary);
     if (!file.is_open()) {
         spdlog::error("Failed to open mesh file: {}", file_path);
-        sendJson(res, false, 404, "Mesh file not found");
+        sendJson(res, false, 1001, "Mesh file not found");
         return;
     }
 
@@ -559,7 +559,7 @@ void RobotHttpServer::handleSetWorkMode(const httplib::Request& req, httplib::Re
 
     nlohmann::json body = nlohmann::json::parse(req.body, nullptr, false);
     if (body.is_discarded() || !body.contains("mode")) {
-        sendJson(res, false, 400, "Invalid JSON or missing 'mode' field");
+        sendJson(res, false, 1001, "Invalid JSON or missing 'mode' field");
         return;
     }
 
@@ -577,7 +577,7 @@ void RobotHttpServer::handleSetWorkMode(const httplib::Request& req, httplib::Re
     } else if (mode_str == "cart_imp") {
         mode = Robot::WorkMode::CartImp;
     } else {
-        sendJson(res, false, 400, "Unknown work mode: " + mode_str);
+        sendJson(res, false, 1006, "Unknown work mode: " + mode_str);
         return;
     }
 
@@ -585,7 +585,7 @@ void RobotHttpServer::handleSetWorkMode(const httplib::Request& req, httplib::Re
     if (ok) {
         sendJson(res, true, 0, "Work mode set to " + mode_str);
     } else {
-        sendJson(res, false, 500, "Failed to set work mode");
+        sendJson(res, false, 3002, "Failed to set work mode");
     }
 }
 
@@ -598,14 +598,14 @@ void RobotHttpServer::handleMoveJ(const httplib::Request& req, httplib::Response
 
     nlohmann::json body = nlohmann::json::parse(req.body, nullptr, false);
     if (body.is_discarded() || !body.contains("joints")) {
-        sendJson(res, false, 400, "Invalid JSON or missing 'joints' array");
+        sendJson(res, false, 1001, "Invalid JSON or missing 'joints' array");
         return;
     }
 
     int jnt_num = robot_->getJointNum();
     auto joints_arr = body["joints"];
     if (static_cast<int>(joints_arr.size()) != jnt_num) {
-        sendJson(res, false, 400, "Joint count mismatch: expected " + std::to_string(jnt_num));
+        sendJson(res, false, 1003, "Joint count mismatch: expected " + std::to_string(jnt_num));
         return;
     }
 
@@ -649,7 +649,7 @@ void RobotHttpServer::handleMoveJ(const httplib::Request& req, httplib::Response
             std::this_thread::sleep_for(std::chrono::milliseconds(10));
         }
         if (!done) {
-            sendJson(res, false, 3003, "Motion timed out after 30s");
+            sendJson(res, false, 5002, "Motion timed out after 30s");
         } else if (result == 0) {
             sendJson(res, true, 0, "MoveJ completed");
         } else {
@@ -663,7 +663,7 @@ void RobotHttpServer::handleMoveJ_IK(const httplib::Request& req, httplib::Respo
 
     nlohmann::json body = nlohmann::json::parse(req.body, nullptr, false);
     if (body.is_discarded() || !body.contains("pose")) {
-        sendJson(res, false, 400, "Invalid JSON or missing 'pose' object");
+        sendJson(res, false, 1001, "Invalid JSON or missing 'pose' object");
         return;
     }
 
@@ -728,7 +728,7 @@ void RobotHttpServer::handleMoveL(const httplib::Request& req, httplib::Response
 
     nlohmann::json body = nlohmann::json::parse(req.body, nullptr, false);
     if (body.is_discarded() || !body.contains("pose")) {
-        sendJson(res, false, 400, "Invalid JSON or missing 'pose' object");
+        sendJson(res, false, 1001, "Invalid JSON or missing 'pose' object");
         return;
     }
 
@@ -777,14 +777,14 @@ void RobotHttpServer::handleMoveL_FK(const httplib::Request& req, httplib::Respo
 
     nlohmann::json body = nlohmann::json::parse(req.body, nullptr, false);
     if (body.is_discarded() || !body.contains("joints")) {
-        sendJson(res, false, 400, "Invalid JSON or missing 'joints' array");
+        sendJson(res, false, 1001, "Invalid JSON or missing 'joints' array");
         return;
     }
 
     int jnt_num = robot_->getJointNum();
     auto joints_arr = body["joints"];
     if (static_cast<int>(joints_arr.size()) != jnt_num) {
-        sendJson(res, false, 400, "Joint count mismatch: expected " + std::to_string(jnt_num));
+        sendJson(res, false, 1003, "Joint count mismatch: expected " + std::to_string(jnt_num));
         return;
     }
 
@@ -830,7 +830,7 @@ void RobotHttpServer::handleMoveC(const httplib::Request& req, httplib::Response
 
     nlohmann::json body = nlohmann::json::parse(req.body, nullptr, false);
     if (body.is_discarded() || !body.contains("pose_via") || !body.contains("pose_to")) {
-        sendJson(res, false, 400, "Invalid JSON or missing 'pose_via'/'pose_to'");
+        sendJson(res, false, 1001, "Invalid JSON or missing 'pose_via'/'pose_to'");
         return;
     }
 
@@ -867,7 +867,7 @@ void RobotHttpServer::handleMoveC(const httplib::Request& req, httplib::Response
             } else if (mode_str == "FIXED" || mode_str == "fixed") {
                 mode = Robot::FIXED;
             } else {
-                sendJson(res, false, 400, "Unknown mode: " + mode_str + " (expected UNCONSTRAINED/FIXED)");
+                sendJson(res, false, 1001, "Unknown mode: " + mode_str + " (expected UNCONSTRAINED/FIXED)");
                 return;
             }
         } else if (body["mode"].is_number()) {
@@ -909,7 +909,7 @@ void RobotHttpServer::handleMoveP(const httplib::Request& req, httplib::Response
 
     nlohmann::json body = nlohmann::json::parse(req.body, nullptr, false);
     if (body.is_discarded() || !body.contains("pose")) {
-        sendJson(res, false, 400, "Invalid JSON or missing 'pose' object");
+        sendJson(res, false, 1001, "Invalid JSON or missing 'pose' object");
         return;
     }
 
@@ -958,13 +958,13 @@ void RobotHttpServer::handleMovePath(const httplib::Request& req, httplib::Respo
 
     nlohmann::json body = nlohmann::json::parse(req.body, nullptr, false);
     if (body.is_discarded() || !body.contains("waypoints")) {
-        sendJson(res, false, 400, "Invalid JSON or missing 'waypoints' array");
+        sendJson(res, false, 1001, "Invalid JSON or missing 'waypoints' array");
         return;
     }
 
     auto waypoints = body["waypoints"];
     if (waypoints.empty()) {
-        sendJson(res, false, 400, "Waypoints array is empty");
+        sendJson(res, false, 1001, "Waypoints array is empty");
         return;
     }
 
@@ -972,7 +972,8 @@ void RobotHttpServer::handleMovePath(const httplib::Request& req, httplib::Respo
     // so we cannot populate them from outside the Robot class.
     // Return 501 (Not Implemented) with clear message.
     spdlog::warn("MovePath: Robot::Path is not yet accessible from outside the class");
-    sendJson(res, false, 501, "MovePath not implemented: Robot::Path has private constructors, needs Robot class API extension");
+    // Mark as Not Implemented using business code 2004 per API design
+    sendJson(res, false, 2004, "MovePath not implemented: Robot::Path has private constructors, needs Robot class API extension");
 }
 
 void RobotHttpServer::handleStop(const httplib::Request& req, httplib::Response& res) {
@@ -990,7 +991,7 @@ void RobotHttpServer::handleMoveStatus(const httplib::Request& req, httplib::Res
     spdlog::info("GET /api/move/status task_id={}", task_id);
 
     if (task_id.empty()) {
-        sendJson(res, false, 400, "Missing 'task_id' query parameter");
+        sendJson(res, false, 1001, "Missing 'task_id' query parameter");
         return;
     }
 
@@ -1014,13 +1015,13 @@ void RobotHttpServer::handleSingleAxisEnable(const httplib::Request& req, httpli
 
     nlohmann::json body = nlohmann::json::parse(req.body, nullptr, false);
     if (body.is_discarded() || !body.contains("id")) {
-        sendJson(res, false, 400, "Invalid JSON or missing 'id' field");
+        sendJson(res, false, 1001, "Invalid JSON or missing 'id' field");
         return;
     }
 
     int id = body["id"].get<int>();
     if (id < 0 || id >= robot_->getJointNum()) {
-        sendJson(res, false, 400, "Invalid joint id: " + std::to_string(id));
+        sendJson(res, false, 1002, "Invalid joint id: " + std::to_string(id));
         return;
     }
 
@@ -1033,13 +1034,13 @@ void RobotHttpServer::handleSingleAxisDisable(const httplib::Request& req, httpl
 
     nlohmann::json body = nlohmann::json::parse(req.body, nullptr, false);
     if (body.is_discarded() || !body.contains("id")) {
-        sendJson(res, false, 400, "Invalid JSON or missing 'id' field");
+        sendJson(res, false, 1001, "Invalid JSON or missing 'id' field");
         return;
     }
 
     int id = body["id"].get<int>();
     if (id < 0 || id >= robot_->getJointNum()) {
-        sendJson(res, false, 400, "Invalid joint id: " + std::to_string(id));
+        sendJson(res, false, 1002, "Invalid joint id: " + std::to_string(id));
         return;
     }
 
@@ -1052,13 +1053,13 @@ void RobotHttpServer::handleSingleAxisMove(const httplib::Request& req, httplib:
 
     nlohmann::json body = nlohmann::json::parse(req.body, nullptr, false);
     if (body.is_discarded() || !body.contains("id") || !body.contains("pos")) {
-        sendJson(res, false, 400, "Invalid JSON or missing 'id'/'pos' fields");
+        sendJson(res, false, 1001, "Invalid JSON or missing 'id'/'pos' fields");
         return;
     }
 
     int id = body["id"].get<int>();
     if (id < 0 || id >= robot_->getJointNum()) {
-        sendJson(res, false, 400, "Invalid joint id: " + std::to_string(id));
+        sendJson(res, false, 1002, "Invalid joint id: " + std::to_string(id));
         return;
     }
 
@@ -1096,13 +1097,13 @@ void RobotHttpServer::handleSingleAxisStop(const httplib::Request& req, httplib:
 
     nlohmann::json body = nlohmann::json::parse(req.body, nullptr, false);
     if (body.is_discarded() || !body.contains("id")) {
-        sendJson(res, false, 400, "Invalid JSON or missing 'id' field");
+        sendJson(res, false, 1001, "Invalid JSON or missing 'id' field");
         return;
     }
 
     int id = body["id"].get<int>();
     if (id < 0 || id >= robot_->getJointNum()) {
-        sendJson(res, false, 400, "Invalid joint id: " + std::to_string(id));
+        sendJson(res, false, 1002, "Invalid joint id: " + std::to_string(id));
         return;
     }
 
@@ -1131,7 +1132,7 @@ void RobotHttpServer::handleMultiAxisMove(const httplib::Request& req, httplib::
 
     nlohmann::json body = nlohmann::json::parse(req.body, nullptr, false);
     if (body.is_discarded()) {
-        sendJson(res, false, 400, "Invalid JSON body");
+        sendJson(res, false, 1001, "Invalid JSON body");
         return;
     }
 
@@ -1140,7 +1141,7 @@ void RobotHttpServer::handleMultiAxisMove(const httplib::Request& req, httplib::
     // Required fields
     if (!body.contains("target_pos") || !body.contains("max_vel") ||
         !body.contains("max_acc") || !body.contains("max_jerk")) {
-        sendJson(res, false, 400, "Missing required fields: target_pos, max_vel, max_acc, max_jerk");
+        sendJson(res, false, 1001, "Missing required fields: target_pos, max_vel, max_acc, max_jerk");
         return;
     }
 
@@ -1153,7 +1154,7 @@ void RobotHttpServer::handleMultiAxisMove(const httplib::Request& req, httplib::
         static_cast<int>(max_vel_arr.size()) != jnt_num ||
         static_cast<int>(max_acc_arr.size()) != jnt_num ||
         static_cast<int>(max_jerk_arr.size()) != jnt_num) {
-        sendJson(res, false, 400, "Array length mismatch: expected " + std::to_string(jnt_num) + " elements");
+        sendJson(res, false, 1003, "Array length mismatch: expected " + std::to_string(jnt_num) + " elements");
         return;
     }
 
@@ -1186,7 +1187,7 @@ void RobotHttpServer::handleMultiAxisSync(const httplib::Request& req, httplib::
 
     nlohmann::json body = nlohmann::json::parse(req.body, nullptr, false);
     if (body.is_discarded() || !body.contains("sync")) {
-        sendJson(res, false, 400, "Invalid JSON or missing 'sync' field");
+        sendJson(res, false, 1001, "Invalid JSON or missing 'sync' field");
         return;
     }
 
@@ -1200,7 +1201,7 @@ void RobotHttpServer::handleMultiAxisSync(const httplib::Request& req, httplib::
     } else if (sync_str == "phase" || sync_str == "SYNC_PHASE") {
         sync = Robot::SYNC_PHASE;
     } else {
-        sendJson(res, false, 400, "Unknown sync mode: " + sync_str);
+        sendJson(res, false, 1001, "Unknown sync mode: " + sync_str);
         return;
     }
 
@@ -1217,7 +1218,7 @@ void RobotHttpServer::handleDragStart(const httplib::Request& req, httplib::Resp
 
     nlohmann::json body = nlohmann::json::parse(req.body, nullptr, false);
     if (body.is_discarded() || !body.contains("flag") || !body.contains("direction")) {
-        sendJson(res, false, 400, "Invalid JSON or missing 'flag'/'direction' fields");
+        sendJson(res, false, 1001, "Invalid JSON or missing 'flag'/'direction' fields");
         return;
     }
 
@@ -1261,7 +1262,7 @@ void RobotHttpServer::handleDragStart(const httplib::Request& req, httplib::Resp
     else if (flag_str == "BASE_YAW")     flag = Robot::DRAGGING_FLAG::BASE_YAW;
     else if (flag_str == "NULLSPACE")    flag = Robot::DRAGGING_FLAG::NULLSPACE;
     else {
-        sendJson(res, false, 400, "Unknown dragging flag: " + flag_str);
+        sendJson(res, false, 1001, "Unknown dragging flag: " + flag_str);
         return;
     }
 
@@ -1274,7 +1275,7 @@ void RobotHttpServer::handleDragStart(const httplib::Request& req, httplib::Resp
     } else if (dir_str == "NONE" || dir_str == "0") {
         dir = Robot::DRAGGING_DIRRECTION::NONE;
     } else {
-        sendJson(res, false, 400, "Unknown dragging direction: " + dir_str);
+        sendJson(res, false, 1001, "Unknown dragging direction: " + dir_str);
         return;
     }
 
@@ -1299,7 +1300,7 @@ void RobotHttpServer::handleSetPoseFrame(const httplib::Request& req, httplib::R
 
     nlohmann::json body = nlohmann::json::parse(req.body, nullptr, false);
     if (body.is_discarded() || !body.contains("id") || !body.contains("pose")) {
-        sendJson(res, false, 400, "Invalid JSON or missing 'id'/'pose' fields");
+        sendJson(res, false, 1001, "Invalid JSON or missing 'id'/'pose' fields");
         return;
     }
 
@@ -1322,7 +1323,7 @@ void RobotHttpServer::handleSetToolFrame(const httplib::Request& req, httplib::R
 
     nlohmann::json body = nlohmann::json::parse(req.body, nullptr, false);
     if (body.is_discarded() || !body.contains("pose")) {
-        sendJson(res, false, 400, "Invalid JSON or missing 'pose' field");
+        sendJson(res, false, 1001, "Invalid JSON or missing 'pose' field");
         return;
     }
 
@@ -1343,7 +1344,7 @@ void RobotHttpServer::handleSetObjectFrame(const httplib::Request& req, httplib:
 
     nlohmann::json body = nlohmann::json::parse(req.body, nullptr, false);
     if (body.is_discarded() || !body.contains("pose")) {
-        sendJson(res, false, 400, "Invalid JSON or missing 'pose' field");
+        sendJson(res, false, 1001, "Invalid JSON or missing 'pose' field");
         return;
     }
 
@@ -1364,13 +1365,13 @@ void RobotHttpServer::handleCalibrationRun(const httplib::Request& req, httplib:
 
     nlohmann::json body = nlohmann::json::parse(req.body, nullptr, false);
     if (body.is_discarded() || !body.contains("frame")) {
-        sendJson(res, false, 400, "Invalid JSON or missing 'frame' field");
+        sendJson(res, false, 1001, "Invalid JSON or missing 'frame' field");
         return;
     }
 
     std::string frame = body["frame"].get<std::string>();
     if (frame != "tool" && frame != "object") {
-        sendJson(res, false, 400, "Invalid frame type: must be 'tool' or 'object'");
+        sendJson(res, false, 4004, "Invalid frame type: must be 'tool' or 'object'");
         return;
     }
 
@@ -1378,7 +1379,7 @@ void RobotHttpServer::handleCalibrationRun(const httplib::Request& req, httplib:
 
     bool error_state = robot_->getErrorStateOfCal();
     if (error_state) {
-        sendJson(res, false, 500, "Calibration failed");
+        sendJson(res, false, 4002, "Calibration failed");
     } else {
         KDL::Frame result = robot_->getPose_out();
         nlohmann::json data;
