@@ -1163,7 +1163,7 @@ namespace rocos
         friend int JC_helper::safety_servo(rocos::Robot *robot_ptr, const std::vector<double> &target_pos);
 
         friend int JC_helper::safety_servo(rocos::Robot *robot_ptr, const KDL::JntArray &target_pos);
-
+        friend class RobotHttpServer; // 允许 Server 直接访问 Robot 的私有/保护成员
     private:
         JC_helper::ft_sensor my_ft_sensor;         // 6维力传感器
         bool flag_admittance_turnoff{false};       // 导纳开关

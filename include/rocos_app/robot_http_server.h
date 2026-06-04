@@ -104,6 +104,8 @@ private:
                   const nlohmann::json& data = nlohmann::json());
 
     KDL::Frame jsonToFrame(const nlohmann::json& j);
+
+    KDL::Frame jsonToFrame(const nlohmann::json& pos, const nlohmann::json& rot);
     nlohmann::json frameToJson(const KDL::Frame& frame);
     std::string getUrdfPath();
 

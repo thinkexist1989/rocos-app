@@ -160,13 +160,14 @@ void RobotHttpServer::registerRoutes() {
     server_->Post("/api/calibration/run", [this](auto& req, auto& res) { handleCalibrationRun(req, res); });
     server_->Get("/api/calibration/result", [this](auto& req, auto& res) { handleCalibrationResult(req, res); });
 
-    // Not found handler
-    server_->set_post_routing_handler(".*", [](const httplib::Request&, httplib::Response& res) {
-        if (res.body.empty() && res.status == 0) {
-            res.status = 404;
-            res.set_content(R"({"success":false,"code":404,"message":"endpoint not found","data":null})", "application/json");
-        }
-    });
+    
+    // 修改后：去掉 ".*",
+server_->set_post_routing_handler([](const httplib::Request&, httplib::Response& res) {
+    if (res.body.empty() && res.status == 0) {
+        res.status = 404;
+        res.set_content(R"({"success":false,"code":404,"message":"endpoint not found","data":null})", "application/json");
+    }
+});
 }
 
 // ============================================================================

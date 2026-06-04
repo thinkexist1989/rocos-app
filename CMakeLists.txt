@@ -192,6 +192,8 @@ target_link_libraries(robot
         $<BUILD_INTERFACE:plog::plog>
         $<BUILD_INTERFACE:JC_helper::gripper>
         OpenSSL::SSL
+        PRIVATE
+        spdlog::spdlog_header_only
         )
 add_library(rocos::robot ALIAS robot)
 
