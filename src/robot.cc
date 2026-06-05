@@ -550,7 +550,7 @@ namespace rocos {
     }
 
     void Robot::setEnabled() {
-        setRunState(RunState::Stopped);
+        setRunState(RunState::Stopped); //TODO: 需要删除
 
         for_each(joints_.begin(), joints_.end(),
                  [=](boost::shared_ptr<Drive> &d) { d->setEnabled(false); }); // 将抱闸设置为同时开启，不阻塞
@@ -580,7 +580,7 @@ namespace rocos {
     }
 
     void Robot::setDisabled() {
-        setRunState(RunState::Disabled);
+        setRunState(RunState::Disabled); //TODO: 需要删除
 
         for_each(joints_.begin(), joints_.end(),
                  [=](boost::shared_ptr<Drive> &d) { d->setDisabled(false); }); // 将抱闸设置为同时开启，不阻塞
