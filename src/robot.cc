@@ -60,19 +60,16 @@ namespace sml = boost::sml;
 
 const auto action_start = [](rocos::Robot& robot) {
     robot.on_fsm_start();
-};  // STARTING TO RUNNING
-// RUNNING
+};
 const auto action_run = [](rocos::Robot& robot) { 
     robot.on_fsm_run();
 };
-
 const auto action_pause = [](rocos::Robot& robot) { 
     robot.on_fsm_pause();
 };
 const auto action_continue = [](rocos::Robot& robot) { 
     robot.on_fsm_continue();
 };
-
 const auto action_stop = [](rocos::Robot& robot) { 
     robot.on_fsm_stop();
 };
@@ -80,10 +77,10 @@ const auto action_reset = [](rocos::Robot& robot) {
     robot.on_fsm_reset();
 };
 const auto action_enable = [](rocos::Robot& robot) {
-
+    robot.on_fsm_enable();
 };
 const auto action_disable = [](rocos::Robot& robot) {
-
+    robot.on_fsm_disable();
 };
 
 struct StateMachine {
@@ -103,13 +100,12 @@ struct StateMachine {
         state<class DISABLING> + sml::on_entry<_> / action_disable,
         state<class DISABLING> + event<EventSuccess> = state<class IDLE>,
 
-
         state<class STOPPED> + event<EventStartReq> = state<class STARTING>,
         state<class STARTING> + sml::on_entry<_> / action_start,
         state<class STARTING> + event<EventSuccess> = state<class RUNNING>,
 
         state<class STOPPED> + event<EventServoReq> = state<class SERVOING>,
-        state<class SERVOING> + event<EventStopReq> = state<class STOPPED>,
+        state<class SERVOING> + event<EventStopReq> = state<class STOPPING>,
 
         state<class RUNNING> + sml::on_entry<_> / action_run,
         state<class RUNNING> + event<EventPauseReq> = state<class PAUSING>,
@@ -118,7 +114,6 @@ struct StateMachine {
         state<class PAUSING> + event<EventSuccess> = state<class PAUSED>,  // 中间状态直接跳转
 
         state<class PAUSED> + event<EventContinueReq> = state<class CONTINUING>,
-
         state<class CONTINUING> + sml::on_entry<_> / action_continue,
         state<class CONTINUING> + event<EventSuccess> = state<class RUNNING>,  // 中间状态直接跳转
 
@@ -129,18 +124,21 @@ struct StateMachine {
         state<class STOPPING> + event<EventSuccess> = state<class STOPPED>,
 
         // ANY STATE JUMP TO ERROR_STATE
-        state<class IDLE>         + event<EventErrorOccurred> = state<class ERROR_STATE>,
-        state<class STOPPED>      + event<EventErrorOccurred> = state<class ERROR_STATE>,
-        state<class RUNNING>      + event<EventErrorOccurred> = state<class ERROR_STATE>,
-        state<class SERVOING>     + event<EventErrorOccurred> = state<class ERROR_STATE>,
-        state<class PAUSED>       + event<EventErrorOccurred> = state<class ERROR_STATE>,
-        state<class ERROR_STATE>  + event<EventErrorOccurred> = state<class ERROR_STATE>,
+        state<class ERROR_STATE>  + event<EventErrorOccurred> = state<class ERROR_STATE>,  //0
+        state<class IDLE>         + event<EventErrorOccurred> = state<class ERROR_STATE>,  //1
+        state<class STOPPED>      + event<EventErrorOccurred> = state<class ERROR_STATE>,  //2
+        state<class RUNNING>      + event<EventErrorOccurred> = state<class ERROR_STATE>,  //3
+        state<class PAUSED>       + event<EventErrorOccurred> = state<class ERROR_STATE>,  //4
+        state<class SERVOING>     + event<EventErrorOccurred> = state<class ERROR_STATE>,  //5
 
-        state<class STARTING>     + event<EventErrorOccurred> = state<class ERROR_STATE>,
-        state<class STOPPING>     + event<EventErrorOccurred> = state<class ERROR_STATE>,
-        state<class PAUSING>      + event<EventErrorOccurred> = state<class ERROR_STATE>,
-        state<class CONTINUING>   + event<EventErrorOccurred> = state<class ERROR_STATE>,
-        state<class RESETTING>    + event<EventErrorOccurred> = state<class ERROR_STATE>
+
+        state<class ENABLING>     + event<EventErrorOccurred> = state<class ERROR_STATE>,  //6
+        state<class DISABLING>    + event<EventErrorOccurred> = state<class ERROR_STATE>,  //7
+        state<class STARTING>     + event<EventErrorOccurred> = state<class ERROR_STATE>,  //8
+        state<class STOPPING>     + event<EventErrorOccurred> = state<class ERROR_STATE>,  //9
+        state<class PAUSING>      + event<EventErrorOccurred> = state<class ERROR_STATE>,  //10
+        state<class CONTINUING>   + event<EventErrorOccurred> = state<class ERROR_STATE>,  //11
+        state<class RESETTING>    + event<EventErrorOccurred> = state<class ERROR_STATE>   //12
     );
   }
 };
@@ -162,10 +160,12 @@ namespace rocos {
     };
 
     void Robot::on_fsm_enable() {
-
+        setEnabled();
+        impl_->process_event(EventSuccess{});
     }
     void Robot::on_fsm_disable() {
-
+        setDisabled();
+        impl_->process_event(EventSuccess{});
     }
     void Robot::on_fsm_start() {
 
