@@ -28,37 +28,35 @@
 
 namespace {
 // 状态定义
-class UNKNOWN       {};     // 未知状态，初始状态
-class IDLE          {};     // 空闲状态，机器人处于停止状态，等待启动命令
+class IDLE          {};     // 空闲状态，机器人传感器与执行器就绪，等待使能命令
+class STOPPED       {};     // 停止状态，机器人上使能，不会动
 class PAUSED        {};     // 暂停状态，机器人暂停在当前位置，等待继续或停止命令
 class RUNNING       {};     // 运行状态，机器人正在执行运动
-class ERROR_STATE   {};     // 错误状态，任何状态发生错误都转到这个状态
+class ERROR_STATE   {};     // 错误状态，任何状态发生错误都转到这个状态[初始状态]
 class SERVOING      {};     // 伺服状态，用于高速udp伺服指令发送
 
 // 中间状态定义
-class INITIALIZING  {};     // 初始化状态，机器人正在初始化
+class RESETTING     {};
+class ENABLING      {};
+class DISABLING     {};
 class STARTING      {};     // 启动状态，机器人正在启动
 class STOPPING      {};
 class PAUSING       {};
 class CONTINUING    {};
-class RESETTING     {};
 
 // 事件定义
-struct EventInitReq        {};        // 初始化请求
+struct EventResetReq       {};        // 恢复请求
+struct EventEnableReq      {};        // 上使能请求
+struct EventDisableReq     {};        // 下使能请求
 struct EventSuccess        {};        // 成功事件
 struct EventStartReq       {};        // 启动请求
 struct EventStopReq        {};        // 停止请求
 struct EventPauseReq       {};        // 暂停请求
 struct EventContinueReq    {};        // 继续请求
 struct EventErrorOccurred  {};        // 发生错误
-struct EventResetReq       {};        // 恢复请求
 struct EventServoReq       {};        // 伺服请求
 
 namespace sml = boost::sml;
-
-const auto action_init = [](rocos::Robot& robot) {
-    robot.on_fsm_init();
-};  // INITIALIZING TO IDLE
 
 const auto action_start = [](rocos::Robot& robot) {
     robot.on_fsm_start();
@@ -81,22 +79,37 @@ const auto action_stop = [](rocos::Robot& robot) {
 const auto action_reset = [](rocos::Robot& robot) { 
     robot.on_fsm_reset();
 };
+const auto action_enable = [](rocos::Robot& robot) {
+
+};
+const auto action_disable = [](rocos::Robot& robot) {
+
+};
 
 struct StateMachine {
   auto operator()() const noexcept {
     using namespace sml;
     return make_transition_table(
         // 初始化
-       *state<class UNKNOWN> + event<EventInitReq> = state<class INITIALIZING>, //初始状态为UNKNOWN
-        state<class INITIALIZING> + sml::on_entry<_> / action_init,
+       *state<class ERROR_STATE> + event<EventResetReq> = state<class RESETTING>,
+        state<class RESETTING> + sml::on_entry<_> / action_reset,
+        state<class RESETTING> + event<EventSuccess> = state<class IDLE>,  // 中间状态直接跳转
 
-        state<class INITIALIZING> + event<EventSuccess> = state<class IDLE>,
-        state<class IDLE> + event<EventStartReq> = state<class STARTING>,
+        state<class IDLE> + event<EventEnableReq> = state<class ENABLING>,
+        state<class ENABLING> + sml::on_entry<_> / action_enable,
+        state<class ENABLING> + event<EventSuccess> = state<class STOPPED>,
+
+        state<class STOPPED> + event<EventDisableReq> = state<class DISABLING>,
+        state<class DISABLING> + sml::on_entry<_> / action_disable,
+        state<class DISABLING> + event<EventSuccess> = state<class IDLE>,
+
+
+        state<class STOPPED> + event<EventStartReq> = state<class STARTING>,
         state<class STARTING> + sml::on_entry<_> / action_start,
         state<class STARTING> + event<EventSuccess> = state<class RUNNING>,
 
-        state<class IDLE> + event<EventServoReq> = state<class SERVOING>,
-        state<class SERVOING> + event<EventStopReq> = state<class IDLE>, 
+        state<class STOPPED> + event<EventServoReq> = state<class SERVOING>,
+        state<class SERVOING> + event<EventStopReq> = state<class STOPPED>,
 
         state<class RUNNING> + sml::on_entry<_> / action_run,
         state<class RUNNING> + event<EventPauseReq> = state<class PAUSING>,
@@ -113,21 +126,16 @@ struct StateMachine {
         state<class RUNNING> + event<EventStopReq> = state<class STOPPING>,
         state<class ERROR_STATE> + event<EventStopReq> = state<class STOPPING>,
         state<class STOPPING> + sml::on_entry<_> / action_stop,
-        state<class STOPPING> + event<EventSuccess> = state<class IDLE>,
-
-        state<class ERROR_STATE> + event<EventResetReq> = state<class RESETTING>,
-        state<class RESETTING> + sml::on_entry<_> / action_reset,
-        state<class RESETTING> + event<EventSuccess> = state<class UNKNOWN>,  // 中间状态直接跳转
+        state<class STOPPING> + event<EventSuccess> = state<class STOPPED>,
 
         // ANY STATE JUMP TO ERROR_STATE
-        state<class UNKNOWN>      + event<EventErrorOccurred> = state<class ERROR_STATE>,
         state<class IDLE>         + event<EventErrorOccurred> = state<class ERROR_STATE>,
+        state<class STOPPED>      + event<EventErrorOccurred> = state<class ERROR_STATE>,
         state<class RUNNING>      + event<EventErrorOccurred> = state<class ERROR_STATE>,
         state<class SERVOING>     + event<EventErrorOccurred> = state<class ERROR_STATE>,
         state<class PAUSED>       + event<EventErrorOccurred> = state<class ERROR_STATE>,
         state<class ERROR_STATE>  + event<EventErrorOccurred> = state<class ERROR_STATE>,
 
-        state<class INITIALIZING> + event<EventErrorOccurred> = state<class ERROR_STATE>,
         state<class STARTING>     + event<EventErrorOccurred> = state<class ERROR_STATE>,
         state<class STOPPING>     + event<EventErrorOccurred> = state<class ERROR_STATE>,
         state<class PAUSING>      + event<EventErrorOccurred> = state<class ERROR_STATE>,
@@ -153,7 +161,28 @@ namespace rocos {
         sml::sm<StateMachine> sm_;  // 状态机实例
     };
 
-    void Robot::on_fsm_init() {
+    void Robot::on_fsm_enable() {
+
+    }
+    void Robot::on_fsm_disable() {
+
+    }
+    void Robot::on_fsm_start() {
+
+    }
+    void Robot::on_fsm_run() {
+
+    }
+    void Robot::on_fsm_stop() {
+
+    }
+    void Robot::on_fsm_pause() {
+
+    }
+    void Robot::on_fsm_continue() {
+
+    }
+    void Robot::on_fsm_reset() {
         log_ptr_->info("Robot is initializing...");
 
         parseUrdf(urdf_file_path_, base_link_, tip_);
@@ -215,8 +244,8 @@ namespace rocos {
         T_object_.p.z(object_param[2]);
         T_object_.M = KDL::Rotation::RPY(object_param[3], object_param[4], object_param[5]);
 
-        log_ptr_->info("tool_param: {}", T_tool_.p.z());
-        log_ptr_->info("object_param: {}", T_object_.p.y());
+        // log_ptr_->info("tool_param: {}", T_tool_.p.z());
+        // log_ptr_->info("object_param: {}", T_object_.p.y());
 
         // 解析逆运动学求解器初始化
         KDL::JntArray q_min(joints_.size());
@@ -226,32 +255,10 @@ namespace rocos {
             q_max(i) = joints_[i]->getMaxPosLimit();
         }
 
-        // if (SRS_kinematics_.init(kinematics_.getChain(), q_min, q_max) < 0)
-        //     exit(-1);
-
         startMotionThread();
 
 
         impl_->process_event(EventSuccess{});  // 模拟初始化成功事件
-
-    }
-    void Robot::on_fsm_start() {
-
-    }
-    void Robot::on_fsm_run() {
-
-    }
-    void Robot::on_fsm_stop() {
-
-    }
-    void Robot::on_fsm_pause() {
-
-    }
-    void Robot::on_fsm_continue() {
-
-    }
-    void Robot::on_fsm_reset() {
-
     }
 
     Robot::Robot(HardwareInterface *hw,
@@ -263,7 +270,7 @@ namespace rocos {
 
         log_ptr_ = Logger::getInstance("Robot");
 
-        impl_->process_event(EventInitReq{});  // 进入初始化状态
+        impl_->process_event(EventResetReq{});  // 进入初始化状态
 
     }
 
@@ -401,7 +408,7 @@ namespace rocos {
 
                     auto id = hw->IntAttribute("id", -1); // 对应的硬件ID，若没指定默认为-1
 
-                    auto jnt_ptr = boost::make_shared<Drive>(hw_interface_, id); //获取相应硬件指针
+                    auto jnt_ptr = std::make_shared<Drive>(hw_interface_, id); //获取相应硬件指针
 
                     jnt_ptr->setName(joint_name); //设置驱动器名称
                     jnt_ptr->setMode(ModeOfOperation::CyclicSynchronousPositionMode); //驱动器模式设置为CSP
@@ -459,16 +466,6 @@ namespace rocos {
 
         return true;
     }
-
-
-    // void Robot::addAllJoints() {
-    //     jnt_num_ = hw_interface_->getSlaveNumber();
-    //     joints_.clear();
-    //     for (int i = 0; i < jnt_num_; i++) {
-    //         joints_.push_back(boost::make_shared<Drive>(hw_interface_, i));
-    //         joints_[i]->setMode(ModeOfOperation::CyclicSynchronousPositionMode);
-    //     }
-    // }
 
     // TODO: 切换HW指针，目前未实现
     bool Robot::switchHW(HardwareInterface *hw) { return false; }
@@ -553,18 +550,18 @@ namespace rocos {
         setRunState(RunState::Stopped); //TODO: 需要删除
 
         for_each(joints_.begin(), joints_.end(),
-                 [=](boost::shared_ptr<Drive> &d) { d->setEnabled(false); }); // 将抱闸设置为同时开启，不阻塞
+                 [=](std::shared_ptr<Drive> &d) { d->setEnabled(false); }); // 将抱闸设置为同时开启，不阻塞
 
 
         // set a temporary time point to prevent getting caught in an infinite loop
-        auto driveStateChangeStartTimePoint = boost::chrono::system_clock::now();
+        auto driveStateChangeStartTimePoint = std::chrono::system_clock::now();
 
         outerloop:
         for (;;) {
             for (const auto &joint: joints_) {
                 // First check timeout
-                auto duration_us = boost::chrono::duration_cast<boost::chrono::microseconds>(
-                        boost::chrono::system_clock::now() - driveStateChangeStartTimePoint);
+                auto duration_us = std::chrono::duration_cast<std::chrono::microseconds>(
+                        std::chrono::system_clock::now() - driveStateChangeStartTimePoint);
                 if (duration_us.count() > 150000) { //wait for 100ms  TODO: configuration_.driveStateChangeMaxTimeout
                     log_ptr_->warn("It takes too long ({} ms) to switch state!", duration_us.count() / 1000.0);
                     break;
@@ -583,19 +580,19 @@ namespace rocos {
         setRunState(RunState::Disabled); //TODO: 需要删除
 
         for_each(joints_.begin(), joints_.end(),
-                 [=](boost::shared_ptr<Drive> &d) { d->setDisabled(false); }); // 将抱闸设置为同时开启，不阻塞
+                 [=](std::shared_ptr<Drive> &d) { d->setDisabled(false); }); // 将抱闸设置为同时开启，不阻塞
 
 
 
         // set a temporary time point to prevent getting caught in an infinite loop
-        auto driveStateChangeStartTimePoint = boost::chrono::system_clock::now();
+        auto driveStateChangeStartTimePoint = std::chrono::system_clock::now();
 
         outerloop:
         for (;;) {
             for (const auto &joint: joints_) {
                 // First check timeout
-                auto duration_us = boost::chrono::duration_cast<boost::chrono::microseconds>(
-                        boost::chrono::system_clock::now() - driveStateChangeStartTimePoint);
+                auto duration_us = std::chrono::duration_cast<std::chrono::microseconds>(
+                        std::chrono::system_clock::now() - driveStateChangeStartTimePoint);
                 if (duration_us.count() > 150000) { //wait for 100ms  TODO: configuration_.driveStateChangeMaxTimeout
                     log_ptr_->warn("It takes too long ({} ms) to switch state!", duration_us.count() / 1000.0);
                     break;
@@ -610,26 +607,23 @@ namespace rocos {
         }
     }
 
+    //TODO: 这里需要修改
     void Robot::startMotionThread() {
-//        setRunState(RunState::Running);
-
         otg_motion_thread_ =
-                boost::make_shared<boost::thread>(&Robot::motionThreadHandler, this);
-        //        boost::thread(&Robot::motionThreadHandler, this);
+                std::make_shared<std::thread>(&Robot::motionThreadHandler, this);
     }
-
+    //TODO: 这里需要修改
     void Robot::stopMotionThread() {
-        // is_running_ = false;
         setRunState(RunState::Stopped);
 
-        otg_motion_thread_->interrupt();
+        // otg_motion_thread_->interrupt();
         otg_motion_thread_->join();  //等待运动线程结束
     }
-
+    //TODO: 这里需要修改，主要为了更新笛卡尔
     void Robot::motionThreadHandler() {
 
         std::ostringstream thread_id_ss;
-        thread_id_ss << boost::this_thread::get_id();
+        thread_id_ss << std::this_thread::get_id();
         log_ptr_->info("Motion thread is running on thread {}", thread_id_ss.str());
 
         //** vector 数组大小初始化 **//
@@ -665,15 +659,12 @@ namespace rocos {
         }
         //**-------------------------------**//
 
-        // std::vector< double > dt( jnt_num_, 0.0 );  // delta T
-        // double max_time = 0.0;
-
         while (true) {  // while start
 
             hw_interface_->waitForSignal(9);
 
             //!< Update Flange State
-            std::lock_guard<std::mutex> lock(mtx);  // 自动获取互斥锁
+            std::lock_guard<std::mutex> lock(mtx);  // 自动获取互斥锁，防止更新坐标系时读取，会读取空的Frame
             for (int i = 0; i < jnt_num_; i++)
             {
                 if (joints_[i]->getDriveState() != DriveState::OperationEnabled)
@@ -714,7 +705,6 @@ namespace rocos {
         target_positions_[id] =
                 pos_[id] +
                 dt * vel_[id] / 2.0;  // TODO：这个减速段计算有问题
-        //        target_positions_[id] = pos_[id];
         target_velocities_[id] = 0.0;
         least_motion_time_ = 0.0;
 
@@ -725,13 +715,9 @@ namespace rocos {
         log_ptr_->info("dt: {}; target_positions: {}", dt, target_positions_[id]);
 
         need_plan_[id] = true;
-
-        //        usleep(dt * 1000000);
-        //        sync_ = sync;
     }
 
     void Robot::stopMultiAxis() {
-        //        auto sync = sync_;
         sync_ = SYNC_NONE;  //停止时候就不需要同步了
 
         double wait_time = 0.0;
@@ -741,7 +727,6 @@ namespace rocos {
             target_positions_[id] =
                     pos_[id] +
                     2 * (dt * vel_[id] / 2.0);  // TODO：这个减速段计算有问题
-            //        target_positions_[id] = pos_[id];
             target_velocities_[id] = 0.0;
             least_motion_time_ = 0.0;
 
@@ -844,12 +829,12 @@ namespace rocos {
 
         if (asynchronous)  //异步执行
         {
-            motion_thread_.reset(new boost::thread{&Robot::RunMoveJ, this, q,
+            motion_thread_.reset(new std::thread{&Robot::RunMoveJ, this, q,
                                                    speed, acceleration, time,
                                                    radius});
         } else  //同步执行
         {
-            motion_thread_.reset(new boost::thread{&Robot::RunMoveJ, this, q,
+            motion_thread_.reset(new std::thread{&Robot::RunMoveJ, this, q,
                                                    speed, acceleration, time,
                                                    radius});
             motion_thread_->join();
@@ -1028,12 +1013,12 @@ namespace rocos {
 
         if (asynchronous)  //异步执行
         {
-            motion_thread_.reset(new boost::thread{&Robot::RunMoveL, this, std::ref(traj_)});
+            motion_thread_.reset(new std::thread{&Robot::RunMoveL, this, std::ref(traj_)});
 
             setRunState(RunState::Running); //TODO: RunState
         } else  //同步执行
         {
-            motion_thread_.reset(new boost::thread{&Robot::RunMoveL, this, std::ref(traj_)});
+            motion_thread_.reset(new std::thread{&Robot::RunMoveL, this, std::ref(traj_)});
             motion_thread_->join();
             motion_thread_ = nullptr;
 
@@ -1184,13 +1169,13 @@ namespace rocos {
 
         if (asynchronous)  //异步执行
         {
-            motion_thread_.reset(new boost::thread{&Robot::RunMoveL, this, std::ref(traj_)});
+            motion_thread_.reset(new std::thread{&Robot::RunMoveL, this, std::ref(traj_)});
 
             setRunState(RunState::Running); //TODO: RunState
 
         } else  //同步执行
         {
-            motion_thread_.reset(new boost::thread{&Robot::RunMoveL, this, std::ref(traj_)});
+            motion_thread_.reset(new std::thread{&Robot::RunMoveL, this, std::ref(traj_)});
             motion_thread_->join();
             motion_thread_ = nullptr;
 
@@ -1399,12 +1384,12 @@ namespace rocos {
 
         if (asynchronous)  //异步执行
         {
-            motion_thread_.reset(new boost::thread{&Robot::RunMoveL, this, std::ref(traj_)});
+            motion_thread_.reset(new std::thread{&Robot::RunMoveL, this, std::ref(traj_)});
             // is_running_motion = true;
             setRunState(RunState::Running);
         } else  //同步执行
         {
-            motion_thread_.reset(new boost::thread{&Robot::RunMoveL, this, std::ref(traj_)});
+            motion_thread_.reset(new std::thread{&Robot::RunMoveL, this, std::ref(traj_)});
             motion_thread_->join();
             motion_thread_ = nullptr;
             // is_running_motion = false;
@@ -1542,12 +1527,12 @@ namespace rocos {
 
         if (asynchronous)  //异步执行
         {
-            motion_thread_.reset(new boost::thread{&Robot::RunMoveL, this, std::ref(traj_)});
+            motion_thread_.reset(new std::thread{&Robot::RunMoveL, this, std::ref(traj_)});
             // is_running_motion = true;
             setRunState(RunState::Running);
         } else  //同步执行
         {
-            motion_thread_.reset(new boost::thread{&Robot::RunMoveL, this, std::ref(traj_)});
+            motion_thread_.reset(new std::thread{&Robot::RunMoveL, this, std::ref(traj_)});
             motion_thread_->join();
             motion_thread_ = nullptr;
             // is_running_motion = false;
@@ -1696,12 +1681,12 @@ namespace rocos {
 
         if (asynchronous)  //异步执行
         {
-            motion_thread_.reset(new boost::thread{&Robot::RunMoveL, this, std::ref(traj_)});
+            motion_thread_.reset(new std::thread{&Robot::RunMoveL, this, std::ref(traj_)});
             // is_running_motion = true;
             setRunState(RunState::Running);
         } else  //同步执行
         {
-            motion_thread_.reset(new boost::thread{&Robot::RunMoveL, this, std::ref(traj_)});
+            motion_thread_.reset(new std::thread{&Robot::RunMoveL, this, std::ref(traj_)});
             motion_thread_->join();
             motion_thread_ = nullptr;
             // is_running_motion = false;
@@ -1848,12 +1833,12 @@ namespace rocos {
 
         if (asynchronous)  //异步执行
         {
-            motion_thread_.reset(new boost::thread{&Robot::RunMoveL, this, std::ref(traj_)});
+            motion_thread_.reset(new std::thread{&Robot::RunMoveL, this, std::ref(traj_)});
             // is_running_motion = true;
             setRunState(RunState::Running);
         } else  //同步执行
         {
-            motion_thread_.reset(new boost::thread{&Robot::RunMoveL, this, std::ref(traj_)});
+            motion_thread_.reset(new std::thread{&Robot::RunMoveL, this, std::ref(traj_)});
             motion_thread_->join();
             motion_thread_ = nullptr;
             // is_running_motion = false;
@@ -2075,12 +2060,12 @@ namespace rocos {
 
         if (asynchronous)  //异步执行
         {
-            motion_thread_.reset(new boost::thread{&Robot::RunMultiMoveL, this, std::ref(traj_)});
+            motion_thread_.reset(new std::thread{&Robot::RunMultiMoveL, this, std::ref(traj_)});
             // is_running_motion = true;
             setRunState(RunState::Running);
         } else  //同步执行
         {
-            motion_thread_.reset(new boost::thread{&Robot::RunMultiMoveL, this, std::ref(traj_)});
+            motion_thread_.reset(new std::thread{&Robot::RunMultiMoveL, this, std::ref(traj_)});
             motion_thread_->join();
             motion_thread_ = nullptr;
             // is_running_motion = false;
@@ -2096,7 +2081,7 @@ namespace rocos {
         static JC_helper::SmartServo_Joint _SmartServo_Joint{&_dragging_finished_flag};
         static JC_helper::SmartServo_Cartesian _SmartServo_Cartesian{&_dragging_finished_flag, kinematics_.getChain()};
         static JC_helper::SmartServo_Nullspace _SmartServo_Nullsapace{&_dragging_finished_flag, kinematics_.getChain()};
-        static std::shared_ptr<boost::thread> _thread_planning{nullptr};
+        static std::shared_ptr<std::thread> _thread_planning{nullptr};
         KDL::JntArray target_joint{static_cast< unsigned int >( jnt_num_ )};
         KDL::Frame target_frame{};
         int index{static_cast< int >( flag )};
@@ -2202,7 +2187,7 @@ namespace rocos {
             }
             _SmartServo_Joint.init(pos_, vel_, acc_, max_speed, max_acceleration, 4 * max_acceleration);
             _thread_planning.reset(
-                    new boost::thread{&JC_helper::SmartServo_Joint::RunSmartServo, &_SmartServo_Joint, this});
+                    new std::thread{&JC_helper::SmartServo_Joint::RunSmartServo, &_SmartServo_Joint, this});
         }
             //笛卡尔空间点动指令
         else if (_dragging_finished_flag && index_type == DRAGGING_TYPE::CARTESIAN) {
@@ -2219,7 +2204,7 @@ namespace rocos {
                 _SmartServo_Cartesian.init(this, max_speed * 1.5);
 
             _thread_planning.reset(
-                    new boost::thread{&JC_helper::SmartServo_Cartesian::RunMotion, &_SmartServo_Cartesian, this});
+                    new std::thread{&JC_helper::SmartServo_Cartesian::RunMotion, &_SmartServo_Cartesian, this});
         }
             // 零空间点动指令
         else if (_dragging_finished_flag && index_type == DRAGGING_TYPE::NULLSPACE) {
@@ -2230,7 +2215,7 @@ namespace rocos {
 
             _SmartServo_Nullsapace.init(this, max_speed);
             _thread_planning.reset(
-                    new boost::thread{&JC_helper::SmartServo_Nullspace::RunMotion, &_SmartServo_Nullsapace, this});
+                    new std::thread{&JC_helper::SmartServo_Nullspace::RunMotion, &_SmartServo_Nullsapace, this});
         }
         //**-------------------------------**//
 

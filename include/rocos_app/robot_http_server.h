@@ -22,6 +22,7 @@
 #include <httplib.h>
 #include <json.hpp>
 #include <rocos_app/robot.h>
+#include <rocos_app/logger.h>
 
 #include <atomic>
 #include <map>
@@ -138,6 +139,8 @@ private:
     bool poolShutdown_;
     std::atomic<int> activeWorkers_;
     static const int MAX_WORKERS = 8;
+
+    Logger::logger_ptr log_ptr_ = nullptr;
 
     // Task TTL
     static const int TASK_TTL_SECONDS = 3600; // 1 hour

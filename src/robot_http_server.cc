@@ -37,6 +37,9 @@ namespace rocos {
 RobotHttpServer::RobotHttpServer(Robot* robot)
     : robot_(robot), server_(new httplib::Server()), taskCounter_(0),
       poolShutdown_(false), activeWorkers_(0) {
+
+    log_ptr_ = Logger::getInstance("HttpServer");
+
     // Start worker thread pool
     for (int i = 0; i < MAX_WORKERS; ++i) {
         workerThreads_.emplace_back([this]() {
@@ -56,7 +59,7 @@ RobotHttpServer::RobotHttpServer(Robot* robot)
                 try {
                     task();
                 } catch (...) {
-                    spdlog::error("Async task threw exception");
+                    log_ptr_->error("Async task threw exception");
                 }
                 --activeWorkers_;
             }
@@ -90,7 +93,7 @@ void RobotHttpServer::submitTask(std::function<void()> func) {
 // ============================================================================
 
 void RobotHttpServer::run(const std::string& host, int port) {
-    spdlog::info("HTTP Server listening on {}:{}", host, port);
+    log_ptr_->info("HTTP Server listening on {}:{}", host, port);
     server_->listen(host, port);
 }
 
@@ -325,7 +328,7 @@ void RobotHttpServer::cleanExpiredTasks() {
 // ============================================================================
 
 void RobotHttpServer::handleGetRobotState(const httplib::Request& req, httplib::Response& res) {
-    spdlog::info("GET /api/robot/state");
+    log_ptr_->info("GET /api/robot/state");
 
     nlohmann::json data;
 
@@ -368,7 +371,7 @@ void RobotHttpServer::handleGetRobotState(const httplib::Request& req, httplib::
 }
 
 void RobotHttpServer::handleGetRobotInfo(const httplib::Request& req, httplib::Response& res) {
-    spdlog::info("GET /api/robot/info");
+    log_ptr_->info("GET /api/robot/info");
 
     nlohmann::json joint_infos = nlohmann::json::array();
     for (int i = 0; i < robot_->getJointNum(); ++i) {
@@ -380,7 +383,7 @@ void RobotHttpServer::handleGetRobotInfo(const httplib::Request& req, httplib::R
         ji["unit_name"] = robot_->getJointUserUnitName(i);
         ji["zero_offset"] = robot_->getJointPosZeroOffset(i);
         joint_infos.push_back(ji);
-        spdlog::info("Joint {}: cnt_per_unit={}, torque_per_unit={}, ratio={}, unit_name={}, zero_offset={}",
+        log_ptr_->info("Joint {}: cnt_per_unit={}, torque_per_unit={}, ratio={}, unit_name={}, zero_offset={}",
                      ji["name"].get<std::string>(),
                      ji["cnt_per_unit"].get<double>(),
                      ji["torque_per_unit"].get<double>(),
@@ -396,7 +399,7 @@ void RobotHttpServer::handleGetRobotInfo(const httplib::Request& req, httplib::R
 }
 
 void RobotHttpServer::handleGetRobotModel(const httplib::Request& req, httplib::Response& res) {
-    spdlog::info("GET /api/robot/model");
+    log_ptr_->info("GET /api/robot/model");
 
     urdf::ModelInterfaceSharedPtr robot_model = urdf::parseURDFFile(getUrdfPath());
     if (!robot_model) {
@@ -490,7 +493,7 @@ void RobotHttpServer::handleGetRobotModel(const httplib::Request& req, httplib::
 void RobotHttpServer::handleGetLinkMesh(const httplib::Request& req, httplib::Response& res) {
     // Query parameter: ?path=relative/path/to/mesh.stl
     std::string path = req.get_param_value("path");
-    spdlog::info("GET /api/robot/model/mesh path={}", path);
+    log_ptr_->info("GET /api/robot/model/mesh path={}", path);
 
     if (path.empty()) {
         sendJson(res, false, 1001, "Missing 'path' query parameter");
@@ -505,7 +508,7 @@ void RobotHttpServer::handleGetLinkMesh(const httplib::Request& req, httplib::Re
 
     std::ifstream file(file_path, std::ios::binary);
     if (!file.is_open()) {
-        spdlog::error("Failed to open mesh file: {}", file_path);
+        log_ptr_->error("Failed to open mesh file: {}", file_path);
         sendJson(res, false, 1001, "Mesh file not found");
         return;
     }
@@ -535,19 +538,19 @@ void RobotHttpServer::handleGetLinkMesh(const httplib::Request& req, httplib::Re
 // ============================================================================
 
 void RobotHttpServer::handleEnable(const httplib::Request& req, httplib::Response& res) {
-    spdlog::info("POST /api/robot/enable");
+    log_ptr_->info("POST /api/robot/enable");
     robot_->setEnabled();
     sendJson(res, true, 0, "Robot enabled");
 }
 
 void RobotHttpServer::handleDisable(const httplib::Request& req, httplib::Response& res) {
-    spdlog::info("POST /api/robot/disable");
+    log_ptr_->info("POST /api/robot/disable");
     robot_->setDisabled();
     sendJson(res, true, 0, "Robot disabled");
 }
 
 void RobotHttpServer::handleIsEnabled(const httplib::Request& req, httplib::Response& res) {
-    spdlog::info("GET /api/robot/enabled");
+    log_ptr_->info("GET /api/robot/enabled");
     bool enabled = robot_->isEnabled();
     nlohmann::json data;
     data["enabled"] = enabled;
@@ -555,7 +558,7 @@ void RobotHttpServer::handleIsEnabled(const httplib::Request& req, httplib::Resp
 }
 
 void RobotHttpServer::handleSetWorkMode(const httplib::Request& req, httplib::Response& res) {
-    spdlog::info("POST /api/robot/workmode");
+    log_ptr_->info("POST /api/robot/workmode");
 
     nlohmann::json body = nlohmann::json::parse(req.body, nullptr, false);
     if (body.is_discarded() || !body.contains("mode")) {
@@ -594,7 +597,7 @@ void RobotHttpServer::handleSetWorkMode(const httplib::Request& req, httplib::Re
 // ============================================================================
 
 void RobotHttpServer::handleMoveJ(const httplib::Request& req, httplib::Response& res) {
-    spdlog::info("POST /api/move/joint");
+    log_ptr_->info("POST /api/move/joint");
 
     nlohmann::json body = nlohmann::json::parse(req.body, nullptr, false);
     if (body.is_discarded() || !body.contains("joints")) {
@@ -659,7 +662,7 @@ void RobotHttpServer::handleMoveJ(const httplib::Request& req, httplib::Response
 }
 
 void RobotHttpServer::handleMoveJ_IK(const httplib::Request& req, httplib::Response& res) {
-    spdlog::info("POST /api/move/joint_ik");
+    log_ptr_->info("POST /api/move/joint_ik");
 
     nlohmann::json body = nlohmann::json::parse(req.body, nullptr, false);
     if (body.is_discarded() || !body.contains("pose")) {
@@ -724,7 +727,7 @@ void RobotHttpServer::handleMoveJ_IK(const httplib::Request& req, httplib::Respo
 }
 
 void RobotHttpServer::handleMoveL(const httplib::Request& req, httplib::Response& res) {
-    spdlog::info("POST /api/move/linear");
+    log_ptr_->info("POST /api/move/linear");
 
     nlohmann::json body = nlohmann::json::parse(req.body, nullptr, false);
     if (body.is_discarded() || !body.contains("pose")) {
@@ -773,7 +776,7 @@ void RobotHttpServer::handleMoveL(const httplib::Request& req, httplib::Response
 }
 
 void RobotHttpServer::handleMoveL_FK(const httplib::Request& req, httplib::Response& res) {
-    spdlog::info("POST /api/move/linear_fk");
+    log_ptr_->info("POST /api/move/linear_fk");
 
     nlohmann::json body = nlohmann::json::parse(req.body, nullptr, false);
     if (body.is_discarded() || !body.contains("joints")) {
@@ -826,7 +829,7 @@ void RobotHttpServer::handleMoveL_FK(const httplib::Request& req, httplib::Respo
 }
 
 void RobotHttpServer::handleMoveC(const httplib::Request& req, httplib::Response& res) {
-    spdlog::info("POST /api/move/circle");
+    log_ptr_->info("POST /api/move/circle");
 
     nlohmann::json body = nlohmann::json::parse(req.body, nullptr, false);
     if (body.is_discarded() || !body.contains("pose_via") || !body.contains("pose_to")) {
@@ -905,7 +908,7 @@ void RobotHttpServer::handleMoveC(const httplib::Request& req, httplib::Response
 }
 
 void RobotHttpServer::handleMoveP(const httplib::Request& req, httplib::Response& res) {
-    spdlog::info("POST /api/move/path");
+    log_ptr_->info("POST /api/move/path");
 
     nlohmann::json body = nlohmann::json::parse(req.body, nullptr, false);
     if (body.is_discarded() || !body.contains("pose")) {
@@ -954,7 +957,7 @@ void RobotHttpServer::handleMoveP(const httplib::Request& req, httplib::Response
 }
 
 void RobotHttpServer::handleMovePath(const httplib::Request& req, httplib::Response& res) {
-    spdlog::info("POST /api/move/pathway");
+    log_ptr_->info("POST /api/move/pathway");
 
     nlohmann::json body = nlohmann::json::parse(req.body, nullptr, false);
     if (body.is_discarded() || !body.contains("waypoints")) {
@@ -971,13 +974,13 @@ void RobotHttpServer::handleMovePath(const httplib::Request& req, httplib::Respo
     // Robot::Path and Robot::PathEntry have private constructors,
     // so we cannot populate them from outside the Robot class.
     // Return 501 (Not Implemented) with clear message.
-    spdlog::warn("MovePath: Robot::Path is not yet accessible from outside the class");
+    log_ptr_->warn("MovePath: Robot::Path is not yet accessible from outside the class");
     // Mark as Not Implemented using business code 2004 per API design
     sendJson(res, false, 2004, "MovePath not implemented: Robot::Path has private constructors, needs Robot class API extension");
 }
 
 void RobotHttpServer::handleStop(const httplib::Request& req, httplib::Response& res) {
-    spdlog::info("POST /api/move/stop");
+    log_ptr_->info("POST /api/move/stop");
     robot_->stopMultiAxis();
     sendJson(res, true, 0, "Motion stopped");
 }
@@ -988,7 +991,7 @@ void RobotHttpServer::handleStop(const httplib::Request& req, httplib::Response&
 
 void RobotHttpServer::handleMoveStatus(const httplib::Request& req, httplib::Response& res) {
     std::string task_id = req.get_param_value("task_id");
-    spdlog::info("GET /api/move/status task_id={}", task_id);
+    log_ptr_->info("GET /api/move/status task_id={}", task_id);
 
     if (task_id.empty()) {
         sendJson(res, false, 1001, "Missing 'task_id' query parameter");
@@ -1011,7 +1014,7 @@ void RobotHttpServer::handleMoveStatus(const httplib::Request& req, httplib::Res
 // ============================================================================
 
 void RobotHttpServer::handleSingleAxisEnable(const httplib::Request& req, httplib::Response& res) {
-    spdlog::info("POST /api/axis/single/enable");
+    log_ptr_->info("POST /api/axis/single/enable");
 
     nlohmann::json body = nlohmann::json::parse(req.body, nullptr, false);
     if (body.is_discarded() || !body.contains("id")) {
@@ -1030,7 +1033,7 @@ void RobotHttpServer::handleSingleAxisEnable(const httplib::Request& req, httpli
 }
 
 void RobotHttpServer::handleSingleAxisDisable(const httplib::Request& req, httplib::Response& res) {
-    spdlog::info("POST /api/axis/single/disable");
+    log_ptr_->info("POST /api/axis/single/disable");
 
     nlohmann::json body = nlohmann::json::parse(req.body, nullptr, false);
     if (body.is_discarded() || !body.contains("id")) {
@@ -1049,7 +1052,7 @@ void RobotHttpServer::handleSingleAxisDisable(const httplib::Request& req, httpl
 }
 
 void RobotHttpServer::handleSingleAxisMove(const httplib::Request& req, httplib::Response& res) {
-    spdlog::info("POST /api/axis/single/move");
+    log_ptr_->info("POST /api/axis/single/move");
 
     nlohmann::json body = nlohmann::json::parse(req.body, nullptr, false);
     if (body.is_discarded() || !body.contains("id") || !body.contains("pos")) {
@@ -1093,7 +1096,7 @@ void RobotHttpServer::handleSingleAxisMove(const httplib::Request& req, httplib:
 }
 
 void RobotHttpServer::handleSingleAxisStop(const httplib::Request& req, httplib::Response& res) {
-    spdlog::info("POST /api/axis/single/stop");
+    log_ptr_->info("POST /api/axis/single/stop");
 
     nlohmann::json body = nlohmann::json::parse(req.body, nullptr, false);
     if (body.is_discarded() || !body.contains("id")) {
@@ -1116,19 +1119,19 @@ void RobotHttpServer::handleSingleAxisStop(const httplib::Request& req, httplib:
 // ============================================================================
 
 void RobotHttpServer::handleMultiAxisEnable(const httplib::Request& req, httplib::Response& res) {
-    spdlog::info("POST /api/axis/multi/enable");
+    log_ptr_->info("POST /api/axis/multi/enable");
     robot_->setEnabled();
     sendJson(res, true, 0, "All joints enabled");
 }
 
 void RobotHttpServer::handleMultiAxisDisable(const httplib::Request& req, httplib::Response& res) {
-    spdlog::info("POST /api/axis/multi/disable");
+    log_ptr_->info("POST /api/axis/multi/disable");
     robot_->setDisabled();
     sendJson(res, true, 0, "All joints disabled");
 }
 
 void RobotHttpServer::handleMultiAxisMove(const httplib::Request& req, httplib::Response& res) {
-    spdlog::info("POST /api/axis/multi/move");
+    log_ptr_->info("POST /api/axis/multi/move");
 
     nlohmann::json body = nlohmann::json::parse(req.body, nullptr, false);
     if (body.is_discarded()) {
@@ -1177,13 +1180,13 @@ void RobotHttpServer::handleMultiAxisMove(const httplib::Request& req, httplib::
 }
 
 void RobotHttpServer::handleMultiAxisStop(const httplib::Request& req, httplib::Response& res) {
-    spdlog::info("POST /api/axis/multi/stop");
+    log_ptr_->info("POST /api/axis/multi/stop");
     robot_->stopMultiAxis();
     sendJson(res, true, 0, "All axes stopped");
 }
 
 void RobotHttpServer::handleMultiAxisSync(const httplib::Request& req, httplib::Response& res) {
-    spdlog::info("POST /api/axis/multi/sync");
+    log_ptr_->info("POST /api/axis/multi/sync");
 
     nlohmann::json body = nlohmann::json::parse(req.body, nullptr, false);
     if (body.is_discarded() || !body.contains("sync")) {
@@ -1214,7 +1217,7 @@ void RobotHttpServer::handleMultiAxisSync(const httplib::Request& req, httplib::
 // ============================================================================
 
 void RobotHttpServer::handleDragStart(const httplib::Request& req, httplib::Response& res) {
-    spdlog::info("POST /api/drag/start");
+    log_ptr_->info("POST /api/drag/start");
 
     nlohmann::json body = nlohmann::json::parse(req.body, nullptr, false);
     if (body.is_discarded() || !body.contains("flag") || !body.contains("direction")) {
@@ -1284,7 +1287,7 @@ void RobotHttpServer::handleDragStart(const httplib::Request& req, httplib::Resp
 }
 
 void RobotHttpServer::handleDragStop(const httplib::Request& req, httplib::Response& res) {
-    spdlog::info("POST /api/drag/stop");
+    log_ptr_->info("POST /api/drag/stop");
     robot_->Dragging(Robot::DRAGGING_FLAG::J0,
                      Robot::DRAGGING_DIRRECTION::NONE,
                      0.0, 0.0);
@@ -1296,7 +1299,7 @@ void RobotHttpServer::handleDragStop(const httplib::Request& req, httplib::Respo
 // ============================================================================
 
 void RobotHttpServer::handleSetPoseFrame(const httplib::Request& req, httplib::Response& res) {
-    spdlog::info("POST /api/calibration/pose");
+    log_ptr_->info("POST /api/calibration/pose");
 
     nlohmann::json body = nlohmann::json::parse(req.body, nullptr, false);
     if (body.is_discarded() || !body.contains("id") || !body.contains("pose")) {
@@ -1319,7 +1322,7 @@ void RobotHttpServer::handleSetPoseFrame(const httplib::Request& req, httplib::R
 }
 
 void RobotHttpServer::handleSetToolFrame(const httplib::Request& req, httplib::Response& res) {
-    spdlog::info("POST /api/calibration/tool");
+    log_ptr_->info("POST /api/calibration/tool");
 
     nlohmann::json body = nlohmann::json::parse(req.body, nullptr, false);
     if (body.is_discarded() || !body.contains("pose")) {
@@ -1340,7 +1343,7 @@ void RobotHttpServer::handleSetToolFrame(const httplib::Request& req, httplib::R
 }
 
 void RobotHttpServer::handleSetObjectFrame(const httplib::Request& req, httplib::Response& res) {
-    spdlog::info("POST /api/calibration/object");
+    log_ptr_->info("POST /api/calibration/object");
 
     nlohmann::json body = nlohmann::json::parse(req.body, nullptr, false);
     if (body.is_discarded() || !body.contains("pose")) {
@@ -1361,7 +1364,7 @@ void RobotHttpServer::handleSetObjectFrame(const httplib::Request& req, httplib:
 }
 
 void RobotHttpServer::handleCalibrationRun(const httplib::Request& req, httplib::Response& res) {
-    spdlog::info("POST /api/calibration/run");
+    log_ptr_->info("POST /api/calibration/run");
 
     nlohmann::json body = nlohmann::json::parse(req.body, nullptr, false);
     if (body.is_discarded() || !body.contains("frame")) {
@@ -1389,7 +1392,7 @@ void RobotHttpServer::handleCalibrationRun(const httplib::Request& req, httplib:
 }
 
 void RobotHttpServer::handleCalibrationResult(const httplib::Request& req, httplib::Response& res) {
-    spdlog::info("GET /api/calibration/result");
+    log_ptr_->info("GET /api/calibration/result");
 
     bool error_state = robot_->getErrorStateOfCal();
     KDL::Frame result = robot_->getPose_out();

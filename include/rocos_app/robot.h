@@ -30,7 +30,6 @@
 #include "JC_helper_kinematics.hpp"
 #include "JC_helper_dynamics.hpp"
 #include <Eigen/StdVector> //!< Eigen官网说明 https://eigen.tuxfamily.org/dox/group__TopicStlContainers.html
-#include <boost/smart_ptr.hpp>
 #include <vector>
 #include "kdl_parser/kdl_parser.hpp" //!< 解析URDF文件
 #include "gripper.hpp"
@@ -755,12 +754,8 @@ namespace rocos
             JntArray q_in(jnt_num_);
             for (int i{0}; i < jnt_num_; i++)
                 q_in(i) = pos_[i];
-            //            std::cout << q_in.data << std::endl;
-
             // Flange Reference
             JntToCart(q_in, flange_);
-
-            //            std::cout << "OK" << std::endl;
         }
 
     public:
@@ -1058,7 +1053,7 @@ namespace rocos
 
     protected:
         HardwareInterface* hw_interface_{nullptr};
-        std::vector<boost::shared_ptr<Drive>> joints_;
+        std::vector<std::shared_ptr<Drive>> joints_;
 
         std::string urdf_file_path_; // urdf文件路径
         std::string base_link_;
@@ -1092,9 +1087,8 @@ namespace rocos
 
         std::vector<bool> need_plan_; // 是否需要重新规划标志
 
-        boost::shared_ptr<boost::thread> otg_motion_thread_{
-            nullptr};                                             // otg在线规划线程
-        boost::shared_ptr<boost::thread> motion_thread_{nullptr}; // 执行motion线程
+        std::shared_ptr<std::thread> otg_motion_thread_{nullptr};// otg在线规划线程
+        std::shared_ptr<std::thread> motion_thread_{nullptr}; // 执行motion线程
 
         // JC_helper::inverse_special_to_SRS SRS_kinematics_; //TODO:
 
@@ -1179,9 +1173,15 @@ namespace rocos
 
         Logger::logger_ptr log_ptr_ = nullptr;
 
+        std::unique_ptr<std::thread> run_thread_handler_  {nullptr}; // 机器人RUNNING开启的线程
+
         //////////FSM Related function (INTERNAL) ///////////////
     public:
-        void on_fsm_init(); 
+        void on_fsm_reset();
+
+        void on_fsm_enable();
+
+        void on_fsm_disable();
 
         void on_fsm_start();
 
@@ -1192,8 +1192,6 @@ namespace rocos
         void on_fsm_pause();
 
         void on_fsm_continue();
-
-        void on_fsm_reset();
 
     };
 
