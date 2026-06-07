@@ -328,9 +328,12 @@ void RobotHttpServer::cleanExpiredTasks() {
 // ============================================================================
 
 void RobotHttpServer::handleGetRobotState(const httplib::Request& req, httplib::Response& res) {
-    log_ptr_->info("GET /api/robot/state");
+    // log_ptr_->info("GET /api/robot/state");
 
     nlohmann::json data;
+
+    data["robot_state"] = robot_->GetRobotState();
+    // log_ptr_->info("Robot state: {}", data["robot_state"].get<std::string>());
 
     // Joint states
     nlohmann::json joint_states = nlohmann::json::array();
@@ -539,19 +542,19 @@ void RobotHttpServer::handleGetLinkMesh(const httplib::Request& req, httplib::Re
 
 void RobotHttpServer::handleEnable(const httplib::Request& req, httplib::Response& res) {
     log_ptr_->info("POST /api/robot/enable");
-    robot_->setEnabled();
+    robot_->SetEnabled();
     sendJson(res, true, 0, "Robot enabled");
 }
 
 void RobotHttpServer::handleDisable(const httplib::Request& req, httplib::Response& res) {
     log_ptr_->info("POST /api/robot/disable");
-    robot_->setDisabled();
+    robot_->SetDisabled();
     sendJson(res, true, 0, "Robot disabled");
 }
 
 void RobotHttpServer::handleIsEnabled(const httplib::Request& req, httplib::Response& res) {
     log_ptr_->info("GET /api/robot/enabled");
-    bool enabled = robot_->isEnabled();
+    bool enabled = robot_->IsEnabled();
     nlohmann::json data;
     data["enabled"] = enabled;
     sendJson(res, true, 0, "ok", data);

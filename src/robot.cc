@@ -151,8 +151,13 @@ namespace rocos {
         explicit Impl(Robot& owner) : sm_ {owner} {}
 
         template<typename Event>
-        void process_event(const Event& event) {
-            sm_.process_event(event);
+        bool process_event(const Event& event) {
+            return sm_.process_event(event);
+        }
+
+        template<typename TState>
+        bool is(const TState& s) const {
+            return sm_.is(s);
         }
 
     private:
@@ -161,11 +166,19 @@ namespace rocos {
 
     void Robot::on_fsm_enable() {
         setEnabled();
-        impl_->process_event(EventSuccess{});
+        if (IsEnabled()) {
+            impl_->process_event(EventSuccess{});
+        } else {
+            impl_->process_event(EventErrorOccurred{});
+        }
     }
     void Robot::on_fsm_disable() {
         setDisabled();
-        impl_->process_event(EventSuccess{});
+        if (!IsDisabled()) {
+            impl_->process_event(EventSuccess{});
+        } else {
+            impl_->process_event(EventErrorOccurred{});
+        }
     }
     void Robot::on_fsm_start() {
 
@@ -282,16 +295,86 @@ namespace rocos {
             log_ptr_.reset();
         }
 
-
-
-
-
-
         // Delete FSM pack
         impl_.reset();
 
     }
 
+    std::string Robot::GetRobotState() {
+        if (impl_->is(sml::state<class IDLE>)) {
+            return "IDLE";
+        } else if (impl_->is(sml::state<class ENABLING>)) {
+            return "ENABLING";
+        } else if (impl_->is(sml::state<class DISABLING>)) {
+            return "DISABLING";
+        } else if (impl_->is(sml::state<class STARTING>)) {
+            return "STARTING";
+        } else if (impl_->is(sml::state<class STOPPING>)) {
+            return "STOPPING";
+        } else if (impl_->is(sml::state<class PAUSING>)) {
+            return "PAUSING";
+        } else if (impl_->is(sml::state<class CONTINUING>)) {
+            return "CONTINUING";
+        } else if (impl_->is(sml::state<class RESETTING>)) {
+            return "RESETTING";
+        } else if (impl_->is(sml::state<class RUNNING>)) {
+            return "RUNNING";
+        } else if (impl_->is(sml::state<class PAUSED>)) {
+            return "PAUSED";
+        } else if (impl_->is(sml::state<class STOPPED>)) {
+            return "STOPPED";
+        } else if (impl_->is(sml::state<class ERROR_STATE>)) {
+            return "ERROR_STATE";
+        } else {
+            return "UNKNOWN_STATE";
+        }
+
+    }
+
+
+
+    int Robot::SetEnabled() {
+        log_ptr_->info("Robot Enabling.....");
+        if (!impl_->process_event(EventEnableReq{})) {
+            log_ptr_->error("Failed to process EventEnableReq.");
+            return -1; //TODO: 需要替换为错误码
+        }
+
+
+    }
+
+    int Robot::SetDisabled() {
+        log_ptr_->info("Robot Disabling.....");
+        if (!impl_->process_event(EventDisableReq{})) {
+            log_ptr_->error("Failed to process EventDisableReq.");
+            return -1; //TODO: 需要替换为错误码
+        }
+    }
+
+
+    bool Robot::IsEnabled() {
+        for (int i = 0; i < jnt_num_; i++) {
+            //使能检查
+            if (joints_[i]->getDriveState() != DriveState::OperationEnabled) {
+                log_ptr_->error("joints[{}] is not Enabled", i);
+                return false;
+            }
+        }
+        return true;
+    }
+
+    bool Robot::IsDisabled() {
+        for (int i = 0; i < jnt_num_; i++) {
+            //使能检查
+            if (joints_[i]->getDriveState() == DriveState::OperationEnabled) {
+                log_ptr_->warn("joints[{}] is Enabled", i);
+                return false;
+            }
+        }
+        return true;
+    }
+
+    //////////////////////////////////////////////////////////////////////////////
 
     bool Robot::parseUrdf(const string &urdf_file_path,
                           const string &base_link,
@@ -2374,20 +2457,6 @@ namespace rocos {
         return 0;
     }
 
-
-    bool Robot::isEnabled()
-    {
-        for (int i = 0; i < jnt_num_; i++) {
-            //使能检查
-            if (joints_[i]->getDriveState() != DriveState::OperationEnabled) {
-                log_ptr_->error("joints[{}] is in OperationDisabled", i);
-                return false;
-            }
-        }
-
-        return true;
-    }
-
     void Robot::RunMoveJ(JntArray q, double speed, double acceleration, double time, double radius) {
         //** 变量初始化 **//
         double dt = 0.0;
@@ -2465,7 +2534,7 @@ namespace rocos {
         //** 伺服控制 **//
         dt = 0;
         while (dt <= max_time) {
-            if(!isEnabled())
+            if(!IsEnabled())
                 goto Exit;
 
             for (int i = 0; i < jnt_num_; ++i) {
@@ -2494,7 +2563,7 @@ namespace rocos {
         log_ptr_->info("No. of waypoints: {}", traj.size());
         
         for (const auto &waypoints: traj) {
-            if(!isEnabled())
+            if(!IsEnabled())
                 goto Exit;
 
             for (int i = 0; i < jnt_num_; ++i) {
@@ -2527,7 +2596,7 @@ namespace rocos {
         log_ptr_->info("No. of waypoints: {}", traj.size());
 
         for (const auto &waypoints: traj) {
-            if(!isEnabled())
+            if(!IsEnabled())
                 goto Exit;
 
             for (int i = 0; i < jnt_num_; ++i) {
@@ -2722,73 +2791,6 @@ namespace rocos {
     int Robot::stop_joint_admittance_teaching() {
         flag_admittance_joint_turnoff = true;
 
-        return 0;
-    }
-
-
-    // TODO: 未完成,Sun的伺服驱动接口
-    // 模仿UR机械臂的servoj函数的实现
-    // SERVOJ的函数原理:
-    // 目标位置target_pos,当前位置current_pos,当前速度current_vel,当前加速度current_acc,采样周期dt
-    // 下一时刻的加速度next_acc = (target_pos - current_pos) *gain+current_vel*lookhead*gain
-    // 下一时刻的速度next_vel = current_vel + next_acc*dt
-    // 下一时刻的位置next_pos = current_pos + next_vel*dt
-    int Robot::sun_servoJ(const KDL::JntArray &target_pos, const KDL::JntArray &max_vel, const KDL::JntArray &max_acc,
-                          double Gain, double lookhead) {
-        KDL::JntArray current_pose{jointNum};
-        KDL::JntArray current_vel{jointNum};
-        KDL::JntArray current_acc{jointNum};
-        KDL::JntArray next_acc{jointNum};
-        KDL::JntArray next_vel{jointNum};
-        KDL::JntArray next_pos{jointNum};
-        KDL::JntArray next_jerk{jointNum};
-        double dt = DELTA_T;
-        double look_head2 = 0.6;
-        int pre = 0;
-        bool is_first = true; // 是否可以一次性到达目标位置，不可以一直循环，可以退出
-        for (int i = 0; i < jointNum; ++i) {
-            current_pose(i) = pos_[i];
-            current_vel(i) = vel_[i];
-            current_acc(i) = acc_[i];
-            next_acc(i) = 0;
-            next_vel(i) = 0;
-            next_pos(i) = 0;
-            next_jerk(i) = 0;
-            log_ptr_->info("target_pos( {} )  = {}", i, target_pos(i));
-        }
-
-        log_ptr_->info("next_pose:");
-
-        for (int i = 0; i < jointNum; ++i) {
-            next_jerk(i) = (0 - current_vel(i)) * Gain + (0 - current_acc(i)) * look_head2 * Gain +
-                           (target_pos(i) - current_pose(i)) * Gain + (0 - current_vel(i)) * lookhead * Gain;
-            next_acc(i) = next_jerk(i) * DELTA_T;
-
-            if (next_acc(i) > max_acc(i) * DELTA_T) {
-                next_acc(i) = max_acc(i) * DELTA_T;
-            } else if (next_acc(i) < -max_acc(i) * DELTA_T) {
-                next_acc(i) = -max_acc(i) * DELTA_T;
-            }
-
-            next_vel(i) = current_vel(i) + next_acc(i);
-
-            if (next_vel(i) > max_vel(i) * DELTA_T) {
-                next_vel(i) = max_vel(i) * DELTA_T;
-            } else if (next_vel(i) < -max_vel(i) * DELTA_T) {
-                next_vel(i) = -max_vel(i) * DELTA_T;
-            }
-            next_pos(i) = current_pose(i) + next_vel(i);
-
-            pos_[i] = next_pos(i);
-            vel_[i] = next_vel(i);
-            acc_[i] = next_acc(i);
-            joints_[i]->setPosition(next_pos(i));
-
-        }
-
-        hw_interface_->waitForSignal(0);
-
-        //**-------------------------------**//
         return 0;
     }
 

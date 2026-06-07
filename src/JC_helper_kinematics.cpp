@@ -1068,7 +1068,7 @@ namespace JC_helper
             PLOG_INFO << "waiting for command";
         }
 
-        while (robot_ptr->isEnabled())
+        while (robot_ptr->IsEnabled())
         {
             t_start = std::chrono::high_resolution_clock::now();
 
@@ -3099,7 +3099,7 @@ namespace JC_helper
             ; // 等待指令
         }
 
-        while (robot_ptr->isEnabled())
+        while (robot_ptr->IsEnabled())
         {
             t_start = std::chrono::high_resolution_clock::now();
 

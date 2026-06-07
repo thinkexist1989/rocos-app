@@ -106,6 +106,20 @@ namespace rocos
 
         ~Robot();
 
+        std::string GetRobotState();
+
+        int SetEnabled();
+
+        int SetDisabled();
+
+        bool IsEnabled();
+
+        bool IsDisabled();
+
+
+
+
+
         bool parseUrdf(const std::string &urdf_file_path,
                        const std::string &base_link,
                        const std::string &tip);
@@ -1017,7 +1031,7 @@ namespace rocos
          * @param target_frame 目标位置
          * @return int
          */
-        int sun_servoJ(const KDL::JntArray &target_pos, const KDL::JntArray &max_vel, const KDL::JntArray &max_acc, double Gain, double lookhead);
+        // int sun_servoJ(const KDL::JntArray &target_pos, const KDL::JntArray &max_vel, const KDL::JntArray &max_acc, double Gain, double lookhead);
         /**
          * @brief 1000hz位姿伺服接口
          *
@@ -1030,26 +1044,11 @@ namespace rocos
          */
         int servoL(const KDL::Frame &target_frame);
 
-//        int moveJ_with_speed_scaling(const KDL::JntArray &target_pos, double max_vel, double max_acc, double max_jerk);
-
-        /**
-         * @brief 速度缩放函数，运动中每次循环需要调佣一次
-         *
-         * @return int
-         */
-//        int speed_scaling();
-
-//        int set_target_speed_frcision(double i)
-//        {
-//            target_speed_fraction = i;
-//            is_fraction_changed = true;
-//            return 0;
-//        }
 
     public:
 
         int stop_joint_admittance_teaching();
-        bool isEnabled();
+
 
     protected:
         HardwareInterface* hw_interface_{nullptr};
