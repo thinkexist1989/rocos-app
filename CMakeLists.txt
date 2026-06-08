@@ -195,6 +195,7 @@ add_library(rocos::dynamics ALIAS dynamics)
 add_library(robot
         SHARED
         src/robot.cc
+        src/UnitIntervalMotionProfile.cpp
         src/JC_helper_kinematics.cpp
         src/JC_helper_dynamics.cpp
         src/DHParamsLoader.cpp
@@ -416,3 +417,15 @@ target_link_libraries(unit_test
 #        robot
 #        )
 add_test(NAME unit_test COMMAND unit_test)
+
+add_executable(unit_interval_motion_profile_test
+        test/unit_interval_motion_profile_test.cc
+        src/UnitIntervalMotionProfile.cpp
+        )
+target_link_libraries(unit_interval_motion_profile_test
+        PRIVATE
+        ruckig::ruckig
+        Eigen3::Eigen
+        )
+add_test(NAME unit_interval_motion_profile_test
+        COMMAND unit_interval_motion_profile_test)
