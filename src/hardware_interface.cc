@@ -18,6 +18,7 @@
 // email: luoyang@sia.cn
 
 #include "include/rocos_app/hardware_interface.h"
+#include <unistd.h>
 
 namespace rocos {
 

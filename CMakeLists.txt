@@ -58,7 +58,7 @@ find_package(Threads REQUIRED)
 find_package(Eigen3 REQUIRED)
 find_package(OpenSSL REQUIRED)
 
-find_package(rocos_ecm REQUIRED)
+# find_package(rocos_ecm REQUIRED)
 
 find_package(orocos_kdl REQUIRED)
 
@@ -127,8 +127,8 @@ add_library(hardware
 target_link_libraries(hardware
         PUBLIC
         ${DEP_LIBS}
-        Boost::thread
-        rocos::ecat_config
+        # Boost::thread
+        # rocos::ecat_config
         )
 add_library(rocos::hardware ALIAS hardware)
 

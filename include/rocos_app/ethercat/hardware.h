@@ -26,7 +26,8 @@
 #include "status_word.h"
 #include "mode_of_operation.h"
 
-#include <rocos_ecm/ecat_config.h>
+// #include <rocos_ecm/ecat_config.h>
+#include "ecat_config.h"
 
 #include "../hardware_interface.h"
 
