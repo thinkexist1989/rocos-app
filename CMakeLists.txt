@@ -25,7 +25,7 @@ email: luoyang@sia.cn
 cmake_minimum_required(VERSION 3.15)
 project(rocos_app VERSION 1.0.5 DESCRIPTION "ROCOS Application Library")
 
-list(APPEND CMAKE_PREFIX_PATH "/opt/rocos/ecm")
+# list(APPEND CMAKE_PREFIX_PATH "/opt/rocos/ecm")
 # add_compile_options(-std=c++11)
 set(CMAKE_CXX_STANDARD 17)
 
@@ -91,7 +91,7 @@ link_directories(
 
 file(GLOB_RECURSE SRCS src/*.cpp)
 file(GLOB_RECURSE HDRS include/*.h include/*.hpp)
-file(GLOB_RECURSE CONFIG_FILE config/*.urdf  config/public.key  config/license config/*.yaml )
+file(GLOB_RECURSE CONFIG_FILE config/*.urdf config/*.yaml )
 
 set(DEP_LIBS
         dl
@@ -272,58 +272,9 @@ install(FILES ${CMAKE_BINARY_DIR}/ver.h
         DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}/rocos_app
         )
 
-install(FILES include/tinyfsm.hpp
-        DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}
-        )
-
 install(DIRECTORY include/rocos_app
         DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}
         )
-
-## Install hardware library
-#install(TARGETS hardware
-#        EXPORT hardware-targets
-#        LIBRARY DESTINATION ${CMAKE_INSTALL_LIBDIR}  # 动态库安装路径
-#        ARCHIVE DESTINATION ${CMAKE_INSTALL_LIBDIR}  # 静态库安装路径
-#        RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR}  # 可执行文件安装路径
-#        PUBLIC_HEADER DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}  # 头文件安装路径
-#        )
-#
-## Install drive library
-#install(TARGETS drive
-#        EXPORT drive-targets
-#        LIBRARY DESTINATION ${CMAKE_INSTALL_LIBDIR}  # 动态库安装路径
-#        ARCHIVE DESTINATION ${CMAKE_INSTALL_LIBDIR}  # 静态库安装路径
-#        RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR}  # 可执行文件安装路径
-#        PUBLIC_HEADER DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}  # 头文件安装路径
-#        )
-#
-## Install kinematics library
-#install(TARGETS kinematics
-#        EXPORT kinematics-targets
-#        LIBRARY DESTINATION ${CMAKE_INSTALL_LIBDIR}  # 动态库安装路径
-#        ARCHIVE DESTINATION ${CMAKE_INSTALL_LIBDIR}  # 静态库安装路径
-#        RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR}  # 可执行文件安装路径
-#        PUBLIC_HEADER DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}  # 头文件安装路径
-#        )
-#
-## Install robot library
-#install(TARGETS robot
-#        EXPORT robot-targets
-#        LIBRARY DESTINATION ${CMAKE_INSTALL_LIBDIR}  # 动态库安装路径
-#        ARCHIVE DESTINATION ${CMAKE_INSTALL_LIBDIR}  # 静态库安装路径
-#        RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR}  # 可执行文件安装路径
-#        PUBLIC_HEADER DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}  # 头文件安装路径
-#        )
-#
-## Install protocol library
-#install(TARGETS protocol
-#        EXPORT protocol-targets
-#        LIBRARY DESTINATION ${CMAKE_INSTALL_LIBDIR}  # 动态库安装路径
-#        ARCHIVE DESTINATION ${CMAKE_INSTALL_LIBDIR}  # 静态库安装路径
-#        RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR}  # 可执行文件安装路径
-#        PUBLIC_HEADER DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}  # 头文件安装路径
-#        )
 
 install(TARGETS hardware drive kinematics robot rocos_app rocosAppMain
         EXPORT rocos_app-targets
@@ -337,36 +288,6 @@ install(TARGETS hardware drive kinematics robot rocos_app rocosAppMain
 install(FILES ${CONFIG_FILE}
         DESTINATION ${${PROJECT_NAME}_INSTALL_CONFIGDIR}
         )
-
-#install(EXPORT hardware-targets
-#        FILE hardware-targets.cmake
-#        NAMESPACE rocos::
-#        DESTINATION ${${PROJECT_NAME}_INSTALL_CMAKEDIR}
-#        )
-#
-#install(EXPORT drive-targets
-#        FILE drive-targets.cmake
-#        NAMESPACE rocos::
-#        DESTINATION ${${PROJECT_NAME}_INSTALL_CMAKEDIR}
-#        )
-#
-#install(EXPORT kinematics-targets
-#        FILE kinematics-targets.cmake
-#        NAMESPACE rocos::
-#        DESTINATION ${${PROJECT_NAME}_INSTALL_CMAKEDIR}
-#        )
-#
-#install(EXPORT robot-targets
-#        FILE robot-targets.cmake
-#        NAMESPACE rocos::
-#        DESTINATION ${${PROJECT_NAME}_INSTALL_CMAKEDIR}
-#        )
-#
-#install(EXPORT protocol-targets
-#        FILE protocol-targets.cmake
-#        NAMESPACE rocos::
-#        DESTINATION ${${PROJECT_NAME}_INSTALL_CMAKEDIR}
-#        )
 
 install(EXPORT rocos_app-targets
         FILE rocos_app-targets.cmake

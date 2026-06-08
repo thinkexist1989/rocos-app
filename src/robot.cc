@@ -55,6 +55,7 @@ struct EventPauseReq       {};        // 暂停请求
 struct EventContinueReq    {};        // 继续请求
 struct EventErrorOccurred  {};        // 发生错误
 struct EventServoReq       {};        // 伺服请求
+struct EventIsEnabled      {};        //TODO: 检查使能状态事件(临时兼容性，要删除)
 
 namespace sml = boost::sml;
 
@@ -91,6 +92,7 @@ struct StateMachine {
        *state<class ERROR_STATE> + event<EventResetReq> = state<class RESETTING>,
         state<class RESETTING> + sml::on_entry<_> / action_reset,
         state<class RESETTING> + event<EventSuccess> = state<class IDLE>,  // 中间状态直接跳转
+        state<class RESETTING> + event<EventIsEnabled> = state<class STOPPED>,  // 错误事件直接跳转到错误状态
 
         state<class IDLE> + event<EventEnableReq> = state<class ENABLING>,
         state<class ENABLING> + sml::on_entry<_> / action_enable,
@@ -270,8 +272,12 @@ namespace rocos {
 
         startMotionThread();
 
-
-        impl_->process_event(EventSuccess{});  // 模拟初始化成功事件
+        if(IsEnabled()) {
+            impl_->process_event(EventIsEnabled{});  // 模拟初始化成功事件
+        }
+        else {
+            impl_->process_event(EventSuccess{});  // 模拟初始化失败事件
+        }
     }
 
     Robot::Robot(HardwareInterface *hw,
