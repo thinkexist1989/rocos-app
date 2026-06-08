@@ -429,7 +429,7 @@ namespace JC_helper
             // usleep(1000000);
             robot_ptr->servoJ(q_target);
         }
-        robot_ptr->setRunState(rocos::Robot::RunState::Stopped);
+        robot_ptr->enterStopped();
         delete this;
     }
 

@@ -34,6 +34,7 @@ class PAUSED        {};     // 暂停状态，机器人暂停在当前位置，�
 class RUNNING       {};     // 运行状态，机器人正在执行运动
 class ERROR_STATE   {};     // 错误状态，任何状态发生错误都转到这个状态[初始状态]
 class SERVOING      {};     // 伺服状态，用于高速udp伺服指令发送
+class IDENTIFYING   {};     // 动力学参数辨识状态，从STOPPED进入，辨识完成回到STOPPED
 
 // 中间状态定义
 class RESETTING     {};
@@ -55,6 +56,7 @@ struct EventPauseReq       {};        // 暂停请求
 struct EventContinueReq    {};        // 继续请求
 struct EventErrorOccurred  {};        // 发生错误
 struct EventServoReq       {};        // 伺服请求
+struct EventIdentifyReq    {};        // 动力学参数辨识请求
 struct EventIsEnabled      {};        //TODO: 检查使能状态事件(临时兼容性，要删除)
 
 namespace sml = boost::sml;
@@ -83,6 +85,9 @@ const auto action_enable = [](rocos::Robot& robot) {
 const auto action_disable = [](rocos::Robot& robot) {
     robot.on_fsm_disable();
 };
+const auto action_identify = [](rocos::Robot& robot) {
+    robot.on_fsm_identify();
+};
 
 struct StateMachine {
   auto operator()() const noexcept {
@@ -108,6 +113,10 @@ struct StateMachine {
 
         state<class STOPPED> + event<EventServoReq> = state<class SERVOING>,
         state<class SERVOING> + event<EventStopReq> = state<class STOPPING>,
+
+        state<class STOPPED> + event<EventIdentifyReq> = state<class IDENTIFYING>,
+        state<class IDENTIFYING> + sml::on_entry<_> / action_identify,
+        state<class IDENTIFYING> + event<EventSuccess> = state<class STOPPED>,
 
         state<class RUNNING> + sml::on_entry<_> / action_run,
         state<class RUNNING> + event<EventPauseReq> = state<class PAUSING>,
@@ -140,7 +149,8 @@ struct StateMachine {
         state<class STOPPING>     + event<EventErrorOccurred> = state<class ERROR_STATE>,  //9
         state<class PAUSING>      + event<EventErrorOccurred> = state<class ERROR_STATE>,  //10
         state<class CONTINUING>   + event<EventErrorOccurred> = state<class ERROR_STATE>,  //11
-        state<class RESETTING>    + event<EventErrorOccurred> = state<class ERROR_STATE>   //12
+        state<class RESETTING>    + event<EventErrorOccurred> = state<class ERROR_STATE>,  //12
+        state<class IDENTIFYING>  + event<EventErrorOccurred> = state<class ERROR_STATE>   //13
     );
   }
 };
@@ -152,18 +162,24 @@ namespace rocos {
     public:
         explicit Impl(Robot& owner) : sm_ {owner} {}
 
+        // 运动线程与 HTTP 线程都会触发事件，必须串行化处理。
+        // 用递归锁：action 回调（on_entry）内会再次调用 process_event（如 ENABLING
+        // 进入时 on_fsm_enable 再触发 EventSuccess），属同线程重入，普通锁会死锁。
         template<typename Event>
         bool process_event(const Event& event) {
+            std::lock_guard<std::recursive_mutex> lock(mtx_);
             return sm_.process_event(event);
         }
 
         template<typename TState>
         bool is(const TState& s) const {
+            std::lock_guard<std::recursive_mutex> lock(mtx_);
             return sm_.is(s);
         }
 
     private:
-        sml::sm<StateMachine> sm_;  // 状态机实例
+        sml::sm<StateMachine> sm_;       // 状态机实例
+        mutable std::recursive_mutex mtx_;  // 保护状态机的并发访问（允许同线程重入）
     };
 
     void Robot::on_fsm_enable() {
@@ -183,19 +199,32 @@ namespace rocos {
         }
     }
     void Robot::on_fsm_start() {
-
+        // STARTING 进入：运动线程已由 MoveJ/MoveL 等在调用线程启动，
+        // 此处确认启动成功并转入 RUNNING。
+        impl_->process_event(EventSuccess{});
     }
     void Robot::on_fsm_run() {
-
+        // 已进入 RUNNING 状态，运动正在执行。仅记录，不再触发事件。
+        log_ptr_->info("Robot is running.");
     }
     void Robot::on_fsm_stop() {
-
+        // STOPPING 进入：运动已结束/被中止，确认停止并转入 STOPPED。
+        impl_->process_event(EventSuccess{});
     }
     void Robot::on_fsm_pause() {
-
+        // PAUSING 进入：确认暂停并转入 PAUSED。
+        impl_->process_event(EventSuccess{});
     }
     void Robot::on_fsm_continue() {
-
+        // CONTINUING 进入：确认继续并转回 RUNNING。
+        impl_->process_event(EventSuccess{});
+    }
+    void Robot::on_fsm_identify() {
+        // 动力学参数辨识入口。具体辨识算法（激励轨迹、最小二乘求解等）后续实现，
+        // 此处仅占位：辨识流程结束后回报成功，状态机自动返回 STOPPED。
+        log_ptr_->info("Robot dynamics identification started...");
+        // TODO: 执行动力学参数辨识流程
+        impl_->process_event(EventSuccess{});
     }
     void Robot::on_fsm_reset() {
         log_ptr_->info("Robot is initializing...");
@@ -329,6 +358,10 @@ namespace rocos {
             return "PAUSED";
         } else if (impl_->is(sml::state<class STOPPED>)) {
             return "STOPPED";
+        } else if (impl_->is(sml::state<class SERVOING>)) {
+            return "SERVOING";
+        } else if (impl_->is(sml::state<class IDENTIFYING>)) {
+            return "IDENTIFYING";
         } else if (impl_->is(sml::state<class ERROR_STATE>)) {
             return "ERROR_STATE";
         } else {
@@ -346,7 +379,7 @@ namespace rocos {
             return -1; //TODO: 需要替换为错误码
         }
 
-
+        return 0;
     }
 
     int Robot::SetDisabled() {
@@ -355,6 +388,8 @@ namespace rocos {
             log_ptr_->error("Failed to process EventDisableReq.");
             return -1; //TODO: 需要替换为错误码
         }
+
+        return 0;
     }
 
 
@@ -583,7 +618,7 @@ namespace rocos {
             hw_interface_->waitForSignal(5);
 
         //TODO: 机器人只能在停止状态切换工作模式，有状态机，需要删掉
-        if (getRunState() == RunState::Running) {
+        if (isMotionRunning()) {
             log_ptr_->error("Robot is not stopped!");
             return false;
         }
@@ -615,29 +650,31 @@ namespace rocos {
         return true;
     }
 
-    bool Robot::setRunState(RunState state) {
-        run_state_ = state;
-
-        switch (state) {
-            case RunState::Disabled:
-                is_running_motion = false;
-                break;
-            case RunState::Stopped:
-                is_running_motion = false;
-                break;
-            case RunState::Running:
-                is_running_motion = true;
-                break;
-            default:
-                break;
+    bool Robot::enterRunning() {
+        // 仅当处于 STOPPED 时 EventStartReq 才会被状态机处理（STOPPED→STARTING→RUNNING，
+        // 中间态经 on_entry 回调自动推进）。其他状态下事件不被处理，process_event 返回
+        // false —— 这就是原子的状态门控：RUNNING/PAUSED 等状态下新运动被直接拒绝，
+        // 无需额外的标志位，也不存在 check-then-act 竞态。
+        if (!impl_->process_event(EventStartReq{})) {
+            log_ptr_->error("无法开始运动：机器人不处于 STOPPED 状态（当前：{}）", GetRobotState());
+            return false;
         }
-
         return true;
     }
 
-    void Robot::setEnabled() {
-        setRunState(RunState::Stopped); //TODO: 需要删除
+    void Robot::enterStopped() {
+        // 运动线程结束或中止时调用，从 RUNNING/PAUSED/SERVOING/ERROR 回到 STOPPED
+        // （STOPPING 中间态经 on_fsm_stop 自动推进）。若当前已是 STOPPED/IDLE，
+        // EventStopReq 不被处理，视为无害空操作。
+        impl_->process_event(EventStopReq{});
+    }
 
+    bool Robot::isMotionRunning() const {
+        // 是否有运动正占用机器人（FSM 处于 RUNNING）。替代旧的 is_running_motion 读取。
+        return impl_->is(sml::state<class RUNNING>);
+    }
+
+    void Robot::setEnabled() {
         for_each(joints_.begin(), joints_.end(),
                  [=](std::shared_ptr<Drive> &d) { d->setEnabled(false); }); // 将抱闸设置为同时开启，不阻塞
 
@@ -666,8 +703,6 @@ namespace rocos {
     }
 
     void Robot::setDisabled() {
-        setRunState(RunState::Disabled); //TODO: 需要删除
-
         for_each(joints_.begin(), joints_.end(),
                  [=](std::shared_ptr<Drive> &d) { d->setDisabled(false); }); // 将抱闸设置为同时开启，不阻塞
 
@@ -703,8 +738,6 @@ namespace rocos {
     }
     //TODO: 这里需要修改
     void Robot::stopMotionThread() {
-        setRunState(RunState::Stopped);
-
         // otg_motion_thread_->interrupt();
         otg_motion_thread_->join();  //等待运动线程结束
     }
@@ -902,13 +935,10 @@ namespace rocos {
             }
         }
 
-        if (is_running_motion)  //最大异步执行一条任务
+        if (!enterRunning())  //最大异步执行一条任务：仅 STOPPED 状态可启动新运动
         {
             log_ptr_->error(" Motion is still running and waiting for it to finish");
             return -1;
-        } else {
-            // is_running_motion = true;
-            setRunState(RunState::Running);
         }
 
         if (motion_thread_) {
@@ -998,13 +1028,10 @@ namespace rocos {
             return -1;
         }
 
-        if (is_running_motion)  //最大一条任务异步执行
+        if (!enterRunning())  //最大一条任务异步执行：仅 STOPPED 状态可启动新运动
         {
             log_ptr_->error(" Motion is still running and waiting for it to finish");
             return -1;
-        } else {
-            //is_running_motion = true;
-            setRunState(RunState::Running);
         }
 
         if (motion_thread_) {
@@ -1032,7 +1059,7 @@ namespace rocos {
         if (JC_helper::link_trajectory(traj_target, frame_init, pose, speed, acceleration) < 0) {
             log_ptr_->error("link trajectory planning fail ");
 
-            setRunState(RunState::Stopped); //TODO: RunState
+            enterStopped();
 
             return -1;
         }
@@ -1080,13 +1107,13 @@ namespace rocos {
                         break;
                     default:
                         log_ptr_->error("Undefined error!");
-                        setRunState(RunState::Stopped);
+                        enterStopped();
                         return -1;
                 }
             }
             catch (...) {
                 log_ptr_->error("Undefined error!");
-                setRunState(RunState::Stopped);
+                enterStopped();
                 return -1;
             }
 
@@ -1094,7 +1121,7 @@ namespace rocos {
 
         if (ik_count == max_running_count) {
             log_ptr_->error("CartToJnt still failed even after {} attempts", max_running_count);
-            setRunState(RunState::Stopped);
+            enterStopped();
             return -1;
         }
 
@@ -1103,15 +1130,13 @@ namespace rocos {
         if (asynchronous)  //异步执行
         {
             motion_thread_.reset(new std::thread{&Robot::RunMoveL, this, std::ref(traj_)});
-
-            setRunState(RunState::Running); //TODO: RunState
+            // 已在 RUNNING 状态，无需再次设置
         } else  //同步执行
         {
             motion_thread_.reset(new std::thread{&Robot::RunMoveL, this, std::ref(traj_)});
             motion_thread_->join();
             motion_thread_ = nullptr;
-
-            setRunState(RunState::Stopped); //TODO: RunState
+            // RunMoveL 末尾会调用 enterStopped()
         }
 
         return 0;
@@ -1141,14 +1166,10 @@ namespace rocos {
             return -1;
         }
 
-        if (is_running_motion)  //最大一条任务异步执行 //TODO: RunState
+        if (!enterRunning())  //最大一条任务异步执行：仅 STOPPED 状态可启动新运动
         {
             log_ptr_->error(" Motion is still running and waiting for it to finish");
             return -1;
-        } else {
-
-            setRunState(RunState::Running); //TODO: RunState
-
         }
 
         if (motion_thread_) {
@@ -1170,7 +1191,7 @@ namespace rocos {
         if (JC_helper::link_trajectory(vel_target, frame_current, pose, speed, acceleration) < 0) {
             log_ptr_->error("link trajectory planning fail ");
 
-            setRunState(RunState::Stopped); //TODO: RunState
+            enterStopped();
 
             return -1;
         }
@@ -1232,14 +1253,14 @@ namespace rocos {
                         break;
                     default:
                         log_ptr_->error("Undefined error!");
-                        setRunState(RunState::Stopped); //TODO: RunState
+                        enterStopped();
 
                         return -1;
                 }
             }
             catch (...) {
                 log_ptr_->error("Undefined error!");
-                setRunState(RunState::Stopped); //TODO: RunState
+                enterStopped();
 
                 return -1;
             }
@@ -1249,7 +1270,7 @@ namespace rocos {
         if (ik_count == max_running_count) {
             log_ptr_->error("CartToJnt still failed even after {} attempts", max_running_count);
 
-            setRunState(RunState::Stopped); //TODO: RunState
+            enterStopped();
 
             return -1;
         }
@@ -1259,17 +1280,13 @@ namespace rocos {
         if (asynchronous)  //异步执行
         {
             motion_thread_.reset(new std::thread{&Robot::RunMoveL, this, std::ref(traj_)});
-
-            setRunState(RunState::Running); //TODO: RunState
-
+            // 已在 RUNNING 状态，无需再次设置
         } else  //同步执行
         {
             motion_thread_.reset(new std::thread{&Robot::RunMoveL, this, std::ref(traj_)});
             motion_thread_->join();
             motion_thread_ = nullptr;
-
-            setRunState(RunState::Stopped); //TODO: RunState
-
+            // RunMoveL 末尾会调用 enterStopped()
         }
 
         return 0;
@@ -1370,13 +1387,10 @@ namespace rocos {
             log_ptr_->error("given parameters is invalid");
             return -1;
         }
-        if (is_running_motion)  //最大一条任务异步执行
+        if (!enterRunning())  //最大一条任务异步执行：仅 STOPPED 状态可启动新运动
         {
             log_ptr_->error(" Motion is still running and waiting for it to finish");
             return -1;
-        } else {
-            // is_running_motion = true;
-            setRunState(RunState::Running);
         }
 
         if (motion_thread_) {
@@ -1404,8 +1418,7 @@ namespace rocos {
         if (JC_helper::circle_trajectory(traj_target, frame_init, pose_via, pose_to, speed, acceleration,
                                          orientation_fixed) < 0) {
             log_ptr_->error("circle trajectory planning fail ");
-            // is_running_motion =false;
-            setRunState(RunState::Stopped);
+            enterStopped();
             return -1;
         }
 
@@ -1449,23 +1462,20 @@ namespace rocos {
                         break;
                     default:
                         log_ptr_->error("Undefined error!");
-                        // is_running_motion = false;
-                        setRunState(RunState::Stopped);
+                        enterStopped();
                         return -1;
                 }
             }
             catch (...) {
                 log_ptr_->error("Undefined error!");
-                // is_running_motion =false;
-                setRunState(RunState::Stopped);
+                enterStopped();
                 return -1;
             }
         }
 
         if (ik_count == max_running_count) {
             log_ptr_->error("CartToJnt still failed even after {} attempts", max_running_count);
-            // is_running_motion =false;
-            setRunState(RunState::Stopped);
+            enterStopped();
             return -1;
         }
 
@@ -1474,15 +1484,13 @@ namespace rocos {
         if (asynchronous)  //异步执行
         {
             motion_thread_.reset(new std::thread{&Robot::RunMoveL, this, std::ref(traj_)});
-            // is_running_motion = true;
-            setRunState(RunState::Running);
+            // 已在 RUNNING 状态，无需再次设置
         } else  //同步执行
         {
             motion_thread_.reset(new std::thread{&Robot::RunMoveL, this, std::ref(traj_)});
             motion_thread_->join();
             motion_thread_ = nullptr;
-            // is_running_motion = false;
-            setRunState(RunState::Stopped);
+            // RunMoveL 末尾会调用 enterStopped()
         }
 
         return 0;
@@ -1512,13 +1520,10 @@ namespace rocos {
             return -1;
         }
 
-        if (is_running_motion)  //最大一条任务异步执行
+        if (!enterRunning())  //最大一条任务异步执行：仅 STOPPED 状态可启动新运动
         {
             log_ptr_->error(" Motion is still running and waiting for it to finish");
             return -1;
-        } else {
-            // is_running_motion = true;
-            setRunState(RunState::Running);
         }
 
         if (motion_thread_) {
@@ -1546,8 +1551,7 @@ namespace rocos {
         if (JC_helper::circle_trajectory(traj_target, frame_init, center, theta, axiz, speed, acceleration,
                                          orientation_fixed) < 0) {
             log_ptr_->error("circle trajectory planning fail ");
-            // is_running_motion =false;
-            setRunState(RunState::Stopped);
+            enterStopped();
             return -1;
         }
 
@@ -1592,23 +1596,20 @@ namespace rocos {
                         break;
                     default:
                         log_ptr_->error("Undefined error!");
-                        // is_running_motion = false;
-                        setRunState(RunState::Stopped);
+                        enterStopped();
                         return -1;
                 }
             }
             catch (...) {
                 log_ptr_->error("Undefined error!");
-                // is_running_motion =false;
-                setRunState(RunState::Stopped);
+                enterStopped();
                 return -1;
             }
         }
 
         if (ik_count == max_running_count) {
             log_ptr_->error("CartToJnt still failed even after {} attempts", max_running_count);
-            // is_running_motion =false;
-            setRunState(RunState::Stopped);
+            enterStopped();
             return -1;
         }
 
@@ -1617,15 +1618,13 @@ namespace rocos {
         if (asynchronous)  //异步执行
         {
             motion_thread_.reset(new std::thread{&Robot::RunMoveL, this, std::ref(traj_)});
-            // is_running_motion = true;
-            setRunState(RunState::Running);
+            // 已在 RUNNING 状态，无需再次设置
         } else  //同步执行
         {
             motion_thread_.reset(new std::thread{&Robot::RunMoveL, this, std::ref(traj_)});
             motion_thread_->join();
             motion_thread_ = nullptr;
-            // is_running_motion = false;
-            setRunState(RunState::Stopped);
+            // RunMoveL 末尾会调用 enterStopped()
         }
 
         return 0;
@@ -1658,13 +1657,10 @@ namespace rocos {
             log_ptr_->error("given parameters is invalid");
             return -1;
         }
-        if (is_running_motion)  //最大一条任务异步执行
+        if (!enterRunning())  //最大一条任务异步执行：仅 STOPPED 状态可启动新运动
         {
             log_ptr_->error(" Motion is still running and waiting for it to finish");
             return -1;
-        } else {
-            // is_running_motion = true;
-            setRunState(RunState::Running);
         }
 
         if (motion_thread_) {
@@ -1686,7 +1682,7 @@ namespace rocos {
         if (JC_helper::circle_trajectory(traj_vel_target, current_frame, pose_via, pose_to, speed, acceleration,
                                          orientation_fixed) < 0) {
             log_ptr_->error("circle trajectory planning fail ");
-            is_running_motion = false;
+            enterStopped();
             return -1;
         }
 
@@ -1746,23 +1742,20 @@ namespace rocos {
                         break;
                     default:
                         log_ptr_->error("Undefined error!");
-                        // is_running_motion = false;
-                        setRunState(RunState::Stopped);
+                        enterStopped();
                         return -1;
                 }
             }
             catch (...) {
                 log_ptr_->error("Undefined error!");
-                // is_running_motion =false;
-                setRunState(RunState::Stopped);
+                enterStopped();
                 return -1;
             }
         }
 
         if (ik_count == max_running_count) {
             log_ptr_->error("CartToJnt still failed even after {} attempts", max_running_count);
-            // is_running_motion =false;
-            setRunState(RunState::Stopped);
+            enterStopped();
             return -1;
         }
 
@@ -1771,15 +1764,13 @@ namespace rocos {
         if (asynchronous)  //异步执行
         {
             motion_thread_.reset(new std::thread{&Robot::RunMoveL, this, std::ref(traj_)});
-            // is_running_motion = true;
-            setRunState(RunState::Running);
+            // 已在 RUNNING 状态，无需再次设置
         } else  //同步执行
         {
             motion_thread_.reset(new std::thread{&Robot::RunMoveL, this, std::ref(traj_)});
             motion_thread_->join();
             motion_thread_ = nullptr;
-            // is_running_motion = false;
-            setRunState(RunState::Stopped);
+            // RunMoveL 末尾会调用 enterStopped()
         }
 
         return 0;
@@ -1809,13 +1800,10 @@ namespace rocos {
             return -1;
         }
 
-        if (is_running_motion)  //最大一条任务异步执行
+        if (!enterRunning())  //最大一条任务异步执行：仅 STOPPED 状态可启动新运动
         {
             log_ptr_->error(" Motion is still running and waiting for it to finish");
             return -1;
-        } else {
-            // is_running_motion = true;
-            setRunState(RunState::Running);
         }
 
         if (motion_thread_) {
@@ -1837,8 +1825,7 @@ namespace rocos {
         if (JC_helper::circle_trajectory(traj_vel_target, current_frame, center, theta, axiz, speed, acceleration,
                                          orientation_fixed) < 0) {
             log_ptr_->error("circle trajectory planning fail ");
-            // is_running_motion =false;
-            setRunState(RunState::Stopped);
+            enterStopped();
             return -1;
         }
 
@@ -1898,23 +1885,20 @@ namespace rocos {
                         break;
                     default:
                         log_ptr_->error("Undefined error!");
-                        // is_running_motion = false;
-                        setRunState(RunState::Stopped);
+                        enterStopped();
                         return -1;
                 }
             }
             catch (...) {
                 log_ptr_->error("Undefined error!");
-                // is_running_motion =false;
-                setRunState(RunState::Stopped);
+                enterStopped();
                 return -1;
             }
         }
 
         if (ik_count == max_running_count) {
             log_ptr_->error("CartToJnt still failed even after {} attempts", max_running_count);
-            // is_running_motion =false;
-            setRunState(RunState::Stopped);
+            enterStopped();
             return -1;
         }
 
@@ -1923,15 +1907,13 @@ namespace rocos {
         if (asynchronous)  //异步执行
         {
             motion_thread_.reset(new std::thread{&Robot::RunMoveL, this, std::ref(traj_)});
-            // is_running_motion = true;
-            setRunState(RunState::Running);
+            // 已在 RUNNING 状态，无需再次设置
         } else  //同步执行
         {
             motion_thread_.reset(new std::thread{&Robot::RunMoveL, this, std::ref(traj_)});
             motion_thread_->join();
             motion_thread_ = nullptr;
-            // is_running_motion = false;
-            setRunState(RunState::Running);
+            // RunMoveL 末尾会调用 enterStopped()
         }
 
         return 0;
@@ -1963,7 +1945,7 @@ namespace rocos {
             }
         }
 
-        if (is_running_motion)  //最大一条任务异步执行
+        if (!enterRunning())  //最大一条任务异步执行：仅 STOPPED 状态可启动新运动
         {
             log_ptr_->error(" Motion is still running and waiting for it to finish");
             return -1;
@@ -2126,23 +2108,20 @@ namespace rocos {
                         break;
                     default:
                         log_ptr_->error("Undefined error!");
-                        // is_running_motion = false;
-                        setRunState(RunState::Stopped);
+                        enterStopped();
                         return -1;
                 }
             }
             catch (...) {
                 log_ptr_->error("Undefined error!");
-                // is_running_motion = false;
-                setRunState(RunState::Stopped);
+                enterStopped();
                 return -1;
             }
         }
 
         if (ik_count == max_running_count) {
             log_ptr_->error("\n\nCartToJnt still failed even after {} attempts", max_running_count);
-            // is_running_motion = false;
-            setRunState(RunState::Stopped);
+            enterStopped();
             return -1;
         }
 
@@ -2150,15 +2129,13 @@ namespace rocos {
         if (asynchronous)  //异步执行
         {
             motion_thread_.reset(new std::thread{&Robot::RunMultiMoveL, this, std::ref(traj_)});
-            // is_running_motion = true;
-            setRunState(RunState::Running);
+            // 已在 RUNNING 状态，无需再次设置
         } else  //同步执行
         {
             motion_thread_.reset(new std::thread{&Robot::RunMultiMoveL, this, std::ref(traj_)});
             motion_thread_->join();
             motion_thread_ = nullptr;
-            // is_running_motion = false;
-            setRunState(RunState::Stopped);
+            // RunMultiMoveL 末尾会调用 enterStopped()
         }
 
         return 0;
@@ -2241,26 +2218,28 @@ namespace rocos {
             last_dir = dir;
         }
 
-        //** is_running_motion的作用：不允许其他运动异步运行时,执行dragging;不允许执行dragging时，执行其他离线类运动**//
+        //** isMotionRunning()的作用：不允许其他运动异步运行时,执行dragging;不允许执行dragging时，执行其他离线类运动**//
         //** _dragging_finished_flag的作用：保证dragging 多次调用时，只初始化一次**//
-        if (_dragging_finished_flag && is_running_motion) {
+        if (_dragging_finished_flag && isMotionRunning()) {
 
             log_ptr_->error("其他运动仍在运行，不允许执行点动功能");
             return -1;
 
-        } else if (_dragging_finished_flag && !is_running_motion) {
+        } else if (_dragging_finished_flag && !isMotionRunning()) {
             if (motion_thread_) {
                 motion_thread_->join();
                 motion_thread_ = nullptr;
             }
-            // is_running_motion = true;
-            setRunState(RunState::Running); // TODO: 感觉应该是Stopped，原来为Running
+            if (!enterRunning()) {  // 占用机器人：进入 RUNNING，标识点动正在进行
+                log_ptr_->error("机器人不处于 STOPPED 状态，无法开始点动");
+                return -1;
+            }
             traj_.clear();  //!
         }
         //**-------------------------------**//
 
         //** 心跳保持 **//
-        if (is_running_motion) {
+        if (isMotionRunning()) {
             tick_count++;
         }
         //**-------------------------------**//
@@ -2381,11 +2360,10 @@ namespace rocos {
 
             default:
                 log_ptr_->error("Undefined command flag: {}", index);
-                //! 在此处位置时会置位is_running_motion
-                //! 如果没有jogging 运动线程 且 is_running_motion 被置位，那is_running_motion就会被永久卡住
-                if (_dragging_finished_flag && is_running_motion)
-                    // is_running_motion = false;
-                    setRunState(RunState::Stopped);
+                //! 在此处位置时机器人已被点动占用（FSM 处于 RUNNING）
+                //! 如果没有 jogging 运动线程且占用未释放，那机器人就会被永久卡在 RUNNING
+                if (_dragging_finished_flag && isMotionRunning())
+                    enterStopped();
                 return -1;
         }
         return 0;
@@ -2500,8 +2478,7 @@ namespace rocos {
 
             if (!interp[i]->isValidMovement() || interp[i]->getDuration() <= 0) {
                 log_ptr_->error("Joint[{}] MoveJ trajectory is infeasible", i);
-                // is_running_motion = false;
-                setRunState(RunState::Stopped);
+                enterStopped();
                 return;
             }
             max_time = max(max_time, interp[i]->getDuration());
@@ -2526,8 +2503,7 @@ namespace rocos {
                     log_ptr_->error("q_target( {} )  = {}", i, target_pos[i] * 180 / M_PI);
                     log_ptr_->error("q_init( {} ) ={}", i, init_pos[i] * 180 / M_PI);
 
-                    // is_running_motion = false;
-                    setRunState(RunState::Stopped);
+                    enterStopped();
                     return;
                 } else
                     init_pos[i] = target_pos[i];
@@ -2560,8 +2536,7 @@ namespace rocos {
         //**-------------------------------**//
 
         Exit:
-        // is_running_motion = false;
-        setRunState(RunState::Stopped);
+        enterStopped();
     }
 
     void Robot::RunMoveL(const std::vector<KDL::JntArray> &traj) {
@@ -2583,8 +2558,7 @@ namespace rocos {
                     joints_[i]->setPosition(pos_[i]);
                 } else {
                     log_ptr_->error("关节[{}] 不支持此模式 :{}", i, static_cast<int> (joints_[i]->getMode()));
-                    // is_running_motion = false;
-                    setRunState(RunState::Stopped);
+                    enterStopped();
                     return;
                 }
             }
@@ -2593,8 +2567,7 @@ namespace rocos {
         }
 
         Exit:
-        // is_running_motion = false;
-        setRunState(RunState::Stopped);
+        enterStopped();
     }
 
     void Robot::RunMultiMoveL(const std::vector<KDL::JntArray> &traj) {
@@ -2613,25 +2586,20 @@ namespace rocos {
         }
 
         Exit:
-        // is_running_motion = false;
-        setRunState(RunState::Stopped);
+        enterStopped();
     }
 
     int Robot::admittance_teaching(bool asynchronous) {
-        if (is_running_motion)  // 最大一条任务异步执行
+        if (!enterRunning())  // 最大一条任务异步执行：仅 STOPPED 状态可启动新运动
         {
             log_ptr_->error(" Motion is still running and waiting for it to finish");
             return -1;
-        } else {
-            // is_running_motion = true;
-            setRunState(RunState::Running);
         }
 
         JC_helper::admittance admittance_control{this, &my_ft_sensor};
 
         if (admittance_control.init(flange_) < 0) {
-            // is_running_motion = false;
-            setRunState(RunState::Stopped);
+            enterStopped();
             return -1;
         }
 
@@ -2659,8 +2627,7 @@ namespace rocos {
 
             log_ptr_->info("结束示教");
 
-            // is_running_motion = false;
-            setRunState(RunState::Stopped);
+            enterStopped();
         } else {
             _thread_admittance_teaching->detach();
         }
@@ -2675,21 +2642,17 @@ namespace rocos {
 
 
     int Robot::admittance_link(KDL::Frame frame_target, double speed, double acceleration) {
-        if (is_running_motion)  // 最大一条任务异步执行
+        if (!enterRunning())  // 最大一条任务异步执行：仅 STOPPED 状态可启动新运动
         {
             log_ptr_->error(" Motion is still running and waiting for it to finish");
             return -1;
-        } else {
-            // is_running_motion = true;
-            setRunState(RunState::Running);
         }
 
         JC_helper::admittance admittance_control{this, &my_ft_sensor};
 
         // admittance类里自带传感器类，需要初始化才能用
         if (admittance_control.init(flange_) < 0) {
-            // is_running_motion = false;
-            setRunState(RunState::Stopped);
+            enterStopped();
             return -1;
         }
 
@@ -2708,8 +2671,7 @@ namespace rocos {
 
         log_ptr_->info("结束导纳运动");
 
-        // is_running_motion = false;
-        setRunState(RunState::Stopped);
+        enterStopped();
         return 0;
     }
 
@@ -2754,13 +2716,10 @@ namespace rocos {
     }
 
     int Robot::joint_admittance_teaching(bool asynchronous) {
-        if (is_running_motion)  // 最大一条任务异步执行
+        if (!enterRunning())  // 最大一条任务异步执行：仅 STOPPED 状态可启动新运动
         {
             log_ptr_->error(" Motion is still running and waiting for it to finish");
             return -1;
-        } else {
-            // is_running_motion = true;
-            setRunState(RunState::Running);
         }
 
         JC_helper::admittance_joint *admittance_control = new JC_helper::admittance_joint{this};
@@ -2786,7 +2745,7 @@ namespace rocos {
 
             delete admittance_control;
 
-            setRunState(RunState::Stopped);
+            enterStopped();
         } else {
             _thread_admittance_teaching->detach();
         }

@@ -92,13 +92,6 @@ namespace rocos
             CartImp = 4
         };
 
-        enum class RunState //TODO: 有状态机，需要删掉
-        {
-            Disabled = 0,
-            Stopped = 1,
-            Running = 2
-        };
-
         explicit Robot(HardwareInterface *hw,
                        const string &urdf_file_path = "robot.urdf",
                        const string &base_link = "base_link",
@@ -132,9 +125,14 @@ namespace rocos
         inline WorkMode getWorkMode() { return work_mode_; }
         bool setWorkMode(WorkMode mode);
 
-
-        inline RunState getRunState() { return run_state_; } //TODO: 用状态机了，不需要这个状态
-        bool setRunState(RunState state);//TODO: 用状态机了，不需要这个状态
+        // 运动执行的状态进入/退出封装（基于 FSM，替代旧的 setRunState/is_running_motion）。
+        // enterRunning：仅当处于 STOPPED 才允许，原子地门控并转入 RUNNING；
+        //               非 STOPPED 时事件被状态机忽略，返回 false（拒绝新运动）。
+        // enterStopped：从 RUNNING/PAUSED/ERROR 回到 STOPPED，运动线程结束时调用。
+        // isMotionRunning：是否有运动正占用机器人（FSM 处于 RUNNING）。
+        bool enterRunning();
+        void enterStopped();
+        bool isMotionRunning() const;
 
         void setEnabled();
 
@@ -1082,8 +1080,6 @@ namespace rocos
 
         Synchronization sync_{SYNC_TIME};
 
-        std::atomic<bool> is_running_motion{false};
-
         std::vector<bool> need_plan_; // 是否需要重新规划标志
 
         std::shared_ptr<std::thread> otg_motion_thread_{nullptr};// otg在线规划线程
@@ -1122,7 +1118,6 @@ namespace rocos
         std::atomic<int> tick_count{0};
 
         WorkMode work_mode_{WorkMode::Position};                        // 机器人当前模式，默认为位置模式
-        RunState run_state_{RunState::Disabled};                        // 机器人当前状态，默认为下使能
         std::shared_ptr<rocos::Trapezoid> T_speed_scaling_ptr{nullptr}; // 速度缩放T型规划器
         std::atomic<double> current_speed_fraction = 1;                 // 当前的速度比例
         std::atomic<double> target_speed_fraction = 1;                  // 期望的速度比例
@@ -1191,6 +1186,8 @@ namespace rocos
         void on_fsm_pause();
 
         void on_fsm_continue();
+
+        void on_fsm_identify();
 
     };
 

@@ -1151,8 +1151,7 @@ namespace JC_helper
         }
 
         (*external_finished_flag_ptr) = true;                    // 这次smart servo已结束，等待下一次smart servo
-        //                robot_ptr->is_running_motion    = false;  // 机械臂运动已结束，可以执行其他离线类运动
-        robot_ptr->setRunState(rocos::Robot::RunState::Stopped); // 机械臂运动已结束，可以执行其他离线类运动
+        robot_ptr->enterStopped();                               // 机械臂运动已结束，可以执行其他离线类运动
         on_stop_trajectory = false;                              // 这个必须设为false,因为新线程仍然使用同一个对象数据成员
         //                PLOG_INFO << "smart servo has finished";
     }
@@ -2568,7 +2567,7 @@ namespace JC_helper
         while ( !FinishPlanningFrame ) std::this_thread::sleep_for( std::chrono::duration< double >{ DELTA_T } );
 
         ( *external_finished_flag_ptr ) = true;   //这次smart servo已结束，等待下一次smart servo
-        robot_ptr->is_running_motion    = false;  //机械臂运动已结束，可以执行其他离线类运动
+        robot_ptr->enterStopped();                 //机械臂运动已结束，可以执行其他离线类运动
         on_stop_trajectory              = false;
         PLOG_INFO << "SmartServo_Cartesian 全部结束";
     }
@@ -3169,8 +3168,7 @@ namespace JC_helper
         }
 
         (*external_finished_flag_ptr) = true;                    // 这次smart servo已结束，等待下一次smart servo
-                                                                 //        robot_ptr->is_running_motion    = false;  // 机械臂运动已结束，可以执行其他离线类运动
-        robot_ptr->setRunState(rocos::Robot::RunState::Stopped); // 机械臂运动已结束，可以执行其他离线类运动
+        robot_ptr->enterStopped();                               // 机械臂运动已结束，可以执行其他离线类运动
     }
 
     void SmartServo_Cartesian::command(int Cartesian_vel_index, const char *reference_frame)
@@ -3426,8 +3424,7 @@ namespace JC_helper
         }
 
         (*external_finished_flag_ptr) = true;                    // 这次smart servo已结束，等待下一次smart servo
-                                                                 //        robot_ptr->is_running_motion    = false;  // 机械臂运动已结束，可以执行其他离线类运动
-        robot_ptr->setRunState(rocos::Robot::RunState::Stopped); // 机械臂运动已结束，可以执行其他离线类运动
+        robot_ptr->enterStopped();                               // 机械臂运动已结束，可以执行其他离线类运动
     }
 
     void SmartServo_Nullspace::command(int jogging_Direction)
