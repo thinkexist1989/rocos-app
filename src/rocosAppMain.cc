@@ -36,7 +36,7 @@ DEFINE_string(base, "base_link", "Base link name");
 DEFINE_string(tip, "link_7", "Tip link name");
 DEFINE_bool(sim, true, "Sim or not");
 DEFINE_int32(id, 0, "hardware id, only work for real hardware");
-DEFINE_string(http_host, "0.0.0.0", "HTTP server listen host");
+DEFINE_string(http_host, "192.168.1.131", "HTTP server listen host");
 DEFINE_int32(http_port, 8080, "HTTP server listen port");
 
 bool isRuning = true;

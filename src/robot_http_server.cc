@@ -113,6 +113,12 @@ void RobotHttpServer::stop() {
 // ============================================================================
 
 void RobotHttpServer::registerRoutes() {
+    if (!server_->set_mount_point("/", "web") &&
+        !server_->set_mount_point("/", "../web") &&
+        !server_->set_mount_point("/", "../../web")) {
+        log_ptr_->error("Failed to mount web UI directory. Tried: web, ../web, ../../web");
+    }
+
     // CORS preflight
     server_->Options(".*", [this](const httplib::Request&, httplib::Response& res) {
         setCorsHeaders(res);
