@@ -54,6 +54,54 @@ EventErrorOccurred
 
 FSM 不应该知道 `MoveJ`、`MoveL`、`MoveC`、`Jog` 等具体名称。
 
+## 逻辑框图
+
+```mermaid
+flowchart TD
+    Host[上位机 / HTTP Client]
+    Server[RobotHttpServer]
+    Robot[Robot 门面 API]
+    Executor[MotionExecutor]
+    FSM[Boost.SML FSM]
+    Current[Current MotionCommand]
+    Context[MotionContext]
+    Profile[UnitIntervalMotionProfile]
+    Sampler[Path Sampler / IK Sampler]
+    HW[Drive / HardwareInterface]
+
+    Host -->|POST /api/move/joint| Server
+    Host -->|POST /api/move/pause| Server
+    Host -->|POST /api/move/resume| Server
+    Host -->|POST /api/move/stop| Server
+
+    Server --> Robot
+    Robot -->|submit MoveJCommand / MoveLCommand / JogCommand| Executor
+    Robot -->|pause / resume / stop| Executor
+
+    Executor -->|process EventStartReq / EventPauseReq / EventStopReq| FSM
+    FSM -->|accepted / rejected| Executor
+
+    Executor -->|prepare/start/update/pause/resume/stop| Current
+    Executor -->|passes controlled access| Context
+    Current --> Context
+
+    Current -->|finite path command| Profile
+    Current -->|sample by s| Sampler
+    Sampler -->|q_cmd / pose_cmd -> q_cmd| Current
+    Current -->|set target| HW
+    Context --> HW
+    HW -->|waitForSignal/read state| Context
+
+    Current -->|Finished / Paused / Stopped / Failed| Executor
+    Executor -->|EventSuccess / EventErrorOccurred| FSM
+```
+
+这张图表达三个关键隔离点：
+
+- FSM 只接收事件，不调用 MoveJ/MoveL 细节。
+- MotionExecutor 只调度当前 command，不知道轨迹如何采样。
+- MotionCommand 通过 MotionContext 访问底层资源，不直接拥有完整 `Robot` 控制权。
+
 ### MotionExecutor
 
 MotionExecutor 是运动任务调度器，每个 `Robot` 建议持有一个 executor。
@@ -70,9 +118,157 @@ MotionExecutor 是运动任务调度器，每个 `Robot` 建议持有一个 exec
 
 MotionExecutor 知道“当前有一个任务”，但不关心任务是 MoveJ 还是 MoveL。
 
+建议把 MotionExecutor 设计成“运动生命周期所有权”的唯一持有者：
+
+```text
+MotionExecutor
+  owns current command
+  owns/uses motion worker thread
+  owns current task id / task state
+  owns stop/pause/resume request coordination
+  references FSM gateway
+  references MotionContext
+```
+
+它内部可以维护如下状态：
+
+```cpp
+enum class ExecutorState {
+    Idle,
+    Starting,
+    Running,
+    Pausing,
+    Paused,
+    Continuing,
+    Stopping,
+    Error
+};
+
+enum class MotionResultCode {
+    Ok,
+    Busy,
+    InvalidCommand,
+    InvalidState,
+    Unsupported,
+    PlanningFailed,
+    ExecutionFailed,
+    HardwareFault
+};
+
+enum class MotionStepStatus {
+    Running,
+    Paused,
+    Finished,
+    Stopped,
+    Failed
+};
+```
+
+其中 `ExecutorState` 不一定必须独立存在；如果 FSM 已经能可靠查询当前状态，executor 可以只保存 command 和 task 状态。保留 executor state 的好处是 HTTP task 查询更直接，缺点是需要避免和 FSM 状态重复失真。
+
+建议公开接口：
+
+```cpp
+class MotionExecutor {
+public:
+    MotionSubmitResult submit(std::unique_ptr<MotionCommand> command);
+
+    MotionResult pause();
+    MotionResult resume();
+    MotionResult stop();
+
+    MotionTaskStatus currentTaskStatus() const;
+    bool hasActiveCommand() const;
+
+private:
+    void workerLoop();
+    void finishCurrentCommand(MotionStepStatus status);
+    MotionResult transitionToRunning();
+    MotionResult transitionToStopped();
+    MotionResult transitionToError(MotionResultCode reason);
+};
+```
+
+`submit()` 的责任边界：
+
+```text
+submit(command)
+  -> command 非空检查
+  -> current command 是否为空
+  -> FSM 是否允许 START
+  -> command.prepare(ctx)
+  -> command.start(ctx)
+  -> 启动 workerLoop
+  -> 返回 task_id 或错误
+```
+
+`pause()` 的责任边界：
+
+```text
+pause()
+  -> 当前必须有 command
+  -> 当前 command 必须 supportsPause()
+  -> FSM 必须接受 EventPauseReq
+  -> 调用 command.pause(ctx)
+  -> workerLoop 继续 update，直到 command 返回 Paused
+  -> FSM 接收 EventSuccess，进入 PAUSED
+```
+
+`resume()` 的责任边界：
+
+```text
+resume()
+  -> 当前必须有 command
+  -> 当前 command 必须 supportsResume()
+  -> FSM 必须接受 EventContinueReq
+  -> 调用 command.resume(ctx)
+  -> FSM 接收 EventSuccess，进入 RUNNING
+  -> workerLoop 继续 update
+```
+
+`stop()` 的责任边界：
+
+```text
+stop()
+  -> 如果没有 command，可作为幂等 no-op
+  -> 当前 command 必须 supportsStop()
+  -> FSM 必须接受 EventStopReq
+  -> 调用 command.stop(ctx)
+  -> workerLoop 继续 update，直到 command 返回 Stopped
+  -> 清理 command，FSM 进入 STOPPED
+```
+
+并发要求：
+
+- `submit/pause/resume/stop` 可能来自 HTTP 线程。
+- `workerLoop` 在运动线程或实时控制循环中运行。
+- executor 对 `current_command_`、task 状态、请求标志必须加锁或使用原子状态。
+- 不建议在持有 executor mutex 时调用可能阻塞的底层硬件函数。
+- FSM 的 `process_event()` 已有递归锁保护，但 executor 仍应把自身状态保护好。
+
+建议成员：
+
+```cpp
+class MotionExecutor {
+private:
+    mutable std::mutex mutex_;
+    std::unique_ptr<MotionCommand> current_;
+    MotionContext& ctx_;
+    RobotFsmGateway& fsm_;
+    std::unique_ptr<std::thread> worker_;
+    std::atomic<bool> worker_running_{false};
+    std::string current_task_id_;
+    MotionTaskStatus task_status_;
+};
+```
+
+`RobotFsmGateway` 可以是对现有 `Robot::Impl::process_event()` 的薄包装，避免 executor 直接依赖 Boost.SML 类型。
+
 ### MotionCommand
 
 MotionCommand 是具体运动任务的抽象。
+
+MotionCommand 的核心思想是：每个具体运动任务都实现同一套生命周期接口。MoveJ、MoveL、Jog 的差异只体现在 command 内部。
 
 建议接口：
 
@@ -83,14 +279,21 @@ public:
 
     virtual std::string name() const = 0;
 
+    // 能力声明。Executor 根据这些能力决定是否允许发送 FSM pause/resume 事件。
     virtual bool supportsPause() const { return false; }
     virtual bool supportsResume() const { return false; }
     virtual bool supportsStop() const { return true; }
 
+    // prepare 只做启动前检查和规划准备。失败通常不进入 ERROR_STATE。
     virtual MotionResult prepare(MotionContext& ctx) = 0;
+
+    // start 激活内部控制器，例如 UnitIntervalMotionProfile::Start。
     virtual MotionResult start(MotionContext& ctx) = 0;
+
+    // update 每个控制周期调用一次。返回任务当前进展。
     virtual MotionStepResult update(MotionContext& ctx) = 0;
 
+    // pause/resume/stop 只改变 command 内部控制器状态，不直接操作 FSM。
     virtual MotionResult pause(MotionContext& ctx) {
         return MotionResult::Unsupported;
     }
@@ -102,6 +305,108 @@ public:
     virtual MotionResult stop(MotionContext& ctx) = 0;
 };
 ```
+
+建议 `MotionStepResult` 携带错误信息：
+
+```cpp
+struct MotionStepResult {
+    MotionStepStatus status;
+    MotionResultCode code;
+    std::string message;
+};
+```
+
+Command 生命周期：
+
+```text
+Constructed
+  -> prepare(ctx)
+  -> start(ctx)
+  -> update(ctx) repeated
+  -> Finished / Paused / Stopped / Failed
+```
+
+有限路径 command 的典型内部结构：
+
+```cpp
+class MoveJCommand : public MotionCommand {
+private:
+    KDL::JntArray q_start_;
+    KDL::JntArray q_goal_;
+    KDL::JntArray q_cmd_;
+    UnitIntervalMotionProfile profile_;
+    bool stopping_{false};
+    bool pausing_{false};
+};
+```
+
+`MoveJCommand::update()` 的职责：
+
+```text
+profile.Update()
+s = profile.position()
+q_cmd = q_start + s * (q_goal - q_start)
+ctx.setJointTargets(q_cmd)
+
+if profile.HasError(): return Failed
+if stopping && profile.IsStopCompleted(): return Stopped
+if pausing && profile.IsStopped(): return Paused
+if profile.HasReachedTarget(): return Finished
+return Running
+```
+
+`MoveLCommand::update()` 的职责：
+
+```text
+profile.Update()
+s = profile.position()
+pose_cmd = sample Cartesian path by s
+q_cmd = solve IK with q_last as seed
+ctx.setJointTargets(q_cmd)
+
+if IK failed during execution: return Failed or request safe stop
+if stopping && profile.IsStopCompleted(): return Stopped
+if pausing && profile.IsStopped(): return Paused
+if profile.HasReachedTarget(): return Finished
+return Running
+```
+
+`JogCommand` 的典型内部结构：
+
+```cpp
+class JogCommand : public MotionCommand {
+public:
+    bool supportsPause() const override { return false; }
+    bool supportsResume() const override { return false; }
+    bool supportsStop() const override { return true; }
+
+private:
+    JogDirection direction_;
+    double velocity_;
+    bool stopping_{false};
+};
+```
+
+`JogCommand::update()` 的职责：
+
+```text
+if not stopping:
+    compute next jog target or velocity command
+    ctx.setJointTargets(...) or ctx.setJointVelocities(...)
+    return Running
+
+if stopping:
+    ramp velocity down
+    if velocity reaches 0: return Stopped
+    return Running
+```
+
+Command 的禁止事项：
+
+- 不直接调用 FSM `process_event()`。
+- 不直接调用 `enterRunning()` / `enterStopped()`。
+- 不直接持有完整 `Robot*`，除非处于迁移阶段。
+- 不在 `prepare()` 里启动不可回滚的硬件运动。
 
 典型子类：
 
@@ -134,6 +439,96 @@ stop token / cancellation token
 ```
 
 实现初期可以先用轻量包装，内部仍转发到 `Robot`，后续再逐步收窄权限。
+
+建议 MotionContext 分成只读状态、规划服务、控制输出、同步等待四类能力。
+
+```cpp
+class MotionContext {
+public:
+    // 只读状态
+    int jointCount() const;
+    std::vector<double> jointPositions() const;
+    std::vector<double> jointVelocities() const;
+    ModeOfOperation jointMode(int id) const;
+    bool isEnabled() const;
+    KDL::Frame flangePose() const;
+
+    // 限制与配置
+    std::vector<double> maxJointVelocity() const;
+    std::vector<double> maxJointAcceleration() const;
+    std::vector<double> maxJointJerk() const;
+    double controlPeriod() const;
+
+    // 规划服务
+    bool solveIk(const KDL::Frame& pose,
+                 const KDL::JntArray& seed,
+                 KDL::JntArray& q_out);
+    bool forwardKinematics(const KDL::JntArray& q,
+                           KDL::Frame& pose_out);
+
+    // 控制输出
+    void setJointPosition(int id, double position);
+    void setJointVelocity(int id, double velocity);
+    void setJointTargets(const KDL::JntArray& q);
+    void setJointVelocities(const KDL::JntArray& dq);
+
+    // 控制同步
+    void waitControlCycle();
+
+    // 日志与错误
+    Logger::logger_ptr logger();
+};
+```
+
+MotionContext 的价值：
+
+- 限制 command 能访问的范围，避免 command 依赖 `Robot` 的全部内部字段。
+- 让 MoveJCommand、MoveLCommand 可以单独测试。
+- 后续替换硬件、仿真或离线测试时，只需要替换 context。
+- 让 executor 可以统一注入 cancel token、pause token、task id、logger。
+
+迁移阶段可以先这样实现：
+
+```cpp
+class RobotMotionContext : public MotionContext {
+public:
+    explicit RobotMotionContext(Robot& robot);
+
+private:
+    Robot& robot_;
+};
+```
+
+但应把 `RobotMotionContext` 作为唯一持有 `Robot&` 的适配层，command 不直接接触 `Robot&`。
+
+线程安全建议：
+
+- `jointPositions()`、`flangePose()` 等读取应复用现有 `Robot::mtx` 或新增清晰的状态锁。
+- `setJointTargets()` 应只在运动控制线程调用。
+- `waitControlCycle()` 应封装 `hw_interface_->waitForSignal(0)`。
+- `isEnabled()` 可以作为 command 每周期安全检查，硬件异常由 executor 转成 `ERROR_STATE`。
+
+MotionContext 与现有代码的对应关系：
+
+```text
+ctx.jointPositions()
+  -> Robot::pos_
+
+ctx.jointMode(id)
+  -> joints_[id]->getMode()
+
+ctx.setJointPosition(id, q)
+  -> joints_[id]->setPosition(q)
+
+ctx.setJointVelocity(id, dq)
+  -> joints_[id]->setVelocity(dq)
+
+ctx.waitControlCycle()
+  -> hw_interface_->waitForSignal(0)
+
+ctx.solveIk(...)
+  -> kinematics_.CartToJnt(...)
+```
 
 ### UnitIntervalMotionProfile
 
