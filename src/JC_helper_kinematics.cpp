@@ -3158,6 +3158,10 @@ namespace JC_helper
                     //                    PLOG_INFO << "笛卡尔空间急停已完成";
                     break;
                 }
+                else if (res == 0) // OTG Finished，无急停请求，正常结束
+                {
+                    break;
+                }
             }
             t_stop = std::chrono::high_resolution_clock::now();
             duration = (t_stop - t_start);
