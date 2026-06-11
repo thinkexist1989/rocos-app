@@ -62,7 +62,8 @@ flowchart TD
     Server[RobotHttpServer]
     Robot[Robot 门面 API]
     Executor[MotionExecutor]
-    FSM[Boost.SML FSM]
+    FSM[Boost.SML FSM<br/>唯一机器人状态源]
+    TaskStatus[MotionTaskStatus<br/>任务查询状态]
     Current[Current MotionCommand]
     Context[MotionContext]
     Profile[UnitIntervalMotionProfile]
@@ -78,8 +79,9 @@ flowchart TD
     Robot -->|submit MoveJCommand / MoveLCommand / JogCommand| Executor
     Robot -->|pause / resume / stop| Executor
 
-    Executor -->|process EventStartReq / EventPauseReq / EventStopReq| FSM
-    FSM -->|accepted / rejected| Executor
+    Executor -->|询问: EventStartReq / EventPauseReq / EventStopReq 是否合法| FSM
+    FSM -->|accepted / rejected + current robot state| Executor
+    Executor -->|更新任务视角: Accepted / Running / Finished / Failed| TaskStatus
 
     Executor -->|prepare/start/update/pause/resume/stop| Current
     Executor -->|passes controlled access| Context
@@ -99,7 +101,8 @@ flowchart TD
 这张图表达三个关键隔离点：
 
 - FSM 只接收事件，不调用 MoveJ/MoveL 细节。
-- MotionExecutor 只调度当前 command，不知道轨迹如何采样。
+- MotionExecutor 只调度当前 command，并使用 FSM 判断动作是否合法。
+- MotionTaskStatus 只是任务查询状态，不替代 FSM 的机器人状态。
 - MotionCommand 通过 MotionContext 访问底层资源，不直接拥有完整 `Robot` 控制权。
 
 ### MotionExecutor
@@ -118,6 +121,8 @@ MotionExecutor 是运动任务调度器，每个 `Robot` 建议持有一个 exec
 
 MotionExecutor 知道“当前有一个任务”，但不关心任务是 MoveJ 还是 MoveL。
 
+FSM 是唯一的机器人运动状态源。MotionExecutor 不维护 `STOPPED/RUNNING/PAUSED` 这类机器人状态，避免出现两个状态源互相矛盾。Executor 只维护任务管理数据，例如当前 command、task id、任务查询状态、worker 线程状态和最后一次错误。
+
 建议把 MotionExecutor 设计成“运动生命周期所有权”的唯一持有者：
 
 ```text
@@ -130,20 +135,9 @@ MotionExecutor
   references MotionContext
 ```
 
-它内部可以维护如下状态：
+它内部可以维护如下任务状态和结果码：
 
 ```cpp
-enum class ExecutorState {
-    Idle,
-    Starting,
-    Running,
-    Pausing,
-    Paused,
-    Continuing,
-    Stopping,
-    Error
-};
-
 enum class MotionResultCode {
     Ok,
     Busy,
@@ -155,6 +149,17 @@ enum class MotionResultCode {
     HardwareFault
 };
 
+enum class MotionTaskStatus {
+    None,
+    Accepted,
+    Running,
+    Paused,
+    Stopping,
+    Finished,
+    Failed,
+    Cancelled
+};
+
 enum class MotionStepStatus {
     Running,
     Paused,
@@ -164,7 +169,20 @@ enum class MotionStepStatus {
 };
 ```
 
-其中 `ExecutorState` 不一定必须独立存在；如果 FSM 已经能可靠查询当前状态，executor 可以只保存 command 和 task 状态。保留 executor state 的好处是 HTTP task 查询更直接，缺点是需要避免和 FSM 状态重复失真。
+`MotionTaskStatus` 只服务于 HTTP task 查询和 executor 清理逻辑，不参与机器人状态流转判断。判断“当前能不能 start/pause/resume/stop”必须问 FSM，而不是看 `MotionTaskStatus`。
+
+例子：
+
+```text
+FSM = STOPPED, task_status = Finished
+  -> 合法：机器人已停止，上一条任务完成。
+
+FSM = ERROR_STATE, task_status = Failed
+  -> 合法：机器人处于错误态，上一条任务失败。
+
+FSM = RUNNING, task_status = Running
+  -> 合法：当前任务正在占用机器人。
+```
 
 建议公开接口：
 
@@ -178,14 +196,15 @@ public:
     MotionResult stop();
 
     MotionTaskStatus currentTaskStatus() const;
+    std::string currentRobotState() const;
     bool hasActiveCommand() const;
 
 private:
     void workerLoop();
     void finishCurrentCommand(MotionStepStatus status);
-    MotionResult transitionToRunning();
-    MotionResult transitionToStopped();
-    MotionResult transitionToError(MotionResultCode reason);
+    MotionResult notifyStartAccepted();
+    MotionResult notifyStopCompleted();
+    MotionResult notifyError(MotionResultCode reason);
 };
 ```
 
@@ -195,7 +214,7 @@ private:
 submit(command)
   -> command 非空检查
   -> current command 是否为空
-  -> FSM 是否允许 START
+  -> FSM 是否允许 EventStartReq
   -> command.prepare(ctx)
   -> command.start(ctx)
   -> 启动 workerLoop
@@ -242,7 +261,7 @@ stop()
 
 - `submit/pause/resume/stop` 可能来自 HTTP 线程。
 - `workerLoop` 在运动线程或实时控制循环中运行。
-- executor 对 `current_command_`、task 状态、请求标志必须加锁或使用原子状态。
+- executor 对 `current_command_`、`task_status_`、请求标志必须加锁或使用原子状态。
 - 不建议在持有 executor mutex 时调用可能阻塞的底层硬件函数。
 - FSM 的 `process_event()` 已有递归锁保护，但 executor 仍应把自身状态保护好。
 
@@ -259,6 +278,8 @@ private:
     std::atomic<bool> worker_running_{false};
     std::string current_task_id_;
     MotionTaskStatus task_status_;
+    MotionResultCode last_result_{MotionResultCode::Ok};
+    std::string last_error_message_;
 };
 ```
 
