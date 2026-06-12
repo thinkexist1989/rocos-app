@@ -1,6 +1,6 @@
 # Motion FSM, Executor, Command 技术设计
 
-本文档整理机器人运动状态机与底层运动控制的解耦设计。目标是让 FSM 只负责状态流转，让 MoveJ、MoveL、点动等运动实现只负责运动细节，中间通过 MotionExecutor 和 MotionCommand 统一调度。
+本文档整理机器人运动状态机与底层运动控制的解耦设计。目标是让 FSM 只负责状态流转，让 MoveJ、MoveL、点动等运动实现只负责运动参考生成，让 MotionController 决定如何控制和下发，整体由 MotionExecutor 统一调度。
 
 **运动中失败先由 Command 报告失败类型，Executor 根据失败类型决定“安全停止回 STOPPED”还是“进入 ERROR_STATE”；FSM 只表达最终机器人状态，任务失败原因保存在 MotionTaskStatus/last_error 里。**
 
@@ -19,6 +19,9 @@ HTTP/API 层
   -> MotionExecutor
   -> FSM
   -> MotionCommand
+  -> MotionReference
+  -> MotionController
+  -> LowLevelCommand
   -> MotionProgressController / 底层控制循环
 ```
 
@@ -67,6 +70,10 @@ flowchart TD
     FSM[Boost.SML FSM<br/>唯一机器人状态源]
     TaskStatus[MotionTaskStatus<br/>任务查询状态]
     Current[Current MotionCommand]
+    Model[ModelProvider<br/>Kinematics + Dynamics]
+    Controller[Active MotionController]
+    Ref[MotionReference]
+    LowCmd[LowLevelCommand]
     Context[MotionContext]
     Progress[MotionProgressController<br/>封装 UnitIntervalMotionProfile]
     Sampler[Path Sampler / IK Sampler]
@@ -87,14 +94,21 @@ flowchart TD
 
     Executor -->|prepare/start/update/pause/resume/stop| Current
     Executor -->|passes controlled access| Context
+    Executor -->|active controller dispatch| Controller
     Current --> Context
+    Controller --> Context
+    Current --> Model
+    Controller --> Model
 
     Executor -->|finite path command: start/pause/resume/stop/update| Progress
     Progress -->|s / s_dot / s_ddot| Executor
     Executor -->|sample by s| Current
     Current -->|Path Sampler / IK Sampler| Sampler
-    Sampler -->|q_cmd / pose_cmd -> q_cmd| Current
-    Current -->|set target| HW
+    Sampler -->|q_ref / pose_ref| Current
+    Current -->|produces| Ref
+    Ref -->|consumed by| Controller
+    Controller -->|computes| LowCmd
+    LowCmd -->|write| Context
     Context --> HW
     HW -->|waitForSignal/read state| Context
 
@@ -108,7 +122,9 @@ flowchart TD
 - MotionExecutor 只调度当前 command，并使用 FSM 判断动作是否合法。
 - MotionTaskStatus 只是任务查询状态，不替代 FSM 的机器人状态。
 - MotionProgressController 属于当前运动生命周期，由 executor 统一管理；command 不各自持有 profile。
-- MotionCommand 通过 MotionContext 访问底层资源，不直接拥有完整 `Robot` 控制权。
+- MotionCommand 生成 `MotionReference`，不直接下发关节目标。
+- MotionController 消费 `MotionReference`，结合模型和实际状态生成 `LowLevelCommand`。
+- MotionContext 负责实际状态读取和底层命令下发，不让 command/controller 直接拥有完整 `Robot` 控制权。
 
 ### MotionExecutor
 
@@ -133,12 +149,14 @@ FSM 是唯一的机器人运动状态源。MotionExecutor 不维护 `STOPPED/RUN
 ```text
 MotionExecutor
   owns current command
+  owns/selects active MotionController
   owns one MotionProgressController for the current finite path task
   owns/uses motion worker thread
   owns current task id / task state
   owns stop/pause/resume request coordination
   references FSM gateway
   references MotionContext
+  references ModelProvider
 ```
 
 它内部可以维护如下任务状态和结果码：
@@ -278,7 +296,9 @@ class MotionExecutor {
 private:
     mutable std::mutex mutex_;
     std::unique_ptr<MotionCommand> current_;
+    std::unique_ptr<MotionController> active_controller_;
     MotionContext& ctx_;
+    ModelProvider& model_;
     RobotFsmGateway& fsm_;
     MotionProgressController progress_;
     std::unique_ptr<std::thread> worker_;
@@ -291,6 +311,168 @@ private:
 ```
 
 `RobotFsmGateway` 可以是对现有 `Robot::Impl::process_event()` 的薄包装，避免 executor 直接依赖 Boost.SML 类型。
+
+### ModelProvider
+
+`ModelProvider` 是只读模型服务，供 `MotionCommand` 和 `MotionController` 共同使用。它不直接读写硬件，也不管理状态机。
+
+```cpp
+class ModelProvider {
+public:
+    KinematicsAdapter& kinematics();
+    DynamicsAdapter& dynamics();
+};
+```
+
+建议职责：
+
+```text
+KinematicsAdapter
+  -> FK
+  -> IK
+  -> Jacobian
+  -> singularity / reachability check
+
+DynamicsAdapter
+  -> M(q)
+  -> C(q, q_dot)
+  -> G(q)
+  -> Lambda(q)
+  -> torque feasibility / feedforward terms
+```
+
+`MotionCommand` 主要使用运动学模型做路径采样、IK、FK、奇异性检查和路径预览。`MotionController` 会同时使用运动学和动力学模型做前馈计算、阻抗成型、雅可比映射、重力补偿和力矩约束检查。
+
+### MotionReference 与 LowLevelCommand
+
+`MotionReference` 是 command 到 controller 的中间数据。它表示“希望机器人跟踪什么参考”，不是底层下发命令。
+
+```cpp
+enum class ReferenceSpace : uint8_t {
+    None = 0,
+    Joint = 1,
+    Cartesian = 2,
+    Both = 3
+};
+
+struct JointReference {
+    KDL::JntArray q;
+    KDL::JntArray q_dot;
+    KDL::JntArray q_ddot;
+};
+
+struct CartesianReference {
+    KDL::Frame pose;
+    KDL::Twist twist;
+    KDL::Twist acceleration;
+};
+
+struct MotionReference {
+    ReferenceSpace space{ReferenceSpace::None};
+    std::optional<JointReference> joint;
+    std::optional<CartesianReference> cartesian;
+};
+```
+
+`LowLevelCommand` 是 controller 到 hardware/context 的输出，表示“本周期最终下发什么”。
+
+```cpp
+struct LowLevelCommand {
+    std::optional<KDL::JntArray> target_position;
+    std::optional<KDL::JntArray> target_velocity;
+    std::optional<KDL::JntArray> target_torque;
+};
+```
+
+核心边界：
+
+```text
+MotionCommand
+  -> 生成 MotionReference
+
+MotionController
+  -> 消费 MotionReference
+  -> 生成 LowLevelCommand
+
+MotionContext
+  -> 下发 LowLevelCommand
+```
+
+### MotionController
+
+`MotionController` 是控制律和下发策略的抽象。代码上建议使用基类 + 子类，`Robot` 或 `MotionExecutor` 支持切换当前控制器类型。
+
+```cpp
+enum class ControllerType {
+    JointPosition,
+    JointImpedance,
+    CartesianSpace,
+    CartesianImpedance
+};
+
+enum class ComplianceSpace {
+    None,
+    Joint,
+    Cartesian
+};
+
+class MotionController {
+public:
+    virtual ~MotionController() = default;
+
+    virtual ControllerType type() const = 0;
+    virtual ReferenceSpace acceptedReferenceSpace() const = 0;
+    virtual ComplianceSpace complianceSpace() const = 0;
+
+    virtual MotionResult activate(MotionContext& ctx,
+                                  ModelProvider& model) = 0;
+
+    virtual MotionStepResult update(MotionContext& ctx,
+                                    ModelProvider& model,
+                                    const MotionReference& ref,
+                                    LowLevelCommand& out) = 0;
+
+    virtual MotionResult deactivate(MotionContext& ctx) = 0;
+};
+```
+
+典型子类：
+
+```text
+JointPositionController
+JointImpedanceController
+CartesianSpaceController
+CartesianImpedanceController
+```
+
+控制器切换约束：
+
+- 只建议在 `IDLE` 或 `STOPPED` 下切换控制器。
+- `RUNNING`、`PAUSED`、`PAUSING`、`STOPPING` 中不允许切换。
+- `ERROR_STATE` 下是否允许切换，应由 reset 流程统一决定。
+
+`ReferenceSpace` 和 `ComplianceSpace` 是两个不同维度，不能混为一谈：
+
+```text
+ReferenceSpace
+  -> 轨迹参考在哪个空间表达：Joint / Cartesian / Both
+
+ComplianceSpace
+  -> 柔顺或阻抗在哪个空间定义：Joint / Cartesian
+```
+
+因此，笛卡尔阻抗控制器不一定只能消费 CartesianReference。它也可以消费 JointReference，并将笛卡尔刚度动态映射到关节空间执行。
+
+例如，当控制器配置了笛卡尔刚度 `K_x` 和阻尼 `D_x`，但收到纯关节参考 `q_d` 时，可以用当前雅可比 `J(q)` 做瞬态映射：
+
+```text
+K_q = J(q)^T K_x J(q)
+D_q = J(q)^T D_x J(q)
+
+tau = K_q (q_d - q) + D_q (q_dot_d - q_dot) + G(q)
+```
+
+这避免了 `MoveJ -> FK -> CartesianReference -> CartesianController 再反算` 的冗余链路。此时 MoveJ 仍然是关节空间轨迹，只是柔顺性由笛卡尔刚度映射决定。
 
 ### MotionCommand
 
@@ -329,16 +511,19 @@ public:
         return {};
     }
 
-    // 有限路径 command 根据共享进度 s 采样底层目标。
-    virtual MotionStepResult sample(MotionContext& ctx,
-                                    double s,
-                                    double s_dot,
-                                    double s_ddot) {
-        return MotionStepResult{
-            MotionStepStatus::Failed,
-            MotionResultCode::Unsupported,
-            "sample is unsupported by this command"
-        };
+    // command 声明自己能产生哪类 reference，executor 用它和 controller 能力做匹配。
+    virtual ReferenceSpace producedReferenceSpace() const {
+        return ReferenceSpace::None;
+    }
+
+    // 有限路径 command 根据共享进度 s 生成 MotionReference，不直接下发硬件。
+    virtual MotionSampleResult sample(MotionContext& ctx,
+                                      ModelProvider& model,
+                                      double s,
+                                      double s_dot,
+                                      double s_ddot,
+                                      ReferenceSpace required) {
+        return MotionSampleResult::unsupported("sample is unsupported by this command");
     }
 
     // pause/resume/stop 不直接操作 FSM。有限路径 command 通常不需要重写 pause/resume。
@@ -362,6 +547,15 @@ struct MotionStepResult {
     MotionResultCode code;
     std::string message;
 };
+
+struct MotionSampleResult {
+    MotionStepStatus status;
+    MotionResultCode code;
+    std::string message;
+    MotionReference reference;
+
+    static MotionSampleResult unsupported(const std::string& message);
+};
 ```
 
 Command 生命周期：
@@ -384,11 +578,14 @@ Constructed
 class MoveJCommand : public MotionCommand {
 public:
     bool usesProgressController() const override { return true; }
+    ReferenceSpace producedReferenceSpace() const override { return ReferenceSpace::Both; }
     MotionProfileLimits profileLimits(MotionContext& ctx) const override;
-    MotionStepResult sample(MotionContext& ctx,
-                            double s,
-                            double s_dot,
-                            double s_ddot) override;
+    MotionSampleResult sample(MotionContext& ctx,
+                              ModelProvider& model,
+                              double s,
+                              double s_dot,
+                              double s_ddot,
+                              ReferenceSpace required) override;
 
 private:
     KDL::JntArray q_start_;
@@ -402,20 +599,28 @@ private:
 ```text
 q_cmd = q_start + s * (q_goal - q_start)
 q_dot_cmd = s_dot * (q_goal - q_start)
-ctx.setJointTargets(q_cmd)
 
-return Running
+if required includes Cartesian:
+    pose_cmd = FK(q_cmd)
+
+return MotionReference:
+    joint = q_cmd / q_dot_cmd / q_ddot_cmd
+    cartesian = pose_cmd if requested
 ```
 
 `MoveLCommand::sample()` 的职责：
 
 ```text
 pose_cmd = sample Cartesian path by s
-q_cmd = solve IK with q_last as seed
-ctx.setJointTargets(q_cmd)
+
+if required includes Joint:
+    q_cmd = IK(pose_cmd, q_last)
 
 if IK failed during execution: return Failed or request safe stop
-return Running
+
+return MotionReference:
+    cartesian = pose_cmd
+    joint = q_cmd if requested
 ```
 
 有限路径 command 不负责判断 `progress.reachedTarget()`、`progress.stopped()` 或 `progress.stopCompleted()`。这些状态由 executor 的共享 `MotionProgressController` 统一判断。这样 MoveJ、MoveL、MoveC 的 pause/resume/stop 逻辑不会重复。
@@ -441,7 +646,7 @@ private:
 ```text
 if not stopping:
     compute next jog target or velocity command
-    ctx.setJointTargets(...) or ctx.setJointVelocities(...)
+    produce LowLevelCommand directly, or use a jog-specific controller path
     return Running
 
 if stopping:
@@ -471,7 +676,7 @@ IdentifyCommand
 
 ### MotionContext
 
-MotionContext 是 command 访问机器人底层资源的受控上下文，避免 command 到处持有完整 `Robot*`。
+MotionContext 是 executor/controller 访问机器人运行时状态和底层硬件输出的受控上下文，避免 command/controller 到处持有完整 `Robot*`。
 
 可能包含：
 
@@ -480,16 +685,15 @@ joint count
 joint current position/velocity
 joint mode
 joint limits
-kinematics solver
 hardware waitForSignal
-set joint target position/velocity
+write low-level joint command
 logger
 stop token / cancellation token
 ```
 
 实现初期可以先用轻量包装，内部仍转发到 `Robot`，后续再逐步收窄权限。
 
-建议 MotionContext 分成只读状态、规划服务、控制输出、同步等待四类能力。
+建议 MotionContext 分成只读状态、控制输出、同步等待三类能力。FK、IK、Jacobian、Dynamics 由 `ModelProvider` 提供，不再放在 MotionContext。
 
 ```cpp
 class MotionContext {
@@ -508,18 +712,12 @@ public:
     std::vector<double> maxJointJerk() const;
     double controlPeriod() const;
 
-    // 规划服务
-    bool solveIk(const KDL::Frame& pose,
-                 const KDL::JntArray& seed,
-                 KDL::JntArray& q_out);
-    bool forwardKinematics(const KDL::JntArray& q,
-                           KDL::Frame& pose_out);
-
     // 控制输出
     void setJointPosition(int id, double position);
     void setJointVelocity(int id, double velocity);
     void setJointTargets(const KDL::JntArray& q);
     void setJointVelocities(const KDL::JntArray& dq);
+    void writeLowLevelCommand(const LowLevelCommand& command);
 
     // 控制同步
     void waitControlCycle();
@@ -531,7 +729,7 @@ public:
 
 MotionContext 的价值：
 
-- 限制 command 能访问的范围，避免 command 依赖 `Robot` 的全部内部字段。
+- 限制 command/controller 能访问的范围，避免它们依赖 `Robot` 的全部内部字段。
 - 让 MoveJCommand、MoveLCommand 可以单独测试。
 - 后续替换硬件、仿真或离线测试时，只需要替换 context。
 - 让 executor 可以统一注入 cancel token、pause token、task id、logger。
@@ -553,7 +751,8 @@ private:
 线程安全建议：
 
 - `jointPositions()`、`flangePose()` 等读取应复用现有 `Robot::mtx` 或新增清晰的状态锁。
-- `setJointTargets()` 应只在运动控制线程调用。
+- `setJointTargets()` / `writeLowLevelCommand()` 应只在运动控制线程调用。
+- command 不应直接调用控制输出接口；底层输出应由 controller 生成 `LowLevelCommand` 后通过 context 写入。
 - `waitControlCycle()` 应封装 `hw_interface_->waitForSignal(0)`。
 - `isEnabled()` 可以作为 command 每周期安全检查，硬件异常由 executor 转成 `ERROR_STATE`。
 
@@ -575,8 +774,11 @@ ctx.setJointVelocity(id, dq)
 ctx.waitControlCycle()
   -> hw_interface_->waitForSignal(0)
 
-ctx.solveIk(...)
+model.kinematics().solveIk(...)
   -> kinematics_.CartToJnt(...)
+
+model.kinematics().forward(...)
+  -> kinematics_.JntToCart(...)
 ```
 
 ### MotionProgressController
@@ -663,16 +865,16 @@ s_ddot = acceleration()
 
 ## Sampler 的含义
 
-Sampler 是将 `s` 映射到底层控制目标的组件。它可以是独立类，也可以只是 command 内部函数。
+Sampler 是将 `s` 映射成 `MotionReference` 的组件。它可以是独立类，也可以只是 command 内部函数。Sampler 不直接下发硬件，也不决定使用位置控制、阻抗控制还是力矩控制。
 
 ### MoveJ Sampler
 
 MoveJ 在关节空间插值：
 
 ```text
-q_cmd = q_start + s * (q_goal - q_start)
-qdot_cmd = s_dot * (q_goal - q_start)
-qddot_cmd = s_ddot * (q_goal - q_start)
+q_ref = q_start + s * (q_goal - q_start)
+q_dot_ref = s_dot * (q_goal - q_start)
+q_ddot_ref = s_ddot * (q_goal - q_start)
 ```
 
 ### CartesianPathSampler
@@ -682,8 +884,8 @@ CartesianPathSampler 表示笛卡尔路径采样。
 MoveL 示例：
 
 ```text
-p_cmd = p_start + s * (p_goal - p_start)
-R_cmd = slerp(R_start, R_goal, s)
+pose_ref.p = p_start + s * (p_goal - p_start)
+pose_ref.M = slerp(R_start, R_goal, s)
 ```
 
 MoveC 示例：
@@ -697,16 +899,190 @@ pose_cmd = sample circle arc by s
 IKSampler 表示从笛卡尔位姿求关节目标：
 
 ```text
-q_cmd = IK(pose_cmd, q_seed)
+q_ref = IK(pose_ref, q_seed)
 ```
 
 MoveL 可以先实现成一个合并版 `MoveLSampler`，内部同时做笛卡尔采样和 IK：
 
 ```text
-s -> pose_cmd -> q_cmd
+s -> pose_ref -> q_ref
 ```
 
 不要求一开始就拆成多个类。
+
+## 轨迹空间与控制器组合场景
+
+MoveJ、MoveL 描述的是路径或参考轨迹类型；JointPosition、JointImpedance、CartesianImpedance 描述的是控制律或柔顺性。两者不应一一绑定。
+
+### MoveJ + JointPositionController
+
+语义：
+
+```text
+关节轨迹 + 关节位置控制
+```
+
+运行逻辑：
+
+```text
+MoveJCommand.sample()
+  -> 生成 JointReference(q_d, q_dot_d, q_ddot_d)
+
+JointPositionController.update()
+  -> 消费 JointReference
+  -> LowLevelCommand.target_position = q_d
+  -> 可选 target_velocity = q_dot_d
+
+MotionContext.writeLowLevelCommand()
+  -> joints[i]->setPosition(...)
+```
+
+这是 MoveJ 最直接的执行方式，适合 CSP/CSV 等关节伺服模式。
+
+### MoveJ + JointImpedanceController
+
+语义：
+
+```text
+关节轨迹 + 关节刚度
+```
+
+运行逻辑：
+
+```text
+MoveJCommand.sample()
+  -> 生成 JointReference(q_d, q_dot_d, q_ddot_d)
+
+JointImpedanceController.update()
+  -> 消费 JointReference
+  -> 使用关节刚度 K_q 和阻尼 D_q
+  -> tau = K_q (q_d - q) + D_q (q_dot_d - q_dot) + G(q)
+  -> LowLevelCommand.target_torque = tau
+```
+
+这里轨迹仍然是关节空间路径，只是跟踪方式从刚性位置跟踪变成关节阻抗。
+
+### MoveJ + CartesianImpedanceController
+
+语义：
+
+```text
+关节轨迹 + 笛卡尔刚度映射到关节空间
+```
+
+不建议为了适配 CartesianImpedanceController 强行执行：
+
+```text
+q_d -> FK -> x_d -> Cartesian controller 再反算
+```
+
+这会造成资源计算冗余，也会混淆 MoveJ 的语义。更合理的是保持 MoveJ 输出 `JointReference(q_d)`，由 CartesianImpedanceController 将笛卡尔刚度映射成当前构型下的关节空间等效刚度：
+
+```text
+J = J(q)
+K_q = J^T K_x J
+D_q = J^T D_x J
+
+tau = K_q (q_d - q) + D_q (q_dot_d - q_dot) + G(q)
+```
+
+此时：
+
+```text
+MoveJCommand
+  -> 只负责关节轨迹 q_d
+
+CartesianImpedanceController
+  -> 使用 K_x / D_x 定义末端柔顺性
+  -> 使用 J(q) 动态映射成 K_q / D_q
+  -> 输出关节力矩或等效关节命令
+```
+
+这体现了“轨迹空间”和“柔顺空间”的解耦：路径是关节空间，柔顺性可以按笛卡尔空间定义。
+
+### MoveL + JointPositionController
+
+语义：
+
+```text
+笛卡尔路径采样 + IK 得到 q_d + 关节位置控制
+```
+
+运行逻辑：
+
+```text
+MoveLCommand.sample()
+  -> 根据 s 采样 pose_d
+  -> IK(pose_d, q_seed) 得到 q_d
+  -> 生成 JointReference(q_d) 和可选 CartesianReference(pose_d)
+
+JointPositionController.update()
+  -> 消费 JointReference
+  -> LowLevelCommand.target_position = q_d
+```
+
+这是最接近当前实现的 MoveL 路径：MoveL 保证末端路径，控制器仍然用关节位置模式执行。
+
+### MoveL + JointImpedanceController
+
+语义：
+
+```text
+笛卡尔路径采样 + IK 得到 q_d + 关节阻抗控制
+```
+
+运行逻辑：
+
+```text
+MoveLCommand.sample()
+  -> 根据 s 采样 pose_d
+  -> IK(pose_d, q_seed) 得到 q_d
+  -> 生成 JointReference(q_d, q_dot_d, q_ddot_d) 和可选 CartesianReference(pose_d)
+
+JointImpedanceController.update()
+  -> 消费 JointReference
+  -> 使用关节刚度 K_q 和阻尼 D_q
+  -> tau = K_q (q_d - q) + D_q (q_dot_d - q_dot) + G(q)
+  -> LowLevelCommand.target_torque = tau
+```
+
+这说明 MoveL 不等于必须使用笛卡尔控制器。MoveL 描述末端路径，执行方式可以仍然是关节阻抗，只要 command 提供可消费的 `JointReference`。
+
+### MoveL + CartesianImpedanceController
+
+语义：
+
+```text
+笛卡尔路径 pose_d + 笛卡尔阻抗控制
+```
+
+运行逻辑：
+
+```text
+MoveLCommand.sample()
+  -> 根据 s 采样 pose_d / twist_d
+  -> 生成 CartesianReference(pose_d, twist_d)
+
+CartesianImpedanceController.update()
+  -> 消费 CartesianReference
+  -> 计算当前 x = FK(q), x_dot = J(q) q_dot
+  -> F = K_x (x_d - x) + D_x (x_dot_d - x_dot)
+  -> tau = J(q)^T F + G(q)
+  -> LowLevelCommand.target_torque = tau
+```
+
+这种组合下，MoveL 不需要先 IK 成 q_d；控制器直接在笛卡尔空间闭环跟踪 pose_d。若控制器实现需要关节前馈，也可以由 ModelProvider 提供 IK/Jacobian/Dynamics，但这属于 controller 内部策略。
+
+### 组合规则
+
+Executor 启动任务前应检查 command 和 controller 的能力是否匹配：
+
+```text
+command.producedReferenceSpace()
+  intersects controller.acceptedReferenceSpace()
+```
+
+如果不匹配，任务应在 STARTING 阶段被拒绝并回到 STOPPED，不进入 RUNNING。
 
 ## 能力声明
 
@@ -759,7 +1135,9 @@ submit(command)
   -> FSM: STOPPED -> STARTING
   -> command.prepare()
   -> if prepare failed: EventStopReq or EventErrorOccurred
+  -> check active_controller accepts command.producedReferenceSpace()
   -> command.start()
+  -> active_controller.activate(ctx, model)
   -> if command.usesProgressController(): progress.start(command.profileLimits(ctx))
   -> FSM: STARTING -> RUNNING
   -> executor control loop starts
@@ -771,28 +1149,46 @@ submit(command)
 while command active:
   if command.usesProgressController():
       progress.update()
-      result = command.sample(ctx, progress.s(), progress.sDot(), progress.sDDot())
+      sample = command.sample(ctx,
+                              model,
+                              progress.s(),
+                              progress.sDot(),
+                              progress.sDDot(),
+                              active_controller.acceptedReferenceSpace())
+      result = sample.status
 
       if progress.hasError(): result = Failed
       if stopping && progress.stopCompleted(): result = Stopped
       if pausing && progress.stopped(): result = Paused
       if progress.reachedTarget(): result = Finished
 
+      if result == Running:
+          controller_result = active_controller.update(ctx, model, sample.reference, low_level)
+          if controller_result.status == Failed:
+              result = Failed
+          else:
+              ctx.writeLowLevelCommand(low_level)
+
   else:
+      // 连续任务可选择自定义 update；例如 JogCommand 可直接生成低层命令，
+      // 或后续扩展为 command.updateReference() + controller.update()。
       result = command.update(ctx)
 
   if result == Running:
-      hw.waitForSignal(0)
+      ctx.waitControlCycle()
 
   if result == Finished:
+      active_controller.deactivate(ctx)
       FSM: RUNNING -> STOPPING -> STOPPED
       clear current command
 
   if result == Stopped:
+      active_controller.deactivate(ctx)
       FSM: STOPPING -> STOPPED
       clear current command
 
   if result == Failed:
+      active_controller.deactivate(ctx)
       FSM: * -> ERROR_STATE
       clear current command
 ```
@@ -808,7 +1204,7 @@ pause()
   -> FSM: RUNNING -> PAUSING
   -> if finite path command: progress.pause()
   -> else: command.pause()
-  -> control loop continues updating until progress or command reports Paused
+  -> control loop continues updating until command reports Paused
   -> FSM: PAUSING -> PAUSED
 ```
 
@@ -839,7 +1235,7 @@ stop()
   -> FSM: RUNNING/PAUSED -> STOPPING
   -> if finite path command: progress.stop()
   -> else: command.stop()
-  -> control loop continues updating until progress or command reports Stopped
+  -> control loop continues updating until command reports Stopped
   -> FSM: STOPPING -> STOPPED
   -> clear current command
 ```
@@ -867,9 +1263,10 @@ stop()
   -> control loop:
        - progress.update()
        - s = progress.s()
-       - MoveJCommand.sample(ctx, s, s_dot, s_ddot)
-       - q_cmd = q_start + s * (q_goal - q_start)
-       - joints[i].setPosition(q_cmd[i])
+       - MoveJCommand.sample(ctx, model, s, s_dot, s_ddot, active_controller.acceptedReferenceSpace())
+       - produces MotionReference, usually JointReference(q_d)
+       - active_controller.update(ctx, model, reference, low_level)
+       - ctx.writeLowLevelCommand(low_level)
        - waitForSignal(0)
   -> progress.reachedTarget()
   -> command reports Finished
@@ -898,11 +1295,10 @@ stop()
   -> control loop:
        - progress.update()
        - s = progress.s()
-       - MoveLCommand.sample(ctx, s, s_dot, s_ddot)
-       - pose_cmd = sample linear position and slerp rotation
-       - q_cmd = IK(pose_cmd, q_last)
-       - joints[i].setPosition(q_cmd[i])
-       - q_last = q_cmd
+       - MoveLCommand.sample(ctx, model, s, s_dot, s_ddot, active_controller.acceptedReferenceSpace())
+       - produces CartesianReference(pose_d) and/or JointReference(q_d)
+       - active_controller.update(ctx, model, reference, low_level)
+       - ctx.writeLowLevelCommand(low_level)
        - waitForSignal(0)
   -> progress.reachedTarget()
   -> FSM: RUNNING -> STOPPING -> STOPPED
@@ -923,9 +1319,9 @@ current command = MoveJCommand
   -> MotionExecutor progress.pause()
   -> control loop continues:
        - progress.update()
-       - MoveJCommand.sample(ctx, s, s_dot, s_ddot)
-       - q_cmd = q_start + s * delta_q
-       - setPosition(q_cmd)
+       - MoveJCommand.sample(ctx, model, s, s_dot, s_ddot, active_controller.acceptedReferenceSpace())
+       - active_controller.update(ctx, model, reference, low_level)
+       - ctx.writeLowLevelCommand(low_level)
        - waitForSignal(0)
   -> progress.stopped() == true
   -> command reports Paused
@@ -949,8 +1345,9 @@ progress.s() = s_pause
   -> control loop:
        - progress.update()
        - s 从 s_pause 继续到 1
-       - MoveJCommand.sample(ctx, s, s_dot, s_ddot)
-       - q_cmd = q_start + s * delta_q
+       - MoveJCommand.sample(ctx, model, s, s_dot, s_ddot, active_controller.acceptedReferenceSpace())
+       - active_controller.update(ctx, model, reference, low_level)
+       - ctx.writeLowLevelCommand(low_level)
   -> finished
   -> FSM: RUNNING -> STOPPING -> STOPPED
 ```
@@ -966,8 +1363,8 @@ pause:
   -> usesProgressController() == true
   -> FSM: RUNNING -> PAUSING
   -> progress.pause()
-  -> control loop keeps sampling pose by current s
-  -> IK continues with q_last seed
+  -> control loop keeps sampling reference by current s
+  -> active_controller continues consuming MotionReference and writing LowLevelCommand
   -> progress.stopped()
   -> FSM: PAUSING -> PAUSED
 
@@ -978,7 +1375,8 @@ resume:
   -> progress.resume()
   -> FSM: CONTINUING -> RUNNING
   -> s continues to 1
-  -> pose_cmd continues along same Cartesian path
+  -> MoveLCommand keeps producing MotionReference along same Cartesian path
+  -> active_controller continues tracking it
   -> finished
   -> FSM: RUNNING -> STOPPING -> STOPPED
 ```
@@ -997,8 +1395,9 @@ current command = MoveJCommand
   -> MotionExecutor progress.stop()
   -> control loop continues:
        - progress.update()
-       - MoveJCommand.sample(ctx, s, s_dot, s_ddot)
-       - q_cmd follows deceleration
+       - MoveJCommand.sample(ctx, model, s, s_dot, s_ddot, active_controller.acceptedReferenceSpace())
+       - active_controller.update(ctx, model, reference, low_level)
+       - ctx.writeLowLevelCommand(low_level)
   -> progress.stopCompleted()
   -> command reports Stopped
   -> FSM: STOPPING -> STOPPED
@@ -1037,8 +1436,8 @@ progress.stopped() == true
   -> JogCommand.usesProgressController() == false
   -> FSM: STARTING -> RUNNING
   -> control loop:
-       - compute next q_cmd or velocity command
-       - setPosition/setVelocity
+       - compute next jog LowLevelCommand or jog-specific reference
+       - ctx.writeLowLevelCommand(...)
        - waitForSignal(0)
   -> keeps running until stop request
 ```
