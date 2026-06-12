@@ -19,10 +19,10 @@ HTTP/API 层
   -> MotionExecutor
   -> FSM
   -> MotionCommand
-  -> UnitIntervalMotionProfile / 底层控制循环
+  -> MotionProgressController / 底层控制循环
 ```
 
-说明：`UnitIntervalMotionProfile` 已经提供 Start、Pause、Resume、Stop、Update 等能力，但当前主 `Robot::MoveJ/MoveL` 执行路径还没有完全接入它。本文档描述的是建议的目标架构和迁移顺序。
+说明：`UnitIntervalMotionProfile` 已经提供 Start、Pause、Resume、Stop、Update 等能力，但当前主 `Robot::MoveJ/MoveL` 执行路径还没有完全接入它。本文档建议不要让每个 Move command 各自持有 profile，而是由 `MotionExecutor` 持有一个共享的 `MotionProgressController`，其内部封装一个 `UnitIntervalMotionProfile`。有限路径 command 只负责提供 profile limits 和按 `s` 采样目标。
 
 ## 核心角色
 
@@ -68,7 +68,7 @@ flowchart TD
     TaskStatus[MotionTaskStatus<br/>任务查询状态]
     Current[Current MotionCommand]
     Context[MotionContext]
-    Profile[UnitIntervalMotionProfile]
+    Progress[MotionProgressController<br/>封装 UnitIntervalMotionProfile]
     Sampler[Path Sampler / IK Sampler]
     HW[Drive / HardwareInterface]
 
@@ -89,8 +89,10 @@ flowchart TD
     Executor -->|passes controlled access| Context
     Current --> Context
 
-    Current -->|finite path command| Profile
-    Current -->|sample by s| Sampler
+    Executor -->|finite path command: start/pause/resume/stop/update| Progress
+    Progress -->|s / s_dot / s_ddot| Executor
+    Executor -->|sample by s| Current
+    Current -->|Path Sampler / IK Sampler| Sampler
     Sampler -->|q_cmd / pose_cmd -> q_cmd| Current
     Current -->|set target| HW
     Context --> HW
@@ -105,6 +107,7 @@ flowchart TD
 - FSM 只接收事件，不调用 MoveJ/MoveL 细节。
 - MotionExecutor 只调度当前 command，并使用 FSM 判断动作是否合法。
 - MotionTaskStatus 只是任务查询状态，不替代 FSM 的机器人状态。
+- MotionProgressController 属于当前运动生命周期，由 executor 统一管理；command 不各自持有 profile。
 - MotionCommand 通过 MotionContext 访问底层资源，不直接拥有完整 `Robot` 控制权。
 
 ### MotionExecutor
@@ -130,6 +133,7 @@ FSM 是唯一的机器人运动状态源。MotionExecutor 不维护 `STOPPED/RUN
 ```text
 MotionExecutor
   owns current command
+  owns one MotionProgressController for the current finite path task
   owns/uses motion worker thread
   owns current task id / task state
   owns stop/pause/resume request coordination
@@ -276,6 +280,7 @@ private:
     std::unique_ptr<MotionCommand> current_;
     MotionContext& ctx_;
     RobotFsmGateway& fsm_;
+    MotionProgressController progress_;
     std::unique_ptr<std::thread> worker_;
     std::atomic<bool> worker_running_{false};
     std::string current_task_id_;
@@ -310,13 +315,33 @@ public:
     // prepare 只做启动前检查和规划准备。失败通常不进入 ERROR_STATE。
     virtual MotionResult prepare(MotionContext& ctx) = 0;
 
-    // start 激活内部控制器，例如 UnitIntervalMotionProfile::Start。
+    // start 激活 command 自身资源。有限路径进度由 executor 的 MotionProgressController 管理。
     virtual MotionResult start(MotionContext& ctx) = 0;
 
     // update 每个控制周期调用一次。返回任务当前进展。
     virtual MotionStepResult update(MotionContext& ctx) = 0;
 
-    // pause/resume/stop 只改变 command 内部控制器状态，不直接操作 FSM。
+    // 有限路径 command 使用共享 MotionProgressController；连续任务如 Jog 返回 false。
+    virtual bool usesProgressController() const { return false; }
+
+    // 有限路径 command 提供单位区间进度规划的限制。
+    virtual MotionProfileLimits profileLimits(MotionContext& ctx) const {
+        return {};
+    }
+
+    // 有限路径 command 根据共享进度 s 采样底层目标。
+    virtual MotionStepResult sample(MotionContext& ctx,
+                                    double s,
+                                    double s_dot,
+                                    double s_ddot) {
+        return MotionStepResult{
+            MotionStepStatus::Failed,
+            MotionResultCode::Unsupported,
+            "sample is unsupported by this command"
+        };
+    }
+
+    // pause/resume/stop 不直接操作 FSM。有限路径 command 通常不需要重写 pause/resume。
     virtual MotionResult pause(MotionContext& ctx) {
         return MotionResult::Unsupported;
     }
@@ -345,7 +370,11 @@ Command 生命周期：
 Constructed
   -> prepare(ctx)
   -> start(ctx)
-  -> update(ctx) repeated
+  -> if usesProgressController():
+         executor progress.update()
+         sample(ctx, s, s_dot, s_ddot) repeated
+     else:
+         update(ctx) repeated
   -> Finished / Paused / Stopped / Failed
 ```
 
@@ -353,46 +382,43 @@ Constructed
 
 ```cpp
 class MoveJCommand : public MotionCommand {
+public:
+    bool usesProgressController() const override { return true; }
+    MotionProfileLimits profileLimits(MotionContext& ctx) const override;
+    MotionStepResult sample(MotionContext& ctx,
+                            double s,
+                            double s_dot,
+                            double s_ddot) override;
+
 private:
     KDL::JntArray q_start_;
     KDL::JntArray q_goal_;
     KDL::JntArray q_cmd_;
-    UnitIntervalMotionProfile profile_;
-    bool stopping_{false};
-    bool pausing_{false};
 };
 ```
 
-`MoveJCommand::update()` 的职责：
+`MoveJCommand::sample()` 的职责：
 
 ```text
-profile.Update()
-s = profile.position()
 q_cmd = q_start + s * (q_goal - q_start)
+q_dot_cmd = s_dot * (q_goal - q_start)
 ctx.setJointTargets(q_cmd)
 
-if profile.HasError(): return Failed
-if stopping && profile.IsStopCompleted(): return Stopped
-if pausing && profile.IsStopped(): return Paused
-if profile.HasReachedTarget(): return Finished
 return Running
 ```
 
-`MoveLCommand::update()` 的职责：
+`MoveLCommand::sample()` 的职责：
 
 ```text
-profile.Update()
-s = profile.position()
 pose_cmd = sample Cartesian path by s
 q_cmd = solve IK with q_last as seed
 ctx.setJointTargets(q_cmd)
 
 if IK failed during execution: return Failed or request safe stop
-if stopping && profile.IsStopCompleted(): return Stopped
-if pausing && profile.IsStopped(): return Paused
-if profile.HasReachedTarget(): return Finished
 return Running
 ```
+
+有限路径 command 不负责判断 `progress.reachedTarget()`、`progress.stopped()` 或 `progress.stopCompleted()`。这些状态由 executor 的共享 `MotionProgressController` 统一判断。这样 MoveJ、MoveL、MoveC 的 pause/resume/stop 逻辑不会重复。
 
 `JogCommand` 的典型内部结构：
 
@@ -553,6 +579,68 @@ ctx.solveIk(...)
   -> kinematics_.CartToJnt(...)
 ```
 
+### MotionProgressController
+
+`MotionProgressController` 是 executor 持有的当前有限路径进度控制器。它是 `UnitIntervalMotionProfile` 的语义包装，整个 `Robot` 同一时间最多只有一个正在执行的有限路径任务，因此一个 executor 只需要一个 progress controller。
+
+建议接口：
+
+```cpp
+class MotionProgressController {
+public:
+    void reset();
+    MotionResult start(const MotionProfileLimits& limits);
+    MotionResult pause();
+    MotionResult resume();
+    MotionResult stop();
+    MotionResult update();
+
+    double s() const;
+    double sDot() const;
+    double sDDot() const;
+
+    bool isActive() const;
+    bool hasError() const;
+    bool reachedTarget() const;
+    bool stopped() const;
+    bool stopCompleted() const;
+
+private:
+    UnitIntervalMotionProfile profile_;
+};
+```
+
+`MotionProgressController` 的职责：
+
+- 统一管理 finite path motion 的 `s/s_dot/s_ddot`。
+- 统一处理 Start/Pause/Resume/Stop。
+- 统一判断 reached target、paused、stop completed、profile error。
+- 向 executor 暴露进度查询，方便实现 `/api/move/status` 或 `/api/move/progress`。
+
+它不负责：
+
+- 不采样 MoveJ/MoveL 轨迹。
+- 不求 IK。
+- 不直接设置 joint target。
+- 不直接操作 FSM。
+
+有限路径 command 和 progress controller 的分工：
+
+```text
+MotionProgressController
+  -> 负责 s 怎么走
+
+MoveJCommand / MoveLCommand / MoveCCommand
+  -> 负责给定 s 后输出什么目标
+```
+
+连续任务如 `JogCommand` 不使用 progress controller：
+
+```text
+JogCommand.usesProgressController() == false
+Executor.workerLoop() 直接调用 JogCommand.update(ctx)
+```
+
 ### UnitIntervalMotionProfile
 
 `UnitIntervalMotionProfile` 是一维单位区间进度规划器。它不表示 MoveJ 或 MoveL，而是表示路径进度 `s`。
@@ -571,7 +659,7 @@ s_ddot = acceleration()
 - `Stop()`：从当前 `s_dot` 平滑减速到 0，并标记 stop completed。
 - `Update()`：每个控制周期推进一次。
 
-它适合作为 MoveJ、MoveL、MoveC 等有限路径运动的共用进度控制器。
+它适合作为 MoveJ、MoveL、MoveC 等有限路径运动的共用底层进度规划器，但建议由 `MotionProgressController` 统一持有和封装，而不是由每个 command 各自持有。
 
 ## Sampler 的含义
 
@@ -672,15 +760,26 @@ submit(command)
   -> command.prepare()
   -> if prepare failed: EventStopReq or EventErrorOccurred
   -> command.start()
+  -> if command.usesProgressController(): progress.start(command.profileLimits(ctx))
   -> FSM: STARTING -> RUNNING
-  -> executor control loop calls command.update()
+  -> executor control loop starts
 ```
 
 ### 控制周期
 
 ```text
 while command active:
-  result = command.update(ctx)
+  if command.usesProgressController():
+      progress.update()
+      result = command.sample(ctx, progress.s(), progress.sDot(), progress.sDDot())
+
+      if progress.hasError(): result = Failed
+      if stopping && progress.stopCompleted(): result = Stopped
+      if pausing && progress.stopped(): result = Paused
+      if progress.reachedTarget(): result = Finished
+
+  else:
+      result = command.update(ctx)
 
   if result == Running:
       hw.waitForSignal(0)
@@ -704,10 +803,12 @@ while command active:
 pause()
   -> require current command
   -> require current command supports pause
+  -> require current command uses progress controller, or command has custom pause()
   -> require FSM accepts EventPauseReq
   -> FSM: RUNNING -> PAUSING
-  -> command.pause()
-  -> control loop continues updating until command reports Paused
+  -> if finite path command: progress.pause()
+  -> else: command.pause()
+  -> control loop continues updating until progress or command reports Paused
   -> FSM: PAUSING -> PAUSED
 ```
 
@@ -719,9 +820,11 @@ pause()
 resume()
   -> require current command
   -> require current command supports resume
+  -> require current command uses progress controller, or command has custom resume()
   -> require FSM accepts EventContinueReq
   -> FSM: PAUSED -> CONTINUING
-  -> command.resume()
+  -> if finite path command: progress.resume()
+  -> else: command.resume()
   -> FSM: CONTINUING -> RUNNING
   -> control loop continues updating
 ```
@@ -734,8 +837,9 @@ stop()
   -> require current command supports stop
   -> require FSM accepts EventStopReq
   -> FSM: RUNNING/PAUSED -> STOPPING
-  -> command.stop()
-  -> control loop continues updating until command reports Stopped
+  -> if finite path command: progress.stop()
+  -> else: command.stop()
+  -> control loop continues updating until progress or command reports Stopped
   -> FSM: STOPPING -> STOPPED
   -> clear current command
 ```
@@ -757,16 +861,17 @@ stop()
        - save q_start and q_goal
        - compute profile limits from joint limits
   -> MoveJCommand.start()
-       - profile.Reset()
-       - profile.Start(max_s_dot, max_s_ddot, max_s_jerk)
+       - command resources are ready
+  -> MotionExecutor progress.start(MoveJCommand.profileLimits(ctx))
   -> FSM: STARTING -> RUNNING
   -> control loop:
-       - profile.Update()
-       - s = profile.position()
+       - progress.update()
+       - s = progress.s()
+       - MoveJCommand.sample(ctx, s, s_dot, s_ddot)
        - q_cmd = q_start + s * (q_goal - q_start)
        - joints[i].setPosition(q_cmd[i])
        - waitForSignal(0)
-  -> profile.HasReachedTarget()
+  -> progress.reachedTarget()
   -> command reports Finished
   -> FSM: RUNNING -> STOPPING -> STOPPED
   -> task finished
@@ -787,18 +892,19 @@ stop()
        - compute path length and rotation angle
        - compute unit interval profile limits
   -> MoveLCommand.start()
-       - profile.Reset()
-       - profile.Start(...)
+       - command resources are ready
+  -> MotionExecutor progress.start(MoveLCommand.profileLimits(ctx))
   -> FSM: STARTING -> RUNNING
   -> control loop:
-       - profile.Update()
-       - s = profile.position()
+       - progress.update()
+       - s = progress.s()
+       - MoveLCommand.sample(ctx, s, s_dot, s_ddot)
        - pose_cmd = sample linear position and slerp rotation
        - q_cmd = IK(pose_cmd, q_last)
        - joints[i].setPosition(q_cmd[i])
        - q_last = q_cmd
        - waitForSignal(0)
-  -> profile.HasReachedTarget()
+  -> progress.reachedTarget()
   -> FSM: RUNNING -> STOPPING -> STOPPED
   -> task finished
 ```
@@ -812,15 +918,16 @@ current command = MoveJCommand
 上位机 POST /api/move/pause
   -> MotionExecutor::pause()
   -> MoveJCommand.supportsPause() == true
+  -> MoveJCommand.usesProgressController() == true
   -> FSM: RUNNING -> PAUSING
-  -> MoveJCommand.pause()
-       - profile.Pause()
+  -> MotionExecutor progress.pause()
   -> control loop continues:
-       - profile.Update()
+       - progress.update()
+       - MoveJCommand.sample(ctx, s, s_dot, s_ddot)
        - q_cmd = q_start + s * delta_q
        - setPosition(q_cmd)
        - waitForSignal(0)
-  -> profile.IsStopped() == true
+  -> progress.stopped() == true
   -> command reports Paused
   -> FSM: PAUSING -> PAUSED
 ```
@@ -830,18 +937,19 @@ current command = MoveJCommand
 ```text
 当前 FSM = PAUSED
 current command = MoveJCommand
-profile.position() = s_pause
+progress.s() = s_pause
 
 上位机 POST /api/move/resume
   -> MotionExecutor::resume()
   -> MoveJCommand.supportsResume() == true
+  -> MoveJCommand.usesProgressController() == true
   -> FSM: PAUSED -> CONTINUING
-  -> MoveJCommand.resume()
-       - profile.Resume()
+  -> MotionExecutor progress.resume()
   -> FSM: CONTINUING -> RUNNING
   -> control loop:
-       - profile.Update()
+       - progress.update()
        - s 从 s_pause 继续到 1
+       - MoveJCommand.sample(ctx, s, s_dot, s_ddot)
        - q_cmd = q_start + s * delta_q
   -> finished
   -> FSM: RUNNING -> STOPPING -> STOPPED
@@ -855,17 +963,19 @@ current command = MoveLCommand
 
 pause:
   -> supportsPause() == true
+  -> usesProgressController() == true
   -> FSM: RUNNING -> PAUSING
-  -> profile.Pause()
+  -> progress.pause()
   -> control loop keeps sampling pose by current s
   -> IK continues with q_last seed
-  -> profile.IsStopped()
+  -> progress.stopped()
   -> FSM: PAUSING -> PAUSED
 
 resume:
   -> supportsResume() == true
+  -> usesProgressController() == true
   -> FSM: PAUSED -> CONTINUING
-  -> profile.Resume()
+  -> progress.resume()
   -> FSM: CONTINUING -> RUNNING
   -> s continues to 1
   -> pose_cmd continues along same Cartesian path
@@ -882,13 +992,14 @@ current command = MoveJCommand
 上位机 POST /api/move/stop
   -> MotionExecutor::stop()
   -> MoveJCommand.supportsStop() == true
+  -> MoveJCommand.usesProgressController() == true
   -> FSM: RUNNING -> STOPPING
-  -> MoveJCommand.stop()
-       - profile.Stop()
+  -> MotionExecutor progress.stop()
   -> control loop continues:
-       - profile.Update()
+       - progress.update()
+       - MoveJCommand.sample(ctx, s, s_dot, s_ddot)
        - q_cmd follows deceleration
-  -> profile.IsStopCompleted()
+  -> progress.stopCompleted()
   -> command reports Stopped
   -> FSM: STOPPING -> STOPPED
 ```
@@ -898,14 +1009,13 @@ current command = MoveJCommand
 ```text
 当前 FSM = PAUSED
 current command = MoveJCommand
-profile.IsStopped() == true
+progress.stopped() == true
 
 上位机 POST /api/move/stop
   -> MotionExecutor::stop()
   -> FSM: PAUSED -> STOPPING
-  -> MoveJCommand.stop()
-       - profile.Stop()
-       - because profile is already stopped, stop completes immediately
+  -> MotionExecutor progress.stop()
+       - because progress is already stopped, stop completes immediately
   -> command reports Stopped
   -> FSM: STOPPING -> STOPPED
 ```
@@ -924,6 +1034,7 @@ profile.IsStopped() == true
        - check velocity limits
        - save jog direction and velocity
   -> JogCommand.start()
+  -> JogCommand.usesProgressController() == false
   -> FSM: STARTING -> RUNNING
   -> control loop:
        - compute next q_cmd or velocity command
@@ -984,13 +1095,14 @@ current command = JogCommand
 
 ### 场景 12：相对距离点动
 
-如果点动接口是“移动固定相对距离”，例如关节 +0.01 rad，则它本质上是小型 MoveJ，可以复用 `UnitIntervalMotionProfile`。
+如果点动接口是“移动固定相对距离”，例如关节 +0.01 rad，则它本质上是小型 MoveJ，可以复用 executor 的共享 `MotionProgressController`。
 
 ```text
 上位机 POST /api/jog/step
   -> q_goal = q_current + delta
   -> create StepJogCommand
-  -> StepJogCommand uses UnitIntervalMotionProfile
+  -> StepJogCommand.usesProgressController() == true
+  -> MotionExecutor progress.start(StepJogCommand.profileLimits(ctx))
   -> supportsPause/resume can be true or false, based on product semantics
   -> if treated as finite motion:
        STOPPED -> STARTING -> RUNNING -> STOPPING -> STOPPED
@@ -1195,11 +1307,13 @@ GET  /api/move/status?task_id=...
 - 让 `Robot::MoveJ/MoveL` 创建 command 并提交 executor。
 - 暂时可以让 command 内部复用现有规划/执行代码。
 
-### 阶段 2：接入 UnitIntervalMotionProfile
+### 阶段 2：接入 MotionProgressController
 
-- 将 MoveJ 改为 `UnitIntervalMotionProfile + JointSampler`。
-- 将 MoveL 改为 `UnitIntervalMotionProfile + MoveLSampler`。
-- 暂停/继续/停止统一由 profile 完成。
+- 新增 `MotionProgressController`，由 `MotionExecutor` 持有一个共享实例。
+- `MotionProgressController` 内部封装 `UnitIntervalMotionProfile`。
+- 将 MoveJ 改为 `MoveJCommand::profileLimits() + MoveJCommand::sample(s)`。
+- 将 MoveL 改为 `MoveLCommand::profileLimits() + MoveLCommand::sample(s)`。
+- 暂停/继续/停止统一由 executor 调用 `progress.pause()/resume()/stop()` 完成。
 
 ### 阶段 3：点动和拖拽示教 command 化
 
@@ -1218,7 +1332,8 @@ GET  /api/move/status?task_id=...
 - FSM 只管状态，不管轨迹。
 - Executor 只管生命周期，不管轨迹细节。
 - Command 只管具体运动，不直接改 FSM。
-- UnitIntervalMotionProfile 只管路径进度，不知道机器人状态。
+- MotionProgressController 只管当前有限路径任务的路径进度，不知道机器人状态。
+- UnitIntervalMotionProfile 是 MotionProgressController 的底层实现细节。
 - Pause/Resume 能力由 command 声明，executor 统一拦截。
 - Stop 尽量幂等，并优先平滑停止。
 - 参数错误和规划失败默认不进入 `ERROR_STATE`。
