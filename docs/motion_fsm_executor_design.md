@@ -2,6 +2,8 @@
 
 本文档整理机器人运动状态机与底层运动控制的解耦设计。目标是让 FSM 只负责状态流转，让 MoveJ、MoveL、点动等运动实现只负责运动细节，中间通过 MotionExecutor 和 MotionCommand 统一调度。
 
+**运动中失败先由 Command 报告失败类型，Executor 根据失败类型决定“安全停止回 STOPPED”还是“进入 ERROR_STATE”；FSM 只表达最终机器人状态，任务失败原因保存在 MotionTaskStatus/last_error 里。**
+
 ## 背景
 
 当前 `Robot::MoveJ`、`Robot::MoveL`、点动、拖拽示教等接口直接调用 `enterRunning()` 和 `enterStopped()`。这种方式能工作，但运动函数会直接参与状态机流转，导致两个问题：
