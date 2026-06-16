@@ -22,10 +22,10 @@ HTTP/API 层
   -> MotionReference
   -> MotionController
   -> LowLevelCommand
-  -> MotionProgressController / 底层控制循环
+  -> FiniteMotionCommand(UnitVelocityProfile) / 底层控制循环
 ```
 
-说明：`UnitIntervalMotionProfile` 已经提供 Start、Pause、Resume、Stop、Update 等能力，但当前主 `Robot::MoveJ/MoveL` 执行路径还没有完全接入它。本文档建议不要让每个 Move command 各自持有 profile，而是由 `MotionExecutor` 持有一个共享的 `MotionProgressController`，其内部封装一个 `UnitIntervalMotionProfile`。有限路径 command 只负责提供 profile limits 和按 `s` 采样目标。
+说明：`UnitVelocityProfile` 提供 Start、Pause、Resume、Stop、Update 等能力，适合作为有限路径运动的单位进度控制器。本文档建议不要把它放在最顶层 `MotionCommand`，而是放在 `FiniteMotionCommand` 基类中。MoveJ、MoveL、MoveC、StepJog 等有限路径命令继承 `FiniteMotionCommand`；连续点动 `JogCommand` 单独实现 `update()`，不携带有限路径 profile。这样既复用 profile，又不会让所有 command 都背上有限路径语义。
 
 ## 核心角色
 
@@ -75,7 +75,7 @@ flowchart TD
     Ref[MotionReference]
     LowCmd[LowLevelCommand]
     Context[MotionContext]
-    Progress[MotionProgressController<br/>封装 UnitIntervalMotionProfile]
+    Profile[FiniteMotionCommand<br/>UnitVelocityProfile]
     Sampler[Path Sampler / IK Sampler]
     HW[Drive / HardwareInterface]
 
@@ -100,9 +100,9 @@ flowchart TD
     Current --> Model
     Controller --> Model
 
-    Executor -->|finite path command: start/pause/resume/stop/update| Progress
-    Progress -->|s / s_dot / s_ddot| Executor
-    Executor -->|sample by s| Current
+    Current -->|finite path command owns| Profile
+    Profile -->|s / s_dot / s_ddot| Current
+    Current -->|sample by s| Sampler
     Current -->|Path Sampler / IK Sampler| Sampler
     Sampler -->|q_ref / pose_ref| Current
     Current -->|produces| Ref
@@ -121,7 +121,7 @@ flowchart TD
 - FSM 只接收事件，不调用 MoveJ/MoveL 细节。
 - MotionExecutor 只调度当前 command，并使用 FSM 判断动作是否合法。
 - MotionTaskStatus 只是任务查询状态，不替代 FSM 的机器人状态。
-- MotionProgressController 属于当前运动生命周期，由 executor 统一管理；command 不各自持有 profile。
+- `UnitVelocityProfile` 属于 `FiniteMotionCommand` 基类；有限路径命令复用它，连续命令不携带它。
 - MotionCommand 生成 `MotionReference`，不直接下发关节目标。
 - MotionController 消费 `MotionReference`，结合模型和实际状态生成 `LowLevelCommand`。
 - MotionContext 负责实际状态读取和底层命令下发，不让 command/controller 直接拥有完整 `Robot` 控制权。
@@ -149,8 +149,7 @@ FSM 是唯一的机器人运动状态源。MotionExecutor 不维护 `STOPPED/RUN
 ```text
 MotionExecutor
   owns current command
-  owns/selects active MotionController
-  owns one MotionProgressController for the current finite path task
+  references active MotionController owned by Robot
   owns/uses motion worker thread
   owns current task id / task state
   owns stop/pause/resume request coordination
@@ -239,7 +238,7 @@ submit(command)
   -> command 非空检查
   -> current command 是否为空
   -> FSM 是否允许 EventStartReq
-  -> command.prepare(ctx)
+  -> command.prepare(ctx, model)
   -> command.start(ctx)
   -> 启动 workerLoop
   -> 返回 task_id 或错误
@@ -296,11 +295,10 @@ class MotionExecutor {
 private:
     mutable std::mutex mutex_;
     std::unique_ptr<MotionCommand> current_;
-    std::unique_ptr<MotionController> active_controller_;
+    MotionController* active_controller_{nullptr};  // owned by Robot
     MotionContext& ctx_;
     ModelProvider& model_;
     RobotFsmGateway& fsm_;
-    MotionProgressController progress_;
     std::unique_ptr<std::thread> worker_;
     std::atomic<bool> worker_running_{false};
     std::string current_task_id_;
@@ -311,6 +309,63 @@ private:
 ```
 
 `RobotFsmGateway` 可以是对现有 `Robot::Impl::process_event()` 的薄包装，避免 executor 直接依赖 Boost.SML 类型。
+
+### Robot 指针与所有权边界
+
+`Robot*` 不应在 `MotionExecutor`、`MoveJCommand`、`MoveLCommand`、`MotionController` 中到处传播。推荐的所有权和指针规则：
+
+```text
+Robot
+  owns RobotMotionContext
+  owns RobotModelProvider
+  owns RobotFsmGateway
+  owns MotionExecutor
+  owns controller registry / active MotionController
+
+MotionExecutor
+  holds MotionContext&
+  holds ModelProvider&
+  holds RobotFsmGateway&
+  holds MotionController* or MotionController&  // controller owned by Robot
+  owns current MotionCommand
+
+MotionCommand
+  no Robot*
+  reads snapshots in prepare(ctx, model)
+
+MotionController
+  no Robot*
+  reads state through MotionContext
+  reads model through ModelProvider
+```
+
+也就是说，`Robot` 指针只放在适配层：
+
+```text
+RobotMotionContext
+RobotModelProvider
+RobotFsmGateway
+```
+
+`MoveJCommand` 需要当前关节角、当前速度、当前末端姿态时，不保存 `Robot*`，而是在 `prepare(ctx, model)` 中读取快照：
+
+```text
+MoveJCommand::prepare(ctx, model)
+  -> q_start = ctx.jointPositions()
+  -> q_dot_start = ctx.jointVelocities()
+  -> flange_start = ctx.flangePose()
+  -> q_goal = user target
+  -> check limits / modes / profile limits
+```
+
+控制器切换由 `Robot` 管理，executor 只使用当前激活控制器：
+
+```text
+Robot::setController(type)
+  -> require FSM state is IDLE or STOPPED
+  -> create/select controller owned by Robot
+  -> executor.setActiveController(controller_ptr)
+```
 
 ### ModelProvider
 
@@ -404,10 +459,11 @@ MotionContext
 
 ```cpp
 enum class ControllerType {
-    JointPosition,
+    Position,
     JointImpedance,
-    CartesianSpace,
-    CartesianImpedance
+    JointAdmittance,
+    CartesianImpedance,
+    CartesianAdmittance
 };
 
 enum class ComplianceSpace {
@@ -439,10 +495,11 @@ public:
 典型子类：
 
 ```text
-JointPositionController
-JointImpedanceController
-CartesianSpaceController
-CartesianImpedanceController
+PositionController              位置控制器
+JointImpedanceController        基于关节扭矩的阻抗控制器
+JointAdmittanceController       基于关节扭矩的导纳控制器
+CartesianImpedanceController    基于关节力矩的笛卡尔阻抗控制器
+CartesianAdmittanceController   基于末端六维力的导纳控制器
 ```
 
 控制器切换约束：
@@ -495,38 +552,22 @@ public:
     virtual bool supportsStop() const { return true; }
 
     // prepare 只做启动前检查和规划准备。失败通常不进入 ERROR_STATE。
-    virtual MotionResult prepare(MotionContext& ctx) = 0;
+    virtual MotionResult prepare(MotionContext& ctx, ModelProvider& model) = 0;
 
-    // start 激活 command 自身资源。有限路径进度由 executor 的 MotionProgressController 管理。
+    // start 激活 command 自身资源。
     virtual MotionResult start(MotionContext& ctx) = 0;
 
     // update 每个控制周期调用一次。返回任务当前进展。
-    virtual MotionStepResult update(MotionContext& ctx) = 0;
-
-    // 有限路径 command 使用共享 MotionProgressController；连续任务如 Jog 返回 false。
-    virtual bool usesProgressController() const { return false; }
-
-    // 有限路径 command 提供单位区间进度规划的限制。
-    virtual MotionProfileLimits profileLimits(MotionContext& ctx) const {
-        return {};
-    }
+    virtual MotionStepResult update(MotionContext& ctx,
+                                    ModelProvider& model,
+                                    ReferenceSpace required) = 0;
 
     // command 声明自己能产生哪类 reference，executor 用它和 controller 能力做匹配。
     virtual ReferenceSpace producedReferenceSpace() const {
         return ReferenceSpace::None;
     }
 
-    // 有限路径 command 根据共享进度 s 生成 MotionReference，不直接下发硬件。
-    virtual MotionSampleResult sample(MotionContext& ctx,
-                                      ModelProvider& model,
-                                      double s,
-                                      double s_dot,
-                                      double s_ddot,
-                                      ReferenceSpace required) {
-        return MotionSampleResult::unsupported("sample is unsupported by this command");
-    }
-
-    // pause/resume/stop 不直接操作 FSM。有限路径 command 通常不需要重写 pause/resume。
+    // pause/resume/stop 不直接操作 FSM。
     virtual MotionResult pause(MotionContext& ctx) {
         return MotionResult::Unsupported;
     }
@@ -539,6 +580,56 @@ public:
 };
 ```
 
+有限路径命令通过 `FiniteMotionCommand` 复用 `UnitVelocityProfile`。这比把 profile 放进最顶层 `MotionCommand` 更清楚：Jog、拖拽示教等连续任务不会被迫携带有限路径状态，也不会降低封装。
+
+```cpp
+class FiniteMotionCommand : public MotionCommand {
+public:
+    bool supportsPause() const override { return true; }
+    bool supportsResume() const override { return true; }
+    bool supportsStop() const override { return true; }
+
+    MotionResult start(MotionContext& ctx) override {
+        profile_.Reset();
+        profile_.Start(profileLimits(ctx).max_velocity,
+                       profileLimits(ctx).max_acceleration,
+                       profileLimits(ctx).max_jerk);
+        return MotionResult::Ok;
+    }
+
+    MotionResult pause(MotionContext& ctx) override {
+        profile_.Pause();
+        return MotionResult::Ok;
+    }
+
+    MotionResult resume(MotionContext& ctx) override {
+        profile_.Resume();
+        return MotionResult::Ok;
+    }
+
+    MotionResult stop(MotionContext& ctx) override {
+        profile_.Stop();
+        return MotionResult::Ok;
+    }
+
+    MotionStepResult update(MotionContext& ctx,
+                            ModelProvider& model,
+                            ReferenceSpace required) override;
+
+protected:
+    virtual MotionProfileLimits profileLimits(MotionContext& ctx) const = 0;
+
+    virtual MotionSampleResult sample(MotionContext& ctx,
+                                      ModelProvider& model,
+                                      double s,
+                                      double s_dot,
+                                      double s_ddot,
+                                      ReferenceSpace required) = 0;
+
+    UnitVelocityProfile profile_;
+};
+```
+
 建议 `MotionStepResult` 携带错误信息：
 
 ```cpp
@@ -546,6 +637,7 @@ struct MotionStepResult {
     MotionStepStatus status;
     MotionResultCode code;
     std::string message;
+    std::optional<MotionReference> reference;
 };
 
 struct MotionSampleResult {
@@ -562,23 +654,24 @@ Command 生命周期：
 
 ```text
 Constructed
-  -> prepare(ctx)
+  -> prepare(ctx, model)
   -> start(ctx)
-  -> if usesProgressController():
-         executor progress.update()
+  -> if FiniteMotionCommand:
+         command.update(ctx, model, required) advances UnitVelocityProfile
          sample(ctx, s, s_dot, s_ddot) repeated
      else:
-         update(ctx) repeated
+         update(ctx, model, required) repeated
   -> Finished / Paused / Stopped / Failed
 ```
 
 有限路径 command 的典型内部结构：
 
 ```cpp
-class MoveJCommand : public MotionCommand {
+class MoveJCommand : public FiniteMotionCommand {
 public:
-    bool usesProgressController() const override { return true; }
     ReferenceSpace producedReferenceSpace() const override { return ReferenceSpace::Both; }
+
+protected:
     MotionProfileLimits profileLimits(MotionContext& ctx) const override;
     MotionSampleResult sample(MotionContext& ctx,
                               ModelProvider& model,
@@ -623,7 +716,7 @@ return MotionReference:
     joint = q_cmd if requested
 ```
 
-有限路径 command 不负责判断 `progress.reachedTarget()`、`progress.stopped()` 或 `progress.stopCompleted()`。这些状态由 executor 的共享 `MotionProgressController` 统一判断。这样 MoveJ、MoveL、MoveC 的 pause/resume/stop 逻辑不会重复。
+有限路径 command 的 pause/resume/stop 和 reachedTarget/stopped/stopCompleted 判断由 `FiniteMotionCommand` 基类统一处理。MoveJ、MoveL、MoveC 只实现 profile limits 和 sample 逻辑，避免重复。
 
 `JogCommand` 的典型内部结构：
 
@@ -781,71 +874,53 @@ model.kinematics().forward(...)
   -> kinematics_.JntToCart(...)
 ```
 
-### MotionProgressController
+### 是否保留 MotionProgressController
 
-`MotionProgressController` 是 executor 持有的当前有限路径进度控制器。它是 `UnitIntervalMotionProfile` 的语义包装，整个 `Robot` 同一时间最多只有一个正在执行的有限路径任务，因此一个 executor 只需要一个 progress controller。
-
-建议接口：
-
-```cpp
-class MotionProgressController {
-public:
-    void reset();
-    MotionResult start(const MotionProfileLimits& limits);
-    MotionResult pause();
-    MotionResult resume();
-    MotionResult stop();
-    MotionResult update();
-
-    double s() const;
-    double sDot() const;
-    double sDDot() const;
-
-    bool isActive() const;
-    bool hasError() const;
-    bool reachedTarget() const;
-    bool stopped() const;
-    bool stopCompleted() const;
-
-private:
-    UnitIntervalMotionProfile profile_;
-};
-```
-
-`MotionProgressController` 的职责：
-
-- 统一管理 finite path motion 的 `s/s_dot/s_ddot`。
-- 统一处理 Start/Pause/Resume/Stop。
-- 统一判断 reached target、paused、stop completed、profile error。
-- 向 executor 暴露进度查询，方便实现 `/api/move/status` 或 `/api/move/progress`。
-
-它不负责：
-
-- 不采样 MoveJ/MoveL 轨迹。
-- 不求 IK。
-- 不直接设置 joint target。
-- 不直接操作 FSM。
-
-有限路径 command 和 progress controller 的分工：
+本文档不再单独保留 `MotionProgressController`。原因是它会让 executor 同时管理任务生命周期和有限路径 profile 生命周期，边界容易变厚。更清晰的做法是：
 
 ```text
-MotionProgressController
-  -> 负责 s 怎么走
+MotionCommand
+  -> 顶层命令接口，不携带 UnitVelocityProfile
 
-MoveJCommand / MoveLCommand / MoveCCommand
-  -> 负责给定 s 后输出什么目标
+FiniteMotionCommand : MotionCommand
+  -> 有限路径命令基类
+  -> 内部持有 UnitVelocityProfile
+  -> 统一实现 start/pause/resume/stop/update profile
+
+JogCommand : MotionCommand
+  -> 连续点动命令
+  -> 不携带 UnitVelocityProfile
+  -> 单独实现 update()
 ```
 
-连续任务如 `JogCommand` 不使用 progress controller：
+这样不会降低封装。相反，它把有限路径语义限制在 `FiniteMotionCommand` 分支内，避免让 Jog、拖拽示教、伺服流式命令等连续任务也依赖 `UnitVelocityProfile`。
+
+Executor 不直接操作 `UnitVelocityProfile`，而是调用当前 command 的统一生命周期接口：
 
 ```text
-JogCommand.usesProgressController() == false
-Executor.workerLoop() 直接调用 JogCommand.update(ctx)
+submit:
+  -> command.start(ctx)
+
+pause:
+  -> command.pause(ctx)
+
+resume:
+  -> command.resume(ctx)
+
+stop:
+  -> command.stop(ctx)
+
+workerLoop:
+  -> command.update(ctx, model, active_controller.acceptedReferenceSpace())
 ```
 
-### UnitIntervalMotionProfile
+对于 `FiniteMotionCommand`，`update(ctx, model, required)` 内部推进 `UnitVelocityProfile`，再调用子类实现的 `sample(ctx, model, s, s_dot, s_ddot, required)`。
 
-`UnitIntervalMotionProfile` 是一维单位区间进度规划器。它不表示 MoveJ 或 MoveL，而是表示路径进度 `s`。
+对于 `JogCommand`，`update(ctx, model, required)` 走连续点动自己的逻辑，通常会忽略 `model/required` 或只使用其中很少一部分。
+
+### UnitVelocityProfile
+
+`UnitVelocityProfile` 是一维单位区间进度规划器。它不表示 MoveJ 或 MoveL，而是表示路径进度 `s`。
 
 ```text
 s = position()      当前路径进度，范围 0 到 1
@@ -861,7 +936,7 @@ s_ddot = acceleration()
 - `Stop()`：从当前 `s_dot` 平滑减速到 0，并标记 stop completed。
 - `Update()`：每个控制周期推进一次。
 
-它适合作为 MoveJ、MoveL、MoveC 等有限路径运动的共用底层进度规划器，但建议由 `MotionProgressController` 统一持有和封装，而不是由每个 command 各自持有。
+它适合作为 MoveJ、MoveL、MoveC、StepJog 等有限路径运动的共用底层进度规划器，建议由 `FiniteMotionCommand` 基类持有和封装。
 
 ## Sampler 的含义
 
@@ -912,9 +987,9 @@ s -> pose_ref -> q_ref
 
 ## 轨迹空间与控制器组合场景
 
-MoveJ、MoveL 描述的是路径或参考轨迹类型；JointPosition、JointImpedance、CartesianImpedance 描述的是控制律或柔顺性。两者不应一一绑定。
+MoveJ、MoveL 描述的是路径或参考轨迹类型；Position、JointImpedance、CartesianImpedance 描述的是控制律或柔顺性。两者不应一一绑定。
 
-### MoveJ + JointPositionController
+### MoveJ + PositionController
 
 语义：
 
@@ -928,7 +1003,7 @@ MoveJ、MoveL 描述的是路径或参考轨迹类型；JointPosition、JointImp
 MoveJCommand.sample()
   -> 生成 JointReference(q_d, q_dot_d, q_ddot_d)
 
-JointPositionController.update()
+PositionController.update()
   -> 消费 JointReference
   -> LowLevelCommand.target_position = q_d
   -> 可选 target_velocity = q_dot_d
@@ -1000,7 +1075,7 @@ CartesianImpedanceController
 
 这体现了“轨迹空间”和“柔顺空间”的解耦：路径是关节空间，柔顺性可以按笛卡尔空间定义。
 
-### MoveL + JointPositionController
+### MoveL + PositionController
 
 语义：
 
@@ -1016,7 +1091,7 @@ MoveLCommand.sample()
   -> IK(pose_d, q_seed) 得到 q_d
   -> 生成 JointReference(q_d) 和可选 CartesianReference(pose_d)
 
-JointPositionController.update()
+PositionController.update()
   -> 消费 JointReference
   -> LowLevelCommand.target_position = q_d
 ```
@@ -1133,12 +1208,13 @@ submit(command)
   -> if current command exists: return Busy
   -> if FSM cannot process EventStartReq: return InvalidState / Busy
   -> FSM: STOPPED -> STARTING
-  -> command.prepare()
+  -> command.prepare(ctx, model)
   -> if prepare failed: EventStopReq or EventErrorOccurred
   -> check active_controller accepts command.producedReferenceSpace()
-  -> command.start()
+  -> command.start(ctx)
   -> active_controller.activate(ctx, model)
-  -> if command.usesProgressController(): progress.start(command.profileLimits(ctx))
+  -> if command is FiniteMotionCommand:
+         UnitVelocityProfile is started inside command.start(ctx)
   -> FSM: STARTING -> RUNNING
   -> executor control loop starts
 ```
@@ -1147,32 +1223,25 @@ submit(command)
 
 ```text
 while command active:
-  if command.usesProgressController():
-      progress.update()
-      sample = command.sample(ctx,
-                              model,
-                              progress.s(),
-                              progress.sDot(),
-                              progress.sDDot(),
-                              active_controller.acceptedReferenceSpace())
-      result = sample.status
+  step = command.update(ctx, model, active_controller.acceptedReferenceSpace())
+  result = step.status
 
-      if progress.hasError(): result = Failed
-      if stopping && progress.stopCompleted(): result = Stopped
-      if pausing && progress.stopped(): result = Paused
-      if progress.reachedTarget(): result = Finished
+  if step.reference exists and result == Running:
+      controller_result = active_controller.update(ctx, model, step.reference, low_level)
+      if controller_result.status == Failed:
+          result = Failed
+      else:
+          ctx.writeLowLevelCommand(low_level)
 
-      if result == Running:
-          controller_result = active_controller.update(ctx, model, sample.reference, low_level)
-          if controller_result.status == Failed:
-              result = Failed
-          else:
-              ctx.writeLowLevelCommand(low_level)
+  if step.status == Failed:
+      result = Failed
 
-  else:
-      // 连续任务可选择自定义 update；例如 JogCommand 可直接生成低层命令，
-      // 或后续扩展为 command.updateReference() + controller.update()。
-      result = command.update(ctx)
+  // 对 FiniteMotionCommand：
+  //   update(ctx, model, required) 内部推进 UnitVelocityProfile，
+  //   再调用子类 sample(ctx, model, s, s_dot, s_ddot, required)。
+  //
+  // 对 JogCommand：
+  //   update(ctx, model, required) 走自己的连续点动逻辑，不依赖 UnitVelocityProfile。
 
   if result == Running:
       ctx.waitControlCycle()
@@ -1199,11 +1268,9 @@ while command active:
 pause()
   -> require current command
   -> require current command supports pause
-  -> require current command uses progress controller, or command has custom pause()
   -> require FSM accepts EventPauseReq
   -> FSM: RUNNING -> PAUSING
-  -> if finite path command: progress.pause()
-  -> else: command.pause()
+  -> command.pause(ctx)
   -> control loop continues updating until command reports Paused
   -> FSM: PAUSING -> PAUSED
 ```
@@ -1216,11 +1283,9 @@ pause()
 resume()
   -> require current command
   -> require current command supports resume
-  -> require current command uses progress controller, or command has custom resume()
   -> require FSM accepts EventContinueReq
   -> FSM: PAUSED -> CONTINUING
-  -> if finite path command: progress.resume()
-  -> else: command.resume()
+  -> command.resume(ctx)
   -> FSM: CONTINUING -> RUNNING
   -> control loop continues updating
 ```
@@ -1233,8 +1298,7 @@ stop()
   -> require current command supports stop
   -> require FSM accepts EventStopReq
   -> FSM: RUNNING/PAUSED -> STOPPING
-  -> if finite path command: progress.stop()
-  -> else: command.stop()
+  -> command.stop(ctx)
   -> control loop continues updating until command reports Stopped
   -> FSM: STOPPING -> STOPPED
   -> clear current command
@@ -1258,17 +1322,17 @@ stop()
        - compute profile limits from joint limits
   -> MoveJCommand.start()
        - command resources are ready
-  -> MotionExecutor progress.start(MoveJCommand.profileLimits(ctx))
+       - FiniteMotionCommand starts UnitVelocityProfile internally
   -> FSM: STARTING -> RUNNING
   -> control loop:
-       - progress.update()
-       - s = progress.s()
+       - MoveJCommand.update(ctx)
+       - FiniteMotionCommand advances UnitVelocityProfile internally
        - MoveJCommand.sample(ctx, model, s, s_dot, s_ddot, active_controller.acceptedReferenceSpace())
        - produces MotionReference, usually JointReference(q_d)
        - active_controller.update(ctx, model, reference, low_level)
        - ctx.writeLowLevelCommand(low_level)
        - waitForSignal(0)
-  -> progress.reachedTarget()
+  -> UnitVelocityProfile reaches target
   -> command reports Finished
   -> FSM: RUNNING -> STOPPING -> STOPPED
   -> task finished
@@ -1290,17 +1354,17 @@ stop()
        - compute unit interval profile limits
   -> MoveLCommand.start()
        - command resources are ready
-  -> MotionExecutor progress.start(MoveLCommand.profileLimits(ctx))
+       - FiniteMotionCommand starts UnitVelocityProfile internally
   -> FSM: STARTING -> RUNNING
   -> control loop:
-       - progress.update()
-       - s = progress.s()
+       - MoveLCommand.update(ctx)
+       - FiniteMotionCommand advances UnitVelocityProfile internally
        - MoveLCommand.sample(ctx, model, s, s_dot, s_ddot, active_controller.acceptedReferenceSpace())
        - produces CartesianReference(pose_d) and/or JointReference(q_d)
        - active_controller.update(ctx, model, reference, low_level)
        - ctx.writeLowLevelCommand(low_level)
        - waitForSignal(0)
-  -> progress.reachedTarget()
+  -> UnitVelocityProfile reaches target
   -> FSM: RUNNING -> STOPPING -> STOPPED
   -> task finished
 ```
@@ -1314,16 +1378,16 @@ current command = MoveJCommand
 上位机 POST /api/move/pause
   -> MotionExecutor::pause()
   -> MoveJCommand.supportsPause() == true
-  -> MoveJCommand.usesProgressController() == true
   -> FSM: RUNNING -> PAUSING
-  -> MotionExecutor progress.pause()
+  -> MoveJCommand.pause(ctx)
+       - FiniteMotionCommand calls UnitVelocityProfile.Pause()
   -> control loop continues:
-       - progress.update()
+       - MoveJCommand.update(ctx)
        - MoveJCommand.sample(ctx, model, s, s_dot, s_ddot, active_controller.acceptedReferenceSpace())
        - active_controller.update(ctx, model, reference, low_level)
        - ctx.writeLowLevelCommand(low_level)
        - waitForSignal(0)
-  -> progress.stopped() == true
+  -> UnitVelocityProfile velocity reaches 0
   -> command reports Paused
   -> FSM: PAUSING -> PAUSED
 ```
@@ -1333,17 +1397,17 @@ current command = MoveJCommand
 ```text
 当前 FSM = PAUSED
 current command = MoveJCommand
-progress.s() = s_pause
+UnitVelocityProfile position = s_pause
 
 上位机 POST /api/move/resume
   -> MotionExecutor::resume()
   -> MoveJCommand.supportsResume() == true
-  -> MoveJCommand.usesProgressController() == true
   -> FSM: PAUSED -> CONTINUING
-  -> MotionExecutor progress.resume()
+  -> MoveJCommand.resume(ctx)
+       - FiniteMotionCommand calls UnitVelocityProfile.Resume()
   -> FSM: CONTINUING -> RUNNING
   -> control loop:
-       - progress.update()
+       - MoveJCommand.update(ctx)
        - s 从 s_pause 继续到 1
        - MoveJCommand.sample(ctx, model, s, s_dot, s_ddot, active_controller.acceptedReferenceSpace())
        - active_controller.update(ctx, model, reference, low_level)
@@ -1360,19 +1424,19 @@ current command = MoveLCommand
 
 pause:
   -> supportsPause() == true
-  -> usesProgressController() == true
   -> FSM: RUNNING -> PAUSING
-  -> progress.pause()
+  -> MoveLCommand.pause(ctx)
+  -> UnitVelocityProfile.Pause()
   -> control loop keeps sampling reference by current s
   -> active_controller continues consuming MotionReference and writing LowLevelCommand
-  -> progress.stopped()
+  -> UnitVelocityProfile velocity reaches 0
   -> FSM: PAUSING -> PAUSED
 
 resume:
   -> supportsResume() == true
-  -> usesProgressController() == true
   -> FSM: PAUSED -> CONTINUING
-  -> progress.resume()
+  -> MoveLCommand.resume(ctx)
+  -> UnitVelocityProfile.Resume()
   -> FSM: CONTINUING -> RUNNING
   -> s continues to 1
   -> MoveLCommand keeps producing MotionReference along same Cartesian path
@@ -1390,15 +1454,15 @@ current command = MoveJCommand
 上位机 POST /api/move/stop
   -> MotionExecutor::stop()
   -> MoveJCommand.supportsStop() == true
-  -> MoveJCommand.usesProgressController() == true
   -> FSM: RUNNING -> STOPPING
-  -> MotionExecutor progress.stop()
+  -> MoveJCommand.stop(ctx)
+       - FiniteMotionCommand calls UnitVelocityProfile.Stop()
   -> control loop continues:
-       - progress.update()
+       - MoveJCommand.update(ctx)
        - MoveJCommand.sample(ctx, model, s, s_dot, s_ddot, active_controller.acceptedReferenceSpace())
        - active_controller.update(ctx, model, reference, low_level)
        - ctx.writeLowLevelCommand(low_level)
-  -> progress.stopCompleted()
+  -> UnitVelocityProfile stop completed
   -> command reports Stopped
   -> FSM: STOPPING -> STOPPED
 ```
@@ -1408,20 +1472,20 @@ current command = MoveJCommand
 ```text
 当前 FSM = PAUSED
 current command = MoveJCommand
-progress.stopped() == true
+UnitVelocityProfile velocity == 0
 
 上位机 POST /api/move/stop
   -> MotionExecutor::stop()
   -> FSM: PAUSED -> STOPPING
-  -> MotionExecutor progress.stop()
-       - because progress is already stopped, stop completes immediately
+  -> MoveJCommand.stop(ctx)
+       - because profile velocity is already 0, stop completes immediately
   -> command reports Stopped
   -> FSM: STOPPING -> STOPPED
 ```
 
 ### 场景 8：点动正常启动
 
-连续点动没有固定终点，因此不建议强行使用 `UnitIntervalMotionProfile` 的 `0 -> 1` 模型。
+连续点动没有固定终点，因此不建议强行使用 `UnitVelocityProfile` 的 `0 -> 1` 模型。
 
 ```text
 上位机 POST /api/jog/start
@@ -1433,7 +1497,7 @@ progress.stopped() == true
        - check velocity limits
        - save jog direction and velocity
   -> JogCommand.start()
-  -> JogCommand.usesProgressController() == false
+  -> JogCommand is not FiniteMotionCommand
   -> FSM: STARTING -> RUNNING
   -> control loop:
        - compute next jog LowLevelCommand or jog-specific reference
@@ -1494,14 +1558,15 @@ current command = JogCommand
 
 ### 场景 12：相对距离点动
 
-如果点动接口是“移动固定相对距离”，例如关节 +0.01 rad，则它本质上是小型 MoveJ，可以复用 executor 的共享 `MotionProgressController`。
+如果点动接口是“移动固定相对距离”，例如关节 +0.01 rad，则它本质上是小型有限路径运动，可以让 `StepJogCommand` 继承 `FiniteMotionCommand`。
 
 ```text
 上位机 POST /api/jog/step
   -> q_goal = q_current + delta
   -> create StepJogCommand
-  -> StepJogCommand.usesProgressController() == true
-  -> MotionExecutor progress.start(StepJogCommand.profileLimits(ctx))
+  -> StepJogCommand : FiniteMotionCommand
+  -> StepJogCommand.start(ctx)
+       - FiniteMotionCommand starts UnitVelocityProfile internally
   -> supportsPause/resume can be true or false, based on product semantics
   -> if treated as finite motion:
        STOPPED -> STARTING -> RUNNING -> STOPPING -> STOPPED
@@ -1706,13 +1771,14 @@ GET  /api/move/status?task_id=...
 - 让 `Robot::MoveJ/MoveL` 创建 command 并提交 executor。
 - 暂时可以让 command 内部复用现有规划/执行代码。
 
-### 阶段 2：接入 MotionProgressController
+### 阶段 2：接入 FiniteMotionCommand
 
-- 新增 `MotionProgressController`，由 `MotionExecutor` 持有一个共享实例。
-- `MotionProgressController` 内部封装 `UnitIntervalMotionProfile`。
+- 新增 `FiniteMotionCommand`，内部持有并封装 `UnitVelocityProfile`。
+- 让 MoveJ、MoveL、MoveC、StepJog 等有限路径命令继承 `FiniteMotionCommand`。
 - 将 MoveJ 改为 `MoveJCommand::profileLimits() + MoveJCommand::sample(s)`。
 - 将 MoveL 改为 `MoveLCommand::profileLimits() + MoveLCommand::sample(s)`。
-- 暂停/继续/停止统一由 executor 调用 `progress.pause()/resume()/stop()` 完成。
+- 暂停/继续/停止由 `FiniteMotionCommand` 调用 `profile_.Pause()/Resume()/Stop()` 完成。
+- 连续 Jog 继续直接继承 `MotionCommand`，单独实现 `update()`。
 
 ### 阶段 3：点动和拖拽示教 command 化
 
@@ -1731,8 +1797,9 @@ GET  /api/move/status?task_id=...
 - FSM 只管状态，不管轨迹。
 - Executor 只管生命周期，不管轨迹细节。
 - Command 只管具体运动，不直接改 FSM。
-- MotionProgressController 只管当前有限路径任务的路径进度，不知道机器人状态。
-- UnitIntervalMotionProfile 是 MotionProgressController 的底层实现细节。
+- FiniteMotionCommand 只管有限路径命令的 profile 生命周期，不知道机器人状态机。
+- UnitVelocityProfile 是 FiniteMotionCommand 的底层进度实现细节。
+- JogCommand 不继承 FiniteMotionCommand，避免连续点动被有限路径 profile 约束。
 - Pause/Resume 能力由 command 声明，executor 统一拦截。
 - Stop 尽量幂等，并优先平滑停止。
 - 参数错误和规划失败默认不进入 `ERROR_STATE`。
