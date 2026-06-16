@@ -192,7 +192,7 @@ namespace rocos {
     }
     void Robot::on_fsm_disable() {
         setDisabled();
-        if (!IsDisabled()) {
+        if (IsDisabled()) {
             impl_->process_event(EventSuccess{});
         } else {
             impl_->process_event(EventErrorOccurred{});
