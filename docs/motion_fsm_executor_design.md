@@ -72,6 +72,7 @@ flowchart TD
     Current[Current MotionCommand]
     Model[ModelProvider<br/>Kinematics + Dynamics]
     Controller[Active MotionController]
+    Guard[MotionSafetyGuard<br/>final command check]
     Ref[MotionReference]
     LowCmd[LowLevelCommand]
     Context[MotionContext]
@@ -108,7 +109,9 @@ flowchart TD
     Current -->|produces| Ref
     Ref -->|consumed by| Controller
     Controller -->|computes| LowCmd
-    LowCmd -->|write| Context
+    LowCmd -->|check before write| Guard
+    Context -->|RobotStateSnapshot| Guard
+    Guard -->|accepted command| Context
     Context --> HW
     HW -->|waitForSignal/read state| Context
 
@@ -124,6 +127,7 @@ flowchart TD
 - `UnitVelocityProfile` 属于 `FiniteMotionCommand` 基类；有限路径命令复用它，连续命令不携带它。
 - MotionCommand 生成 `MotionReference`，不直接下发关节目标。
 - MotionController 消费 `MotionReference`，结合模型和实际状态生成 `LowLevelCommand`。
+- MotionSafetyGuard 负责最终下发前安全检查，维护上一周期真正接受的命令。
 - MotionContext 负责实际状态读取和底层命令下发，不让 command/controller 直接拥有完整 `Robot` 控制权。
 
 ### MotionExecutor
@@ -169,6 +173,7 @@ enum class MotionResultCode {
     Unsupported,
     PlanningFailed,
     ExecutionFailed,
+    SafetyViolation,
     HardwareFault
 };
 
@@ -450,7 +455,152 @@ MotionController
   -> 生成 LowLevelCommand
 
 MotionContext
-  -> 下发 LowLevelCommand
+  -> 调用 MotionSafetyGuard
+  -> 通过后下发 LowLevelCommand
+```
+
+### MotionSafetyGuard
+
+`MotionSafetyGuard` 是最终下发前的安全门禁。`Command.prepare()` 解决的是“这条指令理论上是否合理”，`MotionController.update()` 解决的是“本周期控制器想输出什么”，而 `MotionSafetyGuard` 解决的是“这一周期的命令是否真的允许写到硬件”。
+
+它不负责规划轨迹，也不修改 FSM。它只做下发前检查，并维护上一周期真正通过检查、成功写出的命令。
+
+关键状态的维护责任：
+
+```text
+q_actual
+  -> 当前实际关节角
+  -> 由 Robot / HardwareInterface 读取
+  -> 由 RobotMotionContext 缓存并通过 RobotStateSnapshot 提供
+
+q_dot_actual
+  -> 当前实际关节速度
+  -> 由 Robot / HardwareInterface 读取
+  -> 由 RobotMotionContext 缓存并通过 RobotStateSnapshot 提供
+
+q_cmd
+  -> 本周期准备下发的目标
+  -> 由 MotionController.update() 生成
+  -> 作为 LowLevelCommand 的一部分传给 MotionContext
+
+q_last_cmd
+  -> 上一周期真正通过安全检查并写出的目标
+  -> 由 MotionSafetyGuard 或独立 CommandHistory 维护
+  -> 只有 writeLowLevelCommand() 成功后才更新
+```
+
+推荐接口：
+
+```cpp
+struct RobotStateSnapshot {
+    std::vector<double> q_actual;
+    std::vector<double> q_dot_actual;
+    std::vector<double> tau_actual;
+    bool enabled;
+    double stamp;
+};
+
+enum class SafetyViolationCode {
+    None,
+    NotEnabled,
+    InvalidMode,
+    InvalidNumber,
+    PositionLimitExceeded,
+    CommandVelocityLimitExceeded,
+    CommandAccelerationLimitExceeded,
+    FollowingErrorExceeded,
+    TorqueLimitExceeded
+};
+
+struct SafetyCheckResult {
+    bool ok;
+    SafetyViolationCode code;
+    std::string message;
+};
+
+class MotionSafetyGuard {
+public:
+    SafetyCheckResult check(const LowLevelCommand& new_cmd,
+                            const RobotStateSnapshot& actual,
+                            double dt);
+
+    void accept(const LowLevelCommand& accepted_cmd);
+    void reset();
+
+private:
+    std::optional<LowLevelCommand> last_accepted_cmd_;
+};
+```
+
+典型调用顺序：
+
+```text
+RobotMotionContext::writeLowLevelCommand(cmd)
+  -> actual = readStateSnapshot()
+  -> result = safety_guard.check(cmd, actual, control_period)
+  -> if result is not ok:
+         reject command
+         return SafetyViolation
+  -> write cmd to joints / hardware
+  -> safety_guard.accept(cmd)
+  -> return Ok
+```
+
+位置模式下至少检查：
+
+```text
+q_cmd within joint position limit
+q_cmd is finite, not NaN / Inf
+joint mode is correct
+robot is enabled
+
+command_velocity = (q_cmd - q_last_cmd) / dt
+abs(command_velocity) <= max_command_velocity
+
+following_error = q_cmd - q_actual
+abs(following_error) <= max_following_error
+```
+
+如果命令中包含速度或力矩，还应按控制模式增加：
+
+```text
+command_acceleration = (q_dot_cmd - q_dot_last_cmd) / dt
+abs(command_acceleration) <= max_command_acceleration
+
+abs(tau_cmd) <= max_torque
+abs(tau_cmd - tau_last_cmd) / dt <= max_torque_rate
+```
+
+不同控制器的下发检查重点：
+
+```text
+PositionController
+  -> q_cmd 连续性、速度、加速度、关节限位、跟随误差
+
+JointImpedanceController
+  -> q_d 连续性、tau_cmd 限幅、tau 变化率、刚度/阻尼参数范围
+
+JointAdmittanceController
+  -> 导纳输出的 q_d / dq_d 限幅、外力矩输入有效性、虚拟参数范围
+
+CartesianImpedanceController
+  -> pose_d 连续性、等效关节命令或 tau_cmd 限幅、奇异性阈值
+
+CartesianAdmittanceController
+  -> 六维力输入有效性、导纳输出速度/位移限幅、pose_d 连续性
+```
+
+不建议在 `MotionSafetyGuard` 中悄悄 clamp 后继续下发。因为这样会改变路径形状，command 和 controller 仍以为命令按原样执行，后续状态会变得不可信。推荐策略：
+
+```text
+软约束 / shaping
+  -> 放在 MotionController 或 MotionCommand.update()
+  -> 可做速度缩放、滤波、时间缩放、参考平滑
+
+硬门禁 / final guard
+  -> 放在 MotionSafetyGuard
+  -> 只做最终检查
+  -> 发现违规就拒绝本周期命令，并让 executor 进入停止或错误处理
 ```
 
 ### MotionController
@@ -489,6 +639,10 @@ public:
                                     LowLevelCommand& out) = 0;
 
     virtual MotionResult deactivate(MotionContext& ctx) = 0;
+
+    virtual MotionResult safeStop(MotionContext& ctx) {
+        return MotionResult::Unsupported;
+    }
 };
 ```
 
@@ -798,6 +952,7 @@ public:
     ModeOfOperation jointMode(int id) const;
     bool isEnabled() const;
     KDL::Frame flangePose() const;
+    RobotStateSnapshot readStateSnapshot() const;
 
     // 限制与配置
     std::vector<double> maxJointVelocity() const;
@@ -810,7 +965,7 @@ public:
     void setJointVelocity(int id, double velocity);
     void setJointTargets(const KDL::JntArray& q);
     void setJointVelocities(const KDL::JntArray& dq);
-    void writeLowLevelCommand(const LowLevelCommand& command);
+    MotionResult writeLowLevelCommand(const LowLevelCommand& command);
 
     // 控制同步
     void waitControlCycle();
@@ -846,6 +1001,7 @@ private:
 - `jointPositions()`、`flangePose()` 等读取应复用现有 `Robot::mtx` 或新增清晰的状态锁。
 - `setJointTargets()` / `writeLowLevelCommand()` 应只在运动控制线程调用。
 - command 不应直接调用控制输出接口；底层输出应由 controller 生成 `LowLevelCommand` 后通过 context 写入。
+- `writeLowLevelCommand()` 必须先调用 `MotionSafetyGuard`，通过后才写硬件；失败时返回 `SafetyViolation` 类错误。
 - `waitControlCycle()` 应封装 `hw_interface_->waitForSignal(0)`。
 - `isEnabled()` 可以作为 command 每周期安全检查，硬件异常由 executor 转成 `ERROR_STATE`。
 
@@ -854,6 +1010,10 @@ MotionContext 与现有代码的对应关系：
 ```text
 ctx.jointPositions()
   -> Robot::pos_
+
+ctx.readStateSnapshot()
+  -> Robot::pos_
+  -> joint velocity / torque / mode / enabled state
 
 ctx.jointMode(id)
   -> joints_[id]->getMode()
@@ -1231,7 +1391,10 @@ while command active:
       if controller_result.status == Failed:
           result = Failed
       else:
-          ctx.writeLowLevelCommand(low_level)
+          write_result = ctx.writeLowLevelCommand(low_level)
+          if write_result is SafetyViolation:
+              result = Failed
+              error = write_result
 
   if step.status == Failed:
       result = Failed
@@ -1261,6 +1424,20 @@ while command active:
       FSM: * -> ERROR_STATE
       clear current command
 ```
+
+下发前安全检查失败时，建议按执行期安全问题处理：
+
+```text
+ctx.writeLowLevelCommand(low_level)
+  -> MotionSafetyGuard detects command velocity / following error / torque violation
+  -> command is not written to hardware
+  -> last_accepted_cmd is not updated
+  -> executor marks current task Failed
+  -> controller.safeStop(ctx) or command.stop(ctx) if available
+  -> FSM enters ERROR_STATE or STOPPED according to product safety policy
+```
+
+其中“参数错误、目标不可达、IK 失败”等启动前问题仍然属于 `prepare()` 阶段的 `InvalidCommand / PlanningFailed`，通常不进入 `ERROR_STATE`；而运行中发现本周期命令不能安全下发，属于执行期安全违规，应至少停止当前任务。
 
 ### 暂停
 
@@ -1629,7 +1806,32 @@ RecoverableFailure: safe stop then STOPPED
 FatalFailure: ERROR_STATE
 ```
 
-### 场景 16：执行中驱动掉使能
+### 场景 16：执行中下发安全检查失败
+
+运行中如果 controller 生成的 `q_cmd` 相对上一周期真正下发的 `q_last_cmd` 速度超限，不能继续写硬件。
+
+```text
+当前 FSM = RUNNING
+current command = MoveJCommand
+
+control loop:
+  -> MoveJCommand.update(ctx, model, required)
+  -> active_controller.update(ctx, model, reference, low_level)
+  -> ctx.writeLowLevelCommand(low_level)
+       - RobotMotionContext reads RobotStateSnapshot
+       - MotionSafetyGuard compares q_cmd with q_last_cmd
+       - command_velocity = (q_cmd - q_last_cmd) / dt
+       - command_velocity exceeds max_command_velocity
+       - reject command
+       - do not update q_last_cmd
+  -> executor marks task Failed
+  -> controller.safeStop(ctx) or command.stop(ctx) if available
+  -> FSM: RUNNING -> ERROR_STATE or RUNNING -> STOPPING -> STOPPED
+```
+
+是否进入 `ERROR_STATE` 取决于产品安全策略。推荐默认按运行期安全违规处理，至少停止当前任务；如果违规来源不明、连续出现或已经接近硬件风险，应进入 `ERROR_STATE`。
+
+### 场景 17：执行中驱动掉使能
 
 ```text
 当前 FSM = RUNNING
@@ -1643,7 +1845,7 @@ control loop detects !IsEnabled()
 
 硬件掉使能、急停、通信错误应进入 `ERROR_STATE`。
 
-### 场景 17：暂停期间驱动掉使能
+### 场景 18：暂停期间驱动掉使能
 
 ```text
 当前 FSM = PAUSED
@@ -1654,7 +1856,7 @@ monitor detects !IsEnabled()
   -> current command invalidated
 ```
 
-### 场景 18：无任务时 Stop
+### 场景 19：无任务时 Stop
 
 ```text
 当前 FSM = STOPPED
@@ -1669,7 +1871,7 @@ current command = null
 
 建议 HTTP 层把 stop 设计为幂等操作：无运动时返回 success/no-op。
 
-### 场景 19：无任务时 Pause
+### 场景 20：无任务时 Pause
 
 ```text
 当前 FSM = STOPPED
@@ -1786,7 +1988,15 @@ GET  /api/move/status?task_id=...
 - 拖拽示教使用 `AdmittanceTeachCommand`，按语义决定是否支持 pause/resume。
 - 所有运动占用都走 executor，不再直接调用 `enterRunning()/enterStopped()`。
 
-### 阶段 4：收敛状态机事件
+### 阶段 4：接入 MotionSafetyGuard
+
+- 新增 `RobotStateSnapshot`，由 `RobotMotionContext` 从硬件状态读取并缓存。
+- 新增 `MotionSafetyGuard`，维护上一周期真正接受的 `last_accepted_cmd_`。
+- 将 `RobotMotionContext::writeLowLevelCommand()` 改为先检查、再写硬件、最后更新 `last_accepted_cmd_`。
+- 先实现位置模式的基础检查：NaN/Inf、关节限位、命令速度、跟随误差、使能和模式。
+- 后续按控制器类型补充力矩、力矩变化率、笛卡尔速度、外力输入等检查。
+
+### 阶段 5：收敛状态机事件
 
 - `enterRunning()`、`enterStopped()` 从公开运动函数中移除。
 - FSM 事件只由 executor 发出。
@@ -1800,6 +2010,7 @@ GET  /api/move/status?task_id=...
 - FiniteMotionCommand 只管有限路径命令的 profile 生命周期，不知道机器人状态机。
 - UnitVelocityProfile 是 FiniteMotionCommand 的底层进度实现细节。
 - JogCommand 不继承 FiniteMotionCommand，避免连续点动被有限路径 profile 约束。
+- MotionSafetyGuard 是最终下发门禁，维护 `last_accepted_cmd_`，不负责规划或控制律。
 - Pause/Resume 能力由 command 声明，executor 统一拦截。
 - Stop 尽量幂等，并优先平滑停止。
 - 参数错误和规划失败默认不进入 `ERROR_STATE`。
