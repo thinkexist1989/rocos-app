@@ -21,6 +21,8 @@
 #include "include/rocos_app/drive_guard.h"
 #include "include/rocos_app/drive.h"
 
+#include <algorithm>
+
 namespace rocos {
 
     DriveGuard::DriveGuard() {
@@ -44,13 +46,21 @@ namespace rocos {
     }
 
     void DriveGuard::addDrive(Drive *drive) {
+        boost::lock_guard<boost::mutex> lock(drives_mutex_);
         drives_.push_back(drive); //将驱动器添加到_drives中
+    }
+
+    void DriveGuard::removeDrive(Drive *drive) {
+        boost::lock_guard<boost::mutex> lock(drives_mutex_);
+        drives_.erase(std::remove(drives_.begin(), drives_.end(), drive),
+                      drives_.end());
     }
 
     void DriveGuard::workingThread() {
         std::cout << "Drive Guard is running on thread " << boost::this_thread::get_id() << std::endl;
         while (is_thread_running_) {
 
+            boost::lock_guard<boost::mutex> lock(drives_mutex_);
             for (auto &d: drives_) {
 
                 d->current_drive_state_ = d->hw_interface_->getDriverState(d->id_);

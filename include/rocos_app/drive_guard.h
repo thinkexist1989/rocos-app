@@ -46,6 +46,7 @@ namespace rocos {
         static DriveGuard * getInstance(); //获取句柄
 
         void addDrive(Drive* drive);
+        void removeDrive(Drive* drive);
 
         void workingThread();
 
@@ -53,6 +54,7 @@ namespace rocos {
         static boost::shared_ptr<DriveGuard> instance_; // 单例模式对象
 
         std::vector<Drive*> drives_; // 用于保存驱动器指针
+        boost::mutex drives_mutex_;
 
         boost::shared_ptr<boost::thread> thread_ {nullptr};
 

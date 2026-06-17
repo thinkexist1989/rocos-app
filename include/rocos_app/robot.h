@@ -34,6 +34,11 @@
 #include "kdl_parser/kdl_parser.hpp" //!< 解析URDF文件
 #include "gripper.hpp"
 #include "DHParamsLoader.h"
+#include <rocos_app/motion/motion_executor.h>
+#include <rocos_app/motion/move_j_submission.h>
+#include <rocos_app/motion/position_controller.h>
+#include <rocos_app/motion/robot_fsm_gateway.h>
+#include <rocos_app/motion/robot_motion_context.h>
 namespace rocos
 {
     //! Class Robot
@@ -133,6 +138,12 @@ namespace rocos
         bool enterRunning();
         void enterStopped();
         bool isMotionRunning() const;
+        bool requestMotionStart();
+        bool requestMotionPause();
+        bool requestMotionContinue();
+        bool requestMotionStop();
+        bool notifyMotionError();
+        void waitControlCycle();
 
         void setEnabled();
 
@@ -781,6 +792,9 @@ namespace rocos
         //! \return 错误标志位,成功返回0
         int MoveJ(JntArray q, double speed = 1.05, double acceleration = 1.4,
                   double time = 0.0, double radius = 0.0, bool asynchronous = false);
+        int PauseMotion();
+        int ResumeMotion();
+        int StopMotion();
 
         //! \brief 关节运动到指定笛卡尔位姿
         //! \param pose 位姿
@@ -1007,6 +1021,8 @@ namespace rocos
         int CheckBeforeMove(const Frame &pos, double speed,
                             double acceleration, double time, double radius);
 
+        void initializeMotionExecutor();
+
         // 实际movej执行线程
         void RunMoveJ(JntArray q, double speed = 1.05, double acceleration = 1.4,
                       double time = 0.0, double radius = 0.0);
@@ -1082,8 +1098,14 @@ namespace rocos
 
         std::vector<bool> need_plan_; // 是否需要重新规划标志
 
+        std::atomic<bool> motion_thread_stop_requested_{false};
         std::shared_ptr<std::thread> otg_motion_thread_{nullptr};// otg在线规划线程
         std::shared_ptr<std::thread> motion_thread_{nullptr}; // 执行motion线程
+        std::unique_ptr<motion::MotionSafetyGuard> motion_safety_guard_{nullptr};
+        std::unique_ptr<motion::BasicRobotFsmGateway<Robot>> motion_fsm_gateway_{nullptr};
+        std::unique_ptr<motion::PositionController> motion_position_controller_{nullptr};
+        std::unique_ptr<motion::RobotMotionContext<Robot>> motion_context_{nullptr};
+        std::unique_ptr<motion::MotionExecutor> motion_executor_{nullptr};
 
         // JC_helper::inverse_special_to_SRS SRS_kinematics_; //TODO:
 

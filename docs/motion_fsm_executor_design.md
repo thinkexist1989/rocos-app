@@ -197,6 +197,203 @@ enum class MotionStepStatus {
 };
 ```
 
+### DianaApi 错误码返回规范
+
+对外 API 的 `code` 字段应复用《思灵机器人工业版 API 手册(C&C++版) V2.16.0.pdf》附件 A 的 DianaApi 错误码，避免系统内部再定义一套 `200x/300x/500x` 错误码。
+
+基本规则：
+
+- 成功统一返回 `0`。
+- 失败统一返回 DianaApi 负数错误码。
+- `MotionResultCode`、`MotionStepStatus`、`SafetyViolationCode` 是 executor 内部分类，不直接作为 HTTP/API 对外错误码。
+- `MotionTaskStatus/last_error` 中同时保存内部分类、DianaApi 错误码和错误消息，便于任务查询和日志定位。
+- 调用底层 DianaApi 失败时，优先透传底层返回值或 `getLastError()` 得到的错误码。
+- executor 自己发现的错误，应按下面的推荐映射转换成 DianaApi 错误码。
+
+建议任务结果结构：
+
+```cpp
+struct MotionResult {
+    bool success{false};
+    MotionResultCode result{MotionResultCode::Ok};
+    int api_error_code{0};          // 对外返回 DianaApi 错误码；成功为 0
+    std::string message;
+};
+
+struct MotionTaskError {
+    MotionResultCode result{MotionResultCode::Ok};
+    int api_error_code{0};
+    std::string message;
+    std::string source;             // executor / command / controller / safety_guard / hardware
+};
+```
+
+推荐映射：
+
+| 内部错误来源 | 对外 DianaApi 错误码 | 说明 |
+| --- | ---: | --- |
+| 成功 | `0` | success |
+| 当前已有运动任务 / start 冲突 | `-2215` | `ERROR_CODE_CONFLICT_TASK_RUNNING`，运动任务冲突 |
+| 一般调用冲突 | `-2201` | `ERROR_CODE_CALLING_CONFLICT_ERROR` |
+| 空 command / 空指针参数 | `-2901` | `ERROR_CODE_PARAMETER_POINTER_EQUALS_NULLPTR` |
+| NaN / Inf 参数或状态 | `-2902` | `ERROR_CODE_PARAMETER_POINTER_EQUALS_NAN_OR_INF` |
+| 一般非法参数 | `-3006` | `ILLEGAL_PARAMETER` |
+| 输入超物理极限 | `-2905` | `ERROR_CODE_INPUT_OUT_OF_PHYSICAL_POSITION_RANGE` |
+| 输入超关节极限位置 | `-2221` | `ERROR_CODE_INPUT_OUT_OF_EXTREME_POSITION_RANGE` |
+| command/controller reference 不匹配 | `-2325` | `ERROR_CODE_MOVE_UNKNOWN`，运动类型未知或不匹配 |
+| FSM 状态不允许运动 / 未使能 / 未初始化 | `-1013` 或 `-2205` | 未 `initSrv` 用 `-1013`；有关节未正常 OP 用 `-2205` |
+| ERROR_STATE 下提交运动 | `-2205` | 机器人未处于可运动状态 |
+| 当前运动不支持 pause/resume/stop | `-2201` 或 `-2325` | 调用冲突或运动类型不匹配 |
+| 规划失败通用 | `-2301` | `ERROR_CODE_PLAN_ERROR` |
+| 规划器失败 | `-2305` | `ERROR_CODE_PLANNER_ERROR` |
+| 轨迹规划输入错误 | `-2316` | `ERROR_CODE_PLAN_INPUT` |
+| MoveJ 规划失败 | `-2317` | `ERROR_CODE_PLAN_MOVJ` |
+| MoveL 规划失败 | `-2318` | `ERROR_CODE_PLAN_MOVL` |
+| MoveC 规划失败 | `-2319` | `ERROR_CODE_PLAN_MOVC` |
+| 过渡轨迹规划失败 | `-2320` | `ERROR_CODE_PLAN_BLEND` |
+| SpeedJ / SpeedL 规划失败 | `-2321` / `-2322` | `ERROR_CODE_PLAN_SPDJ` / `ERROR_CODE_PLAN_SPDL` |
+| ServoJ / ServoL 规划失败 | `-2323` / `-2324` | `ERROR_CODE_PLAN_SRVJ` / `ERROR_CODE_PLAN_SRVL` |
+| 轨迹未规划 | `-2326` | `ERROR_CODE_MOVE_UNPLAN` |
+| 插补输入错误 | `-2327` | `ERROR_CODE_MOVE_INPUT` |
+| 插补失败 | `-2328` | `ERROR_CODE_MOVE_INTERP` |
+| 位置模式插补失败 | `-2302` | `ERROR_CODE_INTERPOLATE_POSITION_ERROR` |
+| 阻抗模式插补失败 | `-2303` | `ERROR_CODE_INTERPOLATE_TORQUE_ERROR` |
+| 奇异位姿 | `-2304` | `ERROR_CODE_SINGULAR_VALUE_ERROR` |
+| 启动前通用 IK 失败 | `-2315` | `ERROR_CODE_IK_GENERAL` |
+| 执行中 IK 跟踪失败 | `-2314` | `ERROR_CODE_IK_TRACK` |
+| 位置超限 | `-2308` 或 `-2313` | 位置限制或运动限制 |
+| 速度超限 | `-2310` | `ERROR_CODE_SPEED_LIMIT` |
+| 加速度超限 | `-2311` | `ERROR_CODE_ACC_LIMIT` |
+| 加加速度超限 | `-2312` | `ERROR_CODE_JERK_LIMIT` |
+| 力矩超限 | `-2309` | `ERROR_CODE_FORCE_LIMIT` |
+| 跟随误差超限：关节位置 | `-2203` | `ERROR_CODE_NOT_FOLLOW_POSITION_CMD` |
+| 跟随误差超限：TCP | `-2204` | `ERROR_CODE_NOT_FOLLOW_TCP_CMD` |
+| 碰撞 | `-2202` | `ERROR_CODE_COLLISION_ERROR` |
+| 急停 | `-2207` | `ECODE_EMERGENCY_STOP` |
+| 反馈超软限位 | `-2206` | `ECODE_OUT_RANGE_FEEDBACK` |
+| 超出物理限位反馈 | `-2216` | `ERROR_CODE_OUT_OF_PHYSICAL_RANGE_FEEDBACK` |
+| 超出软限位反馈 | `-2217` | `ERROR_CODE_OUT_SOFT_RANGE_FEEDBACK` |
+| 虚拟墙相关 | `-2214` / `-2222` / `-2223` | 在虚拟墙、越过虚拟墙、越过减速墙 |
+| 自由驱动中禁止运动 | `-2210` | `ERROR_CODE_CANNOT_MOVE_WHILE_FREE_DRIVING` |
+| 零空间自由驱动中禁止运动 | `-2211` | `ERROR_CODE_CANNOT_MOVE_WHILE_ZERO_SPACE_FREE_DRIVING` |
+| 硬件错误 | `-2001` | `ERROR_CODE_JOINT_REGIST_ERROR`，应结合 `formatError()` 查询具体硬件错误 |
+| 关节 EEPROM 读/写错误 | `-2010` / `-2011` | 关节参数读写错误 |
+| 编码器/电流/扭矩传感器错误 | `-2012` 到 `-2016` | 低速/高速编码器、电流、扭矩传感器错误 |
+| 底层通信失败 | `-2101` | `ERROR_CODE_COMMUNICATE_ERROR` |
+| 与后台服务心跳断开 | `-2102` | `ERROR_CODE_LOST_HEART_WITH_DIANAROBOT_ERROR` |
+| socket / 服务端心跳 / 机器人状态反馈错误 | `-1001` 到 `-1015` | 网络初始化、socket、心跳、反馈、DH、抱闸等错误 |
+
+DianaApi 错误码索引表：
+
+| 错误码 | 宏定义 | 说明 |
+| ---: | --- | --- |
+| `-1001` | `ERROR_CODE_WSASTART_FAIL` | 加载 Windows socket 库失败 |
+| `-1002` | `ERROR_CODE_CREATE_SOCKET_FAIL` | 创建 socket 对象失败 |
+| `-1003` | `ERROR_CODE_BIND_PORT_FAIL` | socket 绑定端口失败 |
+| `-1004` | `ERROR_CODE_SOCKET_READ_FAIL` | socket select 调用失败 |
+| `-1005` | `ERROR_CODE_SOCKET_TIMEOUT` | socket select 调用超时 |
+| `-1006` | `ERROR_CODE_RECVFROM_FAIL` | socket 接收数据失败 |
+| `-1007` | `ERROR_CODE_SENDTO_FAIL` | socket 发送数据失败 |
+| `-1008` | `ERROR_CODE_LOST_HEARTBEAT` | 服务端心跳连接丢失 |
+| `-1009` | `ERROR_CODE_LOST_ROBOTSTATE` | 服务端信息反馈丢失 |
+| `-1010` | `ERROR_CODE_GET_DH_FAILED` | 获取 DH 信息失败 |
+| `-1011` | `ERROR_CODE_RELEASE_BRAKE_FAILED` | 打开抱闸失败 |
+| `-1012` | `ERROR_CODE_HOLD_BRAKE_FAILED` | 关闭抱闸失败 |
+| `-1013` | `ERROR_CODE_IP_ADDRESS_NOT_REGISTER` | 该 IP 机械臂尚未 initSrv |
+| `-1014` | `ERROR_CODE_ROBOTARM_OVERNUMBER` | 超过最大支持机械臂数 |
+| `-1015` | `ERROR_CODE_SOCKET_OTHER_ERROR` | 其他 socket 连接错误 |
+| `-2001` | `ERROR_CODE_JOINT_REGIST_ERROR` | 硬件错误 |
+| `-2010` | `ERROR_CODE_EEPROM_READ` | 关节读 EEPROM 参数错误 |
+| `-2011` | `ERROR_CODE_EEPROM_WRITE` | 关节写 EEPROM 参数错误 |
+| `-2012` | `ERROR_CODE_LS_ENCODER_OVERSPEED` | 低速侧编码器反馈位置超速 |
+| `-2013` | `ERROR_CODE_LS_ENCODER_FB_ERROR` | 低速侧编码器反馈数据错误 |
+| `-2014` | `ERROR_CODE_MS_SINGAL_Z_ERROR` | 高速侧编码器 Z 信号异常 |
+| `-2015` | `ERROR_CODE_THREE_PHASE_CURRENT` | 电机三相电流瞬时过流 |
+| `-2016` | `ERROR_CODE_TORQUE_SENSOR_READ_ERROR` | 扭矩传感器读取故障 |
+| `-2101` | `ERROR_CODE_COMMUNICATE_ERROR` | 底层通信失败 |
+| `-2102` | `ERROR_CODE_LOST_HEART_WITH_DIANAROBOT_ERROR` | 与后台服务心跳断开 |
+| `-2201` | `ERROR_CODE_CALLING_CONFLICT_ERROR` | 调用冲突 |
+| `-2202` | `ERROR_CODE_COLLISION_ERROR` | 发生碰撞 |
+| `-2203` | `ERROR_CODE_NOT_FOLLOW_POSITION_CMD` | 力控模式关节位置与指令发生滞后 |
+| `-2204` | `ERROR_CODE_NOT_FOLLOW_TCP_CMD` | 力控模式 TCP 位置与指令发生滞后 |
+| `-2205` | `ERROR_CODE_NOT_ALL_AT_OP_STATE` | 有关节未进入正常状态 |
+| `-2206` | `ECODE_OUT_RANGE_FEEDBACK` | 关节角反馈超软限位 |
+| `-2207` | `ECODE_EMERGENCY_STOP` | 急停已拍下 |
+| `-2208` | `ECODE_NO_INIT_PARAMETER` | 找不到关节初始参数 |
+| `-2209` | `ECODE_NOT_MATCH_LOAD` | 负载与理论值不匹配 |
+| `-2210` | `ERROR_CODE_CANNOT_MOVE_WHILE_FREE_DRIVING` | 自由驱动模式不能执行其他运动 |
+| `-2211` | `ERROR_CODE_CANNOT_MOVE_WHILE_ZERO_SPACE_FREE_DRIVING` | 零空间自由驱动模式下不能执行其他运动 |
+| `-2214` | `ERROR_CODE_ROBOT_IN_VIRTUAL_WALL` | 有关节在虚拟墙内 |
+| `-2215` | `ERROR_CODE_CONFLICT_TASK_RUNNING` | 运动任务冲突 |
+| `-2216` | `ERROR_CODE_OUT_OF_PHYSICAL_RANGE_FEEDBACK` | 超出物理限位 |
+| `-2217` | `ERROR_CODE_OUT_SOFT_RANGE_FEEDBACK` | 超出软限位 |
+| `-2218` | `ERROR_CODE_CONVEYOR_NOT_ONLINE` | 传送带编码器不在线 |
+| `-2219` | `ERROR_CODE_CONVEYOR_IS_TRACKED` | 传送带正在被跟踪，不能 moveJ |
+| `-2220` | `ERROR_CODE_CONVEYOR_CANNOT_TRACK` | 开启跟踪传送带失败 |
+| `-2221` | `ERROR_CODE_INPUT_OUT_OF_EXTREME_POSITION_RANGE` | 超出关节极限位置 |
+| `-2222` | `ERROR_CODE_SLOPOVER_VIRTUAWALL` | 关节越过虚拟墙 |
+| `-2223` | `ERROR_CODE_SLOPOVER_REDUCE_VIRTUAWALL` | 关节越过减速墙 |
+| `-2301` | `ERROR_CODE_PLAN_ERROR` | 路径规划失败 |
+| `-2302` | `ERROR_CODE_INTERPOLATE_POSITION_ERROR` | 位置模式插补失败 |
+| `-2303` | `ERROR_CODE_INTERPOLATE_TORQUE_ERROR` | 阻抗模式插补失败 |
+| `-2304` | `ERROR_CODE_SINGULAR_VALUE_ERROR` | 奇异位置 |
+| `-2305` | `ERROR_CODE_PLANNER_ERROR` | 规划失败 |
+| `-2306` | `ERROR_CODE_HOME_POSITION_ERROR` | 需要寻零 |
+| `-2307` | `ERROR_CODE_FATAL` | 严重错误，关节位置超出物理极限 |
+| `-2308` | `ERROR_CODE_POS_LIMIT` | 位置超出限制 |
+| `-2309` | `ERROR_CODE_FORCE_LIMIT` | 关节力矩超出限制 |
+| `-2310` | `ERROR_CODE_SPEED_LIMIT` | 速度超出限制 |
+| `-2311` | `ERROR_CODE_ACC_LIMIT` | 加速度超出限制 |
+| `-2312` | `ERROR_CODE_JERK_LIMIT` | 加加速度超出限制 |
+| `-2313` | `ERROR_CODE_MOTION_LIMIT` | 位置超出限制 |
+| `-2314` | `ERROR_CODE_IK_TRACK` | 轨迹跟踪过程逆解求解失败 |
+| `-2315` | `ERROR_CODE_IK_GENERAL` | 通用位置逆解求解失败 |
+| `-2316` | `ERROR_CODE_PLAN_INPUT` | 轨迹规划输入错误 |
+| `-2317` | `ERROR_CODE_PLAN_MOVJ` | 关节空间轨迹规划失败 |
+| `-2318` | `ERROR_CODE_PLAN_MOVL` | 直线轨迹规划失败 |
+| `-2319` | `ERROR_CODE_PLAN_MOVC` | 圆弧轨迹规划失败 |
+| `-2320` | `ERROR_CODE_PLAN_BLEND` | 过渡轨迹规划失败 |
+| `-2321` | `ERROR_CODE_PLAN_SPDJ` | SpeedJ 轨迹规划失败 |
+| `-2322` | `ERROR_CODE_PLAN_SPDL` | SpeedL 轨迹规划失败 |
+| `-2323` | `ERROR_CODE_PLAN_SRVJ` | ServoJ 轨迹规划失败 |
+| `-2324` | `ERROR_CODE_PLAN_SRVL` | ServoL 轨迹规划失败 |
+| `-2325` | `ERROR_CODE_MOVE_UNKNOWN` | 未知运动类型或运动类型不匹配 |
+| `-2326` | `ERROR_CODE_MOVE_UNPLAN` | 轨迹未规划 |
+| `-2327` | `ERROR_CODE_MOVE_INPUT` | 轨迹插补输入错误 |
+| `-2328` | `ERROR_CODE_MOVE_INTERP` | 轨迹插补失败 |
+| `-2329` | `ERROR_CODE_PLAN_TRANSLATION` | 移动规划失败 |
+| `-2330` | `ERROR_CODE_PLAN_ROTATION` | 旋转规划失败 |
+| `-2331` | `ERROR_CODE_PLAN_JOINTS` | 关节规划失败 |
+| `-2332` | `ERROR_CODE_UNMATCHED_JOINTS_NUMBER` | 零空间自由驱动关节数不匹配 |
+| `-2333` | `ERROR_CODE_TCPCALI_FUTILE_WPS` | 示教点不合理 |
+| `-2334` | `ERROR_CODE_TCPCALI_FIT_FAIL` | 拟合 TCP 失败 |
+| `-2335` | `ERROR_CODE_DHCALI_FIT_WF_FAIL` | DH 参数初始化世界坐标系失败 |
+| `-2336` | `ERROR_CODE_DHCALI_FIT_TF_FAIL` | DH 参数初始化工具坐标系失败 |
+| `-2337` | `ERROR_CODE_DHCALI_FIT_DH_FAIL` | DH 参数拟合失败 |
+| `-2338` | `ERROR_CODE_DHCALI_INIT_FAIL` | DH 参数初始化失败 |
+| `-2339` | `ERROR_CODE_SLFMOV_SINGULAR` | 零空间运动至奇异位置 |
+| `-2340` | `ERROR_CODE_SLFMOV_FUTILE` | 零空间运动在笛卡尔空间内无效 |
+| `-2341` | `ERROR_CODE_SLFMOV_JNTLIM` | 零空间运动至关节限位 |
+| `-2342` | `ERROR_CODE_SLFMOV_SPDLIM` | 零空间运动至速度限位 |
+| `-2343` | `ERROR_CODE_SLFMOV_FAIL` | 零空间运动插补失败 |
+| `-2344` | `ERROR_CODE_SLFMOV_FFC_FAIL` | 零空间运动前馈补偿错误 |
+| `-2345` | `ERROR_CODE_LOADIDENT_INIT_FAIL` | 负载辨识初始化失败 |
+| `-2346` | `ERROR_CODE_LOADIDENT_UFB_FAIL` | 负载辨识更新反馈数据错误 |
+| `-2347` | `ERROR_CODE_LOADIDENT_FIT_FAIL` | 负载辨识失败 |
+| `-2348` | `ERROR_CODE_LOADIDENT_NONLOADED` | 未检测到有效负载 |
+| `-2901` | `ERROR_CODE_PARAMETER_POINTER_EQUALS_NULLPTR` | 输入参数为空 |
+| `-2902` | `ERROR_CODE_PARAMETER_POINTER_EQUALS_NAN_OR_INF` | 输入参数存在 NaN 或 Inf |
+| `-2903` | `ERROR_CODE_ENTER_FORCE_MODE_ERROR` | 进入力控模式失败 |
+| `-2904` | `ERROR_CODE_CANNOT_SET_VELOCITY_PERCENT_VALUE` | 设置速度百分比失败 |
+| `-2905` | `ERROR_CODE_INPUT_OUT_OF_PHYSICAL_POSITION_RANGE` | 输入参数超出物理极限位置 |
+| `-3001` | `ERROR_CODE_RESOURCE_UNAVAILABLE` | 参数错误 |
+| `-3002` | `ERROR_CODE_DUMP_LOG_TIMEOUT` | 导出 Log 文件超时 |
+| `-3003` | `ERROR_CODE_DUMP_LOG_FAILED` | 导出 Log 文件失败 |
+| `-3004` | `RESET_DH_FAILED` | 重置 DH 参数失败 |
+| `-3006` | `ILLEGAL_PARAMETER` | 接口函数传入非法参数 |
+
+手册备注：`ERROR_CODE_JOINT_REGIST_ERROR(-2001)` 硬件错误和 `ERROR_CODE_NOT_ALL_AT_OP_STATE(-2205)` 的 OP 状态错误需要通过 `holdBrake()` 合抱闸函数或重启硬件来清除错误。
+
 `MotionTaskStatus` 只服务于 HTTP task 查询和 executor 清理逻辑，不参与机器人状态流转判断。判断“当前能不能 start/pause/resume/stop”必须问 FSM，而不是看 `MotionTaskStatus`。
 
 例子：
@@ -1948,18 +2145,29 @@ GET  /api/move/status?task_id=...
 返回建议：
 
 ```text
-0    success
-200x planning/execution error
-300x robot state error
-500x async task error
+0      success
+<0     failure，失败码必须使用 DianaApi 错误码
 ```
+
+HTTP 层不要再自定义 `200x/300x/500x` 业务错误码。任务提交、暂停、继续、停止和状态查询都应返回统一结构：
+
+```json
+{
+  "success": false,
+  "code": -2215,
+  "message": "Motion task conflict",
+  "task_id": "optional-task-id"
+}
+```
+
+其中 `code` 必须来自“DianaApi 错误码返回规范”的映射表。底层 DianaApi 调用失败时优先透传底层错误码；executor 自己发现的错误按内部错误到 DianaApi 错误码映射转换。
 
 对点动 pause/resume：
 
 ```json
 {
   "success": false,
-  "code": 3004,
+  "code": -2201,
   "message": "Current motion type does not support pause"
 }
 ```

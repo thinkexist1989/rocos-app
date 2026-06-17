@@ -338,6 +338,8 @@ target_link_libraries(unit_test
 #        robot
 #        )
 add_test(NAME unit_test COMMAND unit_test)
+set_tests_properties(unit_test PROPERTIES
+        WORKING_DIRECTORY ${CMAKE_SOURCE_DIR})
 
 add_executable(unit_interval_motion_profile_test
         test/unit_interval_motion_profile_test.cc
@@ -350,3 +352,82 @@ target_link_libraries(unit_interval_motion_profile_test
         )
 add_test(NAME unit_interval_motion_profile_test
         COMMAND unit_interval_motion_profile_test)
+
+add_executable(motion_core_test
+        test/motion_core_test.cc
+        src/UnitIntervalMotionProfile.cpp
+        )
+target_link_libraries(motion_core_test
+        PRIVATE
+        ruckig::ruckig
+        )
+add_test(NAME motion_core_test
+        COMMAND motion_core_test)
+
+add_executable(motion_executor_test
+        test/motion_executor_test.cc
+        src/UnitIntervalMotionProfile.cpp
+        )
+target_link_libraries(motion_executor_test
+        PRIVATE
+        ruckig::ruckig
+        )
+add_test(NAME motion_executor_test
+        COMMAND motion_executor_test)
+
+add_executable(motion_safety_guard_test
+        test/motion_safety_guard_test.cc
+        )
+add_test(NAME motion_safety_guard_test
+        COMMAND motion_safety_guard_test)
+
+add_executable(motion_context_test
+        test/motion_context_test.cc
+        )
+add_test(NAME motion_context_test
+        COMMAND motion_context_test)
+
+add_executable(motion_controller_test
+        test/motion_controller_test.cc
+        )
+add_test(NAME motion_controller_test
+        COMMAND motion_controller_test)
+
+add_executable(robot_fsm_gateway_test
+        test/robot_fsm_gateway_test.cc
+        )
+add_test(NAME robot_fsm_gateway_test
+        COMMAND robot_fsm_gateway_test)
+
+add_executable(robot_motion_context_test
+        test/robot_motion_context_test.cc
+        )
+add_test(NAME robot_motion_context_test
+        COMMAND robot_motion_context_test)
+
+add_executable(move_j_submission_test
+        test/move_j_submission_test.cc
+        src/UnitIntervalMotionProfile.cpp
+        )
+target_link_libraries(move_j_submission_test
+        PRIVATE
+        ruckig::ruckig
+        )
+add_test(NAME move_j_submission_test
+        COMMAND move_j_submission_test)
+
+add_executable(robot_motion_sim_test
+        test/robot_motion_sim_test.cc
+        )
+target_link_libraries(robot_motion_sim_test
+        PRIVATE
+        robot
+        hardware
+        drive
+        kinematics
+        dynamics
+        )
+add_test(NAME robot_motion_sim_test
+        COMMAND robot_motion_sim_test)
+set_tests_properties(robot_motion_sim_test PROPERTIES
+        WORKING_DIRECTORY ${CMAKE_SOURCE_DIR})

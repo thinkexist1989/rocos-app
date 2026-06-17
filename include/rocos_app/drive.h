@@ -41,6 +41,7 @@ namespace rocos {
 
     public:
         Drive(HardwareInterface *hw, int id);
+        ~Drive();
 
         bool setDriverState(const DriveState &driveState, bool waitForState);
 
@@ -197,7 +198,7 @@ namespace rocos {
 
     protected:
 
-        boost::shared_ptr<HardwareInterface> hw_interface_{nullptr}; // The pointer of HardwareInterface instance
+        HardwareInterface* hw_interface_{nullptr}; // Non-owning HardwareInterface pointer
         int id_{0}; // drive id in bus
         double reduction_ratio_{1.0}; // reduction ratio
         double min_pos_limit_{-2.0};

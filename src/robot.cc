@@ -20,6 +20,7 @@
 #include <rocos_app/robot.h>
 #include <kdl_parser/kdl_parser.hpp> // 用于将urdf文件解析为KDL::Tree
 #include <boost/sml.hpp>
+#include <algorithm>
 #include <iomanip>
 #include <sstream>
 
@@ -307,6 +308,8 @@ namespace rocos {
         else {
             impl_->process_event(EventSuccess{});  // 模拟初始化失败事件
         }
+
+        initializeMotionExecutor();
     }
 
     Robot::Robot(HardwareInterface *hw,
@@ -324,6 +327,14 @@ namespace rocos {
 
 
     Robot::~Robot() {
+        stopMotionThread();
+
+        motion_executor_.reset();
+        motion_context_.reset();
+        motion_position_controller_.reset();
+        motion_fsm_gateway_.reset();
+        motion_safety_guard_.reset();
+
         // Delete logger pointer
         if (log_ptr_) {
             log_ptr_->flush();
@@ -655,7 +666,7 @@ namespace rocos {
         // 中间态经 on_entry 回调自动推进）。其他状态下事件不被处理，process_event 返回
         // false —— 这就是原子的状态门控：RUNNING/PAUSED 等状态下新运动被直接拒绝，
         // 无需额外的标志位，也不存在 check-then-act 竞态。
-        if (!impl_->process_event(EventStartReq{})) {
+        if (!requestMotionStart()) {
             log_ptr_->error("无法开始运动：机器人不处于 STOPPED 状态（当前：{}）", GetRobotState());
             return false;
         }
@@ -666,12 +677,72 @@ namespace rocos {
         // 运动线程结束或中止时调用，从 RUNNING/PAUSED/SERVOING/ERROR 回到 STOPPED
         // （STOPPING 中间态经 on_fsm_stop 自动推进）。若当前已是 STOPPED/IDLE，
         // EventStopReq 不被处理，视为无害空操作。
-        impl_->process_event(EventStopReq{});
+        requestMotionStop();
     }
 
     bool Robot::isMotionRunning() const {
         // 是否有运动正占用机器人（FSM 处于 RUNNING）。替代旧的 is_running_motion 读取。
         return impl_->is(sml::state<class RUNNING>);
+    }
+
+    bool Robot::requestMotionStart() {
+        return impl_->process_event(EventStartReq{});
+    }
+
+    bool Robot::requestMotionPause() {
+        return impl_->process_event(EventPauseReq{});
+    }
+
+    bool Robot::requestMotionContinue() {
+        return impl_->process_event(EventContinueReq{});
+    }
+
+    bool Robot::requestMotionStop() {
+        return impl_->process_event(EventStopReq{});
+    }
+
+    bool Robot::notifyMotionError() {
+        return impl_->process_event(EventErrorOccurred{});
+    }
+
+    void Robot::waitControlCycle() {
+        if (hw_interface_) {
+            hw_interface_->waitForSignal(0);
+        }
+    }
+
+    void Robot::initializeMotionExecutor() {
+        motion::MotionSafetyLimits limits;
+        limits.min_position.reserve(jnt_num_);
+        limits.max_position.reserve(jnt_num_);
+        limits.max_command_velocity.reserve(jnt_num_);
+        limits.max_following_error.reserve(jnt_num_);
+
+        for (int i = 0; i < jnt_num_; ++i) {
+            const double min_position = joints_[i]->getMinPosLimit();
+            const double max_position = joints_[i]->getMaxPosLimit();
+            const double max_velocity = std::max(joints_[i]->getMaxVel(), EPS);
+            limits.min_position.push_back(min_position);
+            limits.max_position.push_back(max_position);
+            limits.max_command_velocity.push_back(max_velocity);
+            limits.max_following_error.push_back(
+                std::max(max_position - min_position, 1.0));
+        }
+
+        motion_safety_guard_ =
+            std::make_unique<motion::MotionSafetyGuard>(std::move(limits));
+        motion_fsm_gateway_ =
+            std::make_unique<motion::BasicRobotFsmGateway<Robot>>(*this);
+        motion_position_controller_ =
+            std::make_unique<motion::PositionController>();
+        motion_context_ =
+            std::make_unique<motion::RobotMotionContext<Robot>>(
+                *this, *motion_safety_guard_, DELTA_T);
+        motion_executor_ =
+            std::make_unique<motion::MotionExecutor>(
+                *motion_fsm_gateway_,
+                *motion_position_controller_,
+                *motion_context_);
     }
 
     void Robot::setEnabled() {
@@ -733,13 +804,17 @@ namespace rocos {
 
     //TODO: 这里需要修改
     void Robot::startMotionThread() {
+        motion_thread_stop_requested_ = false;
         otg_motion_thread_ =
                 std::make_shared<std::thread>(&Robot::motionThreadHandler, this);
     }
     //TODO: 这里需要修改
     void Robot::stopMotionThread() {
-        // otg_motion_thread_->interrupt();
-        otg_motion_thread_->join();  //等待运动线程结束
+        motion_thread_stop_requested_ = true;
+        if (otg_motion_thread_ && otg_motion_thread_->joinable()) {
+            otg_motion_thread_->join();
+        }
+        otg_motion_thread_.reset();
     }
     //TODO: 这里需要修改，主要为了更新笛卡尔
     void Robot::motionThreadHandler() {
@@ -781,7 +856,7 @@ namespace rocos {
         }
         //**-------------------------------**//
 
-        while (true) {  // while start
+        while (!motion_thread_stop_requested_) {  // while start
 
             hw_interface_->waitForSignal(9);
 
@@ -922,44 +997,127 @@ namespace rocos {
     int Robot::MoveJ(JntArray q, double speed, double acceleration, double time,
                      double radius, bool asynchronous) {
 
-        if (CheckBeforeMove(q, speed, acceleration, time, radius) < 0) {
-            log_ptr_->error("given parameters is invalid");
-            return -1;
+        if (!motion_executor_) {
+            initializeMotionExecutor();
+        }
+
+        if (q.rows() != static_cast<unsigned int>(jnt_num_)) {
+            log_ptr_->error("MoveJ target dimension does not match robot joints");
+            return static_cast<int>(motion::DianaErrorCode::UnmatchedJointsNumber);
+        }
+
+        if (time != 0.0 || radius != 0.0) {
+            log_ptr_->error("MoveJ executor path does not support time/radius yet");
+            return static_cast<int>(motion::DianaErrorCode::IllegalParameter);
         }
 
         for (int i{0}; i < jointNum; i++) {
+            if (q(i) > joints_[i]->getMaxPosLimit() ||
+                q(i) < joints_[i]->getMinPosLimit()) {
+                log_ptr_->error("MoveJ position command is out of range");
+                return static_cast<int>(motion::DianaErrorCode::PosLimit);
+            }
+            if (speed > joints_[i]->getMaxVel() ||
+                speed < (-1) * joints_[i]->getMaxVel()) {
+                log_ptr_->error("MoveJ velocity command is out of range");
+                return static_cast<int>(motion::DianaErrorCode::SpeedLimit);
+            }
+            if (acceleration > joints_[i]->getMaxAcc() ||
+                acceleration < (-1) * joints_[i]->getMaxAcc()) {
+                log_ptr_->error("MoveJ acceleration command is out of range");
+                return static_cast<int>(motion::DianaErrorCode::AccLimit);
+            }
+            if (joints_[i]->getDriveState() != DriveState::OperationEnabled) {
+                log_ptr_->error("MoveJ joint[{}] is not operation enabled", i);
+                return static_cast<int>(motion::DianaErrorCode::NotAllAtOpState);
+            }
             if (!(joints_[i]->getMode() == ModeOfOperation::CyclicSynchronousPositionMode ||
                   joints_[i]->getMode() == ModeOfOperation::CyclicSynchronousVelocityMode)) {
                 log_ptr_->error("MoveJ不支持关节[{}]的当前模式 :{}", i, static_cast<int>(joints_[i]->getMode()));
-                return -1;
+                return static_cast<int>(motion::DianaErrorCode::CallingConflictError);
             }
         }
 
-        if (!enterRunning())  //最大异步执行一条任务：仅 STOPPED 状态可启动新运动
-        {
-            log_ptr_->error(" Motion is still running and waiting for it to finish");
-            return -1;
+        std::vector<double> target_position(jnt_num_);
+        for (int i = 0; i < jnt_num_; ++i) {
+            target_position[i] = q(i);
         }
 
-        if (motion_thread_) {
-            motion_thread_->join();
-            motion_thread_ = nullptr;
+        const auto submit_result = motion::submitMoveJ(
+            *this,
+            *motion_executor_,
+            target_position,
+            std::abs(speed),
+            std::abs(acceleration),
+            DELTA_T);
+        if (!submit_result.success) {
+            log_ptr_->error("MoveJ executor submit failed: {}", submit_result.message);
+            return submit_result.api_error_code;
         }
 
-        if (asynchronous)  //异步执行
-        {
-            motion_thread_.reset(new std::thread{&Robot::RunMoveJ, this, q,
-                                                   speed, acceleration, time,
-                                                   radius});
-        } else  //同步执行
-        {
-            motion_thread_.reset(new std::thread{&Robot::RunMoveJ, this, q,
-                                                   speed, acceleration, time,
-                                                   radius});
-            motion_thread_->join();
-            motion_thread_ = nullptr;
+        if (!asynchronous) {
+            while (motion_executor_->hasActiveCommand()) {
+                std::this_thread::sleep_for(std::chrono::milliseconds(1));
+            }
+            const auto last_error = motion_executor_->lastError();
+            if (!last_error.success) {
+                log_ptr_->error("MoveJ executor failed: {}", last_error.message);
+                return last_error.api_error_code;
+            }
         }
 
+        return 0;
+    }
+
+    int Robot::PauseMotion() {
+        if (!motion_executor_) {
+            initializeMotionExecutor();
+        }
+
+        const auto result = motion_executor_->pause();
+        if (!result.success) {
+            log_ptr_->error("PauseMotion failed: {}", result.message);
+            return result.api_error_code;
+        }
+        const auto deadline =
+            std::chrono::steady_clock::now() + std::chrono::seconds(5);
+        while (std::chrono::steady_clock::now() < deadline) {
+            if (motion_executor_->currentTaskStatus() ==
+                motion::MotionTaskStatus::Paused) {
+                return 0;
+            }
+            if (!motion_executor_->hasActiveCommand()) {
+                const auto last_error = motion_executor_->lastError();
+                return last_error.success ? 0 : last_error.api_error_code;
+            }
+            std::this_thread::sleep_for(std::chrono::milliseconds(1));
+        }
+        return static_cast<int>(motion::DianaErrorCode::NotAllAtOpState);
+    }
+
+    int Robot::ResumeMotion() {
+        if (!motion_executor_) {
+            initializeMotionExecutor();
+        }
+
+        const auto result = motion_executor_->resume();
+        if (!result.success) {
+            log_ptr_->error("ResumeMotion failed: {}", result.message);
+            return result.api_error_code;
+        }
+        return 0;
+    }
+
+    int Robot::StopMotion() {
+        if (!motion_executor_) {
+            initializeMotionExecutor();
+        }
+
+        const auto result = motion_executor_->stop();
+        if (!result.success) {
+            log_ptr_->error("StopMotion failed: {}", result.message);
+            return result.api_error_code;
+        }
         return 0;
     }
 

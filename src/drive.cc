@@ -19,6 +19,7 @@
 
 #include "include/rocos_app/drive.h"
 
+#include <algorithm>
 
 namespace rocos {
 
@@ -41,6 +42,12 @@ namespace rocos {
 
         hw_interface_->setModeOfOperation(id_, mode_); // Default CSP
 
+    }
+
+    Drive::~Drive() {
+        if (drive_guard_) {
+            drive_guard_->removeDrive(this);
+        }
     }
 
     bool Drive::setDriverState(const DriveState &driveState, bool waitForState) {

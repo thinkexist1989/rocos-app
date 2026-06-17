@@ -142,6 +142,8 @@ void RobotHttpServer::registerRoutes() {
     server_->Post("/api/move/circle", [this](auto& req, auto& res) { handleMoveC(req, res); });
     server_->Post("/api/move/path", [this](auto& req, auto& res) { handleMoveP(req, res); });
     server_->Post("/api/move/pathway", [this](auto& req, auto& res) { handleMovePath(req, res); });
+    server_->Post("/api/move/pause", [this](auto& req, auto& res) { handlePause(req, res); });
+    server_->Post("/api/move/resume", [this](auto& req, auto& res) { handleResume(req, res); });
     server_->Post("/api/move/stop", [this](auto& req, auto& res) { handleStop(req, res); });
     server_->Get("/api/move/status", [this](auto& req, auto& res) { handleMoveStatus(req, res); });
 
@@ -990,8 +992,32 @@ void RobotHttpServer::handleMovePath(const httplib::Request& req, httplib::Respo
 
 void RobotHttpServer::handleStop(const httplib::Request& req, httplib::Response& res) {
     log_ptr_->info("POST /api/move/stop");
-    robot_->stopMultiAxis();
-    sendJson(res, true, 0, "Motion stopped");
+    const int result = robot_->StopMotion();
+    if (result == 0) {
+        sendJson(res, true, 0, "Motion stopped");
+    } else {
+        sendJson(res, false, result, "Motion stop failed with code " + std::to_string(result));
+    }
+}
+
+void RobotHttpServer::handlePause(const httplib::Request& req, httplib::Response& res) {
+    log_ptr_->info("POST /api/move/pause");
+    const int result = robot_->PauseMotion();
+    if (result == 0) {
+        sendJson(res, true, 0, "Motion paused");
+    } else {
+        sendJson(res, false, result, "Motion pause failed with code " + std::to_string(result));
+    }
+}
+
+void RobotHttpServer::handleResume(const httplib::Request& req, httplib::Response& res) {
+    log_ptr_->info("POST /api/move/resume");
+    const int result = robot_->ResumeMotion();
+    if (result == 0) {
+        sendJson(res, true, 0, "Motion resumed");
+    } else {
+        sendJson(res, false, result, "Motion resume failed with code " + std::to_string(result));
+    }
 }
 
 // ============================================================================

@@ -72,6 +72,8 @@ private:
     void handleMoveC(const httplib::Request& req, httplib::Response& res);
     void handleMoveP(const httplib::Request& req, httplib::Response& res);
     void handleMovePath(const httplib::Request& req, httplib::Response& res);
+    void handlePause(const httplib::Request& req, httplib::Response& res);
+    void handleResume(const httplib::Request& req, httplib::Response& res);
     void handleStop(const httplib::Request& req, httplib::Response& res);
 
     // ---- Single/Multi Axis Control ----
