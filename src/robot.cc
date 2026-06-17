@@ -19,6 +19,8 @@
 
 #include <rocos_app/robot.h>
 #include <kdl_parser/kdl_parser.hpp> // 用于将urdf文件解析为KDL::Tree
+#include <rocos_app/motion/move_l_submission.h>
+#include <rocos_app/motion/move_c_submission.h>
 #include <boost/sml.hpp>
 #include <algorithm>
 #include <iomanip>
@@ -738,11 +740,49 @@ namespace rocos {
         motion_context_ =
             std::make_unique<motion::RobotMotionContext<Robot>>(
                 *this, *motion_safety_guard_, DELTA_T);
+
+        // 初始化 ModelProvider 的 FK/IK 回调
+        model_provider_.kinematics.forwardKinematics =
+            [this](const std::vector<double>& q, std::vector<double>& pose_out) -> bool {
+                if (static_cast<int>(q.size()) != jnt_num_) { return false; }
+                KDL::JntArray q_kdl(jnt_num_);
+                for (int i = 0; i < jnt_num_; ++i) { q_kdl(i) = q[i]; }
+                KDL::Frame frame;
+                if (kinematics_.JntToCart(q_kdl, frame) < 0) { return false; }
+                pose_out.resize(7);
+                pose_out[0] = frame.p.x();
+                pose_out[1] = frame.p.y();
+                pose_out[2] = frame.p.z();
+                frame.M.GetQuaternion(pose_out[3], pose_out[4], pose_out[5], pose_out[6]);
+                return true;
+            };
+        model_provider_.kinematics.inverseKinematics =
+            [this](const std::vector<double>& q_seed,
+                   const std::vector<double>& target_pose,
+                   std::vector<double>& q_out) -> bool {
+                if (target_pose.size() < 7) { return false; }
+                KDL::JntArray q_kdl(jnt_num_);
+                for (int i = 0; i < jnt_num_; ++i) {
+                    q_kdl(i) = (i < static_cast<int>(q_seed.size())) ? q_seed[i] : 0.0;
+                }
+                KDL::Frame target;
+                target.p = KDL::Vector(target_pose[0], target_pose[1], target_pose[2]);
+                target.M = KDL::Rotation::Quaternion(
+                    target_pose[3], target_pose[4], target_pose[5], target_pose[6]);
+                KDL::JntArray result;
+                if (kinematics_.CartToJnt(q_kdl, target, result) < 0) { return false; }
+                q_out.resize(jnt_num_);
+                for (int i = 0; i < jnt_num_; ++i) { q_out[i] = result(i); }
+                return true;
+            };
+        model_provider_.kinematics.getDof = [this]() { return jnt_num_; };
+
         motion_executor_ =
             std::make_unique<motion::MotionExecutor>(
                 *motion_fsm_gateway_,
                 *motion_position_controller_,
-                *motion_context_);
+                *motion_context_,
+                model_provider_);
     }
 
     void Robot::setEnabled() {
@@ -1157,6 +1197,45 @@ namespace rocos {
                 all_vel_mode = false;
         }
 
+        // time==0 && radius==0 → executor 路径（MoveLCommand + S-curve profile）
+        if (time == 0.0 && radius == 0.0) {
+            if (!motion_executor_) {
+                initializeMotionExecutor();
+            }
+
+            for (int i{0}; i < jointNum; i++) {
+                if (joints_[i]->getDriveState() != DriveState::OperationEnabled) {
+                    log_ptr_->error("MoveL joint[{}] is not operation enabled", i);
+                    return static_cast<int>(motion::DianaErrorCode::NotAllAtOpState);
+                }
+            }
+
+            const auto submit_result = motion::submitMoveL(
+                *this,
+                *motion_executor_,
+                pose,
+                speed,
+                acceleration,
+                DELTA_T);
+            if (!submit_result.success) {
+                log_ptr_->error("MoveL executor submit failed: {}", submit_result.message);
+                return submit_result.api_error_code;
+            }
+
+            if (!asynchronous) {
+                while (motion_executor_->hasActiveCommand()) {
+                    std::this_thread::sleep_for(std::chrono::milliseconds(1));
+                }
+                const auto last_error = motion_executor_->lastError();
+                if (!last_error.success) {
+                    log_ptr_->error("MoveL executor failed: {}", last_error.message);
+                    return last_error.api_error_code;
+                }
+            }
+            return 0;
+        }
+
+        // 旧路径（time/radius 不为零，或速度模式）
         if (all_pos_mode)
             return MoveL_pos(pose, speed, acceleration, time, radius, asynchronous, max_running_count);
         else if (all_vel_mode)
@@ -1480,6 +1559,47 @@ namespace rocos {
                 all_vel_mode = false;
         }
 
+        // time==0 && radius==0 → executor 路径（MoveCThreePointCommand）
+        if (time == 0.0 && radius == 0.0) {
+            if (!motion_executor_) {
+                initializeMotionExecutor();
+            }
+
+            for (int i{0}; i < jointNum; i++) {
+                if (joints_[i]->getDriveState() != DriveState::OperationEnabled) {
+                    log_ptr_->error("MoveC joint[{}] is not operation enabled", i);
+                    return static_cast<int>(motion::DianaErrorCode::NotAllAtOpState);
+                }
+            }
+
+            const auto submit_result = motion::submitMoveCThreePoint(
+                *this,
+                *motion_executor_,
+                pose_via,
+                pose_to,
+                speed,
+                acceleration,
+                mode == Robot::OrientationMode::FIXED,
+                DELTA_T);
+            if (!submit_result.success) {
+                log_ptr_->error("MoveC three-point executor submit failed: {}", submit_result.message);
+                return submit_result.api_error_code;
+            }
+
+            if (!asynchronous) {
+                while (motion_executor_->hasActiveCommand()) {
+                    std::this_thread::sleep_for(std::chrono::milliseconds(1));
+                }
+                const auto last_error = motion_executor_->lastError();
+                if (!last_error.success) {
+                    log_ptr_->error("MoveC executor failed: {}", last_error.message);
+                    return last_error.api_error_code;
+                }
+            }
+            return 0;
+        }
+
+        // 旧路径（time/radius 不为零，或速度模式）
         if (all_pos_mode)
             return MoveC_pos(pose_via, pose_to, speed, acceleration, time, radius, mode, asynchronous,
                              max_running_count);
@@ -1507,6 +1627,48 @@ namespace rocos {
                 all_vel_mode = false;
         }
 
+        // time==0 && radius==0 → executor 路径（MoveCCenterAngleCommand）
+        if (time == 0.0 && radius == 0.0) {
+            if (!motion_executor_) {
+                initializeMotionExecutor();
+            }
+
+            for (int i{0}; i < jointNum; i++) {
+                if (joints_[i]->getDriveState() != DriveState::OperationEnabled) {
+                    log_ptr_->error("MoveC joint[{}] is not operation enabled", i);
+                    return static_cast<int>(motion::DianaErrorCode::NotAllAtOpState);
+                }
+            }
+
+            const auto submit_result = motion::submitMoveCCenterAngle(
+                *this,
+                *motion_executor_,
+                center,
+                theta,
+                axiz,
+                speed,
+                acceleration,
+                mode == Robot::OrientationMode::FIXED,
+                DELTA_T);
+            if (!submit_result.success) {
+                log_ptr_->error("MoveC center-angle executor submit failed: {}", submit_result.message);
+                return submit_result.api_error_code;
+            }
+
+            if (!asynchronous) {
+                while (motion_executor_->hasActiveCommand()) {
+                    std::this_thread::sleep_for(std::chrono::milliseconds(1));
+                }
+                const auto last_error = motion_executor_->lastError();
+                if (!last_error.success) {
+                    log_ptr_->error("MoveC executor failed: {}", last_error.message);
+                    return last_error.api_error_code;
+                }
+            }
+            return 0;
+        }
+
+        // 旧路径（time/radius 不为零，或速度模式）
         if (all_pos_mode)
             return MoveC_pos(center, theta, axiz, speed, acceleration, time, radius, mode, asynchronous,
                              max_running_count);

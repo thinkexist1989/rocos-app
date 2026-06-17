@@ -3,11 +3,25 @@
 #include <test/doctest.h>
 
 #include <rocos_app/motion/move_j_submission.h>
+#include <rocos_app/motion/motion_context.h>
+#include <rocos_app/motion/model_provider.h>
 
 #include <memory>
 #include <vector>
 
 namespace {
+
+class StubContext final : public rocos::motion::MotionContext {
+public:
+    rocos::motion::RobotStateSnapshot readStateSnapshot() const override {
+        return rocos::motion::RobotStateSnapshot{};
+    }
+    double controlPeriod() const override { return 0.001; }
+    rocos::motion::MotionResult writeLowLevelCommand(
+        const rocos::motion::LowLevelCommand&) override {
+        return rocos::motion::MotionResult::ok();
+    }
+};
 
 class FakeRobotRuntime {
 public:
@@ -32,7 +46,11 @@ public:
         if (!submit_result.success) {
             return submit_result;
         }
-        command->prepare();
+        if (command) {
+            StubContext stub_ctx;
+            rocos::motion::ModelProvider stub_model;
+            command->prepare(stub_ctx, stub_model);
+        }
         stored_command = std::move(command);
         return rocos::motion::MotionResult::ok();
     }

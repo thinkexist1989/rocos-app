@@ -21,7 +21,7 @@ public:
     bool supportsResume() const override { return true; }
     bool supportsStop() const override { return true; }
 
-    MotionResult start() override {
+    MotionResult start(MotionContext& /*ctx*/) override {
         const auto limits = profileLimits();
         profile_.Reset();
         profile_.Start(limits.max_velocity,
@@ -83,7 +83,9 @@ public:
         return MotionResult::ok();
     }
 
-    MotionStepResult update() override {
+    MotionStepResult update(MotionContext& /*ctx*/,
+                            ModelProvider& /*model*/,
+                            bool /*required*/ = true) override {
         if (status_ == MotionStepStatus::Finished ||
             status_ == MotionStepStatus::Stopped ||
             status_ == MotionStepStatus::Paused ||
@@ -104,6 +106,15 @@ public:
         auto reference = sample(profile_.position(),
                                 profile_.velocity(),
                                 profile_.acceleration());
+
+        if (reference.space == ReferenceSpace::None) {
+            status_ = MotionStepStatus::Failed;
+            return MotionStepResult{
+                status_,
+                MotionResult::fail(MotionResultCode::ExecutionFailed,
+                                   "IK solver failed during finite motion sample"),
+                std::nullopt};
+        }
 
         if (stopping_ && profile_.IsStopCompleted()) {
             status_ = MotionStepStatus::Stopped;

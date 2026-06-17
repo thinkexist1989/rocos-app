@@ -360,6 +360,7 @@ add_executable(motion_core_test
 target_link_libraries(motion_core_test
         PRIVATE
         ruckig::ruckig
+        kinematics
         )
 add_test(NAME motion_core_test
         COMMAND motion_core_test)
@@ -431,3 +432,13 @@ add_test(NAME robot_motion_sim_test
         COMMAND robot_motion_sim_test)
 set_tests_properties(robot_motion_sim_test PROPERTIES
         WORKING_DIRECTORY ${CMAKE_SOURCE_DIR})
+
+add_executable(cartesian_geometry_test
+        test/cartesian_geometry_test.cc
+        )
+target_link_libraries(cartesian_geometry_test
+        PRIVATE
+        kinematics
+        )
+add_test(NAME cartesian_geometry_test
+        COMMAND cartesian_geometry_test)

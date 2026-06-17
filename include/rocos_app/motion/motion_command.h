@@ -7,6 +7,9 @@
 
 namespace rocos::motion {
 
+class MotionContext;
+struct ModelProvider;
+
 class MotionCommand {
 public:
     virtual ~MotionCommand() = default;
@@ -20,9 +23,11 @@ public:
     virtual bool supportsResume() const { return false; }
     virtual bool supportsStop() const { return true; }
 
-    virtual MotionResult prepare() = 0;
-    virtual MotionResult start() = 0;
-    virtual MotionStepResult update() = 0;
+    virtual MotionResult prepare(MotionContext& ctx, ModelProvider& model) = 0;
+    virtual MotionResult start(MotionContext& ctx) = 0;
+    virtual MotionStepResult update(MotionContext& ctx,
+                                    ModelProvider& model,
+                                    bool required = true) = 0;
 
     virtual MotionResult pause() {
         return MotionResult::fail(MotionResultCode::Unsupported,

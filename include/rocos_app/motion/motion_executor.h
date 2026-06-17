@@ -5,6 +5,7 @@
 #include <rocos_app/motion/motion_controller.h>
 #include <rocos_app/motion/motion_command.h>
 #include <rocos_app/motion/motion_fsm_gateway.h>
+#include <rocos_app/motion/model_provider.h>
 
 #include <atomic>
 #include <chrono>
@@ -14,18 +15,45 @@
 
 namespace rocos::motion {
 
+class NullMotionContext final : public MotionContext {
+public:
+    RobotStateSnapshot readStateSnapshot() const override {
+        return RobotStateSnapshot{};
+    }
+    double controlPeriod() const override { return 0.001; }
+    MotionResult writeLowLevelCommand(const LowLevelCommand& /*command*/) override {
+        return MotionResult::ok();
+    }
+};
+
 class MotionExecutor {
 public:
-    MotionExecutor() : fsm_(&default_fsm_) {}
+    MotionExecutor()
+        : fsm_(&default_fsm_),
+          context_(&default_ctx_),
+          model_(&default_model_) {}
 
-    explicit MotionExecutor(MotionFsmGateway& fsm) : fsm_(&fsm) {}
+    MotionExecutor(MotionFsmGateway& fsm)
+        : fsm_(&fsm),
+          context_(&default_ctx_),
+          model_(&default_model_) {}
 
     MotionExecutor(MotionFsmGateway& fsm,
                    MotionController& controller,
                    MotionContext& context)
         : fsm_(&fsm),
           controller_(&controller),
-          context_(&context) {}
+          context_(&context),
+          model_(&default_model_) {}
+
+    MotionExecutor(MotionFsmGateway& fsm,
+                   MotionController& controller,
+                   MotionContext& context,
+                   ModelProvider& model)
+        : fsm_(&fsm),
+          controller_(&controller),
+          context_(&context),
+          model_(&model) {}
 
     ~MotionExecutor() {
         stop();
@@ -68,7 +96,7 @@ public:
             return start_gate_result;
         }
 
-        auto prepare_result = command->prepare();
+        auto prepare_result = command->prepare(*context_, *model_);
         if (!prepare_result.success) {
             fsm_->notifyStopped();
             std::lock_guard<std::mutex> lock(mutex_);
@@ -86,7 +114,7 @@ public:
             return match_result;
         }
 
-        auto start_result = command->start();
+        auto start_result = command->start(*context_);
         if (!start_result.success) {
             fsm_->notifyStopped();
             std::lock_guard<std::mutex> lock(mutex_);
@@ -123,6 +151,14 @@ public:
         if (!current_) {
             return MotionResult::fail(MotionResultCode::InvalidState,
                                       "no active motion command");
+        }
+        if (task_status_ == MotionTaskStatus::Paused) {
+            return MotionResult::fail(MotionResultCode::InvalidState,
+                                      "motion is already paused");
+        }
+        if (task_status_ != MotionTaskStatus::Running) {
+            return MotionResult::fail(MotionResultCode::InvalidState,
+                                      "motion is not running");
         }
         if (!current_->supportsPause()) {
             return MotionResult::fail(MotionResultCode::Unsupported,
@@ -220,7 +256,7 @@ private:
                 if (!current_ || stop_worker_) {
                     return;
                 }
-                step = current_->update();
+                step = current_->update(*context_, *model_, true);
                 if (step.status == MotionStepStatus::Running) {
                     if (step.reference) {
                         auto dispatch_result =
@@ -272,12 +308,27 @@ private:
     }
 
     MotionResult dispatchReference(const MotionReference& reference) {
+        // 无 controller 且无 context：纯测试场景，直接忽略
         if (!controller_ && !context_) {
             return MotionResult::ok();
         }
-        if (!controller_ || !context_) {
+
+        // 无 controller 时，JointReference 直接写入 context（有限运动命令直写）
+        if (!controller_) {
+            if (reference.space == ReferenceSpace::Joint) {
+                LowLevelCommand command;
+                command.target_position = reference.joint.position;
+                command.target_velocity = reference.joint.velocity;
+                return context_->writeLowLevelCommand(command);
+            }
             return MotionResult::fail(MotionResultCode::InvalidState,
-                                      "motion controller and context must be configured together");
+                                      "no controller for non-joint reference");
+        }
+
+        // 有 controller 就必须有 context
+        if (!context_) {
+            return MotionResult::fail(MotionResultCode::InvalidState,
+                                      "motion controller requires context");
         }
 
         LowLevelCommand command;
@@ -291,6 +342,7 @@ private:
 
     MotionResult checkControllerCompatibility(
         const MotionCommand& command) const {
+        // 没有 controller 时，直接接受（JointReference 走直写路径）
         if (!controller_) {
             return MotionResult::ok();
         }
@@ -318,9 +370,12 @@ private:
 
     mutable std::mutex mutex_;
     AcceptAllMotionFsmGateway default_fsm_;
+    NullMotionContext default_ctx_;
+    ModelProvider default_model_;
     MotionFsmGateway* fsm_{nullptr};
     MotionController* controller_{nullptr};
     MotionContext* context_{nullptr};
+    ModelProvider* model_{nullptr};
     std::unique_ptr<MotionCommand> current_;
     std::thread worker_;
     bool stop_worker_{false};

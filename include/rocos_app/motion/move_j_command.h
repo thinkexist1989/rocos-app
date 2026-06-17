@@ -31,7 +31,7 @@ public:
         return ReferenceSpace::Joint;
     }
 
-    MotionResult prepare() override {
+    MotionResult prepare(MotionContext& /*ctx*/, ModelProvider& /*model*/) override {
         const auto n = params_.q_start.size();
         if (n == 0 ||
             params_.q_goal.size() != n ||

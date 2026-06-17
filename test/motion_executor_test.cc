@@ -14,6 +14,18 @@
 
 namespace {
 
+class StubMotionContext : public rocos::motion::MotionContext {
+public:
+    rocos::motion::RobotStateSnapshot readStateSnapshot() const override {
+        return rocos::motion::RobotStateSnapshot{};
+    }
+    double controlPeriod() const override { return 0.001; }
+    rocos::motion::MotionResult writeLowLevelCommand(
+        const rocos::motion::LowLevelCommand&) override {
+        return rocos::motion::MotionResult::ok();
+    }
+};
+
 class CountingCommand final : public rocos::motion::MotionCommand {
 public:
     explicit CountingCommand(int finish_after_updates)
@@ -21,12 +33,14 @@ public:
 
     std::string name() const override { return "CountingCommand"; }
 
-    rocos::motion::MotionResult prepare() override {
+    rocos::motion::MotionResult prepare(
+        rocos::motion::MotionContext&, rocos::motion::ModelProvider&) override {
         prepared_ = true;
         return rocos::motion::MotionResult::ok();
     }
 
-    rocos::motion::MotionResult start() override {
+    rocos::motion::MotionResult start(
+        rocos::motion::MotionContext&) override {
         if (!prepared_) {
             return rocos::motion::MotionResult::fail(
                 rocos::motion::MotionResultCode::InvalidState,
@@ -35,7 +49,10 @@ public:
         return rocos::motion::MotionResult::ok();
     }
 
-    rocos::motion::MotionStepResult update() override {
+    rocos::motion::MotionStepResult update(
+        rocos::motion::MotionContext&,
+        rocos::motion::ModelProvider&,
+        bool) override {
         ++updates_;
         if (stop_requested_) {
             return rocos::motion::MotionStepResult{
@@ -82,17 +99,22 @@ public:
     bool supportsPause() const override { return true; }
     bool supportsResume() const override { return true; }
 
-    rocos::motion::MotionResult prepare() override {
+    rocos::motion::MotionResult prepare(
+        rocos::motion::MotionContext&, rocos::motion::ModelProvider&) override {
         ++stats_->prepare_count;
         return rocos::motion::MotionResult::ok();
     }
 
-    rocos::motion::MotionResult start() override {
+    rocos::motion::MotionResult start(
+        rocos::motion::MotionContext&) override {
         ++stats_->start_count;
         return rocos::motion::MotionResult::ok();
     }
 
-    rocos::motion::MotionStepResult update() override {
+    rocos::motion::MotionStepResult update(
+        rocos::motion::MotionContext&,
+        rocos::motion::ModelProvider&,
+        bool) override {
         if (stop_requested) {
             return rocos::motion::MotionStepResult{
                 rocos::motion::MotionStepStatus::Stopped,
@@ -196,18 +218,23 @@ class FailingPrepareCommand final : public rocos::motion::MotionCommand {
 public:
     std::string name() const override { return "FailingPrepareCommand"; }
 
-    rocos::motion::MotionResult prepare() override {
+    rocos::motion::MotionResult prepare(
+        rocos::motion::MotionContext&, rocos::motion::ModelProvider&) override {
         return rocos::motion::MotionResult::failWithApiCode(
             rocos::motion::MotionResultCode::PlanningFailed,
             static_cast<int>(rocos::motion::DianaErrorCode::PlanMoveJ),
             "MoveJ planning failed");
     }
 
-    rocos::motion::MotionResult start() override {
+    rocos::motion::MotionResult start(
+        rocos::motion::MotionContext&) override {
         return rocos::motion::MotionResult::ok();
     }
 
-    rocos::motion::MotionStepResult update() override {
+    rocos::motion::MotionStepResult update(
+        rocos::motion::MotionContext&,
+        rocos::motion::ModelProvider&,
+        bool) override {
         return rocos::motion::MotionStepResult{
             rocos::motion::MotionStepStatus::Finished,
             rocos::motion::MotionResult::ok(),
@@ -230,15 +257,20 @@ public:
         return space_;
     }
 
-    rocos::motion::MotionResult prepare() override {
+    rocos::motion::MotionResult prepare(
+        rocos::motion::MotionContext&, rocos::motion::ModelProvider&) override {
         return rocos::motion::MotionResult::ok();
     }
 
-    rocos::motion::MotionResult start() override {
+    rocos::motion::MotionResult start(
+        rocos::motion::MotionContext&) override {
         return rocos::motion::MotionResult::ok();
     }
 
-    rocos::motion::MotionStepResult update() override {
+    rocos::motion::MotionStepResult update(
+        rocos::motion::MotionContext&,
+        rocos::motion::ModelProvider&,
+        bool) override {
         ++updates_;
         if (updates_ == 1) {
             rocos::motion::MotionReference reference;
@@ -347,7 +379,7 @@ rocos::motion::MoveJCommand::Parameters makeExecutorMoveJParams() {
     params.q_goal = {1.0, -1.0};
     params.max_velocity = {0.5, 0.5};
     params.max_acceleration = {1.0, 1.0};
-    params.max_jerk = {4.0, 4.0};
+    params.max_jerk = {1.0, 1.0};
     params.dt = 0.001;
     return params;
 }

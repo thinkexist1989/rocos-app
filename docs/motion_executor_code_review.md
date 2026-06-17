@@ -93,12 +93,13 @@
 新增测试：
 
 - `motion_core_test`
+
   - DianaApi 错误码映射。
   - `MoveJCommand` 采样输出位置、速度、加速度。
   - `MoveJCommand` pause/resume/stop 由 `FiniteMotionCommand` 统一处理。
   - NaN 参数返回 `-2902`。
-
 - `motion_executor_test`
+
   - 空 command 返回 `-2901`。
   - 忙碌提交返回 `-2215`。
   - prepare 失败保留 DianaApi 错误码并释放当前 command。
@@ -111,8 +112,8 @@
   - controller activate 失败时 submit 失败，保留 DianaApi 错误码且不写 context。
   - command/controller reference 空间不匹配时，submit 阶段拒绝启动并返回 DianaApi `-2325`。
   - context 拒绝 low-level command 时任务进入 `Failed`，保留 context 返回的 DianaApi 错误码。
-
 - `motion_safety_guard_test`
+
   - 第一条合法位置命令可以通过。
   - 未使能机器人返回 `-2205`。
   - NaN/Inf 返回 `-2902`。
@@ -120,36 +121,36 @@
   - 命令速度越界返回 `-2310`。
   - 跟随误差越界返回 `-2203`。
   - `reset()` 会清除上一条已接受命令历史。
-
 - `motion_context_test`
+
   - safety check 通过后才调用底层写入。
   - safety check 失败时不写底层命令。
   - 底层写入失败时不会调用 `MotionSafetyGuard::accept()`。
   - safety failure 会转换为 `MotionResultCode::SafetyViolation` 并保留 DianaApi 错误码。
-
 - `motion_controller_test`
+
   - `PositionController` 将 `JointReference` 转换成 `LowLevelCommand.target_position`。
   - 可选关节速度 reference 会透传到 `target_velocity`。
   - NaN/Inf reference 返回 DianaApi `-2902`。
   - reference/controller 空间不匹配返回 DianaApi `-2325`。
-
 - `robot_fsm_gateway_test`
+
   - gateway 将 start/pause/resume/stop/error 请求转发到 Robot-like FSM 客户端。
   - FSM 拒绝请求时返回 `MotionResultCode::InvalidState` 和 DianaApi `-2205`。
   - `notifyStopped()` 会通过 `requestMotionStop()` 汇报运动停止。
-
 - `robot_motion_context_test`
+
   - `RobotMotionContext` 可以读取 Robot-like runtime 的关节状态快照。
   - 通过 safety guard 后写入关节位置、速度，并等待一个控制周期。
   - safety guard 拒绝命令时不会写入底层关节目标。
-
 - `move_j_submission_test`
+
   - `submitMoveJ()` 会创建 `MoveJCommand` 并提交 executor。
   - 目标维度不匹配返回 DianaApi `-2332`。
   - 速度、加速度、周期等标量非法时返回 DianaApi 错误码。
   - executor 的 DianaApi 失败结果会原样透传。
-
 - `robot_motion_sim_test`
+
   - 参考 `src/rocosAppMain.cc` 使用 `HardwareSim(20)` 和 `Robot(config/robot.urdf, base_link, link_7)`。
   - 同步 `Robot::MoveJ` 会走 executor 路径，并在仿真硬件上到达目标关节位置。
   - 越界目标会返回 DianaApi `-2308`，机器人状态保持 `STOPPED`。

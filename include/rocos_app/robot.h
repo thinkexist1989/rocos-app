@@ -761,6 +761,7 @@ namespace rocos
     protected:
         // void addAllJoints();
 
+    public:
         int JntToCart(const JntArray &q_in, Frame &p_out)
         {
             return kinematics_.JntToCart(q_in, p_out);
@@ -771,12 +772,14 @@ namespace rocos
             return kinematics_.CartToJnt(q_init, p_in, q_out);
         }
 
+    protected:
+
         //! 更新法兰系,工具系,工件系poseFlange
         void updateCartesianInfo()
         {
             JntArray q_in(jnt_num_);
             for (int i{0}; i < jnt_num_; i++)
-                q_in(i) = pos_[i];
+                q_in(i) = joints_[i]->getPosition();
             // Flange Reference
             JntToCart(q_in, flange_);
         }
@@ -1106,6 +1109,7 @@ namespace rocos
         std::unique_ptr<motion::PositionController> motion_position_controller_{nullptr};
         std::unique_ptr<motion::RobotMotionContext<Robot>> motion_context_{nullptr};
         std::unique_ptr<motion::MotionExecutor> motion_executor_{nullptr};
+        motion::ModelProvider model_provider_;
 
         // JC_helper::inverse_special_to_SRS SRS_kinematics_; //TODO:
 
