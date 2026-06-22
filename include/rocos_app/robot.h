@@ -852,39 +852,7 @@ namespace rocos
         int MoveC_vel(const KDL::Frame &center, double theta, int axiz = 2, double speed = 0.25,
                       double acceleration = 1.2, double time = 0.0, double radius = 0.0,
                       OrientationMode mode = UNCONSTRAINED, bool asynchronous = false, int max_running_count = 1);
-
-
-        /**
-         * @brief 多段直线的连续运动
-         * @note 1、过渡半径bound_dist可以为0，表示终止速度为0；2、point[0]代表第一个目标点
-         * @param point 目标点集
-         * @param bound_dist 过渡半径
-         * @param max_path_v 最大速度
-         * @param max_path_a 最大加速度
-         * @param asynchronous 是否异步运行
-         * @param max_running_count 规划失败重新尝试规划的最大次数
-         *
-         * @example
-            Frame f_p1;
-            Frame f_p2;
-            Frame f_p3;
-            Frame f_p4;
-
-            f_p1 = robot.getFlange() * Frame{ KDL::Rotation::RotX( 90 * M_PI / 180 ), Vector{ 0.3, 0.0, 0 } };
-            f_p2 = f_p1 * Frame{ KDL::Rotation::RotY( 90 * M_PI / 180 ), Vector{ 0.0, -0.3, -0.0 } };
-            f_p3 = f_p2 * Frame{ KDL::Rotation::RotX( -90 * M_PI / 180 ), Vector{ 0.0, 0.0, -0.3 } };
-            f_p4 = f_p3 * Frame{ KDL::Rotation::RotZ( -90 * M_PI / 180 ), Vector{ 0.0, 0.0, 0.3 } };
-
-            std::vector< KDL::Frame > points{ f_p1,f_p2, f_p3, f_p4 };
-            std::vector< double > max_path_v{ 0.06, 0.12, 0.12, 0.24};
-            std::vector< double > max_path_a{ 0.06, 0.06, 0.06, 0.06};
-            std::vector< double > bound_dist{0.05,0.1,0.0,0.2};
-            MultiMoveL( points, bound_dist, max_path_v, max_path_a, false );
-         * @return int 失败为-1，成功为0
-         */
-        int
-        MultiMoveL(const std::vector<KDL::Frame> &point, std::vector<double> bound_dist, std::vector<double> max_path_v,
-                   std::vector<double> max_path_a, bool asynchronous = false, int max_running_count = 1);
+        
 
         enum class DRAGGING_FLAG : int
         {
