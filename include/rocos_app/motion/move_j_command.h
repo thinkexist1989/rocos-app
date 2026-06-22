@@ -94,7 +94,7 @@ protected:
 
     MotionReference sample(double s,
                            double s_dot,
-                           double s_ddot) const override {
+                           double s_ddot) const override { 
         MotionReference reference;
         reference.space = ReferenceSpace::Joint;
         const auto n = params_.q_start.size();

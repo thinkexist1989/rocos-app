@@ -260,6 +260,7 @@ namespace rocos {
             max_acc_[i]  = joints_[i]->getMaxAcc();
             max_jerk_[i] = joints_[i]->getMaxJerk();
 
+            //TODO: 需要删除
             if (profile_type_ == trapezoid) {
                 interp_[i] = new Trapezoid;
             } else if (profile_type_ == doubleS) {
@@ -913,123 +914,11 @@ namespace rocos {
                     joints_[i]->setVelocity(vel_[i]);
                 }
             }
-            updateCartesianInfo();
+            updateCartesianInfo(); //TODO: 更新笛卡尔信息
         }
 
         // process before exit:
     }
-
-    void Robot::moveJ(const vector<double> &target_pos,
-                      const vector<double> &target_vel,
-                      Robot::Synchronization sync) {
-        if ((target_pos.size() != jnt_num_) || (target_vel.size() != jnt_num_)) {
-            log_ptr_->error("MoveJ => Error Input Vector Size!");
-            return;
-        }
-
-        sync_ = sync;
-
-        target_positions_ = target_pos;
-        target_velocities_ = target_vel;
-
-        need_plan_.resize(jnt_num_, true);
-    }
-
-    /// \brief 停止单轴运动
-    /// \param id 轴ID
-    void Robot::stopSingleAxis(int id) {
-        double dt = fabs(vel_[id]) / max_acc_[id];  // 所需要的减速时间
-        target_positions_[id] =
-                pos_[id] +
-                dt * vel_[id] / 2.0;  // TODO：这个减速段计算有问题
-        target_velocities_[id] = 0.0;
-        least_motion_time_ = 0.0;
-
-        auto sync = sync_;
-        sync_ = SYNC_NONE;  //停止时候就不需要同步了
-
-        log_ptr_->info("max_acc: {}; pos: {}; vel: {}", max_acc_[id], pos_[id].load(), vel_[id].load());
-        log_ptr_->info("dt: {}; target_positions: {}", dt, target_positions_[id]);
-
-        need_plan_[id] = true;
-    }
-
-    void Robot::stopMultiAxis() {
-        sync_ = SYNC_NONE;  //停止时候就不需要同步了
-
-        double wait_time = 0.0;
-
-        for (int id = 0; id < jnt_num_; ++id) {
-            double dt = fabs(vel_[id]) / max_acc_[id];  // 所需要的减速时间
-            target_positions_[id] =
-                    pos_[id] +
-                    2 * (dt * vel_[id] / 2.0);  // TODO：这个减速段计算有问题
-            target_velocities_[id] = 0.0;
-            least_motion_time_ = 0.0;
-
-            log_ptr_->info("max_acc: {}; pos: {}; vel: {}", max_acc_[id], pos_[id].load(), vel_[id].load());
-            log_ptr_->info("dt: {}; target_positions: {}", dt, target_positions_[id]);
-
-            need_plan_[id] = true;
-
-            wait_time = wait_time <= dt ? wait_time : dt;
-        }
-    }
-
-    /// 设置单轴运动
-    /// \param id 轴ID
-    /// \param pos 目标位置
-    /// \param vel 目标速度
-    /// \param max_vel 最大速度
-    /// \param max_acc 最大加速度
-    /// \param max_jerk 最大加加速度
-    /// \param least_time 最短运行时间
-    void Robot::moveSingleAxis(int id, double pos, double vel, double max_vel,
-                               double max_acc, double max_jerk, double least_time) {
-        target_positions_[id] = pos;
-        target_velocities_[id] = vel;
-
-        if (max_vel != -1) max_vel_[id] = max_vel;
-        if (max_acc != -1) max_acc_[id] = max_acc;
-        if (max_jerk != -1) max_jerk_[id] = max_jerk;
-        if (least_time != -1) least_motion_time_ = least_time;
-
-        need_plan_[id] = true;
-    }
-
-    /// 设置多轴运动
-    /// \param target_pos 目标位置
-    /// \param target_vel 目标速度
-    /// \param max_vel 最大速度
-    /// \param max_acc 最大加速度
-    /// \param max_jerk 最大加加速度
-    /// \param least_time 最短运行时间
-    void Robot::moveMultiAxis(const vector<double> &target_pos,
-                              const vector<double> &target_vel,
-                              const vector<double> &max_vel,
-                              const vector<double> &max_acc,
-                              const vector<double> &max_jerk, double least_time) {
-        if ((target_pos.size() != jnt_num_) || (target_vel.size() != jnt_num_) ||
-            (max_vel.size() != jnt_num_) || (max_acc.size() != jnt_num_) ||
-            (max_jerk.size() != jnt_num_)) {
-            log_ptr_->error("moveMultiAxis => Error Input Vector Size!");
-            return;
-        }
-
-        for (int id = 0; id < jnt_num_; ++id) {
-            target_positions_[id] = target_pos[id];
-            target_velocities_[id] = target_vel[id];
-
-            if (max_vel[id] != -1) max_vel_[id] = max_vel[id];
-            if (max_acc[id] != -1) max_acc_[id] = max_acc[id];
-            if (max_jerk[id] != -1) max_jerk_[id] = max_jerk[id];
-
-            need_plan_[id] = true;
-        }
-
-        if (least_time != -1) least_motion_time_ = least_time;
-    }
-
 
     /////// Motion Command /////////////
 
@@ -2240,19 +2129,6 @@ namespace rocos {
     }
 
     //TODO: ======================MoveC===========================
-
-
-
-    int Robot::MoveP(Frame pose, double speed, double acceleration, double time,
-                     double radius, bool asynchronous) {
-        log_ptr_->error("have not complicated yet");
-        return 0;
-    }
-
-    int Robot::MovePath(const Path &path, bool asynchronous) {
-        log_ptr_->error("have not complicated yet");
-        return 0;
-    }
 
     int Robot::MultiMoveL(const std::vector<KDL::Frame> &point, std::vector<double> bound_dist,
                           std::vector<double> max_path_v, std::vector<double> max_path_a, bool asynchronous,

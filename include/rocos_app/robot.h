@@ -277,43 +277,6 @@ namespace rocos
         {
             joints_[id]->setUserUnitName(name);
         }
-        /// 多关节运动
-        /// \param target_pos 位置
-        /// \param target_vel 速度
-        /// \param sync 同步模式
-        void moveJ(const std::vector<double> &target_pos,
-                   const std::vector<double> &target_vel,
-                   Synchronization sync = SYNC_TIME);
-
-        void stopSingleAxis(int id);
-
-        void stopMultiAxis();
-
-        /// 单关节运动
-        /// \param id 关节ID
-        /// \param pos 位置
-        /// \param vel 速度
-        /// \param max_vel 最大速度
-        /// \param max_acc 最大加速度
-        /// \param max_jerk 最大加加速度
-        /// \param least_time 最短运行时间
-        void moveSingleAxis(int id, double pos, double vel = 0.0, double max_vel = -1,
-                            double max_acc = -1, double max_jerk = -1,
-                            double least_time = -1);
-
-        /// \brief 多轴运动
-        /// \param target_pos 位置
-        /// \param target_vel 速度
-        /// \param max_vel 最大速度
-        /// \param max_acc 最大加速度
-        /// \param max_jerk 最大加加速度
-        /// \param least_time 最短运行时间
-        void moveMultiAxis(const std::vector<double> &target_pos,
-                           const std::vector<double> &target_vel,
-                           const std::vector<double> &max_vel,
-                           const std::vector<double> &max_acc,
-                           const std::vector<double> &max_jerk,
-                           double least_time = -1);
 
         /// \brief 设置多关节速度约束
         /// \param max_vel 速度约束值
@@ -890,23 +853,6 @@ namespace rocos
                       double acceleration = 1.2, double time = 0.0, double radius = 0.0,
                       OrientationMode mode = UNCONSTRAINED, bool asynchronous = false, int max_running_count = 1);
 
-        //! \brief TODO: 什么是MoveP?
-        //! \param pose 位姿
-        //! \param speed 关节速度限制（leading axis）
-        //! \param acceleration 关节加速度限制
-        //! \param time 最短运行时间
-        //! \param radius 过渡半径
-        //! \param mode 姿态运行模式, UNCONSTRAINED姿态随动
-        //! \param asynchronous 是否异步运行
-        //! \return 错误标志位,成功返回0
-        int MoveP(Frame pose, double speed = 1.05, double acceleration = 1.4,
-                  double time = 0.0, double radius = 0.0, bool asynchronous = false);
-
-        //! \brief 沿指定路径运动
-        //! \param path 路径
-        //! \param asynchronous
-        //! \return 错误标志位,成功返回0
-        int MovePath(const Path &path, bool asynchronous = false);
 
         /**
          * @brief 多段直线的连续运动
@@ -1097,9 +1043,9 @@ namespace rocos
 
         double least_motion_time_{0.0};
 
-        Synchronization sync_{SYNC_TIME};
+        Synchronization sync_{SYNC_TIME}; //TODO: 同步方式，需要删除
 
-        std::vector<bool> need_plan_; // 是否需要重新规划标志
+        std::vector<bool> need_plan_; //TODO: 是否需要重新规划标志，需要删除
 
         std::atomic<bool> motion_thread_stop_requested_{false};
         std::shared_ptr<std::thread> otg_motion_thread_{nullptr};// otg在线规划线程
