@@ -22,15 +22,11 @@
 
 #include "hardware_interface.h"
 
-#include <boost/shared_ptr.hpp>
 #include <boost/thread.hpp>
-#include <boost/thread/lock_guard.hpp>
 #include <boost/thread/recursive_mutex.hpp>
 #include <atomic>
 
 #include "drive_guard.h"
-
-#include "interpolate.h"
 
 #define DELTA_T 0.001
 
@@ -105,7 +101,7 @@ namespace rocos {
         inline int getId() const { return id_; }
 
         inline std::string getName() { return hw_interface_->getSlaveName(id_); }
-        inline void setName(const string& name) { name_ = name; } // 设置驱动器名称，在ecat_config.yaml的无所谓，
+        inline void setName(const std::string& name) { name_ = name; } // 设置驱动器名称，在ecat_config.yaml的无所谓，
                                                                   // 目前是以urdf中的joint name为准，通过hardware id对应
 
         inline double getMinPosLimit() const { return min_pos_limit_; }
@@ -115,10 +111,6 @@ namespace rocos {
         inline void setMaxPosLimit(double max_pos) { max_pos_limit_ = max_pos; }
 
         inline ModeOfOperation getMode() const { return mode_; }
-
-        void moveToPositionInCnt(int32_t pos, double max_vel, double max_acc,
-                                 double max_jerk = std::numeric_limits<double>::max(),
-                                 ProfileType type = trapezoid); // Motion with interpolate
 
     private:
         std::string name_{}; // 关节名称

@@ -138,8 +138,6 @@ add_library(drive
         SHARED
         src/drive.cc
         src/drive_guard.cc
-        src/interpolate.cc
-        src/robotMath.cc
         )
 target_link_libraries(drive
         PUBLIC
@@ -196,8 +194,8 @@ add_library(robot
         SHARED
         src/robot.cc
         src/UnitIntervalMotionProfile.cpp
-        src/JC_helper_kinematics.cpp
-        src/JC_helper_dynamics.cpp
+#        src/JC_helper_kinematics.cpp
+#        src/JC_helper_dynamics.cpp
         src/DHParamsLoader.cpp
         src/robot_http_server.cc
 )

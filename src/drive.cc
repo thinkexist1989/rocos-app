@@ -410,46 +410,6 @@ namespace rocos {
         return hw_interface_->getSecondaryVelocityRaw(id_);
     }
 
-    void Drive::moveToPositionInCnt(int32_t pos, double max_vel, double max_acc, double max_jerk, ProfileType type) {
-        auto p0 = hw_interface_->getActualPositionRaw(id_);
-        R_INTERP_BASE *interp;
-        switch (type) {
-            case trapezoid:
-                interp = new Trapezoid;
-                ((Trapezoid *) interp)->planTrapezoidProfile(0, p0, pos, 0, 0, max_vel, max_acc);
-                break;
-            case doubleS:
-                interp = new DoubleS;
-                ((DoubleS *) interp)->planDoubleSProfile(0, p0, pos, 0, 0, max_vel, max_acc, max_jerk);
-                break;
-            default:
-                std::cout << "Not Supported Profile Type" << std::endl;
-                return;
-        }
-
-        double dt = 0.0;
-        double duration = interp->getDuration();
-        std::cout << "interp duration is: " << duration << std::endl;
-
-        while (dt <= duration && interp->isValidMovement()) {
-            waitForSignal();
-            switch (mode_) {
-                case ModeOfOperation::CyclicSynchronousPositionMode:
-                    hw_interface_->setTargetPositionRaw(id_, interp->pos(dt));
-                    break;
-                case ModeOfOperation::CyclicSynchronousVelocityMode:
-                    hw_interface_->setTargetVelocityRaw(id_, interp->vel(dt));
-                    break;
-                default:
-                    std::cout << "Only Supported CSP and CSV" << std::endl;
-            }
-            dt += DELTA_T;
-        }
-
-        delete interp;
-
-    }
-
     void Drive::setPosition(double pos) {
         auto posInCnt = static_cast<int32_t>(pos * cnt_per_unit_);
         setPositionInCnt(posInCnt);

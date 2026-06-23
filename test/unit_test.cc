@@ -156,65 +156,6 @@ TEST_CASE("HardwareSim") {
     }
 }
 
-TEST_CASE("Drive") {
-
-    using namespace rocos;
-    boost::shared_ptr<HardwareInterface> hw = boost::make_shared<Hardware>();
-
-    Drive drive(hw.get(), 1);
-
-    usleep(1000000);
-    drive.setEnabled();
-    std::cout << "After Enabled: \n" << drive.getDriveState() << std::endl;
-
-    usleep(1000000);
-    drive.setDisabled();
-    std::cout << "After Disabled: \n" << drive.getDriveState() << std::endl;
-
-
-    usleep(1000000);
-    drive.setMode(rocos::ModeOfOperation::CyclicSynchronousPositionMode);
-//    drive.setVelocityInCnt(100000);
-    drive.setEnabled();
-    std::cout << drive.getPositionInCnt() << std::endl;
-
-    drive.moveToPositionInCnt(500000, 100000, 100000);
-
-    std::cout << "Curr State \n" << drive.getDriveState() << std::endl;
-
-    usleep(1000000); // 10s
-    drive.setDisabled();
-
-}
-
-TEST_CASE("Async motion") {
-    using namespace rocos;
-    boost::shared_ptr<HardwareInterface> hw = boost::make_shared<Hardware>();
-    std::vector<Drive *> drives;
-    for (int i = 0; i < 4; i++) {
-        drives.push_back(new Drive(hw.get(), i));
-        drives[i]->setMode(rocos::ModeOfOperation::CyclicSynchronousPositionMode);
-    }
-
-    usleep(1000000);
-    for (auto &drive: drives) {
-        drive->setEnabled();
-        std::cout << "Drive " << drive->getId() << " After Enabled: \n" << drive->getDriveState() << std::endl;
-    }
-
-    drives[0]->moveToPositionInCnt(0, 100000, 100000);
-    drives[1]->moveToPositionInCnt(0, 100000, 100000);
-    drives[2]->moveToPositionInCnt(0, 100000, 100000);
-    drives[3]->moveToPositionInCnt(0, 5000000, 5000000);
-
-    drives[0]->moveToPositionInCnt(500000, 100000, 100000);
-    drives[1]->moveToPositionInCnt(500000, 100000, 100000);
-    drives[2]->moveToPositionInCnt(500000, 100000, 100000);
-    drives[3]->moveToPositionInCnt(25000000, 5000000, 5000000);
-
-
-}
-
 TEST_CASE("Sync motion") {
     using namespace rocos;
     boost::shared_ptr<HardwareInterface> hw = boost::make_shared<Hardware>();
@@ -239,31 +180,6 @@ TEST_CASE("Sync motion") {
     robot.setDisabled();
 
 }
-
-TEST_CASE("Robot Motion Thread") {
-    using namespace rocos;
-//    boost::shared_ptr<HardwareInterface> hw = boost::make_shared<HardwareSim>(5);
-    boost::shared_ptr<HardwareInterface> hw = boost::make_shared<Hardware>();
-
-    Robot robot(hw.get());
-
-    robot.setEnabled();
-
-    usleep(1000000);
-
-    std::vector<double> pos(4, 0);
-    std::vector<double> vel(4, 0);
-
-    robot.moveJ(pos, vel);
-
-    usleep(10000000);
-
-    std::vector<double> pos2(4, 500000);
-    robot.moveJ(pos2, vel);
-
-    usleep(10000000);
-}
-
 
 #include <rocos_app/robot_http_server.h> // 确保引入了新的头文件
 
@@ -457,25 +373,5 @@ TEST_CASE("chain_param") {
         std::cout << "    rotateLink: " << roll << ", " << pitch << ", " << yaw << std::endl;
         std::cout << "    mesh: " << std::dynamic_pointer_cast<urdf::Mesh>(links[i]->visual->geometry)->filename << std::endl;
     }
-
-//    for (int i = 0; i < chain.getNrOfSegments(); ++i) {
-//        auto link = robot_model->getLink(chain.getSegment(i).getName());
-//        auto joint = robot_model->getJoint(chain.getSegment(i).getJoint().getName());
-//        std::cout << "  - name: " << link->name << std::endl;
-//        std::cout << "    order: " << i + 1 << std::endl;
-//        std::cout << "    translate: " << joint->parent_to_joint_origin_transform.position.x << ", "
-//                  << joint->parent_to_joint_origin_transform.position.y << ", "
-//                  << joint->parent_to_joint_origin_transform.position.z << std::endl;
-//        joint->parent_to_joint_origin_transform.rotation.getRPY(roll, pitch, yaw);
-//        std::cout << "    rotate: " << roll << ", " << pitch << ", " << yaw << std::endl;
-//        std::cout << "    axis: " << joint->axis.x << ", " << joint->axis.y << ", " << joint->axis.z  << std::endl;
-//
-//        link->visual->origin.rotation.getRPY(roll, pitch, yaw);
-//        std::cout << "    translateLink: " << link->visual->origin.position.x << ", " << link->visual->origin.position.y << ", "
-//                  << link->visual->origin.position.z << std::endl;
-//        std::cout << "    rotateLink: " << roll << ", " << pitch << ", " << yaw << std::endl;
-//        std::cout << "    mesh: " << std::dynamic_pointer_cast<urdf::Mesh>(link->visual->geometry)->filename << std::endl;
-//
-//    }
 
 }

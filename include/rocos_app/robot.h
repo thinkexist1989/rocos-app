@@ -23,13 +23,15 @@
 #include "logger.h"
 #include "drive.h"
 #include "hardware_interface.h"
-#include "interpolate.h"
+// #include "interpolate.h"
 #include "kinematics.h"
 #include "dynamics.h"
 
-#include "JC_helper_kinematics.hpp"
-#include "JC_helper_dynamics.hpp"
+// #include "JC_helper_kinematics.hpp"
+// #include "JC_helper_dynamics.hpp"
 #include <Eigen/StdVector> //!< Eigen官网说明 https://eigen.tuxfamily.org/dox/group__TopicStlContainers.html
+#include <Eigen/QR>
+#include <Eigen/Geometry>
 #include <vector>
 #include "kdl_parser/kdl_parser.hpp" //!< 解析URDF文件
 #include "gripper.hpp"
@@ -98,9 +100,9 @@ namespace rocos
         };
 
         explicit Robot(HardwareInterface *hw,
-                       const string &urdf_file_path = "robot.urdf",
-                       const string &base_link = "base_link",
-                       const string &tip = "link7"); // std::string yaml_path = "joint_impedance_control.yaml"
+                       const std::string &urdf_file_path = "robot.urdf",
+                       const std::string &base_link = "base_link",
+                       const std::string &tip = "link7"); // std::string yaml_path = "joint_impedance_control.yaml"
 
         ~Robot();
 
@@ -762,131 +764,7 @@ namespace rocos
                      double time = 0.0, double radius = 0.0,
                      bool asynchronous = false);
 
-        //! \brief 圆弧运动（支持位置和速度模式）
-        //! \param pose_via 中间点,姿态给定无效，内部会自动计算
-        //! \param pose_to 目标点,姿态给定无效，内部会自动计算
-        //! \param speed 笛卡尔空间速度限制（leading axis）
-        //! \param acceleration 笛卡尔空间加速度限制
-        //! \param time 最短运行时间
-        //! \param radius 过渡半径
-        //! \param mode 姿态运行模式, UNCONSTRAINED姿态随动
-        //! \param asynchronous 是否异步运行
-        //! \param max_running_count MoveC规划失败重新尝试规划的最大次数
-        //! \return 错误标志位,成功返回0
-
-        int MoveC(Frame pose_via, Frame pose_to, double speed = 0.25,
-                  double acceleration = 1.2, double time = 0.0, double radius = 0.0,
-                  OrientationMode mode = UNCONSTRAINED, bool asynchronous = false, int max_running_count = 1);
-
-        int MoveC_pos(Frame pose_via, Frame pose_to, double speed = 0.25,
-                      double acceleration = 1.2, double time = 0.0, double radius = 0.0,
-                      OrientationMode mode = UNCONSTRAINED, bool asynchronous = false, int max_running_count = 1);
-
-        int MoveC_vel(Frame pose_via, Frame pose_to, double speed = 0.25,
-                      double acceleration = 1.2, double time = 0.0, double radius = 0.0,
-                      OrientationMode mode = UNCONSTRAINED, bool asynchronous = false, int max_running_count = 1);
-
-        //! \brief 圆弧运动（支持位置和速度模式）
-        //! \param center 圆弧圆心位姿
-        //! \param theta 圆弧旋转角度
-        //! \param axiz   绕圆心位姿的哪个轴转（0-X、1-Y、2-Z）
-        //! \param speed 笛卡尔速度限制（leading axis）
-        //! \param acceleration 笛卡尔加速度限制
-        //! \param time 最短运行时间
-        //! \param radius 过渡半径
-        //! \param mode 姿态运行模式, UNCONSTRAINED姿态随动
-        //! \param asynchronous 是否异步运行
-        //! \param max_running_count MoveC规划失败重新尝试规划的最大次数
-        //! \return 错误标志位,成功返回0
-        int MoveC(const KDL::Frame &center, double theta, int axiz = 2, double speed = 0.25,
-                  double acceleration = 1.2, double time = 0.0, double radius = 0.0,
-                  OrientationMode mode = UNCONSTRAINED, bool asynchronous = false, int max_running_count = 1);
-
-        int MoveC_pos(const KDL::Frame &center, double theta, int axiz = 2, double speed = 0.25,
-                      double acceleration = 1.2, double time = 0.0, double radius = 0.0,
-                      OrientationMode mode = UNCONSTRAINED, bool asynchronous = false, int max_running_count = 1);
-
-        int MoveC_vel(const KDL::Frame &center, double theta, int axiz = 2, double speed = 0.25,
-                      double acceleration = 1.2, double time = 0.0, double radius = 0.0,
-                      OrientationMode mode = UNCONSTRAINED, bool asynchronous = false, int max_running_count = 1);
-        
-
         //TODO: Dragging要改成方向向量方式
-        enum class DRAGGING_FLAG : int
-        {
-            J0 = 0,
-            J1 = 1,
-            J2 = 2,
-            J3 = 3,
-            J4 = 4,
-            J5 = 5,
-            J6 = 6,
-            TOOL_X = 100,
-            TOOL_Y = 101,
-            TOOL_Z = 102,
-            TOOL_ROLL = 103,
-            TOOL_PITCH = 104,
-            TOOL_YAW = 105,
-            FLANGE_X = 200,
-            FLANGE_Y = 201,
-            FLANGE_Z = 202,
-            FLANGE_ROLL = 203,
-            FLANGE_PITCH = 204,
-            FLANGE_YAW = 205,
-            OBJECT_X = 300,
-            OBJECT_Y = 301,
-            OBJECT_Z = 302,
-            OBJECT_ROLL = 303,
-            OBJECT_PITCH = 304,
-            OBJECT_YAW = 305,
-            BASE_X = 400,
-            BASE_Y = 401,
-            BASE_Z = 402,
-            BASE_ROLL = 403,
-            BASE_PITCH = 404,
-            BASE_YAW = 405,
-            NULLSPACE = 500
-        };
-
-        enum class DRAGGING_DIRRECTION : int
-        {
-            NONE = 0,
-            POSITION = 1,
-            NEGATIVE = -1
-        };
-
-        enum class DRAGGING_TYPE : int
-        {
-            JOINT = 0,
-            CARTESIAN = 1,
-            NULLSPACE = 2
-        };
-
-        /**
-         * @brief 拖动示教功能
-         * @note 第一次调用会启动ruckig线程，线程运行过程中需要至少100ms以内再次调用一次该函数（保持心跳）
-         * @note 否则会触发紧急停止（进入速度无同步模式，速度快速降至0）
-         * @param flag 命令标志
-         * @param dir 正方向或反方向
-         * @param max_speed 最大运行速度,其10%的值+当前位置等于目标位置
-         * @param max_acceleration 最大关节速度
-         * @return int
-         * @example
-         *   for ( int i = 0; i < 100; i++ )
-         *  {
-         *   robot.Dragging( Robot::DraggingFlag::J1, Robot::DraggingDirection::POSITION, 1, 1);
-         *   std::this_thread::sleep_for( std::chrono::milliseconds( 50 ) );
-         *   }
-         *
-         */
-        int Dragging(DRAGGING_FLAG flag, DRAGGING_DIRRECTION dir, double max_speed, double max_acceleration);
-        /**
-         * @brief 1000hz关节伺服接口
-         *
-         * @param target_pos 目标位置
-         * @return int
-         */
-        int servoJ(const KDL::JntArray &target_pos);
 
     private:
         // 运动前检查数据有效性
@@ -897,32 +775,6 @@ namespace rocos
                             double acceleration, double time, double radius);
 
         void initializeMotionExecutor();
-
-        int admittance_teaching(bool asynchronous = false);
-        int stop_admittance_teaching();
-        int admittance_link(KDL::Frame frame_target, double speed, double acceleration);
-
-        // 关节导纳拖动示教sun
-        int joint_admittance_teaching(bool asynchronous = false);
-
-
-        /**
-         * @brief 1000hz位姿伺服接口
-         *
-         * @param target_pose 目标位置
-         * @param Gain 比例增益
-         * @param lookhead 前瞻时间
-         * @param max_vel 最大速度
-         * @param max_acc 最大加速度
-         * @return int
-         */
-        int servoL(const KDL::Frame &target_frame);
-
-
-    public:
-
-        int stop_joint_admittance_teaching();
-
 
     protected:
         HardwareInterface* hw_interface_{nullptr};
@@ -945,10 +797,7 @@ namespace rocos
         std::vector<double> max_acc_;
         std::vector<double> max_jerk_;
 
-        std::vector<R_INTERP_BASE *> interp_;  //TODO: 插补规划器，需要删掉，改用ruckig
-
         int jnt_num_; //TODO: 关节数据要放到Model类中，删掉
-
 
 
         std::atomic<bool> motion_thread_stop_requested_{false};
@@ -992,7 +841,7 @@ namespace rocos
         std::atomic<int> tick_count{0};
 
         WorkMode work_mode_{WorkMode::Position};                        // 机器人当前模式，默认为位置模式
-        std::shared_ptr<rocos::Trapezoid> T_speed_scaling_ptr{nullptr}; // 速度缩放T型规划器
+        // std::shared_ptr<rocos::Trapezoid> T_speed_scaling_ptr{nullptr}; // 速度缩放T型规划器
         std::atomic<double> current_speed_fraction = 1;                 // 当前的速度比例
         std::atomic<double> target_speed_fraction = 1;                  // 期望的速度比例
         std::atomic<double> current_speed_fraction_vel = 0;             // 当前的速度比例变化率
@@ -1000,32 +849,28 @@ namespace rocos
         std::atomic<bool> is_fraction_changed = false;                  // 标识是否需要重置规划器
         double speed_scaling_dt = 0;                                    // 规划器用时
 
-        //**  记录数据，不应该存在**//
-        // std::ofstream speed_data_csv{"/home/jc/rocos-app/speed_scaling.csv"};
-        //**-------------------------------**//
-
     public:
         Kinematics kinematics_;
         Dynamics dynamics_;
 
 
         //TODO: 所有的JC_helper类都需要处理掉
-        friend void JC_helper::SmartServo_Joint::RunSmartServo(rocos::Robot *);
-        friend class JC_helper::SmartServo_Cartesian;
-        friend class JC_helper::SmartServo_Nullspace;
-        friend void JC_helper::Joint_stop(rocos::Robot *robot_ptr, const KDL::JntArray &current_pos, const KDL::JntArray &last_pos, const KDL::JntArray &last_last_pos);
-        friend class JC_helper::admittance;
+        // friend void JC_helper::SmartServo_Joint::RunSmartServo(rocos::Robot *);
+        // friend class JC_helper::SmartServo_Cartesian;
+        // friend class JC_helper::SmartServo_Nullspace;
+        // friend void JC_helper::Joint_stop(rocos::Robot *robot_ptr, const KDL::JntArray &current_pos, const KDL::JntArray &last_pos, const KDL::JntArray &last_last_pos);
+        // friend class JC_helper::admittance;
         // 声明友元类
-        friend class JC_helper::admittance_joint;
-        friend int JC_helper::safety_servo(rocos::Robot *robot_ptr, const std::vector<double> &target_pos);
-        friend int JC_helper::safety_servo(rocos::Robot *robot_ptr, const KDL::JntArray &target_pos);
+        // friend class JC_helper::admittance_joint;
+        // friend int JC_helper::safety_servo(rocos::Robot *robot_ptr, const std::vector<double> &target_pos);
+        // friend int JC_helper::safety_servo(rocos::Robot *robot_ptr, const KDL::JntArray &target_pos);
 
 
         friend class RobotHttpServer; // 允许 Server 直接访问 Robot 的私有/保护成员
         //TODO: ================================
 
     private:
-        JC_helper::ft_sensor my_ft_sensor;         //TODO: 6维力传感器
+        // JC_helper::ft_sensor my_ft_sensor;         //TODO: 6维力传感器
 
         bool flag_admittance_turnoff{false};       //TODO: 导纳开关
         bool flag_admittance_joint_turnoff{false}; //TODO: 关节拖动开关

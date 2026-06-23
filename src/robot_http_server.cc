@@ -139,7 +139,6 @@ void RobotHttpServer::registerRoutes() {
     server_->Post("/api/move/joint_ik", [this](auto& req, auto& res) { handleMoveJ_IK(req, res); });
     server_->Post("/api/move/linear", [this](auto& req, auto& res) { handleMoveL(req, res); });
     server_->Post("/api/move/linear_fk", [this](auto& req, auto& res) { handleMoveL_FK(req, res); });
-    server_->Post("/api/move/circle", [this](auto& req, auto& res) { handleMoveC(req, res); });
 
     server_->Post("/api/move/pause", [this](auto& req, auto& res) { handlePause(req, res); });
     server_->Post("/api/move/resume", [this](auto& req, auto& res) { handleResume(req, res); });
@@ -825,85 +824,6 @@ void RobotHttpServer::handleMoveL_FK(const httplib::Request& req, httplib::Respo
     }
 }
 
-void RobotHttpServer::handleMoveC(const httplib::Request& req, httplib::Response& res) {
-    log_ptr_->info("POST /api/move/circle");
-
-    nlohmann::json body = nlohmann::json::parse(req.body, nullptr, false);
-    if (body.is_discarded() || !body.contains("pose_via") || !body.contains("pose_to")) {
-        sendJson(res, false, 1001, "Invalid JSON or missing 'pose_via'/'pose_to'");
-        return;
-    }
-
-    KDL::Frame pose_via;
-    {
-        nlohmann::json via_json = body["pose_via"];
-        if (via_json.contains("position") && via_json.contains("orientation")) {
-            pose_via = jsonToFrame(via_json["position"], via_json["orientation"]);
-        } else {
-            pose_via = jsonToFrame(via_json);
-        }
-    }
-
-    KDL::Frame pose_to;
-    {
-        nlohmann::json to_json = body["pose_to"];
-        if (to_json.contains("position") && to_json.contains("orientation")) {
-            pose_to = jsonToFrame(to_json["position"], to_json["orientation"]);
-        } else {
-            pose_to = jsonToFrame(to_json);
-        }
-    }
-
-    double speed = body.value("speed", 0.25);
-    double acceleration = body.value("acceleration", 1.2);
-    double time = body.value("time", 0.0);
-    double radius = body.value("radius", 0.0);
-    Robot::OrientationMode mode = Robot::UNCONSTRAINED;
-    if (body.contains("mode")) {
-        if (body["mode"].is_string()) {
-            std::string mode_str = body["mode"].get<std::string>();
-            if (mode_str == "UNCONSTRAINED" || mode_str == "unconstrained") {
-                mode = Robot::UNCONSTRAINED;
-            } else if (mode_str == "FIXED" || mode_str == "fixed") {
-                mode = Robot::FIXED;
-            } else {
-                sendJson(res, false, 1001, "Unknown mode: " + mode_str + " (expected UNCONSTRAINED/FIXED)");
-                return;
-            }
-        } else if (body["mode"].is_number()) {
-            mode = static_cast<Robot::OrientationMode>(body["mode"].get<int>());
-        }
-    }
-    bool asynchronous = body.value("asynchronous", false);
-
-    if (asynchronous) {
-        std::string taskId = generateTaskId();
-        registerTask(taskId, "MoveC");
-
-        submitTask([this, pose_via, pose_to, speed, acceleration, time, radius, mode, taskId]() {
-            int result = robot_->MoveC(pose_via, pose_to, speed, acceleration, time, radius,
-                                       mode, false);
-            if (result == 0) {
-                updateTaskStatus(taskId, "COMPLETED", result, "ok");
-            } else {
-                updateTaskStatus(taskId, "FAILED", result, "MoveC failed");
-            }
-        });
-
-        nlohmann::json data;
-        data["task_id"] = taskId;
-        sendJson(res, true, 0, "MoveC started", data);
-    } else {
-        int result = robot_->MoveC(pose_via, pose_to, speed, acceleration, time, radius,
-                                   mode, false);
-        if (result == 0) {
-            sendJson(res, true, 0, "MoveC completed");
-        } else {
-            sendJson(res, false, 2004, "MoveC failed with code " + std::to_string(result));
-        }
-    }
-}
-
 void RobotHttpServer::handleStop(const httplib::Request& req, httplib::Response& res) {
     log_ptr_->info("POST /api/move/stop");
     const int result = robot_->StopMotion();
@@ -978,66 +898,13 @@ void RobotHttpServer::handleDragStart(const httplib::Request& req, httplib::Resp
     double max_acceleration = body.value("max_acceleration", 1.0);
 
     // Map flag string to enum
-    Robot::DRAGGING_FLAG flag;
-    if (flag_str == "J0")            flag = Robot::DRAGGING_FLAG::J0;
-    else if (flag_str == "J1")       flag = Robot::DRAGGING_FLAG::J1;
-    else if (flag_str == "J2")       flag = Robot::DRAGGING_FLAG::J2;
-    else if (flag_str == "J3")       flag = Robot::DRAGGING_FLAG::J3;
-    else if (flag_str == "J4")       flag = Robot::DRAGGING_FLAG::J4;
-    else if (flag_str == "J5")       flag = Robot::DRAGGING_FLAG::J5;
-    else if (flag_str == "J6")       flag = Robot::DRAGGING_FLAG::J6;
-    else if (flag_str == "TOOL_X")   flag = Robot::DRAGGING_FLAG::TOOL_X;
-    else if (flag_str == "TOOL_Y")   flag = Robot::DRAGGING_FLAG::TOOL_Y;
-    else if (flag_str == "TOOL_Z")   flag = Robot::DRAGGING_FLAG::TOOL_Z;
-    else if (flag_str == "TOOL_ROLL")    flag = Robot::DRAGGING_FLAG::TOOL_ROLL;
-    else if (flag_str == "TOOL_PITCH")   flag = Robot::DRAGGING_FLAG::TOOL_PITCH;
-    else if (flag_str == "TOOL_YAW")     flag = Robot::DRAGGING_FLAG::TOOL_YAW;
-    else if (flag_str == "FLANGE_X")     flag = Robot::DRAGGING_FLAG::FLANGE_X;
-    else if (flag_str == "FLANGE_Y")     flag = Robot::DRAGGING_FLAG::FLANGE_Y;
-    else if (flag_str == "FLANGE_Z")     flag = Robot::DRAGGING_FLAG::FLANGE_Z;
-    else if (flag_str == "FLANGE_ROLL")  flag = Robot::DRAGGING_FLAG::FLANGE_ROLL;
-    else if (flag_str == "FLANGE_PITCH") flag = Robot::DRAGGING_FLAG::FLANGE_PITCH;
-    else if (flag_str == "FLANGE_YAW")   flag = Robot::DRAGGING_FLAG::FLANGE_YAW;
-    else if (flag_str == "OBJECT_X")     flag = Robot::DRAGGING_FLAG::OBJECT_X;
-    else if (flag_str == "OBJECT_Y")     flag = Robot::DRAGGING_FLAG::OBJECT_Y;
-    else if (flag_str == "OBJECT_Z")     flag = Robot::DRAGGING_FLAG::OBJECT_Z;
-    else if (flag_str == "OBJECT_ROLL")  flag = Robot::DRAGGING_FLAG::OBJECT_ROLL;
-    else if (flag_str == "OBJECT_PITCH") flag = Robot::DRAGGING_FLAG::OBJECT_PITCH;
-    else if (flag_str == "OBJECT_YAW")   flag = Robot::DRAGGING_FLAG::OBJECT_YAW;
-    else if (flag_str == "BASE_X")       flag = Robot::DRAGGING_FLAG::BASE_X;
-    else if (flag_str == "BASE_Y")       flag = Robot::DRAGGING_FLAG::BASE_Y;
-    else if (flag_str == "BASE_Z")       flag = Robot::DRAGGING_FLAG::BASE_Z;
-    else if (flag_str == "BASE_ROLL")    flag = Robot::DRAGGING_FLAG::BASE_ROLL;
-    else if (flag_str == "BASE_PITCH")   flag = Robot::DRAGGING_FLAG::BASE_PITCH;
-    else if (flag_str == "BASE_YAW")     flag = Robot::DRAGGING_FLAG::BASE_YAW;
-    else if (flag_str == "NULLSPACE")    flag = Robot::DRAGGING_FLAG::NULLSPACE;
-    else {
-        sendJson(res, false, 1001, "Unknown dragging flag: " + flag_str);
-        return;
-    }
 
-    // Map direction string to enum
-    Robot::DRAGGING_DIRRECTION dir;
-    if (dir_str == "POSITIVE" || dir_str == "POSITION" || dir_str == "1") {
-        dir = Robot::DRAGGING_DIRRECTION::POSITION;
-    } else if (dir_str == "NEGATIVE" || dir_str == "-1") {
-        dir = Robot::DRAGGING_DIRRECTION::NEGATIVE;
-    } else if (dir_str == "NONE" || dir_str == "0") {
-        dir = Robot::DRAGGING_DIRRECTION::NONE;
-    } else {
-        sendJson(res, false, 1001, "Unknown dragging direction: " + dir_str);
-        return;
-    }
-
-    robot_->Dragging(flag, dir, max_speed, max_acceleration);
     sendJson(res, true, 0, "Dragging started");
 }
 
 void RobotHttpServer::handleDragStop(const httplib::Request& req, httplib::Response& res) {
     log_ptr_->info("POST /api/drag/stop");
-    robot_->Dragging(Robot::DRAGGING_FLAG::J0,
-                     Robot::DRAGGING_DIRRECTION::NONE,
-                     0.0, 0.0);
+
     sendJson(res, true, 0, "Dragging stopped");
 }
 

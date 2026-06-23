@@ -69,7 +69,6 @@ private:
     void handleMoveJ_IK(const httplib::Request& req, httplib::Response& res);
     void handleMoveL(const httplib::Request& req, httplib::Response& res);
     void handleMoveL_FK(const httplib::Request& req, httplib::Response& res);
-    void handleMoveC(const httplib::Request& req, httplib::Response& res);
 
     void handlePause(const httplib::Request& req, httplib::Response& res);
     void handleResume(const httplib::Request& req, httplib::Response& res);
