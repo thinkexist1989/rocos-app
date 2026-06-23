@@ -97,7 +97,7 @@ TEST_CASE("GuardedMotionContext does not write rejected command") {
     CHECK_FALSE(too_fast.success);
     CHECK(too_fast.result == rocos::motion::MotionResultCode::SafetyViolation);
     CHECK(too_fast.api_error_code ==
-          static_cast<int>(rocos::motion::DianaErrorCode::SpeedLimit));
+          static_cast<int>(rocos::motion::ErrorCode::SpeedLimit));
     CHECK(context.write_count() == 1);
 }
 
@@ -114,7 +114,7 @@ TEST_CASE("GuardedMotionContext does not accept command when hardware write fail
             const rocos::motion::LowLevelCommand&) override {
             return rocos::motion::MotionResult::failWithApiCode(
                 rocos::motion::MotionResultCode::HardwareFault,
-                static_cast<int>(rocos::motion::DianaErrorCode::CommunicateError),
+                static_cast<int>(rocos::motion::ErrorCode::CommunicateError),
                 "hardware write failed");
         }
     };
@@ -127,7 +127,7 @@ TEST_CASE("GuardedMotionContext does not accept command when hardware write fail
         failing_context.writeLowLevelCommand(positionCommand(0.0, 0.0));
     CHECK_FALSE(failed.success);
     CHECK(failed.api_error_code ==
-          static_cast<int>(rocos::motion::DianaErrorCode::CommunicateError));
+          static_cast<int>(rocos::motion::ErrorCode::CommunicateError));
 
     const auto not_compared_to_failed_command =
         recovery_context.writeLowLevelCommand(positionCommand(0.01, 0.0));
@@ -145,6 +145,6 @@ TEST_CASE("GuardedMotionContext maps safety failure to MotionResult") {
     CHECK_FALSE(result.success);
     CHECK(result.result == rocos::motion::MotionResultCode::SafetyViolation);
     CHECK(result.api_error_code ==
-          static_cast<int>(rocos::motion::DianaErrorCode::NotAllAtOpState));
+          static_cast<int>(rocos::motion::ErrorCode::NotAllAtOpState));
     CHECK(context.write_count() == 0);
 }

@@ -20,7 +20,7 @@ MotionResult submitMoveJ(RobotRuntime& robot,
     if (joint_count == 0 || target_position.size() != joint_count) {
         return MotionResult::failWithApiCode(
             MotionResultCode::InvalidCommand,
-            static_cast<int>(DianaErrorCode::UnmatchedJointsNumber),
+            static_cast<int>(ErrorCode::UnmatchedJointsNumber),
             "MoveJ target dimension does not match robot joints");
     }
 
@@ -29,7 +29,7 @@ MotionResult submitMoveJ(RobotRuntime& robot,
         !std::isfinite(control_period)) {
         return MotionResult::failWithApiCode(
             MotionResultCode::InvalidNumber,
-            static_cast<int>(DianaErrorCode::ParameterNanOrInf),
+            static_cast<int>(ErrorCode::ParameterNanOrInf),
             "MoveJ scalar parameter contains NaN or Inf");
     }
 
@@ -59,7 +59,7 @@ MotionResult submitMoveJ(RobotRuntime& robot,
             !std::isfinite(max_jerk)) {
             return MotionResult::failWithApiCode(
                 MotionResultCode::InvalidNumber,
-                static_cast<int>(DianaErrorCode::ParameterNanOrInf),
+                static_cast<int>(ErrorCode::ParameterNanOrInf),
                 "MoveJ joint parameter contains NaN or Inf");
         }
 

@@ -42,6 +42,7 @@ enum class MotionStepStatus {
     Failed
 };
 
+//TODO: MotionResult的封装是否有点负责
 struct MotionResult {
     bool success{false};
     MotionResultCode result{MotionResultCode::Ok};

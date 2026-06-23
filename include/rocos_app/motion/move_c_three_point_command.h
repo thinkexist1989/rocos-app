@@ -67,7 +67,7 @@ public:
             if (!isFinite(q)) {
                 return MotionResult::failWithApiCode(
                     MotionResultCode::InvalidNumber,
-                    static_cast<int>(DianaErrorCode::ParameterNanOrInf),
+                    static_cast<int>(ErrorCode::ParameterNanOrInf),
                     "MoveC q_current contains NaN or Inf");
             }
         }

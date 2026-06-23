@@ -58,7 +58,7 @@ private:
         }
         return MotionResult::failWithApiCode(
             MotionResultCode::InvalidState,
-            static_cast<int>(DianaErrorCode::NotAllAtOpState),
+            static_cast<int>(ErrorCode::NotAllAtOpState),
             std::move(message));
     }
 

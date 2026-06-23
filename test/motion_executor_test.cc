@@ -222,7 +222,7 @@ public:
         rocos::motion::MotionContext&, rocos::motion::ModelProvider&) override {
         return rocos::motion::MotionResult::failWithApiCode(
             rocos::motion::MotionResultCode::PlanningFailed,
-            static_cast<int>(rocos::motion::DianaErrorCode::PlanMoveJ),
+            static_cast<int>(rocos::motion::ErrorCode::PlanMoveJ),
             "MoveJ planning failed");
     }
 
@@ -392,7 +392,7 @@ TEST_CASE("MotionExecutor rejects null and busy submissions with Diana codes") {
     const auto null_result = executor.submit(nullptr);
     CHECK_FALSE(null_result.success);
     CHECK(null_result.api_error_code ==
-          static_cast<int>(rocos::motion::DianaErrorCode::ParameterPointerEqualsNullptr));
+          static_cast<int>(rocos::motion::ErrorCode::ParameterPointerEqualsNullptr));
 
     const auto first = executor.submit(std::make_unique<CountingCommand>(50));
     REQUIRE(first.success);
@@ -401,7 +401,7 @@ TEST_CASE("MotionExecutor rejects null and busy submissions with Diana codes") {
     const auto busy = executor.submit(std::make_unique<CountingCommand>(1));
     CHECK_FALSE(busy.success);
     CHECK(busy.api_error_code ==
-          static_cast<int>(rocos::motion::DianaErrorCode::ConflictTaskRunning));
+          static_cast<int>(rocos::motion::ErrorCode::ConflictTaskRunning));
 
     REQUIRE(executor.stop().success);
     CHECK(waitForStatus(executor, rocos::motion::MotionTaskStatus::Cancelled));
@@ -413,11 +413,11 @@ TEST_CASE("MotionExecutor records prepare failure and releases current command")
     const auto result = executor.submit(std::make_unique<FailingPrepareCommand>());
     CHECK_FALSE(result.success);
     CHECK(result.api_error_code ==
-          static_cast<int>(rocos::motion::DianaErrorCode::PlanMoveJ));
+          static_cast<int>(rocos::motion::ErrorCode::PlanMoveJ));
     CHECK(executor.currentTaskStatus() == rocos::motion::MotionTaskStatus::Failed);
     CHECK_FALSE(executor.hasActiveCommand());
     CHECK(executor.lastError().api_error_code ==
-          static_cast<int>(rocos::motion::DianaErrorCode::PlanMoveJ));
+          static_cast<int>(rocos::motion::ErrorCode::PlanMoveJ));
 }
 
 TEST_CASE("MotionExecutor runs command to finished task status") {
@@ -453,7 +453,7 @@ TEST_CASE("MotionExecutor asks FSM before preparing command") {
     RecordingFsmGateway fsm;
     fsm.start_result = rocos::motion::MotionResult::failWithApiCode(
         rocos::motion::MotionResultCode::InvalidState,
-        static_cast<int>(rocos::motion::DianaErrorCode::NotAllAtOpState),
+        static_cast<int>(rocos::motion::ErrorCode::NotAllAtOpState),
         "fsm rejected start");
     rocos::motion::MotionExecutor executor(fsm);
 
@@ -464,7 +464,7 @@ TEST_CASE("MotionExecutor asks FSM before preparing command") {
 
     CHECK_FALSE(result.success);
     CHECK(result.api_error_code ==
-          static_cast<int>(rocos::motion::DianaErrorCode::NotAllAtOpState));
+          static_cast<int>(rocos::motion::ErrorCode::NotAllAtOpState));
     CHECK(fsm.start_requests == 1);
     CHECK(stats->prepare_count == 0);
     CHECK(stats->start_count == 0);
@@ -532,7 +532,7 @@ TEST_CASE("MotionExecutor rejects task when controller activation fails") {
     RecordingMotionContext context;
     controller.activate_result = rocos::motion::MotionResult::failWithApiCode(
         rocos::motion::MotionResultCode::HardwareFault,
-        static_cast<int>(rocos::motion::DianaErrorCode::CommunicateError),
+        static_cast<int>(rocos::motion::ErrorCode::CommunicateError),
         "controller activation failed");
     rocos::motion::MotionExecutor executor(fsm, controller, context);
 
@@ -541,7 +541,7 @@ TEST_CASE("MotionExecutor rejects task when controller activation fails") {
 
     CHECK_FALSE(submit.success);
     CHECK(submit.api_error_code ==
-          static_cast<int>(rocos::motion::DianaErrorCode::CommunicateError));
+          static_cast<int>(rocos::motion::ErrorCode::CommunicateError));
     CHECK(executor.currentTaskStatus() == rocos::motion::MotionTaskStatus::Failed);
     CHECK(controller.activate_count == 1);
     CHECK(controller.deactivate_count == 0);
@@ -560,11 +560,11 @@ TEST_CASE("MotionExecutor rejects incompatible command and controller before sta
 
     CHECK_FALSE(submit.success);
     CHECK(submit.api_error_code ==
-          static_cast<int>(rocos::motion::DianaErrorCode::MoveUnknown));
+          static_cast<int>(rocos::motion::ErrorCode::MoveUnknown));
     CHECK(executor.currentTaskStatus() == rocos::motion::MotionTaskStatus::Failed);
     CHECK(context.write_count == 0);
     CHECK(executor.lastError().api_error_code ==
-          static_cast<int>(rocos::motion::DianaErrorCode::MoveUnknown));
+          static_cast<int>(rocos::motion::ErrorCode::MoveUnknown));
     CHECK(fsm.stopped_notifications == 1);
     CHECK(fsm.error_notifications == 0);
 }
@@ -575,7 +575,7 @@ TEST_CASE("MotionExecutor fails task when context rejects low level command") {
     RecordingMotionContext context;
     context.write_result = rocos::motion::MotionResult::failWithApiCode(
         rocos::motion::MotionResultCode::SafetyViolation,
-        static_cast<int>(rocos::motion::DianaErrorCode::SpeedLimit),
+        static_cast<int>(rocos::motion::ErrorCode::SpeedLimit),
         "command velocity exceeds limit");
     rocos::motion::MotionExecutor executor(fsm, controller, context);
 
@@ -588,6 +588,6 @@ TEST_CASE("MotionExecutor fails task when context rejects low level command") {
     CHECK(executor.lastError().result ==
           rocos::motion::MotionResultCode::SafetyViolation);
     CHECK(executor.lastError().api_error_code ==
-          static_cast<int>(rocos::motion::DianaErrorCode::SpeedLimit));
+          static_cast<int>(rocos::motion::ErrorCode::SpeedLimit));
     CHECK(fsm.error_notifications == 1);
 }

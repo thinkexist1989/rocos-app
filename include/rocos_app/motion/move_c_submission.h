@@ -32,7 +32,7 @@ MotionResult submitMoveCThreePoint(RobotRuntime& robot,
         !std::isfinite(control_period)) {
         return MotionResult::failWithApiCode(
             MotionResultCode::InvalidNumber,
-            static_cast<int>(DianaErrorCode::ParameterNanOrInf),
+            static_cast<int>(ErrorCode::ParameterNanOrInf),
             "MoveC scalar parameter contains NaN or Inf");
     }
     if (max_cartesian_velocity <= 0.0 ||
@@ -56,7 +56,7 @@ MotionResult submitMoveCThreePoint(RobotRuntime& robot,
         if (!std::isfinite(q)) {
             return MotionResult::failWithApiCode(
                 MotionResultCode::InvalidNumber,
-                static_cast<int>(DianaErrorCode::ParameterNanOrInf),
+                static_cast<int>(ErrorCode::ParameterNanOrInf),
                 "MoveC joint position contains NaN or Inf");
         }
         params.q_current.push_back(q);
@@ -121,7 +121,7 @@ MotionResult submitMoveCCenterAngle(RobotRuntime& robot,
         !std::isfinite(control_period)) {
         return MotionResult::failWithApiCode(
             MotionResultCode::InvalidNumber,
-            static_cast<int>(DianaErrorCode::ParameterNanOrInf),
+            static_cast<int>(ErrorCode::ParameterNanOrInf),
             "MoveC scalar parameter contains NaN or Inf");
     }
     if (max_cartesian_velocity <= 0.0 ||
@@ -146,7 +146,7 @@ MotionResult submitMoveCCenterAngle(RobotRuntime& robot,
         if (!std::isfinite(q)) {
             return MotionResult::failWithApiCode(
                 MotionResultCode::InvalidNumber,
-                static_cast<int>(DianaErrorCode::ParameterNanOrInf),
+                static_cast<int>(ErrorCode::ParameterNanOrInf),
                 "MoveC joint position contains NaN or Inf");
         }
         params.q_current.push_back(q);

@@ -3,7 +3,7 @@
 
 namespace rocos::motion {
 
-enum class DianaErrorCode : int {
+enum class ErrorCode : int {
     WsastartFail = -1001,
     CreateSocketFail = -1002,
     BindPortFail = -1003,
@@ -134,26 +134,26 @@ inline int toDianaErrorCode(MotionResultCode code) {
         case MotionResultCode::Ok:
             return 0;
         case MotionResultCode::Busy:
-            return static_cast<int>(DianaErrorCode::ConflictTaskRunning);
+            return static_cast<int>(ErrorCode::ConflictTaskRunning);
         case MotionResultCode::InvalidCommand:
-            return static_cast<int>(DianaErrorCode::IllegalParameter);
+            return static_cast<int>(ErrorCode::IllegalParameter);
         case MotionResultCode::InvalidNumber:
-            return static_cast<int>(DianaErrorCode::ParameterNanOrInf);
+            return static_cast<int>(ErrorCode::ParameterNanOrInf);
         case MotionResultCode::InvalidState:
-            return static_cast<int>(DianaErrorCode::NotAllAtOpState);
+            return static_cast<int>(ErrorCode::NotAllAtOpState);
         case MotionResultCode::Unsupported:
-            return static_cast<int>(DianaErrorCode::CallingConflictError);
+            return static_cast<int>(ErrorCode::CallingConflictError);
         case MotionResultCode::PlanningFailed:
-            return static_cast<int>(DianaErrorCode::PlanError);
+            return static_cast<int>(ErrorCode::PlanError);
         case MotionResultCode::ExecutionFailed:
-            return static_cast<int>(DianaErrorCode::MoveInterp);
+            return static_cast<int>(ErrorCode::MoveInterp);
         case MotionResultCode::SafetyViolation:
-            return static_cast<int>(DianaErrorCode::Fatal);
+            return static_cast<int>(ErrorCode::Fatal);
         case MotionResultCode::HardwareFault:
-            return static_cast<int>(DianaErrorCode::JointRegistError);
+            return static_cast<int>(ErrorCode::JointRegistError);
     }
 
-    return static_cast<int>(DianaErrorCode::IllegalParameter);
+    return static_cast<int>(ErrorCode::IllegalParameter);
 }
 
 }  // namespace rocos::motion

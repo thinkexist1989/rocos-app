@@ -53,7 +53,7 @@ TEST_CASE("MotionSafetyGuard rejects disabled robot before writing") {
     CHECK_FALSE(result.ok);
     CHECK(result.code == rocos::motion::SafetyViolationCode::NotEnabled);
     CHECK(result.api_error_code ==
-          static_cast<int>(rocos::motion::DianaErrorCode::NotAllAtOpState));
+          static_cast<int>(rocos::motion::ErrorCode::NotAllAtOpState));
 }
 
 TEST_CASE("MotionSafetyGuard rejects invalid number and position limit") {
@@ -64,7 +64,7 @@ TEST_CASE("MotionSafetyGuard rejects invalid number and position limit") {
     CHECK_FALSE(invalid_result.ok);
     CHECK(invalid_result.code == rocos::motion::SafetyViolationCode::InvalidNumber);
     CHECK(invalid_result.api_error_code ==
-          static_cast<int>(rocos::motion::DianaErrorCode::ParameterNanOrInf));
+          static_cast<int>(rocos::motion::ErrorCode::ParameterNanOrInf));
 
     const auto limit_result = guard.check(positionCommand(3.0, 0.0),
                                           makeActual(),
@@ -73,7 +73,7 @@ TEST_CASE("MotionSafetyGuard rejects invalid number and position limit") {
     CHECK(limit_result.code ==
           rocos::motion::SafetyViolationCode::PositionLimitExceeded);
     CHECK(limit_result.api_error_code ==
-          static_cast<int>(rocos::motion::DianaErrorCode::PosLimit));
+          static_cast<int>(rocos::motion::ErrorCode::PosLimit));
 }
 
 TEST_CASE("MotionSafetyGuard uses accepted command history for velocity checks") {
@@ -91,7 +91,7 @@ TEST_CASE("MotionSafetyGuard uses accepted command history for velocity checks")
     CHECK(too_fast.code ==
           rocos::motion::SafetyViolationCode::CommandVelocityLimitExceeded);
     CHECK(too_fast.api_error_code ==
-          static_cast<int>(rocos::motion::DianaErrorCode::SpeedLimit));
+          static_cast<int>(rocos::motion::ErrorCode::SpeedLimit));
 
     const auto still_compared_to_first = guard.check(positionCommand(0.001, 0.0),
                                                      actual,
@@ -112,7 +112,7 @@ TEST_CASE("MotionSafetyGuard rejects following error against actual state") {
     CHECK(result.code ==
           rocos::motion::SafetyViolationCode::FollowingErrorExceeded);
     CHECK(result.api_error_code ==
-          static_cast<int>(rocos::motion::DianaErrorCode::NotFollowPositionCmd));
+          static_cast<int>(rocos::motion::ErrorCode::NotFollowPositionCmd));
 }
 
 TEST_CASE("MotionSafetyGuard reset clears accepted command history") {

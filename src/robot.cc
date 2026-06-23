@@ -906,38 +906,38 @@ namespace rocos {
 
         if (q.rows() != static_cast<unsigned int>(jnt_num_)) {
             log_ptr_->error("MoveJ target dimension does not match robot joints");
-            return static_cast<int>(motion::DianaErrorCode::UnmatchedJointsNumber);
+            return static_cast<int>(motion::ErrorCode::UnmatchedJointsNumber);
         }
 
         if (time != 0.0 || radius != 0.0) {
             log_ptr_->error("MoveJ executor path does not support time/radius yet");
-            return static_cast<int>(motion::DianaErrorCode::IllegalParameter);
+            return static_cast<int>(motion::ErrorCode::IllegalParameter);
         }
 
         for (int i{0}; i < jnt_num_; i++) {
             if (q(i) > joints_[i]->getMaxPosLimit() ||
                 q(i) < joints_[i]->getMinPosLimit()) {
                 log_ptr_->error("MoveJ position command is out of range");
-                return static_cast<int>(motion::DianaErrorCode::PosLimit);
+                return static_cast<int>(motion::ErrorCode::PosLimit);
             }
             if (speed > joints_[i]->getMaxVel() ||
                 speed < (-1) * joints_[i]->getMaxVel()) {
                 log_ptr_->error("MoveJ velocity command is out of range");
-                return static_cast<int>(motion::DianaErrorCode::SpeedLimit);
+                return static_cast<int>(motion::ErrorCode::SpeedLimit);
             }
             if (acceleration > joints_[i]->getMaxAcc() ||
                 acceleration < (-1) * joints_[i]->getMaxAcc()) {
                 log_ptr_->error("MoveJ acceleration command is out of range");
-                return static_cast<int>(motion::DianaErrorCode::AccLimit);
+                return static_cast<int>(motion::ErrorCode::AccLimit);
             }
             if (joints_[i]->getDriveState() != DriveState::OperationEnabled) {
                 log_ptr_->error("MoveJ joint[{}] is not operation enabled", i);
-                return static_cast<int>(motion::DianaErrorCode::NotAllAtOpState);
+                return static_cast<int>(motion::ErrorCode::NotAllAtOpState);
             }
             if (!(joints_[i]->getMode() == ModeOfOperation::CyclicSynchronousPositionMode ||
                   joints_[i]->getMode() == ModeOfOperation::CyclicSynchronousVelocityMode)) {
                 log_ptr_->error("MoveJ不支持关节[{}]的当前模式 :{}", i, static_cast<int>(joints_[i]->getMode()));
-                return static_cast<int>(motion::DianaErrorCode::CallingConflictError);
+                return static_cast<int>(motion::ErrorCode::CallingConflictError);
             }
         }
 
@@ -995,7 +995,7 @@ namespace rocos {
             }
             std::this_thread::sleep_for(std::chrono::milliseconds(1));
         }
-        return static_cast<int>(motion::DianaErrorCode::NotAllAtOpState);
+        return static_cast<int>(motion::ErrorCode::NotAllAtOpState);
     }
 
     int Robot::ResumeMotion() {
@@ -1069,7 +1069,7 @@ namespace rocos {
             for (int i{0}; i < jnt_num_; i++) {
                 if (joints_[i]->getDriveState() != DriveState::OperationEnabled) {
                     log_ptr_->error("MoveL joint[{}] is not operation enabled", i);
-                    return static_cast<int>(motion::DianaErrorCode::NotAllAtOpState);
+                    return static_cast<int>(motion::ErrorCode::NotAllAtOpState);
                 }
             }
 
@@ -1122,79 +1122,5 @@ namespace rocos {
 
         return MoveL(target, speed, acceleration, time, radius, asynchronous);
     }
-
-
-    //TODO: 这些检查要在状态机中完成及确认，执行逻辑中，不应该继续判断，直接执行
-    int Robot::CheckBeforeMove(const JntArray &q, double speed, double acceleration,
-                               double time, double radius) {
-        //** 数据有效性检查  **//
-        //TODO 这里的速度、加速度目前只针对关节空间进行检查
-        for (int i = 0; i < jnt_num_; i++) {
-            //位置检查
-            if (q(i) > joints_[i]->getMaxPosLimit() ||
-                q(i) < joints_[i]->getMinPosLimit()) {
-                log_ptr_->error("  Pos command is out of range");
-                return -1;
-            }
-            //速度检查
-            if (speed > joints_[i]->getMaxVel() ||
-                speed < (-1) * joints_[i]->getMaxVel()) {
-                log_ptr_->error(" Vel command is out of range");
-                return -1;
-            }
-            //加速度检查
-            if (acceleration > joints_[i]->getMaxAcc() ||
-                acceleration < (-1) * joints_[i]->getMaxAcc()) {
-                log_ptr_->error(" Acc command is out of range");
-                return -1;
-            }
-            //使能检查
-            if (joints_[i]->getDriveState() != DriveState::OperationEnabled) {
-                log_ptr_->error(" joints[{}] is in OperationDisabled", i);
-                return -1;
-            }
-        }
-        if (time < 0) {
-            log_ptr_->error("  time is less than 0 invalidly");
-            return -1;
-        }
-
-        if (time) {
-            log_ptr_->error(" time not supported yet");
-            return -1;
-        }
-
-        return 0;
-        //**-------------------------------**//
-    }
-
-    int Robot::CheckBeforeMove(const Frame &pos, double speed, double acceleration,
-                               double time, double radius) {
-        //** 数据有效性检查  **//
-        //TODO 使用解析公式去验证目标pose是否可达
-
-        for (int i = 0; i < jnt_num_; i++) {  //TODO 这里的速度、加速度目前只针对关节空间进行检查
-            //速度检查
-            if (speed > joints_[i]->getMaxVel() ||
-                speed < (-1) * joints_[i]->getMaxVel()) {
-                log_ptr_->error(" Vel command is out of range");
-                return -1;
-            }
-            //加速度检查
-            if (acceleration > joints_[i]->getMaxAcc() ||
-                acceleration < (-1) * joints_[i]->getMaxAcc()) {
-                log_ptr_->error("Acc command is out of range");
-                return -1;
-            }
-            //使能检查
-            if (joints_[i]->getDriveState() != DriveState::OperationEnabled) {
-                log_ptr_->error("joints[{}] is in OperationDisabled", i);
-                return -1;
-            }
-        }
-        //**-------------------------------**//
-        return 0;
-    }
-
 
 }  // namespace rocos

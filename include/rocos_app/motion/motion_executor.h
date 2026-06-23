@@ -67,7 +67,7 @@ public:
         if (!command) {
             auto result = MotionResult::failWithApiCode(
                 MotionResultCode::InvalidCommand,
-                static_cast<int>(DianaErrorCode::ParameterPointerEqualsNullptr),
+                static_cast<int>(ErrorCode::ParameterPointerEqualsNullptr),
                 "motion command is null");
             std::lock_guard<std::mutex> lock(mutex_);
             task_status_ = MotionTaskStatus::Failed;
@@ -358,7 +358,7 @@ private:
 
         return MotionResult::failWithApiCode(
             MotionResultCode::Unsupported,
-            static_cast<int>(DianaErrorCode::MoveUnknown),
+            static_cast<int>(ErrorCode::MoveUnknown),
             "motion command reference space does not match active controller");
     }
 

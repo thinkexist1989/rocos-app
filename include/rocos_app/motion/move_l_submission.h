@@ -28,7 +28,7 @@ MotionResult submitMoveL(RobotRuntime& robot,
         !std::isfinite(control_period)) {
         return MotionResult::failWithApiCode(
             MotionResultCode::InvalidNumber,
-            static_cast<int>(DianaErrorCode::ParameterNanOrInf),
+            static_cast<int>(ErrorCode::ParameterNanOrInf),
             "MoveL scalar parameter contains NaN or Inf");
     }
     if (max_cartesian_velocity <= 0.0 ||
@@ -50,7 +50,7 @@ MotionResult submitMoveL(RobotRuntime& robot,
         if (!std::isfinite(q)) {
             return MotionResult::failWithApiCode(
                 MotionResultCode::InvalidNumber,
-                static_cast<int>(DianaErrorCode::ParameterNanOrInf),
+                static_cast<int>(ErrorCode::ParameterNanOrInf),
                 "MoveL joint position contains NaN or Inf");
         }
         params.q_current.push_back(q);

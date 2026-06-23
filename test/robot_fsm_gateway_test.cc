@@ -73,7 +73,7 @@ TEST_CASE("RobotFsmGateway maps rejected FSM requests to Diana API code") {
     CHECK_FALSE(result.success);
     CHECK(result.result == rocos::motion::MotionResultCode::InvalidState);
     CHECK(result.api_error_code ==
-          static_cast<int>(rocos::motion::DianaErrorCode::NotAllAtOpState));
+          static_cast<int>(rocos::motion::ErrorCode::NotAllAtOpState));
 }
 
 TEST_CASE("RobotFsmGateway reports error event to robot FSM") {
@@ -83,7 +83,7 @@ TEST_CASE("RobotFsmGateway reports error event to robot FSM") {
     const auto result = gateway.notifyError(
         rocos::motion::MotionResult::failWithApiCode(
             rocos::motion::MotionResultCode::SafetyViolation,
-            static_cast<int>(rocos::motion::DianaErrorCode::SpeedLimit),
+            static_cast<int>(rocos::motion::ErrorCode::SpeedLimit),
             "speed limit"));
 
     CHECK(result.success);

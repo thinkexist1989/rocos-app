@@ -105,7 +105,7 @@ TEST_CASE("RobotMotionContext does not write command rejected by safety guard") 
 
     CHECK_FALSE(result.success);
     CHECK(result.api_error_code ==
-          static_cast<int>(rocos::motion::DianaErrorCode::PosLimit));
+          static_cast<int>(rocos::motion::ErrorCode::PosLimit));
     CHECK(robot.position_writes == 0);
     CHECK(robot.velocity_writes == 0);
     CHECK(robot.wait_count == 0);

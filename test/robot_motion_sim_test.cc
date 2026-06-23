@@ -64,7 +64,7 @@ TEST_CASE("Robot MoveJ returns Diana API error code on HardwareSim invalid targe
     const auto target = makeTarget(robot->getJointNum(), 4.0);
     const int result = robot->MoveJ(target, 0.5, 1.0, 0.0, 0.0, false);
 
-    CHECK(result == static_cast<int>(rocos::motion::DianaErrorCode::PosLimit));
+    CHECK(result == static_cast<int>(rocos::motion::ErrorCode::PosLimit));
     CHECK(robot->GetRobotState() == "STOPPED");
 }
 

@@ -88,7 +88,7 @@ TEST_CASE("submitMoveJ rejects target dimension mismatch with Diana API code") {
     CHECK_FALSE(result.success);
     CHECK(result.result == rocos::motion::MotionResultCode::InvalidCommand);
     CHECK(result.api_error_code ==
-          static_cast<int>(rocos::motion::DianaErrorCode::UnmatchedJointsNumber));
+          static_cast<int>(rocos::motion::ErrorCode::UnmatchedJointsNumber));
     CHECK(executor.submit_count == 0);
 }
 
@@ -102,7 +102,7 @@ TEST_CASE("submitMoveJ rejects invalid scalar parameters with Diana API code") {
     CHECK_FALSE(result.success);
     CHECK(result.result == rocos::motion::MotionResultCode::InvalidCommand);
     CHECK(result.api_error_code ==
-          static_cast<int>(rocos::motion::DianaErrorCode::IllegalParameter));
+          static_cast<int>(rocos::motion::ErrorCode::IllegalParameter));
     CHECK(executor.submit_count == 0);
 }
 
@@ -118,6 +118,6 @@ TEST_CASE("submitMoveJ propagates executor Diana API result") {
 
     CHECK_FALSE(result.success);
     CHECK(result.api_error_code ==
-          static_cast<int>(rocos::motion::DianaErrorCode::ConflictTaskRunning));
+          static_cast<int>(rocos::motion::ErrorCode::ConflictTaskRunning));
     CHECK(executor.submit_count == 1);
 }

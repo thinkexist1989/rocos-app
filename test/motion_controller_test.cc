@@ -61,7 +61,7 @@ TEST_CASE("PositionController rejects invalid joint numbers with Diana API code"
     CHECK_FALSE(result.success);
     CHECK(result.result == rocos::motion::MotionResultCode::InvalidNumber);
     CHECK(result.api_error_code ==
-          static_cast<int>(rocos::motion::DianaErrorCode::ParameterNanOrInf));
+          static_cast<int>(rocos::motion::ErrorCode::ParameterNanOrInf));
 }
 
 TEST_CASE("PositionController rejects incompatible reference space with Diana API code") {
@@ -75,5 +75,5 @@ TEST_CASE("PositionController rejects incompatible reference space with Diana AP
     CHECK_FALSE(result.success);
     CHECK(result.result == rocos::motion::MotionResultCode::Unsupported);
     CHECK(result.api_error_code ==
-          static_cast<int>(rocos::motion::DianaErrorCode::MoveUnknown));
+          static_cast<int>(rocos::motion::ErrorCode::MoveUnknown));
 }

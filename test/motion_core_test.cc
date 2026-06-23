@@ -132,20 +132,20 @@ rocos::motion::MoveJCommand::Parameters makeMoveJParams() {
 // === Existing MoveJ tests (updated signatures) ===
 
 TEST_CASE("Diana error mapper exposes external API codes") {
-    using rocos::motion::DianaErrorCode;
+    using rocos::motion::ErrorCode;
     using rocos::motion::MotionResultCode;
 
     CHECK(rocos::motion::toDianaErrorCode(MotionResultCode::Ok) == 0);
     CHECK(rocos::motion::toDianaErrorCode(MotionResultCode::Busy) ==
-          static_cast<int>(DianaErrorCode::ConflictTaskRunning));
+          static_cast<int>(ErrorCode::ConflictTaskRunning));
     CHECK(rocos::motion::toDianaErrorCode(MotionResultCode::InvalidCommand) ==
-          static_cast<int>(DianaErrorCode::IllegalParameter));
+          static_cast<int>(ErrorCode::IllegalParameter));
     CHECK(rocos::motion::toDianaErrorCode(MotionResultCode::PlanningFailed) ==
-          static_cast<int>(DianaErrorCode::PlanError));
+          static_cast<int>(ErrorCode::PlanError));
     CHECK(rocos::motion::toDianaErrorCode(MotionResultCode::SafetyViolation) ==
-          static_cast<int>(DianaErrorCode::Fatal));
+          static_cast<int>(ErrorCode::Fatal));
     CHECK(rocos::motion::toDianaErrorCode(MotionResultCode::HardwareFault) ==
-          static_cast<int>(DianaErrorCode::JointRegistError));
+          static_cast<int>(ErrorCode::JointRegistError));
 }
 
 TEST_CASE("MoveJCommand samples finite path references within configured limits") {
@@ -250,7 +250,7 @@ TEST_CASE("MoveJCommand rejects invalid parameters with Diana API error codes") 
     CHECK_FALSE(result.success);
     CHECK(result.result == rocos::motion::MotionResultCode::InvalidNumber);
     CHECK(result.api_error_code ==
-          static_cast<int>(rocos::motion::DianaErrorCode::ParameterNanOrInf));
+          static_cast<int>(rocos::motion::ErrorCode::ParameterNanOrInf));
 }
 
 // === MoveLCommand tests ===
