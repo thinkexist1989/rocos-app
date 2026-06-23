@@ -237,7 +237,6 @@ namespace rocos {
         jointNum = jnt_num_;
 
         target_positions_.resize(jnt_num_);
-        target_positions_prev_.resize(jnt_num_);
         target_velocities_.resize(jnt_num_);
         target_torques_.resize(jnt_num_);
 
@@ -249,7 +248,6 @@ namespace rocos {
         for (int i = 0; i < jnt_num_; ++i) {
             pos_[i] = joints_[i]->getPosition();
             target_positions_[i] = pos_[i];
-            target_positions_prev_[i] = pos_[i];
 
             vel_[i] = joints_[i]->getVelocity();
             target_velocities_[i] = vel_[i];
@@ -261,11 +259,8 @@ namespace rocos {
             max_jerk_[i] = joints_[i]->getMaxJerk();
 
             //TODO: 需要删除
-            if (profile_type_ == trapezoid) {
-                interp_[i] = new Trapezoid;
-            } else if (profile_type_ == doubleS) {
-                interp_[i] = new DoubleS;
-            }
+            interp_[i] = new Trapezoid;
+
         }
 
         // sun 工具系的初始化
@@ -866,7 +861,6 @@ namespace rocos {
 
         //** vector 数组大小初始化 **//
         target_positions_.resize(jnt_num_);
-        target_positions_prev_.resize(jnt_num_);
         target_velocities_.resize(jnt_num_);
         target_torques_.resize(jnt_num_);
         // pos_.resize(jnt_num_);
@@ -876,24 +870,21 @@ namespace rocos {
         max_acc_.resize(jnt_num_);
         max_jerk_.resize(jnt_num_);
         interp_.resize(jnt_num_);
-        need_plan_.resize(jnt_num_, false);
+
         //**-------------------------------**//
         //** vector 数组数值初始化 **//
         for (int i = 0; i < jnt_num_; ++i) {
             pos_[i] = joints_[i]->getPosition();
             target_positions_[i] = pos_[i];
-            target_positions_prev_[i] = pos_[i];
 
             vel_[i] = joints_[i]->getVelocity();
             target_velocities_[i] = vel_[i];
 
             target_torques_[i] = joints_[i]->getTorque();
 
-            if (profile_type_ == trapezoid) {
-                interp_[i] = new Trapezoid;
-            } else if (profile_type_ == doubleS) {
-                interp_[i] = new DoubleS;
-            }
+
+            interp_[i] = new Trapezoid;
+
         }
         //**-------------------------------**//
 
@@ -1125,297 +1116,14 @@ namespace rocos {
         }
 
         // 旧路径（time/radius 不为零，或速度模式）
-        if (all_pos_mode)
-            return MoveL_pos(pose, speed, acceleration, time, radius, asynchronous, max_running_count);
-        else if (all_vel_mode)
-            return MoveL_vel(pose, speed, acceleration, time, radius, asynchronous, max_running_count);
-        else {
-            log_ptr_->error("某关节为既不是位置模式也不是速度模式！");
-            return -1;
-        }
-    }
-
-    int Robot::MoveL_pos(Frame pose, double speed, double acceleration, double time,
-                         double radius, bool asynchronous, int max_running_count) {
-        for (int i{0}; i < jointNum; i++) {
-            if (joints_[i]->getMode() != ModeOfOperation::CyclicSynchronousPositionMode) {
-                log_ptr_->error(" 需要关节[{}]进入位置伺服模式", i);
-                return -1;
-            }
-        }
-
-        if (max_running_count < 1) {
-            log_ptr_->error("max_running_count parameters must be greater than 0");
-            return -1;
-        }
-
-        if (CheckBeforeMove(pose, speed, acceleration, time, radius) < 0) {
-            log_ptr_->error("given parameters is invalid");
-            return -1;
-        }
-
-        if (!enterRunning())  //最大一条任务异步执行：仅 STOPPED 状态可启动新运动
-        {
-            log_ptr_->error(" Motion is still running and waiting for it to finish");
-            return -1;
-        }
-
-        if (motion_thread_) {
-            motion_thread_->join();
-            motion_thread_ = nullptr;
-        }
-
-        //** 变量初始化 **//
-        traj_.clear();
-        KDL::JntArray q_init(jnt_num_);
-        KDL::JntArray q_target(jnt_num_);
-        std::vector<double> max_step;
-        std::vector<KDL::Frame> traj_target;
-        KDL::Frame frame_init;
-        JntToCart(JC_helper::vector_2_JntArray(pos_), frame_init);
-        int traj_count{0};
-        //**-------------------------------**//
-
-        for (int i = 0; i < jnt_num_; i++) {
-            q_init(i) = pos_[i];
-            q_target(i) = pos_[i];
-            max_step.push_back(max_vel_[i] * DELTA_T);
-        }
-
-        if (JC_helper::link_trajectory(traj_target, frame_init, pose, speed, acceleration) < 0) {
-            log_ptr_->error("link trajectory planning fail ");
-
-            enterStopped();
-
-            return -1;
-        }
-
-        //** 轨迹IK计算，计算失败，可以重新计算，有最大计算次数限制{max_running_count} **//
-        int ik_count{0};
-        for (; ik_count < max_running_count; ik_count++) {
-            try {
-                for (int i = 0; i < jnt_num_; i++) {
-                    q_init(i) = pos_[i];
-                }
-                traj_.clear();
-
-                log_ptr_->info("---------------------------------------");
-                //sun
-                // 尝试改为解析解接口
-                for (const auto &target: traj_target) {
-
-                    if (kinematics_.CartToJnt(q_init, target, q_target) < 0) {
-                        log_ptr_->error(" CartToJnt failed on the {} times", ik_count);
-                        throw -1;
-                    }
-                    //*防止奇异位置速度激增
-                    for (int i = 0; i < jnt_num_; i++) {
-                        if (abs(q_target(i) - q_init(i)) > max_step[i]) {
-                            log_ptr_->error("joint[{}] speed is too fast", i);
-                            log_ptr_->error("target speed = {} and max_step = {}", abs(q_target(i) - q_init(i)), max_step[i]);
-                            throw -2;
-                        }
-                    }
-                    //**-------------------------------**//
-                    q_init = q_target;
-                    traj_.push_back(q_target);
-
-                }
-                //在此处时，代表规划成功
-                break;
-
-            }
-            catch (int flag_error) {
-                switch (flag_error) {
-                    case -1:
-                        break;
-                    case -2:
-                        break;
-                    default:
-                        log_ptr_->error("Undefined error!");
-                        enterStopped();
-                        return -1;
-                }
-            }
-            catch (...) {
-                log_ptr_->error("Undefined error!");
-                enterStopped();
-                return -1;
-            }
-
-        }
-
-        if (ik_count == max_running_count) {
-            log_ptr_->error("CartToJnt still failed even after {} attempts", max_running_count);
-            enterStopped();
-            return -1;
-        }
-
-        //**-------------------------------**//
-
-        if (asynchronous)  //异步执行
-        {
-            motion_thread_.reset(new std::thread{&Robot::RunMoveL, this, std::ref(traj_)});
-            // 已在 RUNNING 状态，无需再次设置
-        } else  //同步执行
-        {
-            motion_thread_.reset(new std::thread{&Robot::RunMoveL, this, std::ref(traj_)});
-            motion_thread_->join();
-            motion_thread_ = nullptr;
-            // RunMoveL 末尾会调用 enterStopped()
-        }
-
-        return 0;
-    }
-
-    int Robot::MoveL_vel(Frame pose, double speed, double acceleration, double time,
-                         double radius, bool asynchronous, int max_running_count) {
-        for (int i{0}; i < jointNum; i++) {
-            if (joints_[i]->getMode() != ModeOfOperation::CyclicSynchronousVelocityMode) {
-                log_ptr_->error(" 需要关节[{}]进入速度伺服模式", i);
-                return -1;
-            }
-        }
-
-        if (time) {
-            log_ptr_->error(" time not supported yet");
-            return -1;
-        }
-
-        if (max_running_count < 1) {
-            log_ptr_->error("max_running_count parameters must be greater than 0");
-            return -1;
-        }
-
-        if (CheckBeforeMove(pose, speed, acceleration, time, radius) < 0) {
-            log_ptr_->error("given parameters is invalid");
-            return -1;
-        }
-
-        if (!enterRunning())  //最大一条任务异步执行：仅 STOPPED 状态可启动新运动
-        {
-            log_ptr_->error(" Motion is still running and waiting for it to finish");
-            return -1;
-        }
-
-        if (motion_thread_) {
-            motion_thread_->join();
-            motion_thread_ = nullptr;
-        }
-
-
-
-        //** 变量初始化 **//
-        KDL::JntArray q_init(jnt_num_);
-        KDL::JntArray joint_vel(jnt_num_);
-        std::vector<KDL::Twist> vel_target;
-        KDL::Frame frame_current;
-        JntToCart(JC_helper::vector_2_JntArray(pos_), frame_current);
-        KDL::ChainIkSolverVel_pinv _ik_vel{kinematics_.getChain()};
-        //**-------------------------------**//
-
-        if (JC_helper::link_trajectory(vel_target, frame_current, pose, speed, acceleration) < 0) {
-            log_ptr_->error("link trajectory planning fail ");
-
-            enterStopped();
-
-            return -1;
-        }
-
-        //** 轨迹IK计算，计算失败，可以重新计算，有最大计算次数限制{max_running_count} **//
-        int ik_count{0};
-        for (; ik_count < max_running_count; ik_count++) {
-            try {
-                for (int i = 0; i < jnt_num_; i++) {
-                    q_init(i) = pos_[i];
-                }
-                traj_.clear();
-
-                log_ptr_->info("---------------------------------------");
-
-                for (const auto &target: vel_target) {
-                    //!雅克比默认参考系为base,参考点为flange
-                    if (_ik_vel.CartToJnt(q_init, target, joint_vel) != 0) {
-                        log_ptr_->error("雅克比计算错误,错误号：{}", _ik_vel.CartToJnt(q_init, target, joint_vel));
-                        throw -1;
-                    }
-
-                    //*防止奇异位置速度激增
-                    for (int i = 0; i < jnt_num_; i++) {
-                        if (abs(joint_vel(i)) > max_vel_[i]) {
-                            log_ptr_->error("joint[{}] speed is too fast", i);
-                            log_ptr_->error("target speed = {} and max_vel_ = {}", abs(joint_vel(i)), max_vel_[i]);
-                            throw -2;
-                        }
-
-                    }
-                    //**-------------------------------**//
-
-                    //** 位置保护，雅克比计算需要位置检查 **//
-                    q_init.data = q_init.data + joint_vel.data * DELTA_T;
-                    for (int i = 0; i < jnt_num_; i++) {
-                        if (q_init(i) > joints_[i]->getMaxPosLimit() ||
-                            q_init(i) < joints_[i]->getMinPosLimit()) {
-                            log_ptr_->error("关节[{}] 超过关节限位，求解失败", i);
-                            throw -3;
-                        }
-                    }
-                    //**-------------------------------**//
-
-                    traj_.push_back(joint_vel);
-
-                }
-                //在此处时，代表规划成功
-                break;
-
-            }
-            catch (int flag_error) {
-                switch (flag_error) {
-                    case -1:
-                        break;
-                    case -2:
-                        break;
-                    case -3:
-                        break;
-                    default:
-                        log_ptr_->error("Undefined error!");
-                        enterStopped();
-
-                        return -1;
-                }
-            }
-            catch (...) {
-                log_ptr_->error("Undefined error!");
-                enterStopped();
-
-                return -1;
-            }
-
-        }
-
-        if (ik_count == max_running_count) {
-            log_ptr_->error("CartToJnt still failed even after {} attempts", max_running_count);
-
-            enterStopped();
-
-            return -1;
-        }
-
-        //**-------------------------------**//
-
-        if (asynchronous)  //异步执行
-        {
-            motion_thread_.reset(new std::thread{&Robot::RunMoveL, this, std::ref(traj_)});
-            // 已在 RUNNING 状态，无需再次设置
-        } else  //同步执行
-        {
-            motion_thread_.reset(new std::thread{&Robot::RunMoveL, this, std::ref(traj_)});
-            motion_thread_->join();
-            motion_thread_ = nullptr;
-            // RunMoveL 末尾会调用 enterStopped()
-        }
-
-        return 0;
+        // if (all_pos_mode)
+        //     return MoveL_pos(pose, speed, acceleration, time, radius, asynchronous, max_running_count);
+        // else if (all_vel_mode)
+        //     return MoveL_vel(pose, speed, acceleration, time, radius, asynchronous, max_running_count);
+        // else {
+        //     log_ptr_->error("某关节为既不是位置模式也不是速度模式！");
+        //     return -1;
+        // }
     }
 
     //TODO: ========================MoveL=============================
@@ -1690,18 +1398,18 @@ namespace rocos {
 
         //**-------------------------------**//
 
-        if (asynchronous)  //异步执行
-        {
-            motion_thread_.reset(new std::thread{&Robot::RunMoveL, this, std::ref(traj_)});
-            // 已在 RUNNING 状态，无需再次设置
-        } else  //同步执行
-        {
-            motion_thread_.reset(new std::thread{&Robot::RunMoveL, this, std::ref(traj_)});
-            motion_thread_->join();
-            motion_thread_ = nullptr;
-            // RunMoveL 末尾会调用 enterStopped()
-        }
-
+        // if (asynchronous)  //异步执行
+        // {
+        //     motion_thread_.reset(new std::thread{&Robot::RunMoveL, this, std::ref(traj_)});
+        //     // 已在 RUNNING 状态，无需再次设置
+        // } else  //同步执行
+        // {
+        //     motion_thread_.reset(new std::thread{&Robot::RunMoveL, this, std::ref(traj_)});
+        //     motion_thread_->join();
+        //     motion_thread_ = nullptr;
+        //     // RunMoveL 末尾会调用 enterStopped()
+        // }
+        //
         return 0;
     }
 
@@ -1824,18 +1532,18 @@ namespace rocos {
 
         //**-------------------------------**//
 
-        if (asynchronous)  //异步执行
-        {
-            motion_thread_.reset(new std::thread{&Robot::RunMoveL, this, std::ref(traj_)});
-            // 已在 RUNNING 状态，无需再次设置
-        } else  //同步执行
-        {
-            motion_thread_.reset(new std::thread{&Robot::RunMoveL, this, std::ref(traj_)});
-            motion_thread_->join();
-            motion_thread_ = nullptr;
-            // RunMoveL 末尾会调用 enterStopped()
-        }
-
+        // if (asynchronous)  //异步执行
+        // {
+        //     motion_thread_.reset(new std::thread{&Robot::RunMoveL, this, std::ref(traj_)});
+        //     // 已在 RUNNING 状态，无需再次设置
+        // } else  //同步执行
+        // {
+        //     motion_thread_.reset(new std::thread{&Robot::RunMoveL, this, std::ref(traj_)});
+        //     motion_thread_->join();
+        //     motion_thread_ = nullptr;
+        //     // RunMoveL 末尾会调用 enterStopped()
+        // }
+        //
         return 0;
     }
 
@@ -1970,17 +1678,17 @@ namespace rocos {
 
         //**-------------------------------**//
 
-        if (asynchronous)  //异步执行
-        {
-            motion_thread_.reset(new std::thread{&Robot::RunMoveL, this, std::ref(traj_)});
-            // 已在 RUNNING 状态，无需再次设置
-        } else  //同步执行
-        {
-            motion_thread_.reset(new std::thread{&Robot::RunMoveL, this, std::ref(traj_)});
-            motion_thread_->join();
-            motion_thread_ = nullptr;
-            // RunMoveL 末尾会调用 enterStopped()
-        }
+        // if (asynchronous)  //异步执行
+        // {
+        //     motion_thread_.reset(new std::thread{&Robot::RunMoveL, this, std::ref(traj_)});
+        //     // 已在 RUNNING 状态，无需再次设置
+        // } else  //同步执行
+        // {
+        //     motion_thread_.reset(new std::thread{&Robot::RunMoveL, this, std::ref(traj_)});
+        //     motion_thread_->join();
+        //     motion_thread_ = nullptr;
+        //     // RunMoveL 末尾会调用 enterStopped()
+        // }
 
         return 0;
     }
@@ -2113,17 +1821,17 @@ namespace rocos {
 
         //**-------------------------------**//
 
-        if (asynchronous)  //异步执行
-        {
-            motion_thread_.reset(new std::thread{&Robot::RunMoveL, this, std::ref(traj_)});
-            // 已在 RUNNING 状态，无需再次设置
-        } else  //同步执行
-        {
-            motion_thread_.reset(new std::thread{&Robot::RunMoveL, this, std::ref(traj_)});
-            motion_thread_->join();
-            motion_thread_ = nullptr;
-            // RunMoveL 末尾会调用 enterStopped()
-        }
+        // if (asynchronous)  //异步执行
+        // {
+        //     motion_thread_.reset(new std::thread{&Robot::RunMoveL, this, std::ref(traj_)});
+        //     // 已在 RUNNING 状态，无需再次设置
+        // } else  //同步执行
+        // {
+        //     motion_thread_.reset(new std::thread{&Robot::RunMoveL, this, std::ref(traj_)});
+        //     motion_thread_->join();
+        //     motion_thread_ = nullptr;
+        //     // RunMoveL 末尾会调用 enterStopped()
+        // }
 
         return 0;
     }
@@ -2428,154 +2136,6 @@ namespace rocos {
         }
         //**-------------------------------**//
         return 0;
-    }
-
-    void Robot::RunMoveJ(JntArray q, double speed, double acceleration, double time, double radius) {
-        //** 变量初始化 **//
-        double dt = 0.0;
-        double max_time = 0.0;
-        std::vector<std::shared_ptr<DoubleS> > interp(jnt_num_);
-        std::vector<double> max_step;
-        std::vector<double> target_pos;//为了速度检查
-        std::vector<double> init_pos;//为了速度检查
-        //**-------------------------------**//
-
-        //** 程序初始化 **//
-        for (auto &i: interp)
-            i.reset(new DoubleS{});
-
-        for (int i{0}; i < jnt_num_; i++) {
-            max_step.push_back(max_vel_[i] * DELTA_T);
-            target_pos.push_back(pos_[i]);
-            init_pos.push_back(pos_[i]);
-        }
-        //**-------------------------------**//
-
-        for (int i = 0; i < jnt_num_; ++i) {
-            if (fabs(q(i) - pos_[i]) < EPS) {
-                need_plan_[i] = false;
-                continue;
-            }
-            need_plan_[i] = true;
-
-            interp[i]->planDoubleSProfile(0,          // t
-                                          pos_[i],  // p0
-                                          q(i),     // pf
-                                          0,          // v0
-                                          0,          // vf
-                                          speed, acceleration, max_jerk_[i]);
-
-            if (!interp[i]->isValidMovement() || interp[i]->getDuration() <= 0) {
-                log_ptr_->error("Joint[{}] MoveJ trajectory is infeasible", i);
-                enterStopped();
-                return;
-            }
-            max_time = max(max_time, interp[i]->getDuration());
-        }
-
-        for (int i = 0; i < jnt_num_; i++) {
-            if (need_plan_[i])
-                interp[i]->JC_scaleToDuration(max_time);
-        }
-
-        //** 速度检查 **//
-        dt = 0;
-        while (dt <= max_time) {
-            for (int i = 0; i < jnt_num_; i++) {
-                if (!need_plan_[i]) continue; //不需要规划的关节自然不需要速度检查
-
-                target_pos[i] = interp[i]->pos(dt);
-
-                if (abs(target_pos[i] - init_pos[i]) > max_step[i]) {
-                    log_ptr_->error("joint[{}] speep is too  fast", i);
-                    log_ptr_->error("target speed = {} and  max_speed={}", abs(target_pos[i] - init_pos[i]), max_step[i]);
-                    log_ptr_->error("q_target( {} )  = {}", i, target_pos[i] * 180 / M_PI);
-                    log_ptr_->error("q_init( {} ) ={}", i, init_pos[i] * 180 / M_PI);
-
-                    enterStopped();
-                    return;
-                } else
-                    init_pos[i] = target_pos[i];
-            }
-
-            dt += DELTA_T;
-        }
-        //**-------------------------------**//
-
-        //** 伺服控制 **//
-        dt = 0;
-        while (dt <= max_time) {
-            if(!IsEnabled())
-                goto Exit;
-
-            for (int i = 0; i < jnt_num_; ++i) {
-                if (!need_plan_[i])
-                    continue;
-
-                pos_[i] = interp[i]->pos(dt);
-                vel_[i] = interp[i]->vel(dt);
-                joints_[i]->setPosition(pos_[i]);//!都设置，自动根据模式选取位置或者速度伺服
-                joints_[i]->setVelocity(vel_[i]);//!
-            }
-            dt += DELTA_T;
-
-
-            hw_interface_->waitForSignal(0);
-        }
-        //**-------------------------------**//
-
-        Exit:
-        enterStopped();
-    }
-
-    void Robot::RunMoveL(const std::vector<KDL::JntArray> &traj) {
-
-        log_ptr_->info("No. of waypoints: {}", traj.size());
-        
-        for (const auto &waypoints: traj) {
-            if(!IsEnabled())
-                goto Exit;
-
-            for (int i = 0; i < jnt_num_; ++i) {
-                if (joints_[i]->getMode() == ModeOfOperation::CyclicSynchronousPositionMode) {
-                    pos_[i] = waypoints(i);
-                    joints_[i]->setPosition(waypoints(i));
-                } else if (joints_[i]->getMode() == ModeOfOperation::CyclicSynchronousVelocityMode) {
-                    vel_[i] = waypoints(i);
-                    pos_[i] = pos_[i] + vel_[i] * DELTA_T;
-                    joints_[i]->setVelocity(vel_[i]);
-                    joints_[i]->setPosition(pos_[i]);
-                } else {
-                    log_ptr_->error("关节[{}] 不支持此模式 :{}", i, static_cast<int> (joints_[i]->getMode()));
-                    enterStopped();
-                    return;
-                }
-            }
-
-            hw_interface_->waitForSignal(0);
-        }
-
-        Exit:
-        enterStopped();
-    }
-
-    void Robot::RunMultiMoveL(const std::vector<KDL::JntArray> &traj) {
-
-        log_ptr_->info("No. of waypoints: {}", traj.size());
-
-        for (const auto &waypoints: traj) {
-            if(!IsEnabled())
-                goto Exit;
-
-            for (int i = 0; i < jnt_num_; ++i) {
-                pos_[i] = waypoints(i);
-                joints_[i]->setPosition(waypoints(i));
-            }
-            hw_interface_->waitForSignal(0);
-        }
-
-        Exit:
-        enterStopped();
     }
 
     int Robot::admittance_teaching(bool asynchronous) {

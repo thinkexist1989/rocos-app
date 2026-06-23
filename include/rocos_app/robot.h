@@ -282,8 +282,6 @@ namespace rocos
         /// \param max_vel 速度约束值
         inline void setJntVelLimits(std::vector<double> &max_vel)
         {
-            max_vel_ = max_vel;
-            need_plan_.resize(jnt_num_, true);
         }
 
         /// \brief 获取多关节速度约束
@@ -295,8 +293,6 @@ namespace rocos
         /// \param max_vel 速度约束值
         inline void setJntVelLimit(int id, double max_vel)
         {
-            max_vel_[id] = max_vel;
-            need_plan_[id] = true;
         }
 
         /// \brief 获取单关节速度约束
@@ -308,8 +304,6 @@ namespace rocos
         /// \param max_acc 加速度约束值
         inline void setJntAccLimits(std::vector<double> &max_acc)
         {
-            max_acc_ = max_acc;
-            need_plan_.resize(jnt_num_, true);
         }
 
         /// \brief 获取多关节加速度约束
@@ -321,8 +315,6 @@ namespace rocos
         /// \param max_acc 加速度约束值
         inline void setJntAccLimit(int id, double max_acc)
         {
-            max_acc_[id] = max_acc;
-            need_plan_[id] = true;
         }
 
         /// \brief 获取单关节加速度约束
@@ -334,8 +326,6 @@ namespace rocos
         /// \param max_jerk 多关节加加速约束值
         inline void setJntJerkLimits(std::vector<double> &max_jerk)
         {
-            max_jerk_ = max_jerk;
-            need_plan_.resize(jnt_num_, true);
         }
 
         /// \brief 获取多关节加加速约束
@@ -347,8 +337,6 @@ namespace rocos
         /// \param max_jerk 关节加加速约束值
         inline void setJntJerkLimit(int id, double max_jerk)
         {
-            max_jerk_[id] = max_jerk;
-            need_plan_[id] = true;
         }
 
         /// \brief 获取单关节加加速度约束
@@ -356,28 +344,11 @@ namespace rocos
         /// \return 关节加加速约束值
         inline double getJntJerkLimit(int id) { return max_jerk_[id]; }
 
-        /// \brief 设置规划Profile类型
-        /// \param type Trapezoid、DoubleS
-        inline void setProfileType(ProfileType type)
-        {
-            profile_type_ = type;
-            need_plan_.resize(jnt_num_, true);
-        }
-
-        /// \brief 设置同步模式
-        /// \param sync 无同步、时间同步、相位同步
-        inline void setSynchronization(Synchronization sync)
-        {
-            sync_ = sync;
-            need_plan_.resize(jnt_num_, true);
-        }
-
         inline Frame getFlange()
         {
             std::lock_guard<std::mutex> lock(mtx); // 自动获取互斥锁
             return flange_;
         }
-        // sun
         Frame getTool()
         {
             // tool_=flange_*T_tool_;
@@ -385,8 +356,6 @@ namespace rocos
             tool_ = flange_ * T_tool_;
             return tool_;
         }
-
-        // sun
         Frame getObject()
         {
             std::lock_guard<std::mutex> lock(mtx); // 自动获取互斥锁
@@ -721,22 +690,17 @@ namespace rocos
             return ErrorState;
         }
 
-    protected:
-        // void addAllJoints();
-
     public:
         int JntToCart(const JntArray &q_in, Frame &p_out)
         {
             return kinematics_.JntToCart(q_in, p_out);
         }
-
         int CartToJnt(const JntArray &q_init, const Frame &p_in, JntArray &q_out)
         {
             return kinematics_.CartToJnt(q_init, p_in, q_out);
         }
 
     protected:
-
         //! 更新法兰系,工具系,工件系poseFlange
         void updateCartesianInfo()
         {
@@ -786,12 +750,6 @@ namespace rocos
         int MoveL(Frame pose, double speed = 1.05, double acceleration = 1.4,
                   double time = 0.0, double radius = 0.0, bool asynchronous = false, int max_running_count = 1);
 
-        int MoveL_pos(Frame pose, double speed = 1.05, double acceleration = 1.4,
-                      double time = 0.0, double radius = 0.0, bool asynchronous = false, int max_running_count = 1);
-
-        int MoveL_vel(Frame pose, double speed = 1.05, double acceleration = 1.4,
-                      double time = 0.0, double radius = 0.0, bool asynchronous = false, int max_running_count = 1);
-
         //! \brief 直线运动到关节空间指定位置
         //! \param q 关节位置
         //! \param speed 关节速度限制（leading axis）
@@ -840,7 +798,6 @@ namespace rocos
         //! \param asynchronous 是否异步运行
         //! \param max_running_count MoveC规划失败重新尝试规划的最大次数
         //! \return 错误标志位,成功返回0
-
         int MoveC(const KDL::Frame &center, double theta, int axiz = 2, double speed = 0.25,
                   double acceleration = 1.2, double time = 0.0, double radius = 0.0,
                   OrientationMode mode = UNCONSTRAINED, bool asynchronous = false, int max_running_count = 1);
@@ -854,6 +811,7 @@ namespace rocos
                       OrientationMode mode = UNCONSTRAINED, bool asynchronous = false, int max_running_count = 1);
         
 
+        //TODO: Dragging要改成方向向量方式
         enum class DRAGGING_FLAG : int
         {
             J0 = 0,
@@ -940,15 +898,6 @@ namespace rocos
 
         void initializeMotionExecutor();
 
-        // 实际movej执行线程
-        void RunMoveJ(JntArray q, double speed = 1.05, double acceleration = 1.4,
-                      double time = 0.0, double radius = 0.0);
-
-        // 实际movel执行线程
-        void RunMoveL(const std::vector<KDL::JntArray> &traj);
-
-        // 实际multimovel执行线程
-        void RunMultiMoveL(const std::vector<KDL::JntArray> &traj);
         int admittance_teaching(bool asynchronous = false);
         int stop_admittance_teaching();
         int admittance_link(KDL::Frame frame_target, double speed, double acceleration);
@@ -956,13 +905,7 @@ namespace rocos
         // 关节导纳拖动示教sun
         int joint_admittance_teaching(bool asynchronous = false);
 
-        /**
-         * @brief 1000hz位姿伺服接口
-         *
-         * @param target_frame 目标位置
-         * @return int
-         */
-        // int sun_servoJ(const KDL::JntArray &target_pos, const KDL::JntArray &max_vel, const KDL::JntArray &max_acc, double Gain, double lookhead);
+
         /**
          * @brief 1000hz位姿伺服接口
          *
@@ -990,7 +933,6 @@ namespace rocos
         std::string tip_;
 
         std::vector<double> target_positions_;      // 当前目标位置
-        std::vector<double> target_positions_prev_; // 上一次的目标位置
 
         std::vector<double> target_velocities_;
         std::vector<double> target_torques_;
@@ -1003,17 +945,11 @@ namespace rocos
         std::vector<double> max_acc_;
         std::vector<double> max_jerk_;
 
-        std::vector<R_INTERP_BASE *> interp_;
+        std::vector<R_INTERP_BASE *> interp_;  //TODO: 插补规划器，需要删掉，改用ruckig
 
-        ProfileType profile_type_{trapezoid};
+        int jnt_num_; //TODO: 关节数据要放到Model类中，删掉
 
-        int jnt_num_;
 
-        double least_motion_time_{0.0};
-
-        Synchronization sync_{SYNC_TIME}; //TODO: 同步方式，需要删除
-
-        std::vector<bool> need_plan_; //TODO: 是否需要重新规划标志，需要删除
 
         std::atomic<bool> motion_thread_stop_requested_{false};
         std::shared_ptr<std::thread> otg_motion_thread_{nullptr};// otg在线规划线程
@@ -1024,8 +960,6 @@ namespace rocos
         std::unique_ptr<motion::RobotMotionContext<Robot>> motion_context_{nullptr};
         std::unique_ptr<motion::MotionExecutor> motion_executor_{nullptr};
         motion::ModelProvider model_provider_;
-
-        // JC_helper::inverse_special_to_SRS SRS_kinematics_; //TODO:
 
         // sun
         Frame flange_; //!< 法兰位置姿态
