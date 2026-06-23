@@ -1,20 +1,18 @@
 #define DOCTEST_CONFIG_IMPLEMENT_WITH_MAIN
 
-#include <test/doctest.h>
-
-#include <rocos_app/motion/diana_error_codes.h>
-#include <rocos_app/motion/motion_context.h>
+#include <rocos_app/motion/error_codes.h>
 #include <rocos_app/motion/model_provider.h>
+#include <rocos_app/motion/motion_context.h>
+#include <rocos_app/motion/motion_executor.h>
+#include <rocos_app/motion/move_c_center_angle_command.h>
+#include <rocos_app/motion/move_c_three_point_command.h>
 #include <rocos_app/motion/move_j_command.h>
 #include <rocos_app/motion/move_l_command.h>
-#include <rocos_app/motion/move_c_three_point_command.h>
-#include <rocos_app/motion/move_c_center_angle_command.h>
-#include <rocos_app/motion/motion_executor.h>
 #include <rocos_app/motion/position_controller.h>
-
-#include <kdl/frames.hpp>
+#include <test/doctest.h>
 
 #include <cmath>
+#include <kdl/frames.hpp>
 #include <limits>
 #include <vector>
 
@@ -135,16 +133,16 @@ TEST_CASE("Diana error mapper exposes external API codes") {
     using rocos::motion::ErrorCode;
     using rocos::motion::MotionResultCode;
 
-    CHECK(rocos::motion::toDianaErrorCode(MotionResultCode::Ok) == 0);
-    CHECK(rocos::motion::toDianaErrorCode(MotionResultCode::Busy) ==
+    CHECK(rocos::motion::toErrorCode(MotionResultCode::Ok) == 0);
+    CHECK(rocos::motion::toErrorCode(MotionResultCode::Busy) ==
           static_cast<int>(ErrorCode::ConflictTaskRunning));
-    CHECK(rocos::motion::toDianaErrorCode(MotionResultCode::InvalidCommand) ==
+    CHECK(rocos::motion::toErrorCode(MotionResultCode::InvalidCommand) ==
           static_cast<int>(ErrorCode::IllegalParameter));
-    CHECK(rocos::motion::toDianaErrorCode(MotionResultCode::PlanningFailed) ==
+    CHECK(rocos::motion::toErrorCode(MotionResultCode::PlanningFailed) ==
           static_cast<int>(ErrorCode::PlanError));
-    CHECK(rocos::motion::toDianaErrorCode(MotionResultCode::SafetyViolation) ==
+    CHECK(rocos::motion::toErrorCode(MotionResultCode::SafetyViolation) ==
           static_cast<int>(ErrorCode::Fatal));
-    CHECK(rocos::motion::toDianaErrorCode(MotionResultCode::HardwareFault) ==
+    CHECK(rocos::motion::toErrorCode(MotionResultCode::HardwareFault) ==
           static_cast<int>(ErrorCode::JointRegistError));
 }
 

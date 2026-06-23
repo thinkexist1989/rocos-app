@@ -4,6 +4,9 @@
 namespace rocos::motion {
 
 enum class ErrorCode : int {
+    NoError = 0,
+
+    // API套接字错误
     WsastartFail = -1001,
     CreateSocketFail = -1002,
     BindPortFail = -1003,
@@ -20,6 +23,7 @@ enum class ErrorCode : int {
     RobotArmOverNumber = -1014,
     SocketOtherError = -1015,
 
+    // 硬件错误
     JointRegistError = -2001,
     EepromRead = -2010,
     EepromWrite = -2011,
@@ -29,9 +33,11 @@ enum class ErrorCode : int {
     ThreePhaseCurrent = -2015,
     TorqueSensorReadError = -2016,
 
+    // 内部通信错误
     CommunicateError = -2101,
     LostHeartWithDianaRobotError = -2102,
 
+    // 系统错误
     CallingConflictError = -2201,
     CollisionError = -2202,
     NotFollowPositionCmd = -2203,
@@ -54,6 +60,7 @@ enum class ErrorCode : int {
     SlopoverVirtualWall = -2222,
     SlopoverReduceVirtualWall = -2223,
 
+    // 算法错误
     PlanError = -2301,
     InterpolatePositionError = -2302,
     InterpolateTorqueError = -2303,
@@ -103,12 +110,14 @@ enum class ErrorCode : int {
     LoadIdentFitFail = -2347,
     LoadIdentNonLoaded = -2348,
 
+    // API系统错误
     ParameterPointerEqualsNullptr = -2901,
     ParameterNanOrInf = -2902,
     EnterForceModeError = -2903,
     CannotSetVelocityPercentValue = -2904,
     InputOutOfPhysicalPositionRange = -2905,
 
+    // 其他错误
     ResourceUnavailable = -3001,
     DumpLogTimeout = -3002,
     DumpLogFailed = -3003,
@@ -116,6 +125,8 @@ enum class ErrorCode : int {
     IllegalParameter = -3006,
 };
 
+
+//TODO: MotionResultCode没有存在必要，直接用ErrorCode即可
 enum class MotionResultCode {
     Ok,
     Busy,
@@ -129,7 +140,7 @@ enum class MotionResultCode {
     HardwareFault
 };
 
-inline int toDianaErrorCode(MotionResultCode code) {
+inline int toErrorCode(MotionResultCode code) {
     switch (code) {
         case MotionResultCode::Ok:
             return 0;

@@ -1,7 +1,7 @@
 #ifndef ROCOS_APP_MOTION_MOTION_TYPES_H
 #define ROCOS_APP_MOTION_MOTION_TYPES_H
 
-#include <rocos_app/motion/diana_error_codes.h>
+#include <rocos_app/motion/error_codes.h>
 
 #include <cstdint>
 #include <optional>
@@ -42,7 +42,7 @@ enum class MotionStepStatus {
     Failed
 };
 
-//TODO: MotionResult的封装是否有点负责
+//TODO: MotionResult的封装是否有点复杂，目前看只是多了错误信息字符串，错误码没有区别
 struct MotionResult {
     bool success{false};
     MotionResultCode result{MotionResultCode::Ok};
@@ -54,7 +54,7 @@ struct MotionResult {
     }
 
     static MotionResult fail(MotionResultCode code, std::string text) {
-        return MotionResult{false, code, toDianaErrorCode(code), std::move(text)};
+        return MotionResult{false, code, toErrorCode(code), std::move(text)};
     }
 
     static MotionResult failWithApiCode(MotionResultCode code,
