@@ -52,43 +52,6 @@ namespace rocos
         using Frame = KDL::Frame;
 
     public:
-        //! Class PathEntry is used by Class Path
-        class PathEntry
-        {
-        public:
-            enum MoveType
-            {
-                MOVE_J,
-                MOVE_L,
-                MOVE_P,
-                MOVE_C
-            };
-
-        private:
-            MoveType type_;
-            JntArray q_;
-            Frame pose_;
-        };
-
-        //! Class Path is used by MovePath
-        class Path
-        {
-        private:
-            std::vector<PathEntry> waypoints_;
-        };
-
-        enum Synchronization
-        {
-            SYNC_NONE,
-            SYNC_TIME,
-            SYNC_PHASE
-        };
-
-        enum OrientationMode
-        {
-            UNCONSTRAINED,
-            FIXED
-        };
 
         enum class WorkMode
         {
@@ -116,17 +79,11 @@ namespace rocos
 
         bool IsDisabled();
 
-
-
-
-
         bool parseUrdf(const std::string &urdf_file_path,
                        const std::string &base_link,
                        const std::string &tip);
 
         bool parseDriveParamsFromUrdf(const std::string &urdf_file_path);
-
-        bool switchHW(HardwareInterface *hw); //TODO: 切换硬件指针
 
         // 机器人状态机相关
         inline WorkMode getWorkMode() { return work_mode_; }
@@ -852,19 +809,6 @@ namespace rocos
     public:
         Kinematics kinematics_;
         Dynamics dynamics_;
-
-
-        //TODO: 所有的JC_helper类都需要处理掉
-        // friend void JC_helper::SmartServo_Joint::RunSmartServo(rocos::Robot *);
-        // friend class JC_helper::SmartServo_Cartesian;
-        // friend class JC_helper::SmartServo_Nullspace;
-        // friend void JC_helper::Joint_stop(rocos::Robot *robot_ptr, const KDL::JntArray &current_pos, const KDL::JntArray &last_pos, const KDL::JntArray &last_last_pos);
-        // friend class JC_helper::admittance;
-        // 声明友元类
-        // friend class JC_helper::admittance_joint;
-        // friend int JC_helper::safety_servo(rocos::Robot *robot_ptr, const std::vector<double> &target_pos);
-        // friend int JC_helper::safety_servo(rocos::Robot *robot_ptr, const KDL::JntArray &target_pos);
-
 
         friend class RobotHttpServer; // 允许 Server 直接访问 Robot 的私有/保护成员
         //TODO: ================================

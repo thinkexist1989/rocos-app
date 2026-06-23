@@ -595,10 +595,6 @@ namespace rocos {
         return true;
     }
 
-    // TODO: 切换HW指针，目前未实现
-    bool Robot::switchHW(HardwareInterface *hw) { return false; }
-
-
     bool Robot::setWorkMode(WorkMode mode) {
 
         switch (work_mode_) {
