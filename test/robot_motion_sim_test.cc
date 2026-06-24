@@ -76,15 +76,15 @@ TEST_CASE("Robot MoveJ can pause resume and stop through motion executor on Hard
     REQUIRE(robot->MoveJ(target, 0.05, 0.1, 0.0, 0.0, true) == 0);
 
     std::this_thread::sleep_for(std::chrono::milliseconds(20));
-    CHECK(robot->PauseMotion() == 0);
+    CHECK(robot->Pause() == 0);
     std::this_thread::sleep_for(std::chrono::milliseconds(20));
     CHECK(robot->GetRobotState() == "PAUSED");
 
-    CHECK(robot->ResumeMotion() == 0);
+    CHECK(robot->Continue() == 0);
     std::this_thread::sleep_for(std::chrono::milliseconds(20));
     CHECK(robot->GetRobotState() == "RUNNING");
 
-    CHECK(robot->StopMotion() == 0);
+    CHECK(robot->Stop() == 0);
     std::this_thread::sleep_for(std::chrono::milliseconds(100));
     CHECK(robot->GetRobotState() == "STOPPED");
 }

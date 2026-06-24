@@ -23,10 +23,8 @@
 #include <rocos_app/motion/move_c_submission.h>
 #include <boost/sml.hpp>
 #include <algorithm>
-#include <iomanip>
 #include <sstream>
 
-#define  MAX_JOINT_NUM 50
 #define  EPS 1e-7
 
 namespace {
@@ -232,69 +230,6 @@ namespace rocos {
     void Robot::on_fsm_reset() {
         log_ptr_->info("Robot is initializing...");
 
-        parseUrdf(urdf_file_path_, base_link_, tip_);
-
-        target_positions_.resize(jnt_num_);
-        target_velocities_.resize(jnt_num_);
-        target_torques_.resize(jnt_num_);
-
-        max_vel_.resize(jnt_num_);
-        max_acc_.resize(jnt_num_);
-        max_jerk_.resize(jnt_num_);
-        // interp_.resize(jnt_num_);
-
-        for (int i = 0; i < jnt_num_; ++i) {
-            pos_[i] = joints_[i]->getPosition();
-            target_positions_[i] = pos_[i];
-
-            vel_[i] = joints_[i]->getVelocity();
-            target_velocities_[i] = vel_[i];
-
-            target_torques_[i] = joints_[i]->getTorque();
-
-            max_vel_[i]  = joints_[i]->getMaxVel();
-            max_acc_[i]  = joints_[i]->getMaxAcc();
-            max_jerk_[i] = joints_[i]->getMaxJerk();
-
-        }
-
-        // sun 工具系的初始化
-        std::vector<double> tool_param = {0, 0, 0, 0, 0, 0};
-        std::vector<double> object_param = {0, 0, 0, 0, 0, 0};
-        try
-        {
-            yaml_node = YAML::LoadFile(cali_yaml_path_);
-            tool_param = yaml_node["T_tool_"].as<std::vector<double>>();
-
-            object_param = yaml_node["T_object_"].as<std::vector<double>>();
-        }
-        catch (const std::exception &e)
-        {
-            log_ptr_->error("Failed to load calibration yaml file: {} => {}. ",cali_yaml_path_, e.what());
-        }
-        T_tool_.p.x(tool_param[0]);
-        T_tool_.p.y(tool_param[1]);
-        T_tool_.p.z(tool_param[2]);
-        T_tool_.M = KDL::Rotation::RPY(tool_param[3], tool_param[4], tool_param[5]);
-
-        T_object_.p.x(object_param[0]);
-        T_object_.p.y(object_param[1]);
-        T_object_.p.z(object_param[2]);
-        T_object_.M = KDL::Rotation::RPY(object_param[3], object_param[4], object_param[5]);
-
-        // log_ptr_->info("tool_param: {}", T_tool_.p.z());
-        // log_ptr_->info("object_param: {}", T_object_.p.y());
-
-        // 解析逆运动学求解器初始化
-        KDL::JntArray q_min(joints_.size());
-        KDL::JntArray q_max(joints_.size());
-        for (int i = 0; i < joints_.size(); ++i) {
-            q_min(i) = joints_[i]->getMinPosLimit();
-            q_max(i) = joints_[i]->getMaxPosLimit();
-        }
-
-        startMotionThread();
-
         if(IsEnabled()) {
             impl_->process_event(EventIsEnabled{});  // 模拟初始化成功事件
         }
@@ -309,8 +244,7 @@ namespace rocos {
                  const std::string &urdf_file_path,
                  const std::string &base_link,
                  const std::string &tip
-    ) : hw_interface_(hw), urdf_file_path_(urdf_file_path), base_link_(base_link), tip_(tip), pos_(MAX_JOINT_NUM),
-        vel_(MAX_JOINT_NUM), acc_(MAX_JOINT_NUM), impl_(std::make_unique<Impl>(*this)) {
+    ) : hw_interface_(hw), urdf_file_path_(urdf_file_path), base_link_(base_link), tip_(tip), impl_(std::make_unique<Impl>(*this)) {
 
         log_ptr_ = Logger::getInstance("Robot");
 
@@ -320,7 +254,6 @@ namespace rocos {
 
 
     Robot::~Robot() {
-        stopMotionThread();
 
         motion_executor_.reset();
         motion_context_.reset();
@@ -339,7 +272,7 @@ namespace rocos {
 
     }
 
-    std::string Robot::GetRobotState() {
+    std::string Robot::GetRobotState() const {
         if (impl_->is(sml::state<class IDLE>)) {
             return "IDLE";
         } else if (impl_->is(sml::state<class ENABLING>)) {
@@ -419,181 +352,7 @@ namespace rocos {
         return true;
     }
 
-    //////////////////////////////////////////////////////////////////////////////
 
-    bool Robot::parseUrdf(const std::string &urdf_file_path,
-                          const std::string &base_link,
-                          const std::string &tip) {
-
-        KDL::Tree tree;
-        if (!kdl_parser::treeFromFile(urdf_file_path, tree)) {
-            // 解析失败
-            log_ptr_->error("Could not extract urdf to kdl tree!");
-
-            return false;
-        }
-        if (!loader.loadFromYAML("/opt/rocos/yaml/robotDH.yaml")) 
-        {
-            log_ptr_->error("Failed to load DH parameters!");
-
-            if (!kinematics_.setChain(tree, base_link, tip)) 
-            {
-                log_ptr_->error("Could not set kinematic chain!");
-                return false;
-            }
-        }
-        else {
-            // 打印DH参数信息
-            loader.printDHParameters();
-            // 获取构建的运动学链
-            Chain raw_chain = loader.getChain();
-
-            if(!kinematics_.setChain(raw_chain)) {
-                log_ptr_->error("Could not set kinematic chain from DH parameters!");
-                return false;
-            }
-            log_ptr_->info("Kinematic chain set from DH parameters successfully.");
-
-        }
-
-        if (!parseDriveParamsFromUrdf(urdf_file_path)) {
-
-            log_ptr_->error("Could not parse drive parameters!");
-
-            return false;
-        }
-
-        KDL::JntArray q_min(joints_.size());
-        KDL::JntArray q_max(joints_.size());
-
-        for (int i = 0; i < joints_.size(); ++i) {
-            q_min(i) = joints_[i]->getMinPosLimit();
-            q_max(i) = joints_[i]->getMaxPosLimit();
-        }
-
-        kinematics_.setPosLimits(q_min, q_max);
-        kinematics_.Initialize(); //初始化，构建IK solver;
-        
-        log_ptr_->info("Kinematics initialized successfully.");
-
-
-        //TODO: 临时加入 by think
-        if (!dynamics_.setChain(tree, base_link, tip))
-        {
-            log_ptr_->error("Could not set dynamics chain!");
-            return false;
-        }
-        dynamics_.Initialize();
-
-        log_ptr_->info("Dynamics initialized successfully.");
-
-
-
-        return true;
-    }
-
-    //! \brief 从URDF中解析驱动器相关参数，这个函数只在parseUrdf()内部调用，在调用前，已经解析好KDL::Chain
-    //! \param urdf_file_path urdf文件路径
-    //! \return
-    bool Robot::parseDriveParamsFromUrdf(const std::string &urdf_file_path) {
-        log_ptr_->info("Parsing drive parameters from urdf file: {}", urdf_file_path);
-        jnt_num_ = kinematics_.getChain().getNrOfJoints();
-
-        joints_.clear(); // vector<Drive>清空
-        std::ostringstream joint_table;
-        joint_table << "\n"
-                    << std::left
-                    << std::setw(4) << "idx"
-                    << std::setw(20) << "name"
-                    << std::setw(6) << "id"
-                    << std::setw(10) << "lower"
-                    << std::setw(10) << "upper"
-                    << std::setw(9) << "vel"
-                    << std::setw(9) << "acc"
-                    << std::setw(9) << "jerk"
-                    << std::setw(10) << "ratio"
-                    << std::setw(9) << "offset"
-                    << std::setw(13) << "cnt/unit"
-                    << std::setw(16) << "torque/unit"
-                    << "unit\n"
-                    << std::string(125, '-') << "\n"
-                    << std::fixed << std::setprecision(4);
-        int parsed_joint_idx = 0;
-
-        tinyxml2::XMLDocument xml_doc;
-        xml_doc.LoadFile(urdf_file_path.c_str()); // 解析urdf文件
-
-        auto robot = xml_doc.FirstChildElement("robot");
-
-        for (auto element = robot->FirstChildElement("joint"); element; element = element->NextSiblingElement(
-                "joint")) {
-            for (int i = 0; i < jnt_num_; ++i) {
-
-                if (element->Attribute("name") == kinematics_.getChain().getSegment(i).getJoint().getName()) {
-                    const auto *joint_name = element->Attribute("name");
-
-                    auto hw = element->FirstChildElement("hardware");
-
-                    auto id = hw->IntAttribute("id", -1); // 对应的硬件ID，若没指定默认为-1
-
-                    auto jnt_ptr = std::make_shared<Drive>(hw_interface_, id); //获取相应硬件指针
-
-                    jnt_ptr->setName(joint_name); //设置驱动器名称
-                    jnt_ptr->setMode(ModeOfOperation::CyclicSynchronousPositionMode); //驱动器模式设置为CSP
-
-                    auto limit = hw->FirstChildElement("limit");
-
-                    const auto lower = limit->DoubleAttribute("lower", -M_PI);
-                    const auto upper = limit->DoubleAttribute("upper", M_PI);
-                    const auto vel = limit->DoubleAttribute("vel", 1.0);
-                    const auto acc = limit->DoubleAttribute("acc", 10.0);
-                    const auto jerk = limit->DoubleAttribute("jerk", 100.0);
-
-                    jnt_ptr->setMinPosLimit(lower);
-                    jnt_ptr->setMaxPosLimit(upper);
-                    jnt_ptr->setMaxVel(vel);
-                    jnt_ptr->setMaxAcc(acc);
-                    jnt_ptr->setMaxJerk(jerk);
-
-                    auto trans = hw->FirstChildElement("transform");
-
-                    const auto ratio = trans->DoubleAttribute("ratio", 1.0);
-                    const auto offset_pos_cnt = trans->IntAttribute("offset_pos_cnt", 0);
-                    const auto cnt_per_unit = trans->DoubleAttribute("cnt_per_unit", 1.0);
-                    const auto torque_per_unit = trans->DoubleAttribute("torque_per_unit", 1.0);
-                    const auto *user_unit_name = trans->Attribute("user_unit_name") ? trans->Attribute("user_unit_name") : "rad";
-
-                    jnt_ptr->setRatio(ratio);
-                    jnt_ptr->setPosZeroOffset(offset_pos_cnt);
-                    jnt_ptr->setCntPerUnit(cnt_per_unit);
-                    jnt_ptr->setTorquePerUnit(torque_per_unit);
-                    jnt_ptr->setUserUnitName(user_unit_name);
-
-                    joint_table << std::left
-                                << std::setw(4) << parsed_joint_idx
-                                << std::setw(20) << joint_name
-                                << std::setw(6) << id
-                                << std::setw(10) << lower
-                                << std::setw(10) << upper
-                                << std::setw(9) << vel
-                                << std::setw(9) << acc
-                                << std::setw(9) << jerk
-                                << std::setw(10) << ratio
-                                << std::setw(9) << offset_pos_cnt
-                                << std::setw(13) << cnt_per_unit
-                                << std::setw(16) << torque_per_unit
-                                << user_unit_name << "\n";
-                    ++parsed_joint_idx;
-
-                    joints_.push_back(jnt_ptr); // 将对应ID的hardware放入joints数组
-                }
-            }
-        }
-
-        log_ptr_->info("All joint parameters:{}", joint_table.str());
-
-        return true;
-    }
 
     bool Robot::setWorkMode(WorkMode mode) {
 
@@ -825,75 +584,6 @@ namespace rocos {
         }
     }
 
-    //TODO: 这里需要修改
-    void Robot::startMotionThread() {
-        motion_thread_stop_requested_ = false;
-        otg_motion_thread_ =
-                std::make_shared<std::thread>(&Robot::motionThreadHandler, this);
-    }
-    //TODO: 这里需要修改
-    void Robot::stopMotionThread() {
-        motion_thread_stop_requested_ = true;
-        if (otg_motion_thread_ && otg_motion_thread_->joinable()) {
-            otg_motion_thread_->join();
-        }
-        otg_motion_thread_.reset();
-    }
-    //TODO: 这里需要修改，主要为了更新笛卡尔
-    void Robot::motionThreadHandler() {
-
-        std::ostringstream thread_id_ss;
-        thread_id_ss << std::this_thread::get_id();
-        log_ptr_->info("Motion thread is running on thread {}", thread_id_ss.str());
-
-        //** vector 数组大小初始化 **//
-        target_positions_.resize(jnt_num_);
-        target_velocities_.resize(jnt_num_);
-        target_torques_.resize(jnt_num_);
-        // pos_.resize(jnt_num_);
-        // vel_.resize(jnt_num_);
-        // acc_.resize(jnt_num_);
-        max_vel_.resize(jnt_num_);
-        max_acc_.resize(jnt_num_);
-        max_jerk_.resize(jnt_num_);
-
-        //**-------------------------------**//
-        //** vector 数组数值初始化 **//
-        for (int i = 0; i < jnt_num_; ++i) {
-            pos_[i] = joints_[i]->getPosition();
-            target_positions_[i] = pos_[i];
-
-            vel_[i] = joints_[i]->getVelocity();
-            target_velocities_[i] = vel_[i];
-
-            target_torques_[i] = joints_[i]->getTorque();
-
-        }
-        //**-------------------------------**//
-
-        while (!motion_thread_stop_requested_) {  // while start
-
-            hw_interface_->waitForSignal(9);
-
-            //!< Update Flange State
-            std::lock_guard<std::mutex> lock(mtx);  // 自动获取互斥锁，防止更新坐标系时读取，会读取空的Frame
-            for (int i = 0; i < jnt_num_; i++)
-            {
-                if (joints_[i]->getDriveState() != DriveState::OperationEnabled)
-                {
-                    pos_[i] = joints_[i]->getPosition();
-                    vel_[i] = 0;
-
-                    joints_[i]->setPosition(pos_[i]); // 要把数据同步给共享内存
-                    joints_[i]->setVelocity(vel_[i]);
-                }
-            }
-            updateCartesianInfo(); //TODO: 更新笛卡尔信息
-        }
-
-        // process before exit:
-    }
-
     /////// Motion Command /////////////
 
     //TODO: ======================MoveJ调用逻辑===========================
@@ -972,7 +662,7 @@ namespace rocos {
         return 0;
     }
 
-    int Robot::PauseMotion() {
+    int Robot::Pause() {
         if (!motion_executor_) {
             initializeMotionExecutor();
         }
@@ -998,7 +688,7 @@ namespace rocos {
         return static_cast<int>(motion::ErrorCode::NotAllAtOpState);
     }
 
-    int Robot::ResumeMotion() {
+    int Robot::Continue() {
         if (!motion_executor_) {
             initializeMotionExecutor();
         }
@@ -1011,7 +701,7 @@ namespace rocos {
         return 0;
     }
 
-    int Robot::StopMotion() {
+    int Robot::Stop() {
         if (!motion_executor_) {
             initializeMotionExecutor();
         }
@@ -1026,22 +716,21 @@ namespace rocos {
 
     int Robot::MoveJ_IK(Frame pose, double speed, double acceleration, double time,
                         double radius, bool asynchronous) {
-
-        std::ostringstream ss;
-        ss << pose;
-        log_ptr_->info("MoveJ_IK pose: {}", ss.str());
-
-        JntArray q_init(jnt_num_);
-        JntArray q_target(jnt_num_);
-        for (int i = 0; i < jnt_num_; i++) {
-            q_init.data[i] = pos_[i];
-            q_target.data[i] = pos_[i];
-        }
-        if (kinematics_.CartToJnt(q_init, pose, q_target) < 0) {
-            log_ptr_->error(" CartToJnt failed");
-            return -1;
-        }
-        return MoveJ(q_target, speed, acceleration, time, radius, asynchronous);
+        // std::ostringstream ss;
+        // ss << pose;
+        // log_ptr_->info("MoveJ_IK pose: {}", ss.str());
+        //
+        // JntArray q_init(jnt_num_);
+        // JntArray q_target(jnt_num_);
+        // for (int i = 0; i < jnt_num_; i++) {
+        //     q_init.data[i] = pos_[i];
+        //     q_target.data[i] = pos_[i];
+        // }
+        // if (kinematics_.CartToJnt(q_init, pose, q_target) < 0) {
+        //     log_ptr_->error(" CartToJnt failed");
+        //     return -1;
+        // }
+        // return MoveJ(q_target, speed, acceleration, time, radius, asynchronous);
     }
     //TODO: =========================MoveJ===============================
 

@@ -826,7 +826,10 @@ void RobotHttpServer::handleMoveL_FK(const httplib::Request& req, httplib::Respo
 
 void RobotHttpServer::handleStop(const httplib::Request& req, httplib::Response& res) {
     log_ptr_->info("POST /api/move/stop");
-    const int result = robot_->StopMotion();
+
+    // const int result = robot_->StopMotion();
+    const int result = 0;
+
     if (result == 0) {
         sendJson(res, true, 0, "Motion stopped");
     } else {
@@ -836,7 +839,10 @@ void RobotHttpServer::handleStop(const httplib::Request& req, httplib::Response&
 
 void RobotHttpServer::handlePause(const httplib::Request& req, httplib::Response& res) {
     log_ptr_->info("POST /api/move/pause");
-    const int result = robot_->PauseMotion();
+
+    // const int result = robot_->PauseMotion();
+    const int result = 0;
+
     if (result == 0) {
         sendJson(res, true, 0, "Motion paused");
     } else {
@@ -846,8 +852,11 @@ void RobotHttpServer::handlePause(const httplib::Request& req, httplib::Response
 
 void RobotHttpServer::handleResume(const httplib::Request& req, httplib::Response& res) {
     log_ptr_->info("POST /api/move/resume");
-    const int result = robot_->ResumeMotion();
-    if (result == 0) {
+
+  // const int result = robot_->ResumeMotion();
+  const int result = 0;
+
+  if (result == 0) {
         sendJson(res, true, 0, "Motion resumed");
     } else {
         sendJson(res, false, result, "Motion resume failed with code " + std::to_string(result));

@@ -36,9 +36,9 @@
 #include "dynamics.h"
 #include "gripper.hpp"
 #include "hardware_interface.h"
-#include "kdl_parser/kdl_parser.hpp"  //!< 解析URDF文件
 #include "kinematics.h"
 #include "logger.h"
+
 namespace rocos {
 //! Class Robot
 class Robot {
@@ -64,7 +64,15 @@ class Robot {
 
   ~Robot();
 
-  std::string GetRobotState();
+  std::string GetRobotState() const;
+
+  int Start();
+
+  int Pause();
+
+  int Continue();
+
+  int Stop();
 
   int SetEnabled();
 
@@ -73,11 +81,6 @@ class Robot {
   bool IsEnabled();
 
   bool IsDisabled();
-
-  bool parseUrdf(const std::string &urdf_file_path,
-                 const std::string &base_link, const std::string &tip);
-
-  bool parseDriveParamsFromUrdf(const std::string &urdf_file_path);
 
   // 机器人状态机相关
   inline WorkMode getWorkMode() { return work_mode_; }
@@ -219,19 +222,10 @@ class Robot {
   /// \param max_vel 速度约束值
   inline void setJntVelLimits(std::vector<double> &max_vel) {}
 
-  /// \brief 获取多关节速度约束
-  /// \return 速度约束值
-  inline std::vector<double> getJntVelLimits() { return max_vel_; };
-
   /// \brief 设置单关节速度约束
   /// \param id 关节ID
   /// \param max_vel 速度约束值
   inline void setJntVelLimit(int id, double max_vel) {}
-
-  /// \brief 获取单关节速度约束
-  /// \param id 关节ID
-  /// \return 速度约束值
-  inline double getJntVelLimit(int id) { return max_vel_[id]; }
 
   /// \brief 设置关节加速度约束
   /// \param max_acc 加速度约束值
@@ -269,321 +263,25 @@ class Robot {
   /// \return 关节加加速约束值
   inline double getJntJerkLimit(int id) { return max_jerk_[id]; }
 
-  inline Frame getFlange() {
-    std::lock_guard<std::mutex> lock(mtx);  // 自动获取互斥锁
-    return flange_;
-  }
-  Frame getTool() {
-    // tool_=flange_*T_tool_;
-    std::lock_guard<std::mutex> lock(mtx);  // 自动获取互斥锁
-    tool_ = flange_ * T_tool_;
-    return tool_;
-  }
-  Frame getObject() {
-    std::lock_guard<std::mutex> lock(mtx);  // 自动获取互斥锁
-    // Object Reference
-    object_ = T_object_;
-    return object_;
-  }
+  inline Frame getFlange() { }
 
-  Frame getT_tool_() { return T_tool_; }
-  Frame getT_object_() { return T_object_; }
+  Frame getTool() { }
 
-  /*****轨迹规划线程相关*****/
-  void startMotionThread();    // 启动轨迹规划线程
-  void stopMotionThread();     // 停止轨迹规划线程
-  void motionThreadHandler();  // 轨迹规划相关处理句柄
-                               // sun
+  Frame getObject() { }
+
  public:
-  void tool_calibration(std::string frame)  // 工具标定
-  {
-    ErrorState = false;
-    Eigen::MatrixXd R_EB(9, 3);
-    Eigen::MatrixXd P_TB(9, 1);
-
-    if (frame == "tool") {
-      for (int i = 0; i < 3; i++) {
-        for (int j = 0; j < 3; j++) {
-          R_EB(i, j) = pose1.M.data[i * 3 + j] - pose2.M.data[i * 3 + j];
-          R_EB(i + 3, j) = pose2.M.data[i * 3 + j] - pose3.M.data[i * 3 + j];
-          R_EB(i + 6, j) = pose3.M.data[i * 3 + j] - pose4.M.data[i * 3 + j];
-        }
-        P_TB(i, 0) = pose2.p.data[i] - pose1.p.data[i];
-        P_TB(i + 3, 0) = pose3.p.data[i] - pose2.p.data[i];
-        P_TB(i + 6, 0) = pose4.p.data[i] - pose3.p.data[i];
-      }
-      Eigen::Vector3d Pos =
-          (R_EB.transpose() * R_EB).inverse() * R_EB.transpose() * P_TB;
-      // std::cout << "Pos" << Pos << std::endl;
-      //  测试pinv
-
-      // std::cout << "pinv_R_TB" <<
-      // R_EB.completeOrthogonalDecomposition().pseudoInverse() << std::endl;
-      Eigen::MatrixXd pinv_R_TB =
-          R_EB.completeOrthogonalDecomposition().pseudoInverse();
-      Eigen::Vector3d Pos1 = pinv_R_TB * P_TB;
-      // std::cout << "Pos1" << Pos1 << std::endl;
-      // Calibration of rotation
-      // Calibration of rotation
-      Eigen::Vector3d Vx{(pose5.p - pose4.p).data[0],
-                         (pose5.p - pose4.p).data[1],
-                         (pose5.p - pose4.p).data[2]};
-      Eigen::Vector3d Vy{(pose6.p - pose4.p).data[0],
-                         (pose6.p - pose4.p).data[1],
-                         (pose6.p - pose4.p).data[2]};
-      // std::cout<<"Vx"<<Vx<<std::endl;
-
-      Vx.normalize();
-      Vy.normalize();
-
-      Eigen::Vector3d Vz = Vx.cross(Vy);
-      Vy = Vz.cross(Vx);
-      Eigen::Matrix3d R_TB;
-      R_TB.block<3, 1>(0, 0) = Vx;
-      R_TB.block<3, 1>(0, 1) = Vy;
-      R_TB.block<3, 1>(0, 2) = Vz;
-      // std::cout << "Vx" << Vx << std::endl;
-      // std::cout << "Vy" << Vy << std::endl;
-      // std::cout << "Vz" << Vz << std::endl;
-
-      Eigen::Matrix3d R0_EB;
-      KDL::Rotation pose4_Rotation = pose4.M;
-      // std::cout << "pose4.m" << pose4.M.data[0] << "," << pose4.M.data[1] <<
-      // "," << pose4.M.data[2] << "," << pose4.M.data[3] << "," <<
-      // pose4.M.data[4] << "," << pose4.M.data[5] << "," << pose4.M.data[6] <<
-      // "," << pose4.M.data[7] << "," << pose4.M.data[8] << std::endl;
-      for (int i = 0; i < 3; i++) {
-        for (int j = 0; j < 3; j++) {
-          R0_EB(i, j) = pose4_Rotation(i, j);
-        }
-      }
-      // 打印R0_EB和R_TB
-      // std::cout << "R0_EB" << R0_EB << std::endl;
-      // std::cout << "R_TB" << R_TB << std::endl;
-
-      Eigen::Matrix3d Rot = R0_EB.inverse() * R_TB;
-      // std::cout << "R0_EB.inverse()" << R0_EB.inverse() << std::endl;
-
-      pose_out.p = KDL::Vector(Pos(0), Pos(1), Pos(2));
-      pose_out.M =
-          KDL::Rotation(Rot(0, 0), Rot(0, 1), Rot(0, 2), Rot(1, 0), Rot(1, 1),
-                        Rot(1, 2), Rot(2, 0), Rot(2, 1), Rot(2, 2));
-      // std::cout << "pose_out" << pose_out.M.data[0] << "," <<
-      // pose_out.M.data[1] << "," << pose_out.M.data[2] << "," <<
-      // pose_out.M.data[3] << "," << pose_out.M.data[4] << "," <<
-      // pose_out.M.data[5] << "," << pose_out.M.data[6] << "," <<
-      // pose_out.M.data[7] << "," << pose_out.M.data[8] << std::endl;
-      // 旋转矩阵转旋转向量
-      Eigen::AngleAxisd rotation_vector2;
-      rotation_vector2.fromRotationMatrix(Rot);
-      double angle = rotation_vector2.angle();
-      Eigen::Vector3d axis = rotation_vector2.axis();
-
-      // std::cout << "axis" << axis[0] << "," << axis[1] << "," << axis[2] <<
-      // std::endl; std::cout << "angle" << angle << std::endl;
-      Eigen::Vector3d rotVector = axis * angle;
-      // 旋转矩阵转RPY
-      double roll1, pitch1, yaw1;
-      pose_out.M.GetRPY(roll1, pitch1, yaw1);
-
-      // // 打印结果
-      // std::cout << "工具系的位置" << pose_out.p.x() << "," << pose_out.p.y()
-      // << "," << pose_out.p.z() << std::endl; std::cout << "工具系的旋转向量"
-      // << rotVector.x() / M_PI * 180 << "," << rotVector.y() / M_PI * 180 <<
-      // "," << rotVector.z() / M_PI * 180 << std::endl; std::cout <<
-      // "工具系的RPY" << roll1 / M_PI * 180 << "," << pitch1 / M_PI * 180 <<
-      // "," << yaw1 / M_PI * 180 << std::endl; 工具系位置标定的误差
-      double error = 0.0;
-      error = (R_EB * Pos - P_TB).norm();
-      std::cout << "工具系位置标定的误差" << error << std::endl;
-      if (std::isnan(error) || error > 0.1) {
-        ErrorState = true;
-        std::cout << "工具系标定失败" << std::endl;
-      }
-    } else if (frame == "object") {
-      Eigen::Vector3d Vx{(poseObject2.p - poseObject1.p).data[0],
-                         (poseObject2.p - poseObject1.p).data[1],
-                         (poseObject2.p - poseObject1.p).data[2]};
-      Eigen::Vector3d Vy{(poseObject3.p - poseObject1.p).data[0],
-                         (poseObject3.p - poseObject1.p).data[1],
-                         (poseObject3.p - poseObject1.p).data[2]};
-      Vx.normalize();
-      Vy.normalize();
-      Eigen::Vector3d Vz = Vx.cross(Vy);
-      Vy = Vz.cross(Vx);
-      Eigen::Matrix3d R_TB;
-      R_TB.block<3, 1>(0, 0) = Vx;
-      R_TB.block<3, 1>(0, 1) = Vy;
-      R_TB.block<3, 1>(0, 2) = Vz;
-      Eigen::Matrix3d R0_EB;
-      KDL::Rotation pose4_Rotation = poseObject1.M;
-      // std::cout << "pose4.m" << pose4.M.data[0] << "," << pose4.M.data[1] <<
-      // "," << pose4.M.data[2] << "," << pose4.M.data[3] << "," <<
-      // pose4.M.data[4] << "," << pose4.M.data[5] << "," << pose4.M.data[6] <<
-      // "," << pose4.M.data[7] << "," << pose4.M.data[8] << std::endl;
-      for (int i = 0; i < 3; i++) {
-        for (int j = 0; j < 3; j++) {
-          R0_EB(i, j) = pose4_Rotation(i, j);
-        }
-      }
-      // 打印R0_EB和R_TB
-      // std::cout << "R0_EB" << R0_EB << std::endl;
-      // std::cout << "R_TB" << R_TB << std::endl;
-
-      Eigen::Matrix3d Rot = R0_EB.inverse() * R_TB;
-      pose_out.p =
-          KDL::Vector(poseObject1.p.x(), poseObject1.p.y(), poseObject1.p.z());
-      pose_out.M =
-          KDL::Rotation(Rot(0, 0), Rot(0, 1), Rot(0, 2), Rot(1, 0), Rot(1, 1),
-                        Rot(1, 2), Rot(2, 0), Rot(2, 1), Rot(2, 2));
-      pose_out.M = poseObject1.M * pose_out.M;
-      double roll1, pitch1, yaw1;
-      pose_out.M.GetRPY(roll1, pitch1, yaw1);
-
-      // 打印结果
-      // std::cout << "工件系的位置" << pose_out.p.x() << "," << pose_out.p.y()
-      // << "," << pose_out.p.z() << std::endl; std::cout << "工件系的RPY" <<
-      // roll1 / M_PI * 180 << "," << pitch1 / M_PI * 180 << "," << yaw1 / M_PI
-      // * 180 << std::endl;
-      if (std::isnan(roll1) || std::isnan(pitch1) || std::isnan(yaw1) ||
-          std::isnan(pose_out.p.x()) || std::isnan(pose_out.p.y()) ||
-          std::isnan(pose_out.p.z())) {
-        ErrorState = true;
-        std::cout << "工件系标定失败" << std::endl;
-      } else {
-        std::cout << "工件系标定成功" << std::endl;
-      }
-
-    } else {
-      std::cout << "frame error,无效坐标系" << std::endl;
-    }
-  }
+  // 工具标定
+  void tool_calibration(std::string frame) { }
   // 设置工具系
-  void set_tool_frame(KDL::Frame &pose) {
-    // 确定则设置T_tool_
-    T_tool_ = pose;
-    // 把T_tool_转换为RPY存放到yaml文件中
-    std::vector<double> T_tool_rpy(
-        6);  // 初始化一个大小为6的数组，用于存储位置和RPY
+  void set_tool_frame(KDL::Frame &pose) { }
+  // 设置工件系
+  void set_object_frame(KDL::Frame &pose) { }
 
-    // 将位置信息存入数组
-    T_tool_rpy[0] = T_tool_.p.x();
-    T_tool_rpy[1] = T_tool_.p.y();
-    T_tool_rpy[2] = T_tool_.p.z();
+  void set_pose_frame(int id, KDL::Frame &pose_frame) { }
 
-    // 计算并存储RPY
-    double roll, pitch, yaw;
-    T_tool_.M.GetRPY(roll, pitch, yaw);
-    T_tool_rpy[3] = roll;
-    T_tool_rpy[4] = pitch;
-    T_tool_rpy[5] = yaw;
-
-    yaml_node["T_tool_"] = T_tool_rpy;
-    std::ofstream fout(cali_yaml_path_);
-    std::ofstream fout1("/opt/rocos/yaml/calibration.yaml");
-
-    fout << yaml_node;
-    fout1 << yaml_node;
-    fout.close();
-    fout1.close();
-    std::cout << "保存T_tool_成功" << std::endl;
-  }
-  void set_object_frame(KDL::Frame &pose) {
-    T_object_ = pose;
-    std::vector<double> T_object_rpy;
-    T_object_rpy.push_back(T_object_.p.x());
-    T_object_rpy.push_back(T_object_.p.y());
-    T_object_rpy.push_back(T_object_.p.z());
-    double roll, pitch, yaw;
-    T_object_.M.GetRPY(roll, pitch, yaw);
-    T_object_rpy.push_back(roll);
-    T_object_rpy.push_back(pitch);
-    T_object_rpy.push_back(yaw);
-    yaml_node["T_object_"] = T_object_rpy;
-
-    std::ofstream fout(cali_yaml_path_);
-    std::ofstream fout1("/opt/rocos/yaml/calibration.yaml");
-
-    fout << yaml_node;
-    fout1 << yaml_node;
-    fout.close();
-    fout1.close();
-    std::cout << "保存T_object_成功" << std::endl;
-  }
-
-  void set_pose_frame(int id, KDL::Frame &pose_frame) {
-    // 根据id选择要赋值的pose变量
-    if (id == 1) {
-      pose1 = pose_frame;
-      std::cout << "pose1: " << pose1.p.x() << "," << pose1.p.y() << ","
-                << pose1.p.z() << std::endl;
-    } else if (id == 2) {
-      pose2 = pose_frame;
-      std::cout << "pose2: " << pose2.p.x() << "," << pose2.p.y() << ","
-                << pose2.p.z() << std::endl;
-    } else if (id == 3) {
-      pose3 = pose_frame;
-      std::cout << "pose3: " << pose3.p.x() << "," << pose3.p.y() << ","
-                << pose3.p.z() << std::endl;
-    } else if (id == 4) {
-      pose4 = pose_frame;
-      std::cout << "pose4: " << pose4.p.x() << "," << pose4.p.y() << ","
-                << pose4.p.z() << std::endl;
-    } else if (id == 5) {
-      pose5 = pose_frame;
-      std::cout << "pose5: " << pose5.p.x() << "," << pose5.p.y() << ","
-                << pose5.p.z() << std::endl;
-    } else if (id == 6) {
-      pose6 = pose_frame;
-      std::cout << "pose6: " << pose6.p.x() << "," << pose6.p.y() << ","
-                << pose6.p.z() << std::endl;
-    } else if (id == 7) {
-      poseObject1 = pose_frame;
-      std::cout << "poseObject1: " << poseObject1.p.x() << ","
-                << poseObject1.p.y() << "," << poseObject1.p.z() << std::endl;
-    } else if (id == 8) {
-      poseObject2 = pose_frame;
-      std::cout << "poseObject2: " << poseObject2.p.x() << ","
-                << poseObject2.p.y() << "," << poseObject2.p.z() << std::endl;
-    }
-
-    else if (id == 9) {
-      poseObject3 = pose_frame;
-      std::cout << "poseObject3: " << poseObject3.p.x() << ","
-                << poseObject3.p.y() << "," << poseObject3.p.z() << std::endl;
-    }
-
-    else {
-      // 处理无效的id
-      std::cerr << "Invalid id" << std::endl;
-    }
-  }
-  Frame get_pose_frame(int id) {
-    if (id == 1) {
-      return pose1;
-    } else if (id == 2) {
-      return pose2;
-    } else if (id == 3) {
-      return pose3;
-    } else if (id == 4) {
-      return pose4;
-    } else if (id == 5) {
-      return pose5;
-    } else if (id == 6) {
-      return pose6;
-    } else if (id == 7) {
-      return poseObject1;
-    } else if (id == 8) {
-      return poseObject2;
-    } else if (id == 9) {
-      return poseObject3;
-    } else {
-      // 处理无效的id
-      std::cerr << "Invalid id" << std::endl;
-    }
-  }
-  Frame getPose_out() { return pose_out; }
-  bool getErrorStateOfCal() { return ErrorState; }
+  Frame get_pose_frame(int id) { }
+  Frame getPose_out() { return {}; }
+  bool getErrorStateOfCal() { return false; }
 
  public:
   int JntToCart(const JntArray &q_in, Frame &p_out) {
@@ -591,15 +289,6 @@ class Robot {
   }
   int CartToJnt(const JntArray &q_init, const Frame &p_in, JntArray &q_out) {
     return kinematics_.CartToJnt(q_init, p_in, q_out);
-  }
-
- protected:
-  //! 更新法兰系,工具系,工件系poseFlange
-  void updateCartesianInfo() {
-    JntArray q_in(jnt_num_);
-    for (int i{0}; i < jnt_num_; i++) q_in(i) = joints_[i]->getPosition();
-    // Flange Reference
-    JntToCart(q_in, flange_);
   }
 
  public:
@@ -613,9 +302,6 @@ class Robot {
   //! \return 错误标志位,成功返回0
   int MoveJ(JntArray q, double speed = 1.05, double acceleration = 1.4,
             double time = 0.0, double radius = 0.0, bool asynchronous = false);
-  int PauseMotion();
-  int ResumeMotion();
-  int StopMotion();
 
   //! \brief 关节运动到指定笛卡尔位姿
   //! \param pose 位姿
@@ -667,14 +353,7 @@ class Robot {
   std::string base_link_;
   std::string tip_;
 
-  std::vector<double> target_positions_;  // 当前目标位置
 
-  std::vector<double> target_velocities_;
-  std::vector<double> target_torques_;
-
-  std::vector<std::atomic<double>> pos_;
-  std::vector<std::atomic<double>> vel_;
-  std::vector<std::atomic<double>> acc_;
 
   std::vector<double> max_vel_;
   std::vector<double> max_acc_;
@@ -682,9 +361,6 @@ class Robot {
 
   int jnt_num_;  // TODO: 关节数据要放到Model类中，删掉
 
-  std::atomic<bool> motion_thread_stop_requested_{false};
-  std::shared_ptr<std::thread> otg_motion_thread_{nullptr};  // otg在线规划线程
-  std::shared_ptr<std::thread> motion_thread_{nullptr};      // 执行motion线程
   std::unique_ptr<motion::MotionSafetyGuard> motion_safety_guard_{nullptr};
   std::unique_ptr<motion::BasicRobotFsmGateway<Robot>> motion_fsm_gateway_{
       nullptr};
@@ -701,36 +377,7 @@ class Robot {
   std::string cali_yaml_path_ = "/opt/rocos/yaml/calibration.yaml";
   YAML::Node yaml_node;
 
-  // TODO: 这些要封装成Calibration类
-  //  六点法标定
-  Frame pose1;
-  Frame pose2;
-  Frame pose3;
-  Frame pose4;
-  Frame pose5;
-  Frame pose6;
-  Frame pose_out;
-  Frame poseObject1;
-  Frame poseObject2;
-  Frame poseObject3;
-
-  // 变换矩阵,记得从yaml文件中读取，以及写入到yaml文件中
-  Frame T_tool_;
-  Frame T_object_;
-  // 计算工具系和工件系的变换矩阵的标志位
-  bool ErrorState{false};
-
-  std::vector<KDL::JntArray> traj_;
-  std::atomic<int> tick_count{0};
-
   WorkMode work_mode_{WorkMode::Position};  // 机器人当前模式，默认为位置模式
-  std::atomic<double> current_speed_fraction = 1;      // 当前的速度比例
-  std::atomic<double> target_speed_fraction = 1;       // 期望的速度比例
-  std::atomic<double> current_speed_fraction_vel = 0;  // 当前的速度比例变化率
-  std::atomic<double> current_speed_fraction_acc =
-      0;  // 当前的速度比例变化率的变化率
-  std::atomic<bool> is_fraction_changed = false;  // 标识是否需要重置规划器
-  double speed_scaling_dt = 0;                    // 规划器用时
 
  public:
   Kinematics kinematics_;
@@ -740,25 +387,15 @@ class Robot {
                                  // TODO: ================================
 
  private:
-  // JC_helper::ft_sensor my_ft_sensor;         //TODO: 6维力传感器
-
-  bool flag_admittance_turnoff{false};        // TODO: 导纳开关
-  bool flag_admittance_joint_turnoff{false};  // TODO: 关节拖动开关
 
   std::mutex mtx;  // 互斥锁
   DHParamsLoader loader;
-
-  std::shared_ptr<std::thread> _thread_admittance_teaching{
-      nullptr};  // TODO: 线程都要检查
 
   //// 机器人状态机封装
   struct Impl;
   std::unique_ptr<Impl> impl_;
 
   Logger::logger_ptr log_ptr_ = nullptr;
-
-  std::unique_ptr<std::thread> run_thread_handler_{
-      nullptr};  // 机器人RUNNING开启的线程
 
   //////////FSM Related function (INTERNAL) ///////////////
  public:
