@@ -20,13 +20,12 @@
 #ifndef ROCOS_APP_DRIVE_H
 #define ROCOS_APP_DRIVE_H
 
-#include "hardware_interface.h"
-
+#include <atomic>
 #include <boost/thread.hpp>
 #include <boost/thread/recursive_mutex.hpp>
-#include <atomic>
 
-#include "drive_guard.h"
+#include "../include/rocos_app/hardware_interface.h"
+#include "drive_guard.hpp"
 
 #define DELTA_T 0.001
 

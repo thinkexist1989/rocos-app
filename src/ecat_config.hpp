@@ -5,13 +5,14 @@
 #ifndef ECAT_CONFIG_H_INCLUDED
 #define ECAT_CONFIG_H_INCLUDED
 
-#include "ecat_type.h"
-#include <thread>
-#include <boost/interprocess/managed_shared_memory.hpp>
-#include <boost/interprocess/shared_memory_object.hpp>
-#include <boost/interprocess/mapped_region.hpp>
 #include <boost/format.hpp>
+#include <boost/interprocess/managed_shared_memory.hpp>
+#include <boost/interprocess/mapped_region.hpp>
+#include <boost/interprocess/shared_memory_object.hpp>
 #include <map>
+#include <thread>
+
+#include "../include/rocos_app/ethercat/ecat_type.h"
 
 namespace rocos {
     class EcatConfig {

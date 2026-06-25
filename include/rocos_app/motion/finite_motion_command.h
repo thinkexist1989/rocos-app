@@ -1,8 +1,9 @@
 #ifndef ROCOS_APP_MOTION_FINITE_MOTION_COMMAND_H
 #define ROCOS_APP_MOTION_FINITE_MOTION_COMMAND_H
 
-#include <rocos_app/UnitIntervalMotionProfile.h>
 #include <rocos_app/motion/motion_command.h>
+
+#include <../../../src/velocity_profile.hpp>
 
 namespace rocos::motion {
 
@@ -139,7 +140,7 @@ protected:
                                    double s_ddot) const = 0;
 
 private:
-    UnitIntervalMotionProfile profile_;
+    VelocityProfile profile_;
     MotionStepStatus status_{MotionStepStatus::Stopped};
     bool pause_requested_{false};
     bool stopping_{false};

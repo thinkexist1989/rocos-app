@@ -37,7 +37,7 @@ cd build && ctest
 
 代码组织为一组分层的共享库（定义于 [CMakeLists.txt](CMakeLists.txt)），每个库都是一个 `rocos::` CMake 目标。依赖自下而上流动——上层链接下层：
 
-- **logger** —— 基于 spdlog 的日志封装（[src/logger.cc](src/logger.cc)）。
+- **logger** —— 基于 spdlog 的日志封装（[src/logger.cc](src/logger.cpp)）。
 - **hardware** —— EtherCAT 抽象层。`HardwareInterface`（[include/rocos_app/hardware_interface.h](include/rocos_app/hardware_interface.h)）是抽象基类；`Hardware` 是真实 EtherCAT 驱动，`HardwareSim` 是仿真器。要新增后端，继承 `HardwareInterface` 即可。`ethercat/` 头文件（command、status_word、control_word、drive_state、mode_of_operation）建模 CiA 402 伺服驱动状态机。
 - **drive** —— 单轴控制：`Drive` 封装一个伺服，`DriveGuard` 运行实时控制循环，另含插补与机器人数学运算。
 - **kinematics** —— 通过 orocos-kdl 实现正/逆运动学（FK/IK），IK 求解器使用 trac_ik 和 nlopt。
@@ -45,11 +45,11 @@ cd build && ctest
 - **robot** —— 顶层。`Robot` 类（[include/rocos_app/robot.h](include/rocos_app/robot.h)）是核心 API：持有 `HardwareInterface*`、运动学链（从 URDF 解析）以及运动指令（MoveJ/MoveL/MoveC/MoveP、拖拽示教、通过 `WorkMode` 实现的阻抗控制）。`JC_helper_*` 提供运动规划辅助（基于 Ruckig 的轨迹生成）,Robot类中包含一个Boost::sml状态机，其状态机流转图在docs/fsm.png中
 - **robot_http_server** —— 提供 HTTP/JSON 接口，`Robot` 类的友元类，传入Robot，实现RESTful API通信。
 
-`rocos_app` 是一个 INTERFACE 目标，打包 hardware+drive+kinematics+robot 供下游使用。`rocosAppMain`（[src/rocosAppMain.cc](src/rocosAppMain.cc)）是入口：构造硬件（仿真或真实）、一个 `Robot` 和一个 `RobotHttpServer`，然后运行服务器。
+`rocos_app` 是一个 INTERFACE 目标，打包 hardware+drive+kinematics+robot 供下游使用。`rocosAppMain`（[src/rocosAppMain.cc](src/rocosAppMain.cpp)）是入口：构造硬件（仿真或真实）、一个 `Robot` 和一个 `RobotHttpServer`，然后运行服务器。
 
 ### HTTP API
 
-对外接口是 HTTP/JSON，**而非** gRPC —— gRPC 已被移除（见 [docs/dev_log.md](docs/dev_log.md)）。`RobotHttpServer`（[include/rocos_app/robot_http_server.h](include/rocos_app/robot_http_server.h)）是一个自包含类，仅依赖 `Robot*`，基于内置的 [cpp-httplib](3rdparty/httplib/) 和 [nlohmann/json](3rdparty/json/)（均为单头文件）构建。它注册了约 30 个路由（机器人状态、控制、运动、单轴/多轴、拖拽示教、标定），在线程池上执行异步运动，并返回可通过 `GET /api/move/status` 查询的 `task_id`。
+对外接口是 HTTP/JSON，**而非** gRPC —— gRPC 已被移除（见 [docs/dev_log.md](docs/dev_log.md)）。`RobotHttpServer`（[include/rocos_app/robot_http_server.h](src/robot_http_server.hpp)）是一个自包含类，仅依赖 `Robot*`，基于内置的 [cpp-httplib](3rdparty/httplib/) 和 [nlohmann/json](3rdparty/json/)（均为单头文件）构建。它注册了约 30 个路由（机器人状态、控制、运动、单轴/多轴、拖拽示教、标定），在线程池上执行异步运动，并返回可通过 `GET /api/move/status` 查询的 `task_id`。
 
 新增或修改路由时，请同步更新设计文档与返回码表：
 - [docs/http_api_design.md](docs/http_api_design.md) —— API 规范

@@ -17,19 +17,18 @@
 // Shenyang Institute of Automation, Chinese Academy of Sciences.
 // email: luoyang@sia.cn
 
-#include <csignal>
-#include <cstdio>
-#include <cstdlib>
+#include "drive.hpp"
+#include "robot_http_server.hpp"
 
-#include <rocos_app/drive.h>
+#include <gflags/gflags.h>
+
 #include <rocos_app/ethercat/hardware.h>
 #include <rocos_app/ethercat/hardware_sim.h>
-#include <fstream>
-#include <iostream>
 #include <rocos_app/robot.h>
-#include <rocos_app/robot_http_server.h>
+
+#include <csignal>
+#include <iostream>
 #include <string>
-#include <gflags/gflags.h>
 
 DEFINE_string(urdf, "robot.urdf", "Urdf file path");
 DEFINE_string(base, "base_link", "Base link name");

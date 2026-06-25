@@ -20,10 +20,11 @@
 #ifndef ROCOS_APP_HARDWARE_SIM_H
 #define ROCOS_APP_HARDWARE_SIM_H
 
-#include "../hardware_interface.h"
-#include <vector>
 #include <boost/format.hpp>
 #include <random>
+#include <vector>
+
+#include "../hardware_interface.h"
 
 namespace rocos {
 

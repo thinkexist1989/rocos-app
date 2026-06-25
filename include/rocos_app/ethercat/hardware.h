@@ -23,14 +23,12 @@
 #include "command.h"
 #include "control_word.h"
 #include "drive_state.h"
-#include "status_word.h"
 #include "mode_of_operation.h"
+#include "status_word.h"
 
 // #include <rocos_ecm/ecat_config.h>
-#include "ecat_config.h"
-
+#include "../../../src/ecat_config.hpp"
 #include "../hardware_interface.h"
-
 
 namespace rocos {
 

@@ -27,13 +27,13 @@
 #ifndef ROCOS_APP_HARDWARE_INTERFACE_H
 #define ROCOS_APP_HARDWARE_INTERFACE_H
 
+#include <string>
+
 #include "ethercat/command.h"
 #include "ethercat/control_word.h"
 #include "ethercat/drive_state.h"
-#include "ethercat/status_word.h"
 #include "ethercat/mode_of_operation.h"
-
-#include <string>
+#include "ethercat/status_word.h"
 
 // #include <boost/chrono.hpp>
 

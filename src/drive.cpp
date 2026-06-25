@@ -17,7 +17,7 @@
 // Shenyang Institute of Automation, Chinese Academy of Sciences.
 // email: luoyang@sia.cn
 
-#include "include/rocos_app/drive.h"
+#include "drive.hpp"
 
 #include <algorithm>
 

@@ -17,11 +17,11 @@
 // Shenyang Institute of Automation, Chinese Academy of Sciences.
 // email: luoyang@sia.cn
 
-
-#include "include/rocos_app/drive_guard.h"
-#include "include/rocos_app/drive.h"
+#include "drive_guard.hpp"
 
 #include <algorithm>
+
+#include "drive.hpp"
 
 namespace rocos {
 

@@ -20,16 +20,15 @@
 #ifndef ROCOS_APP_DYNAMICS_H
 #define ROCOS_APP_DYNAMICS_H
 
+#include <rocos_app/logger.h>
+
 #include <kdl/chain.hpp>
+#include <kdl/chainfdsolver.hpp>
+#include <kdl/chainidsolver.hpp>
 #include <kdl/frames.hpp>
 #include <kdl/jntarray.hpp>
 #include <kdl/tree.hpp>
 #include <memory>
-
-#include <kdl/chainidsolver.hpp>
-#include <kdl/chainfdsolver.hpp>
-
-#include <rocos_app/logger.h>
 
 namespace rocos {
   using namespace KDL;

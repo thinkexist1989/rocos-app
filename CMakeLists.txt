@@ -107,22 +107,22 @@ set(DEP_LIBS
         )
 
 
-add_library(logger SHARED src/logger.cc)
+add_library(logger SHARED src/logger.cpp)
 target_link_libraries(logger PUBLIC spdlog::spdlog_header_only)
 add_library(rocos::logger ALIAS logger)
 
 ######### Library Hardware ###############
 add_library(hardware
         SHARED
-        src/command.cc
-        src/status_word.cc
-        src/control_word.cc
-        src/drive_state.cc
-        src/hardware.cc
-        src/hardware_interface.cc
-        src/hardware_sim.cc
-        src/ft_sensor_interface.cc
-        src/ft_sensor_ecat.cc
+        src/command.cpp
+        src/status_word.cpp
+        src/control_word.cpp
+        src/drive_state.cpp
+        src/hardware.cpp
+        src/hardware_interface.cpp
+        src/hardware_sim.cpp
+        src/ft_sensor_interface.cpp
+        src/ft_sensor_ecat.cpp
         src/ecat_config.cpp
         )
 target_link_libraries(hardware
@@ -136,8 +136,8 @@ add_library(rocos::hardware ALIAS hardware)
 ########## Library Drive #################
 add_library(drive
         SHARED
-        src/drive.cc
-        src/drive_guard.cc
+        src/drive.cpp
+        src/drive_guard.cpp
         )
 target_link_libraries(drive
         PUBLIC
@@ -148,7 +148,7 @@ add_library(rocos::drive ALIAS drive)
 ########## Library kinematics #################
 add_library(kinematics
         SHARED
-        src/kinematics.cc
+        src/kinematics.cpp
         
         )
 target_include_directories(kinematics
@@ -169,7 +169,7 @@ add_library(rocos::kinematics ALIAS kinematics)
 ########## Library dynamics #################
 add_library(dynamics
         SHARED
-        src/dynamics.cc
+        src/dynamics.cpp
 
 )
 target_include_directories(dynamics
@@ -192,12 +192,12 @@ add_library(rocos::dynamics ALIAS dynamics)
 ########## Library robot #################
 add_library(robot
         SHARED
-        src/robot.cc
-        src/UnitIntervalMotionProfile.cpp
+        src/robot.cpp
+        src/velocity_profile.cpp
 #        src/JC_helper_kinematics.cpp
 #        src/JC_helper_dynamics.cpp
-        src/DHParamsLoader.cpp
-        src/robot_http_server.cc
+        src/dh_params_loader.cpp
+        src/robot_http_server.cpp
 )
 target_include_directories(robot
         PUBLIC
@@ -239,7 +239,7 @@ add_library(rocos::rocos_app ALIAS rocos_app)
 ########## Executable RocosAppMain ################
 # move rocosAppMain to test. Due to rocos_app is a robot library.
 add_executable(rocosAppMain
-        src/rocosAppMain.cc
+        src/rocosAppMain.cpp
         )
 
 ## Specify libraries to link a library or executable target against

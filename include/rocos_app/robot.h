@@ -23,20 +23,20 @@
 #include <rocos_app/motion/motion_executor.h>
 #include <rocos_app/motion/move_j_submission.h>
 #include <rocos_app/motion/position_controller.h>
-// #include <rocos_app/motion/robot_fsm_gateway.h>
 #include <rocos_app/motion/robot_motion_context.h>
+#include <yaml-cpp/yaml.h>
 
 #include <Eigen/Geometry>
 #include <Eigen/QR>
 #include <Eigen/StdVector>  //!< Eigen官网说明 https://eigen.tuxfamily.org/dox/group__TopicStlContainers.html
 #include <vector>
 
-#include "DHParamsLoader.h"
-#include "drive.h"
-#include "dynamics.h"
+#include "../../src/dh_params_loader.hpp"
+#include "../../src/drive.hpp"
+#include "../../src/dynamics.hpp"
+#include "../../src/kinematics.hpp"
 #include "gripper.hpp"
 #include "hardware_interface.h"
-#include "kinematics.h"
 #include "logger.h"
 
 namespace rocos {
@@ -159,7 +159,7 @@ class Robot {
  private:
 
   std::mutex mtx;  // 互斥锁
-  DHParamsLoader loader;
+  dh_params_loader loader;
 
   //// 机器人状态机封装
   struct Impl;

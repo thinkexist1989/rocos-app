@@ -20,9 +20,9 @@
  * Modified: Yang Luo, luoyang@sia.cn
  */
 
-#include <iomanip>
-
 #include <rocos_app/ethercat/command.h>
+
+#include <iomanip>
 
 namespace rocos {
 

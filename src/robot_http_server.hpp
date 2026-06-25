@@ -20,18 +20,18 @@
 #define ROCOS_APP_ROBOT_HTTP_SERVER_H
 
 #include <httplib.h>
-#include <json.hpp>
-#include <rocos_app/robot.h>
 #include <rocos_app/logger.h>
+#include <rocos_app/robot.h>
 
 #include <atomic>
+#include <condition_variable>
+#include <json.hpp>
 #include <map>
 #include <memory>
 #include <mutex>
 #include <queue>
 #include <string>
 #include <thread>
-#include <condition_variable>
 
 namespace rocos {
 

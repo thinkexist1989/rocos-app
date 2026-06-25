@@ -2,11 +2,11 @@
 // Created by think on 2022/2/20.
 //
 
-#include <rocos_app/kinematics.h>
-#include <kdl_parser/kdl_parser.hpp> // 用于将urdf文件解析为KDL::Tree
+#include "kinematics.hpp"
 
-#include "trac_ik/trac_ik.hpp" //逆运动学处理
+#include <kdl_parser/kdl_parser.hpp>  // 用于将urdf文件解析为KDL::Tree
 
+#include "trac_ik/trac_ik.hpp"  //逆运动学处理
 
 namespace rocos {
 

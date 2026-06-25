@@ -1,12 +1,11 @@
-#include <rocos_app/UnitIntervalMotionProfile.h>
-
-#include <ruckig/ruckig.hpp>
-
 #include <algorithm>
 #include <cmath>
 #include <iostream>
+#include <ruckig/ruckig.hpp>
 
-struct UnitIntervalMotionProfile::Impl {
+#include "velocity_profile.hpp"
+
+struct VelocityProfile::Impl {
   explicit Impl(double dt) : otg(dt) {}
 
   static double ClampToUnitInterval(double value) {
@@ -93,20 +92,20 @@ struct UnitIntervalMotionProfile::Impl {
   bool stop_completed = false;
 };
 
-UnitIntervalMotionProfile::UnitIntervalMotionProfile(double dt)
+VelocityProfile::VelocityProfile(double dt)
     : impl_(std::make_unique<Impl>(dt)) {
   Reset();
 }
 
-UnitIntervalMotionProfile::~UnitIntervalMotionProfile() = default;
+VelocityProfile::~VelocityProfile() = default;
 
-UnitIntervalMotionProfile::UnitIntervalMotionProfile(
-    UnitIntervalMotionProfile&&) noexcept = default;
+VelocityProfile::VelocityProfile(
+    VelocityProfile&&) noexcept = default;
 
-UnitIntervalMotionProfile& UnitIntervalMotionProfile::operator=(
-    UnitIntervalMotionProfile&&) noexcept = default;
+VelocityProfile& VelocityProfile::operator=(
+    VelocityProfile&&) noexcept = default;
 
-void UnitIntervalMotionProfile::Reset(double position,
+void VelocityProfile::Reset(double position,
                                       double velocity,
                                       double acceleration) {
   impl_->input = ruckig::InputParameter<1>();
@@ -128,7 +127,7 @@ void UnitIntervalMotionProfile::Reset(double position,
   impl_->SyncCurrentStateToInput();
 }
 
-void UnitIntervalMotionProfile::Start(double max_velocity,
+void VelocityProfile::Start(double max_velocity,
                                       double max_acceleration,
                                       double max_jerk) {
   if (!Impl::AreValidLimits(max_velocity, max_acceleration, max_jerk)) {
@@ -165,7 +164,7 @@ void UnitIntervalMotionProfile::Start(double max_velocity,
   impl_->stop_completed = false;
 }
 
-void UnitIntervalMotionProfile::Resume() {
+void VelocityProfile::Resume() {
   if (!impl_->HasValidStoredLimits()) {
     impl_->MarkError();
     return;
@@ -189,7 +188,7 @@ void UnitIntervalMotionProfile::Resume() {
   impl_->stop_completed = false;
 }
 
-void UnitIntervalMotionProfile::Pause(double max_acceleration,
+void VelocityProfile::Pause(double max_acceleration,
                                       double max_jerk) {
   double used_max_acceleration = 0.0;
   double used_max_jerk = 0.0;
@@ -227,7 +226,7 @@ void UnitIntervalMotionProfile::Pause(double max_acceleration,
   impl_->stop_completed = false;
 }
 
-void UnitIntervalMotionProfile::Stop(double max_acceleration,
+void VelocityProfile::Stop(double max_acceleration,
                                      double max_jerk) {
   impl_->stop_completed = false;
 
@@ -270,7 +269,7 @@ void UnitIntervalMotionProfile::Stop(double max_acceleration,
   impl_->stop_pending = true;
 }
 
-void UnitIntervalMotionProfile::Update() {
+void VelocityProfile::Update() {
   if (!impl_->active || impl_->error) {
     return;
   }
@@ -323,41 +322,41 @@ void UnitIntervalMotionProfile::Update() {
   }
 }
 
-double UnitIntervalMotionProfile::position() const {
+double VelocityProfile::position() const {
   return impl_->position;
 }
 
-double UnitIntervalMotionProfile::velocity() const {
+double VelocityProfile::velocity() const {
   return impl_->velocity;
 }
 
-double UnitIntervalMotionProfile::acceleration() const {
+double VelocityProfile::acceleration() const {
   return impl_->acceleration;
 }
 
-bool UnitIntervalMotionProfile::IsActive() const {
+bool VelocityProfile::IsActive() const {
   return impl_->active;
 }
 
-bool UnitIntervalMotionProfile::IsSegmentFinished() const {
+bool VelocityProfile::IsSegmentFinished() const {
   return !impl_->active && !impl_->error;
 }
 
-bool UnitIntervalMotionProfile::HasError() const {
+bool VelocityProfile::HasError() const {
   return impl_->error;
 }
 
-bool UnitIntervalMotionProfile::IsStopCompleted() const {
+bool VelocityProfile::IsStopCompleted() const {
   return impl_->stop_completed;
 }
 
-bool UnitIntervalMotionProfile::HasReachedTarget(double epsilon) const {
+bool VelocityProfile::HasReachedTarget(double epsilon) const {
   return std::abs(impl_->position - 1.0) < epsilon &&
          std::abs(impl_->velocity) < epsilon &&
          std::abs(impl_->acceleration) < epsilon;
 }
 
-bool UnitIntervalMotionProfile::IsStopped(double epsilon) const {
+bool VelocityProfile::IsStopped(double epsilon) const {
   return std::abs(impl_->velocity) < epsilon &&
          std::abs(impl_->acceleration) < epsilon;
 }

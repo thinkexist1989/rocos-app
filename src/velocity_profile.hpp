@@ -3,17 +3,17 @@
 
 #include <memory>
 
-class UnitIntervalMotionProfile {
+class VelocityProfile {
  public:
-  explicit UnitIntervalMotionProfile(double dt);
-  ~UnitIntervalMotionProfile();
+  explicit VelocityProfile(double dt);
+  ~VelocityProfile();
 
-  UnitIntervalMotionProfile(const UnitIntervalMotionProfile&) = delete;
-  UnitIntervalMotionProfile& operator=(const UnitIntervalMotionProfile&) =
+  VelocityProfile(const VelocityProfile&) = delete;
+  VelocityProfile& operator=(const VelocityProfile&) =
       delete;
 
-  UnitIntervalMotionProfile(UnitIntervalMotionProfile&&) noexcept;
-  UnitIntervalMotionProfile& operator=(UnitIntervalMotionProfile&&) noexcept;
+  VelocityProfile(VelocityProfile&&) noexcept;
+  VelocityProfile& operator=(VelocityProfile&&) noexcept;
 
   void Reset(double position = 0.0,
              double velocity = 0.0,

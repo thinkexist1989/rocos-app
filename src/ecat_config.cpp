@@ -2,10 +2,10 @@
 // Created by think on 2023/12/11.
 //
 
-#include <rocos_app/ethercat/ecat_config.h>
+#include "ecat_config.hpp"
+
 #include <algorithm>
 #include <iostream>
-
 
 using namespace rocos;
 
