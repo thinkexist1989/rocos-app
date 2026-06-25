@@ -244,7 +244,7 @@ namespace rocos {
                  const std::string &urdf_file_path,
                  const std::string &base_link,
                  const std::string &tip
-    ) : hw_interface_(hw), urdf_file_path_(urdf_file_path), base_link_(base_link), tip_(tip), impl_(std::make_unique<Impl>(*this)) {
+    ) : hw_interface_(hw), impl_(std::make_unique<Impl>(*this)) {
 
         log_ptr_ = Logger::getInstance("Robot");
 
@@ -258,7 +258,6 @@ namespace rocos {
         motion_executor_.reset();
         motion_context_.reset();
         motion_position_controller_.reset();
-        motion_fsm_gateway_.reset();
         motion_safety_guard_.reset();
 
         // Delete logger pointer
@@ -331,336 +330,34 @@ namespace rocos {
 
 
     bool Robot::IsEnabled() {
-        for (int i = 0; i < jnt_num_; i++) {
-            //使能检查
-            if (joints_[i]->getDriveState() != DriveState::OperationEnabled) {
-                log_ptr_->error("joints[{}] is not Enabled", i);
-                return false;
-            }
-        }
+
         return true;
     }
 
     bool Robot::IsDisabled() {
-        for (int i = 0; i < jnt_num_; i++) {
-            //使能检查
-            if (joints_[i]->getDriveState() == DriveState::OperationEnabled) {
-                log_ptr_->warn("joints[{}] is Enabled", i);
-                return false;
-            }
-        }
-        return true;
-    }
-
-
-
-    bool Robot::setWorkMode(WorkMode mode) {
-
-        switch (work_mode_) {
-            case WorkMode::Position:
-                break;
-            case WorkMode::EeAdmitTeach:
-                break;
-            case WorkMode::JntAdmitTeach:
-                break;
-            case WorkMode::JntImp:
-                break;
-            case WorkMode::CartImp:
-                break;
-            default:
-                break;
-        }
-
-        for (int i = 0; i < 10; i++)
-            hw_interface_->waitForSignal(5);
-
-        //TODO: 机器人只能在停止状态切换工作模式，有状态机，需要删掉
-        if (isMotionRunning()) {
-            log_ptr_->error("Robot is not stopped!");
-            return false;
-        }
-
-        work_mode_ = mode;
-
-        switch (mode) {
-            case WorkMode::Position:
-                log_ptr_->info("Robot work mode is set to Position");
-                break;
-            case WorkMode::EeAdmitTeach:
-                log_ptr_->info("Robot work mode is set to EeAdmitTeach");
-                break;
-            case WorkMode::JntAdmitTeach:
-                log_ptr_->info("Robot work mode is set to JntAdmitTeach");
-                break;
-            case WorkMode::JntImp:
-                log_ptr_->info("Robot work mode is set to JntImp");
-                break;
-            case WorkMode::CartImp:
-                log_ptr_->info("Robot work mode is set to CartImp");
-                break;
-            default:
-                break;
-        }
 
         return true;
-    }
-
-    bool Robot::enterRunning() {
-        // 仅当处于 STOPPED 时 EventStartReq 才会被状态机处理（STOPPED→STARTING→RUNNING，
-        // 中间态经 on_entry 回调自动推进）。其他状态下事件不被处理，process_event 返回
-        // false —— 这就是原子的状态门控：RUNNING/PAUSED 等状态下新运动被直接拒绝，
-        // 无需额外的标志位，也不存在 check-then-act 竞态。
-        if (!requestMotionStart()) {
-            log_ptr_->error("无法开始运动：机器人不处于 STOPPED 状态（当前：{}）", GetRobotState());
-            return false;
-        }
-        return true;
-    }
-
-    void Robot::enterStopped() {
-        // 运动线程结束或中止时调用，从 RUNNING/PAUSED/SERVOING/ERROR 回到 STOPPED
-        // （STOPPING 中间态经 on_fsm_stop 自动推进）。若当前已是 STOPPED/IDLE，
-        // EventStopReq 不被处理，视为无害空操作。
-        requestMotionStop();
     }
 
     bool Robot::isMotionRunning() const {
-        // 是否有运动正占用机器人（FSM 处于 RUNNING）。替代旧的 is_running_motion 读取。
         return impl_->is(sml::state<class RUNNING>);
     }
 
-    bool Robot::requestMotionStart() {
-        return impl_->process_event(EventStartReq{});
-    }
-
-    bool Robot::requestMotionPause() {
-        return impl_->process_event(EventPauseReq{});
-    }
-
-    bool Robot::requestMotionContinue() {
-        return impl_->process_event(EventContinueReq{});
-    }
-
-    bool Robot::requestMotionStop() {
-        return impl_->process_event(EventStopReq{});
-    }
-
-    bool Robot::notifyMotionError() {
-        return impl_->process_event(EventErrorOccurred{});
-    }
-
     void Robot::waitControlCycle() {
-        if (hw_interface_) {
-            hw_interface_->waitForSignal(0);
-        }
+
     }
 
     void Robot::initializeMotionExecutor() {
-        motion::MotionSafetyLimits limits;
-        limits.min_position.reserve(jnt_num_);
-        limits.max_position.reserve(jnt_num_);
-        limits.max_command_velocity.reserve(jnt_num_);
-        limits.max_following_error.reserve(jnt_num_);
 
-        for (int i = 0; i < jnt_num_; ++i) {
-            const double min_position = joints_[i]->getMinPosLimit();
-            const double max_position = joints_[i]->getMaxPosLimit();
-            const double max_velocity = std::max(joints_[i]->getMaxVel(), EPS);
-            limits.min_position.push_back(min_position);
-            limits.max_position.push_back(max_position);
-            limits.max_command_velocity.push_back(max_velocity);
-            limits.max_following_error.push_back(
-                std::max(max_position - min_position, 1.0));
-        }
-
-        motion_safety_guard_ =
-            std::make_unique<motion::MotionSafetyGuard>(std::move(limits));
-        motion_fsm_gateway_ =
-            std::make_unique<motion::BasicRobotFsmGateway<Robot>>(*this);
-        motion_position_controller_ =
-            std::make_unique<motion::PositionController>();
-        motion_context_ =
-            std::make_unique<motion::RobotMotionContext<Robot>>(
-                *this, *motion_safety_guard_, DELTA_T);
-
-        // 初始化 ModelProvider 的 FK/IK 回调
-        model_provider_.kinematics.forwardKinematics =
-            [this](const std::vector<double>& q, std::vector<double>& pose_out) -> bool {
-                if (static_cast<int>(q.size()) != jnt_num_) { return false; }
-                KDL::JntArray q_kdl(jnt_num_);
-                for (int i = 0; i < jnt_num_; ++i) { q_kdl(i) = q[i]; }
-                KDL::Frame frame;
-                if (kinematics_.JntToCart(q_kdl, frame) < 0) { return false; }
-                pose_out.resize(7);
-                pose_out[0] = frame.p.x();
-                pose_out[1] = frame.p.y();
-                pose_out[2] = frame.p.z();
-                frame.M.GetQuaternion(pose_out[3], pose_out[4], pose_out[5], pose_out[6]);
-                return true;
-            };
-        model_provider_.kinematics.inverseKinematics =
-            [this](const std::vector<double>& q_seed,
-                   const std::vector<double>& target_pose,
-                   std::vector<double>& q_out) -> bool {
-                if (target_pose.size() < 7) { return false; }
-                KDL::JntArray q_kdl(jnt_num_);
-                for (int i = 0; i < jnt_num_; ++i) {
-                    q_kdl(i) = (i < static_cast<int>(q_seed.size())) ? q_seed[i] : 0.0;
-                }
-                KDL::Frame target;
-                target.p = KDL::Vector(target_pose[0], target_pose[1], target_pose[2]);
-                target.M = KDL::Rotation::Quaternion(
-                    target_pose[3], target_pose[4], target_pose[5], target_pose[6]);
-                KDL::JntArray result;
-                if (kinematics_.CartToJnt(q_kdl, target, result) < 0) { return false; }
-                q_out.resize(jnt_num_);
-                for (int i = 0; i < jnt_num_; ++i) { q_out[i] = result(i); }
-                return true;
-            };
-        model_provider_.kinematics.getDof = [this]() { return jnt_num_; };
-
-        motion_executor_ =
-            std::make_unique<motion::MotionExecutor>(
-                *motion_fsm_gateway_,
-                *motion_position_controller_,
-                *motion_context_,
-                model_provider_);
     }
 
     void Robot::setEnabled() {
-        for_each(joints_.begin(), joints_.end(),
-                 [=](std::shared_ptr<Drive> &d) { d->setEnabled(false); }); // 将抱闸设置为同时开启，不阻塞
-
-
-        // set a temporary time point to prevent getting caught in an infinite loop
-        auto driveStateChangeStartTimePoint = std::chrono::system_clock::now();
-
-        outerloop:
-        for (;;) {
-            for (const auto &joint: joints_) {
-                // First check timeout
-                auto duration_us = std::chrono::duration_cast<std::chrono::microseconds>(
-                        std::chrono::system_clock::now() - driveStateChangeStartTimePoint);
-                if (duration_us.count() > 150000) { //wait for 100ms  TODO: configuration_.driveStateChangeMaxTimeout
-                    log_ptr_->warn("It takes too long ({} ms) to switch state!", duration_us.count() / 1000.0);
-                    break;
-                }
-
-                if (joint->getDriveState() != DriveState::OperationEnabled) {
-                    goto outerloop;
-                }
-
-            }
-            break;
-        }
     }
 
     void Robot::setDisabled() {
-        for_each(joints_.begin(), joints_.end(),
-                 [=](std::shared_ptr<Drive> &d) { d->setDisabled(false); }); // 将抱闸设置为同时开启，不阻塞
-
-
-
-        // set a temporary time point to prevent getting caught in an infinite loop
-        auto driveStateChangeStartTimePoint = std::chrono::system_clock::now();
-
-        outerloop:
-        for (;;) {
-            for (const auto &joint: joints_) {
-                // First check timeout
-                auto duration_us = std::chrono::duration_cast<std::chrono::microseconds>(
-                        std::chrono::system_clock::now() - driveStateChangeStartTimePoint);
-                if (duration_us.count() > 150000) { //wait for 100ms  TODO: configuration_.driveStateChangeMaxTimeout
-                    log_ptr_->warn("It takes too long ({} ms) to switch state!", duration_us.count() / 1000.0);
-                    break;
-                }
-
-                if (joint->getDriveState() != DriveState::SwitchOnDisabled) {
-                    goto outerloop;
-                }
-
-            }
-            break;
-        }
     }
 
     /////// Motion Command /////////////
-
-    //TODO: ======================MoveJ调用逻辑===========================
-    int Robot::MoveJ(JntArray q, double speed, double acceleration, double time,
-                     double radius, bool asynchronous) {
-
-        if (!motion_executor_) {
-            initializeMotionExecutor();
-        }
-
-        if (q.rows() != static_cast<unsigned int>(jnt_num_)) {
-            log_ptr_->error("MoveJ target dimension does not match robot joints");
-            return static_cast<int>(motion::ErrorCode::UnmatchedJointsNumber);
-        }
-
-        if (time != 0.0 || radius != 0.0) {
-            log_ptr_->error("MoveJ executor path does not support time/radius yet");
-            return static_cast<int>(motion::ErrorCode::IllegalParameter);
-        }
-
-        for (int i{0}; i < jnt_num_; i++) {
-            if (q(i) > joints_[i]->getMaxPosLimit() ||
-                q(i) < joints_[i]->getMinPosLimit()) {
-                log_ptr_->error("MoveJ position command is out of range");
-                return static_cast<int>(motion::ErrorCode::PosLimit);
-            }
-            if (speed > joints_[i]->getMaxVel() ||
-                speed < (-1) * joints_[i]->getMaxVel()) {
-                log_ptr_->error("MoveJ velocity command is out of range");
-                return static_cast<int>(motion::ErrorCode::SpeedLimit);
-            }
-            if (acceleration > joints_[i]->getMaxAcc() ||
-                acceleration < (-1) * joints_[i]->getMaxAcc()) {
-                log_ptr_->error("MoveJ acceleration command is out of range");
-                return static_cast<int>(motion::ErrorCode::AccLimit);
-            }
-            if (joints_[i]->getDriveState() != DriveState::OperationEnabled) {
-                log_ptr_->error("MoveJ joint[{}] is not operation enabled", i);
-                return static_cast<int>(motion::ErrorCode::NotAllAtOpState);
-            }
-            if (!(joints_[i]->getMode() == ModeOfOperation::CyclicSynchronousPositionMode ||
-                  joints_[i]->getMode() == ModeOfOperation::CyclicSynchronousVelocityMode)) {
-                log_ptr_->error("MoveJ不支持关节[{}]的当前模式 :{}", i, static_cast<int>(joints_[i]->getMode()));
-                return static_cast<int>(motion::ErrorCode::CallingConflictError);
-            }
-        }
-
-        std::vector<double> target_position(jnt_num_);
-        for (int i = 0; i < jnt_num_; ++i) {
-            target_position[i] = q(i);
-        }
-
-        const auto submit_result = motion::submitMoveJ(
-            *this,
-            *motion_executor_,
-            target_position,
-            std::abs(speed),
-            std::abs(acceleration),
-            DELTA_T);
-        if (!submit_result.success) {
-            log_ptr_->error("MoveJ executor submit failed: {}", submit_result.message);
-            return submit_result.api_error_code;
-        }
-
-        if (!asynchronous) {
-            while (motion_executor_->hasActiveCommand()) {
-                std::this_thread::sleep_for(std::chrono::milliseconds(1));
-            }
-            const auto last_error = motion_executor_->lastError();
-            if (!last_error.success) {
-                log_ptr_->error("MoveJ executor failed: {}", last_error.message);
-                return last_error.api_error_code;
-            }
-        }
-
-        return 0;
-    }
 
     int Robot::Pause() {
         if (!motion_executor_) {
@@ -714,102 +411,7 @@ namespace rocos {
         return 0;
     }
 
-    int Robot::MoveJ_IK(Frame pose, double speed, double acceleration, double time,
-                        double radius, bool asynchronous) {
-        // std::ostringstream ss;
-        // ss << pose;
-        // log_ptr_->info("MoveJ_IK pose: {}", ss.str());
-        //
-        // JntArray q_init(jnt_num_);
-        // JntArray q_target(jnt_num_);
-        // for (int i = 0; i < jnt_num_; i++) {
-        //     q_init.data[i] = pos_[i];
-        //     q_target.data[i] = pos_[i];
-        // }
-        // if (kinematics_.CartToJnt(q_init, pose, q_target) < 0) {
-        //     log_ptr_->error(" CartToJnt failed");
-        //     return -1;
-        // }
-        // return MoveJ(q_target, speed, acceleration, time, radius, asynchronous);
-    }
-    //TODO: =========================MoveJ===============================
 
-    //TODO: ======================MoveL调用逻辑===========================
-    int Robot::MoveL(Frame pose, double speed, double acceleration, double time,
-                     double radius, bool asynchronous, int max_running_count) {
 
-        bool all_pos_mode{true};  //假设全部关节位置模式
-        bool all_vel_mode{true};  //假设全部关节速度模式
-
-        for (int i{0}; i < jnt_num_; i++) {
-            if (joints_[i]->getMode() != ModeOfOperation::CyclicSynchronousPositionMode)
-                all_pos_mode = false;
-
-            if (joints_[i]->getMode() != ModeOfOperation::CyclicSynchronousVelocityMode)
-                all_vel_mode = false;
-        }
-
-        // time==0 && radius==0 → executor 路径（MoveLCommand + S-curve profile）
-        if (time == 0.0 && radius == 0.0) {
-            if (!motion_executor_) {
-                initializeMotionExecutor();
-            }
-
-            for (int i{0}; i < jnt_num_; i++) {
-                if (joints_[i]->getDriveState() != DriveState::OperationEnabled) {
-                    log_ptr_->error("MoveL joint[{}] is not operation enabled", i);
-                    return static_cast<int>(motion::ErrorCode::NotAllAtOpState);
-                }
-            }
-
-            const auto submit_result = motion::submitMoveL(
-                *this,
-                *motion_executor_,
-                pose,
-                speed,
-                acceleration,
-                DELTA_T);
-            if (!submit_result.success) {
-                log_ptr_->error("MoveL executor submit failed: {}", submit_result.message);
-                return submit_result.api_error_code;
-            }
-
-            if (!asynchronous) {
-                while (motion_executor_->hasActiveCommand()) {
-                    std::this_thread::sleep_for(std::chrono::milliseconds(1));
-                }
-                const auto last_error = motion_executor_->lastError();
-                if (!last_error.success) {
-                    log_ptr_->error("MoveL executor failed: {}", last_error.message);
-                    return last_error.api_error_code;
-                }
-            }
-            return 0;
-        }
-
-        // 旧路径（time/radius 不为零，或速度模式）
-        // if (all_pos_mode)
-        //     return MoveL_pos(pose, speed, acceleration, time, radius, asynchronous, max_running_count);
-        // else if (all_vel_mode)
-        //     return MoveL_vel(pose, speed, acceleration, time, radius, asynchronous, max_running_count);
-        // else {
-        //     log_ptr_->error("某关节为既不是位置模式也不是速度模式！");
-        //     return -1;
-        // }
-    }
-
-    //TODO: ========================MoveL=============================
-
-    int Robot::MoveL_FK(JntArray q, double speed, double acceleration, double time,
-                        double radius, bool asynchronous) {
-        KDL::Frame target;
-        kinematics_.JntToCart(q, target);
-        
-        std::ostringstream ss;
-        ss << target;
-        log_ptr_->info("Target pose is: {}", ss.str());
-
-        return MoveL(target, speed, acceleration, time, radius, asynchronous);
-    }
 
 }  // namespace rocos
