@@ -1,7 +1,7 @@
 #ifndef ROCOS_APP_MOTION_DIANA_ERROR_CODES_H
 #define ROCOS_APP_MOTION_DIANA_ERROR_CODES_H
 
-namespace rocos::motion {
+namespace rocos {
 
 enum class ErrorCode : int {
     NoError = 0,

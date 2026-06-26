@@ -119,10 +119,7 @@ add_library(hardware
         src/control_word.cpp
         src/drive_state.cpp
         src/hardware.cpp
-        src/hardware_interface.cpp
         src/hardware_sim.cpp
-        src/ft_sensor_interface.cpp
-        src/ft_sensor_ecat.cpp
         src/ecat_config.cpp
         )
 target_link_libraries(hardware

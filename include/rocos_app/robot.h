@@ -34,9 +34,9 @@
 #include "../../src/dh_params_loader.hpp"
 #include "../../src/drive.hpp"
 #include "../../src/dynamics.hpp"
+#include "../../src/hardware_interface.hpp"
 #include "../../src/kinematics.hpp"
 #include "gripper.hpp"
-#include "hardware_interface.h"
 #include "logger.h"
 
 namespace rocos {

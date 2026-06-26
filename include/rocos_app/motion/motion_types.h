@@ -1,8 +1,7 @@
 #ifndef ROCOS_APP_MOTION_MOTION_TYPES_H
 #define ROCOS_APP_MOTION_MOTION_TYPES_H
 
-#include <rocos_app/motion/error_codes.h>
-
+#include <../../../src/error_code.hpp>
 #include <cstdint>
 #include <optional>
 #include <string>

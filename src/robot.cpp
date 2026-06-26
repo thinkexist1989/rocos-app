@@ -361,55 +361,15 @@ namespace rocos {
     /////// Motion Command /////////////
 
     int Robot::Pause() {
-        if (!motion_executor_) {
-            initializeMotionExecutor();
-        }
 
-        const auto result = motion_executor_->pause();
-        if (!result.success) {
-            log_ptr_->error("PauseMotion failed: {}", result.message);
-            return result.api_error_code;
-        }
-        const auto deadline =
-            std::chrono::steady_clock::now() + std::chrono::seconds(5);
-        while (std::chrono::steady_clock::now() < deadline) {
-            if (motion_executor_->currentTaskStatus() ==
-                motion::MotionTaskStatus::Paused) {
-                return 0;
-            }
-            if (!motion_executor_->hasActiveCommand()) {
-                const auto last_error = motion_executor_->lastError();
-                return last_error.success ? 0 : last_error.api_error_code;
-            }
-            std::this_thread::sleep_for(std::chrono::milliseconds(1));
-        }
-        return static_cast<int>(motion::ErrorCode::NotAllAtOpState);
     }
 
     int Robot::Continue() {
-        if (!motion_executor_) {
-            initializeMotionExecutor();
-        }
 
-        const auto result = motion_executor_->resume();
-        if (!result.success) {
-            log_ptr_->error("ResumeMotion failed: {}", result.message);
-            return result.api_error_code;
-        }
-        return 0;
     }
 
     int Robot::Stop() {
-        if (!motion_executor_) {
-            initializeMotionExecutor();
-        }
 
-        const auto result = motion_executor_->stop();
-        if (!result.success) {
-            log_ptr_->error("StopMotion failed: {}", result.message);
-            return result.api_error_code;
-        }
-        return 0;
     }
 
 

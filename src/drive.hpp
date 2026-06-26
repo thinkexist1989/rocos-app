@@ -24,8 +24,8 @@
 #include <boost/thread.hpp>
 #include <boost/thread/recursive_mutex.hpp>
 
-#include "../include/rocos_app/hardware_interface.h"
 #include "drive_guard.hpp"
+#include "hardware_interface.hpp"
 
 #define DELTA_T 0.001
 

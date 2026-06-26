@@ -28,7 +28,7 @@
 
 // #include <rocos_ecm/ecat_config.h>
 #include "../../../src/ecat_config.hpp"
-#include "../hardware_interface.h"
+#include "../../../src/hardware_interface.hpp"
 
 namespace rocos {
 
@@ -86,12 +86,15 @@ namespace rocos {
 
         void wait() override;
 
-        void parseParamFormUrdf(const std::string &urdf_file_path);
-
         void setDigitalOutputsRaw(int id, int32_t value) override;
+        void setModeOfOperation(int id,
+                                ModeOfOperation modeOfOperation) override {};
+        Statusword getStatusword(int id) override {};
+        DriveState getDriverState(int id) override {};
+        HWType getHardwareType() override {};
+        std::string getHardwareTypeString(HWType type) override {};
 
-
-    protected:
+       protected:
         EcatConfig* ecPtr_ {nullptr};
 
         std::vector<int32_t *> pTargetPos_;    // Target Position

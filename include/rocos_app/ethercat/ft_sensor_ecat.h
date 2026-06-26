@@ -5,7 +5,7 @@
 #ifndef ROCOS_APP_FT_SENSOR_ECAT_H
 #define ROCOS_APP_FT_SENSOR_ECAT_H
 
-#include <rocos_app/ft_sensor_interface.h>
+#include "ft_sensor_interface.h"
 // #include <rocos_ecm/ecat_config.h>
 #include "../../../src/ecat_config.hpp"
 

@@ -38,7 +38,7 @@ cd build && ctest
 代码组织为一组分层的共享库（定义于 [CMakeLists.txt](CMakeLists.txt)），每个库都是一个 `rocos::` CMake 目标。依赖自下而上流动——上层链接下层：
 
 - **logger** —— 基于 spdlog 的日志封装（[src/logger.cc](src/logger.cpp)）。
-- **hardware** —— EtherCAT 抽象层。`HardwareInterface`（[include/rocos_app/hardware_interface.h](include/rocos_app/hardware_interface.h)）是抽象基类；`Hardware` 是真实 EtherCAT 驱动，`HardwareSim` 是仿真器。要新增后端，继承 `HardwareInterface` 即可。`ethercat/` 头文件（command、status_word、control_word、drive_state、mode_of_operation）建模 CiA 402 伺服驱动状态机。
+- **hardware** —— EtherCAT 抽象层。`HardwareInterface`（[include/rocos_app/hardware_interface.hpp](src/hardware_interface.hpp)）是抽象基类；`Hardware` 是真实 EtherCAT 驱动，`HardwareSim` 是仿真器。要新增后端，继承 `HardwareInterface` 即可。`ethercat/` 头文件（command、status_word、control_word、drive_state、mode_of_operation）建模 CiA 402 伺服驱动状态机。
 - **drive** —— 单轴控制：`Drive` 封装一个伺服，`DriveGuard` 运行实时控制循环，另含插补与机器人数学运算。
 - **kinematics** —— 通过 orocos-kdl 实现正/逆运动学（FK/IK），IK 求解器使用 trac_ik 和 nlopt。
 - **dynamics** —— 通过 orocos-kdl 实现刚体动力学。

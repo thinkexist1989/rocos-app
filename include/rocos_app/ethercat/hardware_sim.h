@@ -24,7 +24,7 @@
 #include <random>
 #include <vector>
 
-#include "../hardware_interface.h"
+#include "../../../src/hardware_interface.hpp"
 
 namespace rocos {
 
@@ -45,6 +45,16 @@ namespace rocos {
         void setTargetVelocityRaw(int id, int32_t vel) override;
 
         void setTargetTorqueRaw(int id, int16_t tor) override;
+        HWState getHardwareState() override {};
+        void setHardwareState(HWState state) override {};
+        void waitForSignal(int id) override {};
+        void wait() override {};
+        int32_t getSecondaryPositionRaw(int id) override {};
+        int32_t getSecondaryVelocityRaw(int id) override {};
+        int32_t getDigitalInputsRaw(int id) override {};
+        void setDigitalOutputsRaw(int id, int32_t value) override {};
+        HWType getHardwareType() override {};
+        std::string getHardwareTypeString(HWType type) override {};
 
         void setControlwordRaw(int id, uint16_t ctrlwd) override;
 
