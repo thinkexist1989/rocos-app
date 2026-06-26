@@ -20,24 +20,40 @@
 
 namespace rocos {
 
-    class FtSensorInterface {
+class JntArray;
+class Vector;
+class Rotation;
+class Frame;
+class Wrench;
+class Twist;
+class Jacobian;
 
-    public:
-        virtual ~FtSensorInterface() = default;
+class JntArray {
 
-        virtual float getFx() const = 0;
+};
 
-        virtual float getFy() const= 0;
+class Vector {
 
-        virtual float getFz() const= 0;
+};
 
-        virtual float getMx() const= 0;
+class Rotation {
 
-        virtual float getMy() const= 0;
+};
 
-        virtual float getMz() const= 0;
+class Frame {
 
+};
 
-    };
+class Wrench {
 
-} // rocos
+};
+
+class Twist {
+
+};
+
+class Jacobian {
+
+};
+
+}  // namespace rocos

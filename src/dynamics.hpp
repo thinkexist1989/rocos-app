@@ -20,7 +20,7 @@
 #ifndef ROCOS_APP_DYNAMICS_H
 #define ROCOS_APP_DYNAMICS_H
 
-#include <rocos_app/logger.h>
+#include "logger.hpp"
 
 #include <kdl/chain.hpp>
 #include <kdl/chainfdsolver.hpp>

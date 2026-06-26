@@ -16,13 +16,12 @@
 // HTTP REST API Server for ROCOS-App Robot Controller
 // Replaces gRPC with HTTP/JSON using cpp-httplib
 
-#ifndef ROCOS_APP_ROBOT_HTTP_SERVER_H
-#define ROCOS_APP_ROBOT_HTTP_SERVER_H
+#pragma once
+
+#include "robot.hpp"
+#include "logger.hpp"
 
 #include <httplib.h>
-#include <rocos_app/logger.h>
-#include <rocos_app/robot.h>
-
 #include <atomic>
 #include <condition_variable>
 #include <json.hpp>
@@ -32,6 +31,7 @@
 #include <queue>
 #include <string>
 #include <thread>
+
 
 namespace rocos {
 
@@ -136,5 +136,3 @@ private:
 };
 
 } // namespace rocos
-
-#endif // ROCOS_APP_ROBOT_HTTP_SERVER_H

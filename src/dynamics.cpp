@@ -1,7 +1,3 @@
-//
-// Created by think on 6/4/26.
-//
-
 #include "dynamics.hpp"
 
 namespace rocos {

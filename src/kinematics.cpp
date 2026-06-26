@@ -1,7 +1,3 @@
-//
-// Created by think on 2022/2/20.
-//
-
 #include "kinematics.hpp"
 
 #include <kdl_parser/kdl_parser.hpp>  // 用于将urdf文件解析为KDL::Tree

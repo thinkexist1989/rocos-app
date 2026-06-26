@@ -17,11 +17,8 @@
 // Shenyang Institute of Automation, Chinese Academy of Sciences.
 // email: luoyang@sia.cn
 
-#include <rocos_app/motion/move_c_submission.h>
-#include <rocos_app/motion/move_l_submission.h>
-#include <rocos_app/robot.h>
+#include "robot.hpp"
 
-#include <algorithm>
 #include <boost/sml.hpp>
 #include <kdl_parser/kdl_parser.hpp>  // 用于将urdf文件解析为KDL::Tree
 #include <sstream>

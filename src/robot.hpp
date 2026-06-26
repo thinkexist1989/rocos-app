@@ -31,13 +31,13 @@
 #include <Eigen/StdVector>  //!< Eigen官网说明 https://eigen.tuxfamily.org/dox/group__TopicStlContainers.html
 #include <vector>
 
-#include "../../src/dh_params_loader.hpp"
-#include "../../src/drive.hpp"
-#include "../../src/dynamics.hpp"
-#include "../../src/hardware_interface.hpp"
-#include "../../src/kinematics.hpp"
+#include "dh_params_loader.hpp"
+#include "drive.hpp"
+#include "dynamics.hpp"
 #include "gripper.hpp"
-#include "logger.h"
+#include "hardware_interface.hpp"
+#include "kinematics.hpp"
+#include "logger.hpp"
 
 namespace rocos {
 //! Class Robot
@@ -159,7 +159,7 @@ class Robot {
  private:
 
   std::mutex mtx;  // 互斥锁
-  dh_params_loader loader;
+  DHParamsLoader loader;
 
   //// 机器人状态机封装
   struct Impl;

@@ -1,10 +1,12 @@
+#include "dh_params_loader.hpp"
+
 #include <yaml-cpp/yaml.h>
 
 #include <kdl/frames.hpp>
 
-#include "dh_params_loader.hpp"
+namespace rocos {
 
-dh_params_loader::dh_params_loader() {
+DHParamsLoader::DHParamsLoader() {
     // 初始化默认值
     robot_name_ = "Unknown";
     base_link_ = "base_link";
@@ -13,11 +15,11 @@ dh_params_loader::dh_params_loader() {
     log_ptr_ = Logger::getInstance("DHParamsLoader");
 }
 
-dh_params_loader::~dh_params_loader() {
+DHParamsLoader::~DHParamsLoader() {
     // 析构函数
 }
 
-bool dh_params_loader::loadFromYAML(const std::string& yaml_file) {
+bool DHParamsLoader::loadFromYAML(const std::string& yaml_file) {
     try {
         YAML::Node config = YAML::LoadFile(yaml_file);
         
@@ -76,7 +78,7 @@ bool dh_params_loader::loadFromYAML(const std::string& yaml_file) {
     }
 }
 
-bool dh_params_loader::buildChainFromDH() {
+bool DHParamsLoader::buildChainFromDH() {
     chain_ = KDL::Chain();
     
     if (dh_params_.empty()) {
@@ -113,7 +115,7 @@ bool dh_params_loader::buildChainFromDH() {
     return true;
 }
 
-KDL::Joint dh_params_loader::createJoint(const DHParameters& dh) {
+KDL::Joint DHParamsLoader::createJoint(const DHParameters& dh) {
    if (dh.type == "revolute") {
         // 使用预定义的旋转关节类型，绕Z轴旋转
         return KDL::Joint(dh.joint_name, KDL::Joint::RotZ);
@@ -126,7 +128,7 @@ KDL::Joint dh_params_loader::createJoint(const DHParameters& dh) {
     }
 }
 
-KDL::Frame dh_params_loader::createFrame(const DHParameters& dh) {
+KDL::Frame DHParamsLoader::createFrame(const DHParameters& dh) {
     // 改进DH参数变换顺序: 
     // RotX(alpha(i-1)) * TransX(a(i-1)) * RotZ(theta(i)) * TransZ(d(i))
     
@@ -178,7 +180,7 @@ KDL::Frame dh_params_loader::createFrame(const DHParameters& dh) {
     
 }
 
-void dh_params_loader::printFrame(const KDL::Frame& frame) const {
+void DHParamsLoader::printFrame(const KDL::Frame& frame) const {
     // 1. 位置 (x,y,z)
     log_ptr_->info("Frame Position [m]: x = {:.4f}, y = {:.4f}, z = {:.4f}", frame.p.x(), frame.p.y(), frame.p.z());
 
@@ -195,7 +197,7 @@ void dh_params_loader::printFrame(const KDL::Frame& frame) const {
     log_ptr_->info(ss.str());
 }
 
-void dh_params_loader::printDHParameters() const {
+void DHParamsLoader::printDHParameters() const {
     std::ostringstream ss;
     ss << "\n=== Robot DH Parameters ===" << std::endl;
     ss << "Robot Name: " << robot_name_ << std::endl;
@@ -219,4 +221,6 @@ void dh_params_loader::printDHParameters() const {
     ss << "----------------------------------------------------------------" << std::endl;
 
     log_ptr_->info(ss.str());
+}
+
 }

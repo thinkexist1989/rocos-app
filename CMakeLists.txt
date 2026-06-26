@@ -23,7 +23,7 @@ email: luoyang@sia.cn
 ]]
 
 cmake_minimum_required(VERSION 3.15)
-project(rocos_app VERSION 1.0.5 DESCRIPTION "ROCOS Application Library")
+project(rocos_app VERSION 2.0.0 DESCRIPTION "ROCOS Application Library")
 
 # list(APPEND CMAKE_PREFIX_PATH "/opt/rocos/ecm")
 # add_compile_options(-std=c++11)
@@ -65,7 +65,6 @@ find_package(orocos_kdl REQUIRED)
 ##################
 ##   3rdparty   ##
 ##################
-#add_subdirectory(3rdparty/kdl)
 add_subdirectory(3rdparty/nlopt)
 add_subdirectory(3rdparty/trac_ik)
 add_subdirectory(3rdparty/kdl_parser)
