@@ -113,7 +113,6 @@ add_library(rocos::logger ALIAS logger)
 ######### Library Hardware ###############
 add_library(hardware
         SHARED
-        src/command.cpp
         src/status_word.cpp
         src/control_word.cpp
         src/drive_state.cpp
@@ -136,6 +135,8 @@ add_library(drive
         src/drive_guard.cpp
         src/utilities/utility.hpp
         src/utilities/utility.cpp
+        src/robot.cpp
+        src/robot.hpp
 )
 target_link_libraries(drive
         PUBLIC
@@ -191,10 +192,8 @@ add_library(rocos::dynamics ALIAS dynamics)
 add_library(robot
         SHARED
         src/types.cpp
-        src/robot.cpp
+        src/executor.cpp
         src/velocity_profile.cpp
-#        src/JC_helper_kinematics.cpp
-#        src/JC_helper_dynamics.cpp
         src/dh_params_loader.cpp
         src/robot_http_server.cpp
 )

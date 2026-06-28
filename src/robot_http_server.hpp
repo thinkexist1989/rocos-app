@@ -18,10 +18,8 @@
 
 #pragma once
 
-#include "robot.hpp"
-#include "logger.hpp"
-
 #include <httplib.h>
+
 #include <atomic>
 #include <condition_variable>
 #include <json.hpp>
@@ -32,12 +30,14 @@
 #include <string>
 #include <thread>
 
+#include "executor.hpp"
+#include "logger.hpp"
 
 namespace rocos {
 
 class RobotHttpServer {
 public:
-    explicit RobotHttpServer(Robot* robot);
+    explicit RobotHttpServer(Executor* robot);
     ~RobotHttpServer();
 
     /// Start server (blocking)
@@ -113,7 +113,7 @@ private:
     // ---- Thread Pool ----
     void submitTask(std::function<void()> func);
 
-    Robot* robot_;
+    Executor* robot_;
     std::unique_ptr<httplib::Server> server_;
     std::unique_ptr<std::thread> thread_;
     std::mutex taskMutex_;

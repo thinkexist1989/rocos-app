@@ -1,7 +1,4 @@
-#include "robot.hpp"
-
 #include <gflags/gflags.h>
-
 #include <rocos_app/ethercat/hardware.h>
 #include <rocos_app/ethercat/hardware_sim.h>
 
@@ -9,6 +6,7 @@
 #include <iostream>
 #include <string>
 
+#include "executor.hpp"
 #include "drive.hpp"
 #include "robot_http_server.hpp"
 
@@ -22,7 +20,7 @@ DEFINE_int32(http_port, 8080, "HTTP server listen port");
 
 bool isRuning = true;
 
-rocos::Robot *robot_ptr = nullptr;
+rocos::Executor *robot_ptr = nullptr;
 
 void signalHandler(int signo) {
     if (signo == SIGINT) {
@@ -60,11 +58,11 @@ int main(int argc, char *argv[]) {
     else
         hw = new Hardware(FLAGS_urdf, FLAGS_id); // 真实机械臂
 
-    Robot robot(hw, FLAGS_urdf, FLAGS_base, FLAGS_tip);
+    Executor executor{};
 
-    robot_ptr = &robot;
+    robot_ptr = &executor;
 
-    rocos::RobotHttpServer httpServer(&robot);
+    rocos::RobotHttpServer httpServer(&executor);
 
     //------------------------wait----------------------------------
     httpServer.runAsync(FLAGS_http_host, FLAGS_http_port);

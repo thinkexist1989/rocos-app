@@ -1,7 +1,6 @@
 
 #include "robot_http_server.hpp"
 
-#include "robot.hpp"
 #include <spdlog/spdlog.h>
 
 #include <chrono>
@@ -10,13 +9,15 @@
 #include <kdl_parser/kdl_parser.hpp>
 #include <sstream>
 
+#include "executor.hpp"
+
 namespace rocos {
 
 // ============================================================================
 // Construction / Destruction
 // ============================================================================
 
-RobotHttpServer::RobotHttpServer(Robot* robot)
+RobotHttpServer::RobotHttpServer(Executor* robot)
     : robot_(robot), server_(new httplib::Server()), taskCounter_(0),
       poolShutdown_(false), activeWorkers_(0) {
 

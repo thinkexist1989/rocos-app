@@ -31,7 +31,6 @@
 
 #include "../include/rocos_app/ethercat/mode_of_operation.h"
 #include "../include/rocos_app/ethercat/status_word.h"
-#include "command.hpp"
 #include "control_word.hpp"
 #include "drive_state.hpp"
 

@@ -42,7 +42,7 @@ cd build && ctest
 - **drive** —— 单轴控制：`Drive` 封装一个伺服，`DriveGuard` 运行实时控制循环，另含插补与机器人数学运算。
 - **kinematics** —— 通过 orocos-kdl 实现正/逆运动学（FK/IK），IK 求解器使用 trac_ik 和 nlopt。
 - **dynamics** —— 通过 orocos-kdl 实现刚体动力学。
-- **robot** —— 顶层。`Robot` 类（[include/rocos_app/robot.hpp](src/robot.hpp)）是核心 API：持有 `HardwareInterface*`、运动学链（从 URDF 解析）以及运动指令（MoveJ/MoveL/MoveC/MoveP、拖拽示教、通过 `WorkMode` 实现的阻抗控制）。`JC_helper_*` 提供运动规划辅助（基于 Ruckig 的轨迹生成）,Robot类中包含一个Boost::sml状态机，其状态机流转图在docs/fsm.png中
+- **robot** —— 顶层。`Robot` 类（[include/rocos_app/robot.hpp](src/executor.hpp)）是核心 API：持有 `HardwareInterface*`、运动学链（从 URDF 解析）以及运动指令（MoveJ/MoveL/MoveC/MoveP、拖拽示教、通过 `WorkMode` 实现的阻抗控制）。`JC_helper_*` 提供运动规划辅助（基于 Ruckig 的轨迹生成）,Robot类中包含一个Boost::sml状态机，其状态机流转图在docs/fsm.png中
 - **robot_http_server** —— 提供 HTTP/JSON 接口，`Robot` 类的友元类，传入Robot，实现RESTful API通信。
 
 `rocos_app` 是一个 INTERFACE 目标，打包 hardware+drive+kinematics+robot 供下游使用。`rocosAppMain`（[src/rocosAppMain.cc](src/rocosAppMain.cpp)）是入口：构造硬件（仿真或真实）、一个 `Robot` 和一个 `RobotHttpServer`，然后运行服务器。

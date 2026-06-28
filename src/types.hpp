@@ -22,7 +22,6 @@
 
 #include <Eigen/Core>
 
-
 namespace rocos {
 
 class JntArray;
@@ -115,28 +114,102 @@ class JntArray {
   friend bool operator==(const JntArray& src1, const JntArray& src2);
 };
 
+bool operator==(const JntArray& src1, const JntArray& src2);
+// bool operator!=(const JntArray& src1,const JntArray& src2);
+
+/**
+ * Function to add two joint arrays, all the arguments must
+ * have the same size: A + B = C. This function is
+ * aliasing-safe, A or B can be the same array as C.
+ *
+ * @param src1 A
+ * @param src2 B
+ * @param dest C
+ */
+void Add(const JntArray& src1, const JntArray& src2, JntArray& dest);
+/**
+ * Function to subtract two joint arrays, all the arguments must
+ * have the same size: A - B = C. This function is
+ * aliasing-safe, A or B can be the same array as C.
+ *
+ * @param src1 A
+ * @param src2 B
+ * @param dest C
+ */
+void Subtract(const JntArray& src1, const JntArray& src2, JntArray& dest);
+/**
+ * Function to multiply all the array values with a scalar
+ * factor: A*b=C. This function is aliasing-safe, A can be the
+ * same array as C.
+ *
+ * @param src A
+ * @param factor b
+ * @param dest C
+ */
+void Multiply(const JntArray& src, const double& factor, JntArray& dest);
+/**
+ * Function to divide all the array values with a scalar
+ * factor: A/b=C. This function is aliasing-safe, A can be the
+ * same array as C.
+ *
+ * @param src A
+ * @param factor b
+ * @param dest C
+ */
+void Divide(const JntArray& src, const double& factor, JntArray& dest);
+/**
+ * Function to multiply a KDL::Jacobian with a KDL::JntArray
+ * to get a KDL::Twist, it should not be used to calculate the
+ * forward velocity kinematics, the solver classes are built
+ * for this purpose.
+ * J*q = t
+ *
+ * @param jac J
+ * @param src q
+ * @param dest t
+ * @post dest==Twist::Zero() if 0==src.rows() (ie src is empty)
+ */
+void MultiplyJacobian(const Jacobian& jac, const JntArray& src, Twist& dest);
+/**
+ * Function to set all the values of the array to 0
+ *
+ * @param array
+ */
+void SetToZero(JntArray& array);
+/**
+ * Function to check if two arrays are the same with a
+ *precision of eps
+ *
+ * @param src1
+ * @param src2
+ * @param eps default: epsilon
+ * @return true if each element of src1 is within eps of the same
+ * element in src2, or if both src1 and src2 have no data (ie 0==rows())
+ */
+bool Equal(const JntArray& src1, const JntArray& src2, double eps = EPSILON);
+
 class Vector {
  public:
-  double data[3];
+  double data[3]{};
 
   //! Does not initialise the Vector to zero. use Vector::Zero() or SetToZero
   //! for that
-  inline Vector() { data[0] = data[1] = data[2] = 0.0; }
+  Vector() { data[0] = data[1] = data[2] = 0.0; }
 
   //! Constructs a vector out of the three values x, y and z
-  inline Vector(double x, double y, double z);
+  Vector(double x, double y, double z);
 
   //! Assignment operator. The normal copy by value semantics.
-  inline Vector(const Vector& arg);
+  Vector(const Vector& arg);
 
   //! Assignment operator. The normal copy by value semantics.
-  inline Vector& operator=(const Vector& arg);
+  Vector& operator=(const Vector& arg);
 
   //! Access to elements, range checked when NDEBUG is not set, from 0..2
-  inline double operator()(int index) const;
+  double operator()(int index) const;
 
   //! Access to elements, range checked when NDEBUG is not set, from 0..2
-  inline double& operator()(int index);
+  double& operator()(int index);
 
   //! Equivalent to double operator()(int index) const
   double operator[](int index) const { return this->operator()(index); }
@@ -144,42 +217,42 @@ class Vector {
   //! Equivalent to double& operator()(int index)
   double& operator[](int index) { return this->operator()(index); }
 
-  inline double x() const;
-  inline double y() const;
-  inline double z() const;
-  inline void x(double val);
-  inline void y(double val);
-  inline void z(double val);
+  double x() const;
+  double y() const;
+  double z() const;
+  void x(double val);
+  void y(double val);
+  void z(double val);
 
   //! Reverses the sign of the Vector object itself
-  inline void ReverseSign();
+  void ReverseSign();
 
   //! subtracts a vector from the Vector object itself
-  inline Vector& operator-=(const Vector& arg);
+  Vector& operator-=(const Vector& arg);
 
   //! Adds a vector from the Vector object itself
-  inline Vector& operator+=(const Vector& arg);
+  Vector& operator+=(const Vector& arg);
 
   //! Scalar multiplication is defined
-  inline friend Vector operator*(const Vector& lhs, double rhs);
+  friend Vector operator*(const Vector& lhs, double rhs);
   //! Scalar multiplication is defined
-  inline friend Vector operator*(double lhs, const Vector& rhs);
+  friend Vector operator*(double lhs, const Vector& rhs);
   //! Scalar division is defined
-  inline friend Vector operator/(const Vector& lhs, double rhs);
+  friend Vector operator/(const Vector& lhs, double rhs);
 
-  inline friend Vector operator+(const Vector& lhs, const Vector& rhs);
+  friend Vector operator+(const Vector& lhs, const Vector& rhs);
 
-  inline friend Vector operator-(const Vector& lhs, const Vector& rhs);
-  inline friend Vector operator*(const Vector& lhs, const Vector& rhs);
-  inline friend Vector operator-(const Vector& arg);
-  inline friend double dot(const Vector& lhs, const Vector& rhs);
+  friend Vector operator-(const Vector& lhs, const Vector& rhs);
+  friend Vector operator*(const Vector& lhs, const Vector& rhs);
+  friend Vector operator-(const Vector& arg);
+  friend double dot(const Vector& lhs, const Vector& rhs);
 
   //! To have a uniform operator to put an element to zero, for scalar values
   //! and for objects.
-  inline friend void SetToZero(Vector& v);
+  friend void SetToZero(Vector& v);
 
   //! @return a zero vector
-  inline static Vector Zero();
+  static Vector Zero();
 
   /** Normalizes this vector and returns it norm
    * makes v a unitvector and returns the norm of v.
@@ -194,12 +267,12 @@ class Vector {
   //! do not use operator == because the definition of Equal(.,.) is slightly
   //! different.  It compares whether the 2 arguments are equal in an
   //! eps-interval
-  inline friend bool Equal(const Vector& a, const Vector& b, double eps);
+  friend bool Equal(const Vector& a, const Vector& b, double eps);
 
   //! The literal equality operator==(), also identical.
-  inline friend bool operator==(const Vector& a, const Vector& b);
+  friend bool operator==(const Vector& a, const Vector& b);
   //! The literal inequality operator!=().
-  inline friend bool operator!=(const Vector& a, const Vector& b);
+  friend bool operator!=(const Vector& a, const Vector& b);
 
   friend class Rotation;
   friend class Frame;
@@ -207,69 +280,69 @@ class Vector {
 
 class Rotation {
  public:
-  double data[9];
+  double data[9]{};
 
-  inline Rotation() { *this = Rotation::Identity(); }
-  inline Rotation(double Xx, double Yx, double Zx, double Xy, double Yy,
-                  double Zy, double Xz, double Yz, double Zz);
-  inline Rotation(const Vector& x, const Vector& y, const Vector& z);
+  Rotation() { *this = Rotation::Identity(); }
+  Rotation(double Xx, double Yx, double Zx, double Xy, double Yy, double Zy,
+           double Xz, double Yz, double Zz);
+  Rotation(const Vector& x, const Vector& y, const Vector& z);
 
-  inline Rotation(const Rotation& arg);
+  Rotation(const Rotation& arg);
 
-  inline Rotation& operator=(const Rotation& arg);
+  Rotation& operator=(const Rotation& arg);
 
   //!  Defines a multiplication R*V between a Rotation R and a Vector V.
   //! Complexity : 9M+6A
-  inline Vector operator*(const Vector& v) const;
+  Vector operator*(const Vector& v) const;
 
   //!    Access to elements 0..2,0..2, bounds are checked when NDEBUG is not set
-  inline double& operator()(int i, int j);
+  double& operator()(int i, int j);
 
   //!    Access to elements 0..2,0..2, bounds are checked when NDEBUG is not set
-  inline double operator()(int i, int j) const;
+  double operator()(int i, int j) const;
 
   friend Rotation operator*(const Rotation& lhs, const Rotation& rhs);
 
   //! Sets the value of *this to its inverse.
-  inline void SetInverse();
+  void SetInverse();
 
   //! Gives back the inverse rotation matrix of *this.
-  inline Rotation Inverse() const;
+  [[nodiscard]] Rotation Inverse() const;
 
   //! The same as R.Inverse()*v but more efficient.
-  inline Vector Inverse(const Vector& v) const;
+  [[nodiscard]] Vector Inverse(const Vector& v) const;
 
   //! The same as R.Inverse()*arg but more efficient.
-  inline Wrench Inverse(const Wrench& arg) const;
+  [[nodiscard]] Wrench Inverse(const Wrench& arg) const;
 
   //! The same as R.Inverse()*arg but more efficient.
-  inline Twist Inverse(const Twist& arg) const;
+  [[nodiscard]] Twist Inverse(const Twist& arg) const;
 
   //! Gives back an identity rotaton matrix
-  inline static Rotation Identity();
+  [[nodiscard]] static Rotation Identity();
 
   // = Rotations
   //! The Rot... static functions give the value of the appropriate rotation
   //! matrix back.
-  inline static Rotation RotX(double angle);
+  [[nodiscard]] static Rotation RotX(double angle);
   //! The Rot... static functions give the value of the appropriate rotation
   //! matrix back.
-  inline static Rotation RotY(double angle);
+  [[nodiscard]] static Rotation RotY(double angle);
   //! The Rot... static functions give the value of the appropriate rotation
   //! matrix back.
-  inline static Rotation RotZ(double angle);
+  [[nodiscard]] static Rotation RotZ(double angle);
   //! The DoRot... functions apply a rotation R to *this,such that *this = *this
   //! * Rot.. DoRot... functions are only defined when they can be executed more
   //! efficiently
-  inline void DoRotX(double angle);
+  void DoRotX(double angle);
   //! The DoRot... functions apply a rotation R to *this,such that *this = *this
   //! * Rot.. DoRot... functions are only defined when they can be executed more
   //! efficiently
-  inline void DoRotY(double angle);
+  void DoRotY(double angle);
   //! The DoRot... functions apply a rotation R to *this,such that *this = *this
   //! * Rot.. DoRot... functions are only defined when they can be executed more
   //! efficiently
-  inline void DoRotZ(double angle);
+  void DoRotZ(double angle);
 
   //! Along an arbitrary axes.  It is not necessary to normalize rotvec.
   //! returns identity rotation matrix in the case that the norm of rotvec
@@ -282,7 +355,7 @@ class Rotation {
 
   //! Returns a vector with the direction of the equiv. axis
   //! and its norm is angle
-  Vector GetRot() const;
+  [[nodiscard]] Vector GetRot() const;
 
   /** Returns the rotation angle around the equiv. axis
    * @param axis the rotation axis is returned in this variable
@@ -374,7 +447,7 @@ class Rotation {
    * +/- PI)
    *  	- (angle + 2*k*PI)
    **/
-  inline static Rotation EulerZYX(double Alfa, double Beta, double Gamma) {
+  static Rotation EulerZYX(double Alfa, double Beta, double Gamma) {
     return RPY(Gamma, Beta, Alfa);
   }
 
@@ -399,7 +472,7 @@ class Rotation {
    *
    *  Closely related to RPY-convention.
    **/
-  inline void GetEulerZYX(double& Alfa, double& Beta, double& Gamma) const {
+  void GetEulerZYX(double& Alfa, double& Beta, double& Gamma) const {
     GetRPY(Gamma, Beta, Alfa);
   }
 
@@ -407,39 +480,39 @@ class Rotation {
   //! Complexity : 18M+12A
   //! @see Frame*Twist for a transformation that also transforms
   //! the velocity reference point.
-  inline Twist operator*(const Twist& arg) const;
+  Twist operator*(const Twist& arg) const;
 
   //! Transformation of the base to which the wrench is expressed.
   //! Complexity : 18M+12A
   //! @see Frame*Wrench for a transformation that also transforms
   //! the force reference point.
-  inline Wrench operator*(const Wrench& arg) const;
+  Wrench operator*(const Wrench& arg) const;
 
   //! Access to the underlying unitvectors of the rotation matrix
-  inline Vector UnitX() const { return Vector(data[0], data[3], data[6]); }
+  [[nodiscard]] Vector UnitX() const { return {data[0], data[3], data[6]}; }
 
   //! Access to the underlying unitvectors of the rotation matrix
-  inline void UnitX(const Vector& X) {
+  void UnitX(const Vector& X) {
     data[0] = X(0);
     data[3] = X(1);
     data[6] = X(2);
   }
 
   //! Access to the underlying unitvectors of the rotation matrix
-  inline Vector UnitY() const { return Vector(data[1], data[4], data[7]); }
+  [[nodiscard]] Vector UnitY() const { return {data[1], data[4], data[7]}; }
 
   //! Access to the underlying unitvectors of the rotation matrix
-  inline void UnitY(const Vector& X) {
+  void UnitY(const Vector& X) {
     data[1] = X(0);
     data[4] = X(1);
     data[7] = X(2);
   }
 
   //! Access to the underlying unitvectors of the rotation matrix
-  inline Vector UnitZ() const { return Vector(data[2], data[5], data[8]); }
+  [[nodiscard]] Vector UnitZ() const { return {data[2], data[5], data[8]}; }
 
   //! Access to the underlying unitvectors of the rotation matrix
-  inline void UnitZ(const Vector& X) {
+  void UnitZ(const Vector& X) {
     data[2] = X(0);
     data[5] = X(1);
     data[8] = X(2);
@@ -466,16 +539,16 @@ class Frame {
   Rotation M;  //!< Orientation of the Frame
 
  public:
-  inline Frame(const Rotation& R, const Vector& V);
+  Frame(const Rotation& R, const Vector& V);
 
   //! The rotation matrix defaults to identity
-  explicit inline Frame(const Vector& V);
+  explicit Frame(const Vector& V);
   //! The position matrix defaults to zero
-  explicit inline Frame(const Rotation& R);
+  explicit Frame(const Rotation& R);
 
-  inline Frame() {}
+  Frame() = default;
   //! The copy constructor. Normal copy by value semantics.
-  inline Frame(const Frame& arg);
+  Frame(const Frame& arg);
 
   //! Reads data from an double array
   //\TODO should be formulated as a constructor
@@ -483,31 +556,31 @@ class Frame {
 
   //!  Treats a frame as a 4x4 matrix and returns element i,j
   //!  Access to elements 0..3,0..3, bounds are checked when NDEBUG is not set
-  inline double operator()(int i, int j);
+  double operator()(int i, int j);
 
   //!  Treats a frame as a 4x4 matrix and returns element i,j
   //!    Access to elements 0..3,0..3, bounds are checked when NDEBUG is not set
-  inline double operator()(int i, int j) const;
+  double operator()(int i, int j) const;
 
   // = Inverse
   //! Gives back inverse transformation of a Frame
-  inline Frame Inverse() const;
+  [[nodiscard]] Frame Inverse() const;
 
   //! The same as p2=R.Inverse()*p but more efficient.
-  inline Vector Inverse(const Vector& arg) const;
+  [[nodiscard]] Vector Inverse(const Vector& arg) const;
 
   //! The same as p2=R.Inverse()*p but more efficient.
-  inline Wrench Inverse(const Wrench& arg) const;
+  [[nodiscard]] Wrench Inverse(const Wrench& arg) const;
 
   //! The same as p2=R.Inverse()*p but more efficient.
-  inline Twist Inverse(const Twist& arg) const;
+  [[nodiscard]] Twist Inverse(const Twist& arg) const;
 
   //! Normal copy-by-value semantics.
-  inline Frame& operator=(const Frame& arg);
+  Frame& operator=(const Frame& arg);
 
   //! Transformation of the base to which the vector
   //! is expressed.
-  inline Vector operator*(const Vector& arg) const;
+  Vector operator*(const Vector& arg) const;
 
   //! Transformation of both the force reference point
   //! and of the base to which the wrench is expressed.
@@ -515,7 +588,7 @@ class Frame {
   //! of only the base to which the twist is expressed.
   //!
   //! Complexity : 24M+18A
-  inline Wrench operator*(const Wrench& arg) const;
+  Wrench operator*(const Wrench& arg) const;
 
   //! Transformation of both the velocity reference point
   //! and of the base to which the twist is expressed.
@@ -523,19 +596,19 @@ class Frame {
   //! base to which the twist is expressed.
   //!
   //! Complexity : 24M+18A
-  inline Twist operator*(const Twist& arg) const;
+  Twist operator*(const Twist& arg) const;
 
   //! Composition of two frames.
-  inline friend Frame operator*(const Frame& lhs, const Frame& rhs);
+  friend Frame operator*(const Frame& lhs, const Frame& rhs);
 
   //! @return the identity transformation
   //! Frame(Rotation::Identity(),Vector::Zero()).
-  inline static Frame Identity();
+  static Frame Identity();
 
   //! The twist <t_this> is expressed wrt the current
   //! frame.  This frame is integrated into an updated frame with
   //! <samplefrequency>.  Very simple first order integration rule.
-  inline void Integrate(const Twist& t_this, double frequency);
+  void Integrate(const Twist& t_this, double frequency);
 
   /*
   // DH_Craig1989 : constructs a transformationmatrix
@@ -596,12 +669,12 @@ class Frame {
   //! do not use operator == because the definition of Equal(.,.) is slightly
   //! different.  It compares whether the 2 arguments are equal in an
   //! eps-interval
-  inline friend bool Equal(const Frame& a, const Frame& b, double eps);
+  friend bool Equal(const Frame& a, const Frame& b, double eps);
 
   //! The literal equality operator==(), also identical.
-  inline friend bool operator==(const Frame& a, const Frame& b);
+  friend bool operator==(const Frame& a, const Frame& b);
   //! The literal inequality operator!=().
-  inline friend bool operator!=(const Frame& a, const Frame& b);
+  friend bool operator!=(const Frame& a, const Frame& b);
 };
 
 class Wrench {
@@ -618,42 +691,42 @@ class Wrench {
       : force(_force), torque(_torque) {};
 
   // = Operators
-  inline Wrench& operator-=(const Wrench& arg);
-  inline Wrench& operator+=(const Wrench& arg);
+  Wrench& operator-=(const Wrench& arg);
+  Wrench& operator+=(const Wrench& arg);
 
   //! index-based access to components, first force(0..2), then torque(3..5)
-  inline double& operator()(int i);
+  double& operator()(int i);
 
   //! index-based access to components, first force(0..2), then torque(3..5)
   //! for use with a const Wrench
-  inline double operator()(int i) const;
+  double operator()(int i) const;
 
   double operator[](int index) const { return this->operator()(index); }
 
   double& operator[](int index) { return this->operator()(index); }
 
   //! Scalar multiplication
-  inline friend Wrench operator*(const Wrench& lhs, double rhs);
+  friend Wrench operator*(const Wrench& lhs, double rhs);
   //! Scalar multiplication
-  inline friend Wrench operator*(double lhs, const Wrench& rhs);
+  friend Wrench operator*(double lhs, const Wrench& rhs);
   //! Scalar division
-  inline friend Wrench operator/(const Wrench& lhs, double rhs);
+  friend Wrench operator/(const Wrench& lhs, double rhs);
 
-  inline friend Wrench operator+(const Wrench& lhs, const Wrench& rhs);
-  inline friend Wrench operator-(const Wrench& lhs, const Wrench& rhs);
+  friend Wrench operator+(const Wrench& lhs, const Wrench& rhs);
+  friend Wrench operator-(const Wrench& lhs, const Wrench& rhs);
 
   //! An unary - operator
-  inline friend Wrench operator-(const Wrench& arg);
+  friend Wrench operator-(const Wrench& arg);
 
   //! Sets the Wrench to Zero, to have a uniform function that sets an object or
   //! double to zero.
-  inline friend void SetToZero(Wrench& v);
+  friend void SetToZero(Wrench& v);
 
   //! @return a zero Wrench
-  static inline Wrench Zero();
+  static Wrench Zero();
 
   //! Reverses the sign of the current Wrench
-  inline void ReverseSign();
+  void ReverseSign();
 
   //! Changes the reference point of the wrench.
   //! The vector v_base_AB is expressed in the same base as the twist
@@ -661,17 +734,17 @@ class Wrench {
   //! the new point.
   //!
   //! Complexity : 6M+6A
-  inline Wrench RefPoint(const Vector& v_base_AB) const;
+  [[nodiscard]] Wrench RefPoint(const Vector& v_base_AB) const;
 
   //! do not use operator == because the definition of Equal(.,.) is slightly
   //! different.  It compares whether the 2 arguments are equal in an
   //! eps-interval
-  inline friend bool Equal(const Wrench& a, const Wrench& b, double eps);
+  friend bool Equal(const Wrench& a, const Wrench& b, double eps);
 
   //! The literal equality operator==(), also identical.
-  inline friend bool operator==(const Wrench& a, const Wrench& b);
+  friend bool operator==(const Wrench& a, const Wrench& b);
   //! The literal inequality operator!=().
-  inline friend bool operator!=(const Wrench& a, const Wrench& b);
+  friend bool operator!=(const Wrench& a, const Wrench& b);
 
   friend class Rotation;
   friend class Frame;
@@ -687,40 +760,40 @@ class Twist {
 
   Twist(const Vector& _vel, const Vector& _rot) : vel(_vel), rot(_rot) {};
 
-  inline Twist& operator-=(const Twist& arg);
-  inline Twist& operator+=(const Twist& arg);
+  Twist& operator-=(const Twist& arg);
+  Twist& operator+=(const Twist& arg);
   //! index-based access to components, first vel(0..2), then rot(3..5)
-  inline double& operator()(int i);
+  double& operator()(int i);
 
   //! index-based access to components, first vel(0..2), then rot(3..5)
   //! For use with a const Twist
-  inline double operator()(int i) const;
+  double operator()(int i) const;
 
   double operator[](int index) const { return this->operator()(index); }
 
   double& operator[](int index) { return this->operator()(index); }
 
-  inline friend Twist operator*(const Twist& lhs, double rhs);
-  inline friend Twist operator*(double lhs, const Twist& rhs);
-  inline friend Twist operator/(const Twist& lhs, double rhs);
-  inline friend Twist operator+(const Twist& lhs, const Twist& rhs);
-  inline friend Twist operator-(const Twist& lhs, const Twist& rhs);
-  inline friend Twist operator-(const Twist& arg);
-  inline friend double dot(const Twist& lhs, const Wrench& rhs);
-  inline friend double dot(const Wrench& rhs, const Twist& lhs);
-  inline friend void SetToZero(Twist& v);
+  friend Twist operator*(const Twist& lhs, double rhs);
+  friend Twist operator*(double lhs, const Twist& rhs);
+  friend Twist operator/(const Twist& lhs, double rhs);
+  friend Twist operator+(const Twist& lhs, const Twist& rhs);
+  friend Twist operator-(const Twist& lhs, const Twist& rhs);
+  friend Twist operator-(const Twist& arg);
+  friend double dot(const Twist& lhs, const Wrench& rhs);
+  friend double dot(const Wrench& rhs, const Twist& lhs);
+  friend void SetToZero(Twist& v);
   /// Spatial cross product for 6d motion vectors, beware all of them have to be
   /// expressed in the same reference frame/point
-  inline friend Twist operator*(const Twist& lhs, const Twist& rhs);
+  friend Twist operator*(const Twist& lhs, const Twist& rhs);
   /// Spatial cross product for 6d force vectors, beware all of them have to be
   /// expressed in the same reference frame/point
-  inline friend Wrench operator*(const Twist& lhs, const Wrench& rhs);
+  friend Wrench operator*(const Twist& lhs, const Wrench& rhs);
 
   //! @return a zero Twist : Twist(Vector::Zero(),Vector::Zero())
-  static inline Twist Zero();
+  static Twist Zero();
 
   //! Reverses the sign of the twist
-  inline void ReverseSign();
+  void ReverseSign();
 
   //! Changes the reference point of the twist.
   //! The vector v_base_AB is expressed in the same base as the twist
@@ -728,17 +801,17 @@ class Twist {
   //! the new point.
   //!
   //! Complexity : 6M+6A
-  inline Twist RefPoint(const Vector& v_base_AB) const;
+  [[nodiscard]] Twist RefPoint(const Vector& v_base_AB) const;
 
   //! do not use operator == because the definition of Equal(.,.) is slightly
   //! different.  It compares whether the 2 arguments are equal in an
   //! eps-interval
-  inline friend bool Equal(const Twist& a, const Twist& b, double eps);
+  friend bool Equal(const Twist& a, const Twist& b, double eps);
 
   //! The literal equality operator==(), also identical.
-  inline friend bool operator==(const Twist& a, const Twist& b);
+  friend bool operator==(const Twist& a, const Twist& b);
   //! The literal inequality operator!=().
-  inline friend bool operator!=(const Twist& a, const Twist& b);
+  friend bool operator!=(const Twist& a, const Twist& b);
 
   // = Friends
   friend class Rotation;
@@ -768,8 +841,8 @@ class Jacobian {
 
   double operator()(unsigned int i, unsigned int j) const;
   double& operator()(unsigned int i, unsigned int j);
-  unsigned int rows() const;
-  unsigned int columns() const;
+  [[nodiscard]] unsigned int rows() const;
+  [[nodiscard]] unsigned int columns() const;
 
   friend void SetToZero(Jacobian& jac);
 
@@ -780,7 +853,7 @@ class Jacobian {
   friend bool changeRefFrame(const Jacobian& src1, const Frame& frame,
                              Jacobian& dest);
 
-  Twist getColumn(unsigned int i) const;
+  [[nodiscard]] Twist getColumn(unsigned int i) const;
   void setColumn(unsigned int i, const Twist& t);
 
   void changeRefPoint(const Vector& base_AB);
