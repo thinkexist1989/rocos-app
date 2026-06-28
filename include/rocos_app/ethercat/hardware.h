@@ -20,9 +20,9 @@
 #ifndef ROCOS_APP_HARDWARE_H
 #define ROCOS_APP_HARDWARE_H
 
-#include "command.h"
-#include "control_word.h"
-#include "drive_state.h"
+#include "../../../src/command.hpp"
+#include "../../../src/control_word.hpp"
+#include "../../../src/drive_state.hpp"
 #include "mode_of_operation.h"
 #include "status_word.h"
 

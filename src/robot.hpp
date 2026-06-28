@@ -1,4 +1,4 @@
-// Copyright 2021, Yang Luo"
+// Copyright 2026, Yang Luo"
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU General Public License as published by
 // the Free Software Foundation, either version 3 of the License, or
@@ -17,24 +17,14 @@
 // Shenyang Institute of Automation, Chinese Academy of Sciences.
 // email: luoyang@sia.cn
 
-#ifndef ROCOS_APP_ROBOT_H
-#define ROCOS_APP_ROBOT_H
+#pragma once
 
-#include <rocos_app/motion/motion_executor.h>
-#include <rocos_app/motion/move_j_submission.h>
-#include <rocos_app/motion/position_controller.h>
-#include <rocos_app/motion/robot_motion_context.h>
-#include <yaml-cpp/yaml.h>
 
-#include <Eigen/Geometry>
-#include <Eigen/QR>
-#include <Eigen/StdVector>  //!< Eigen官网说明 https://eigen.tuxfamily.org/dox/group__TopicStlContainers.html
-#include <vector>
+#include "types.hpp"
 
 #include "dh_params_loader.hpp"
 #include "drive.hpp"
 #include "dynamics.hpp"
-#include "gripper.hpp"
 #include "hardware_interface.hpp"
 #include "kinematics.hpp"
 #include "logger.hpp"
@@ -116,11 +106,11 @@ class Robot {
 
   inline void setJointTorque(int id, double tor) { }
 
-  inline Frame getFlange() { }
+  inline Frame getFlange() { return Frame();}
 
-  Frame getTool() { }
+  Frame getTool() { return Frame(); }
 
-  Frame getObject() { }
+  Frame getObject() { return Frame(); }
 
  public:
   int JntToCart(const JntArray &q_in, Frame &p_out) {
@@ -136,17 +126,17 @@ class Robot {
  protected:
   HardwareInterface *hw_interface_{nullptr};
 
-  std::unique_ptr<motion::MotionSafetyGuard> motion_safety_guard_{nullptr};
+  // std::unique_ptr<motion::MotionSafetyGuard> motion_safety_guard_{nullptr};
 
-  std::unique_ptr<motion::PositionController> motion_position_controller_{
-      nullptr};
-  std::unique_ptr<motion::RobotMotionContext<Robot>> motion_context_{nullptr};
-  std::unique_ptr<motion::MotionExecutor> motion_executor_{nullptr};
-  motion::ModelProvider model_provider_;
+  // std::unique_ptr<motion::PositionController> motion_position_controller_{nullptr};
+  // std::unique_ptr<motion::RobotMotionContext<Robot>> motion_context_{nullptr};
+  // std::unique_ptr<motion::MotionExecutor> motion_executor_{nullptr};
+  // motion::ModelProvider model_provider_;
 
 
   std::string cali_yaml_path_ = "/opt/rocos/yaml/calibration.yaml";
-  YAML::Node yaml_node;
+
+  // YAML::Node yaml_node;
 
 
  public:
@@ -189,5 +179,3 @@ class Robot {
 };
 
 }  // namespace rocos
-
-#endif  // ROCOS_APP_ROBOT_H

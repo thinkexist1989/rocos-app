@@ -20,7 +20,7 @@
  * Modified: Yang Luo, luoyang@sia.cn
  */
 
-#include <rocos_app/ethercat/command.h>
+#include "command.hpp"
 
 #include <iomanip>
 

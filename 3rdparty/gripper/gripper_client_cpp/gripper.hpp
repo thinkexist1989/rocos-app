@@ -5,10 +5,8 @@
 #include <arpa/inet.h>
 #include <errno.h>
 #include <netinet/in.h>
-#include <plog/Appenders/ColorConsoleAppender.h>
 #include <plog/Initializers/RollingFileInitializer.h>
 #include <stdio.h>
-#include <stdlib.h>
 #include <string.h>
 #include <string>
 #include <sys/socket.h>

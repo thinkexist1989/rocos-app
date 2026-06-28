@@ -253,10 +253,10 @@ namespace rocos {
 
     Robot::~Robot() {
 
-        motion_executor_.reset();
-        motion_context_.reset();
-        motion_position_controller_.reset();
-        motion_safety_guard_.reset();
+        // motion_executor_.reset();
+        // motion_context_.reset();
+        // motion_position_controller_.reset();
+        // motion_safety_guard_.reset();
 
         // Delete logger pointer
         if (log_ptr_) {

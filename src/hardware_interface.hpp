@@ -29,11 +29,11 @@
 
 #include <string>
 
-#include "../include/rocos_app/ethercat/command.h"
-#include "../include/rocos_app/ethercat/control_word.h"
-#include "../include/rocos_app/ethercat/drive_state.h"
 #include "../include/rocos_app/ethercat/mode_of_operation.h"
 #include "../include/rocos_app/ethercat/status_word.h"
+#include "command.hpp"
+#include "control_word.hpp"
+#include "drive_state.hpp"
 
 // #include <boost/chrono.hpp>
 

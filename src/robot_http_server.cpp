@@ -324,17 +324,17 @@ void RobotHttpServer::handleGetRobotState(const httplib::Request& req, httplib::
     }
     data["joint_states"] = joint_states;
 
-    // Flange pose
-    KDL::Frame flange = robot_->getFlange();
-    data["flange"] = frameToJson(flange);
-
-    // Tool pose
-    KDL::Frame tool = robot_->getTool();
-    data["tool"] = frameToJson(tool);
-
-    // Object pose
-    KDL::Frame object = robot_->getObject();
-    data["object"] = frameToJson(object);
+    // // Flange pose
+    // KDL::Frame flange = robot_->getFlange();
+    // data["flange"] = frameToJson(flange);
+    //
+    // // Tool pose
+    // KDL::Frame tool = robot_->getTool();
+    // data["tool"] = frameToJson(tool);
+    //
+    // // Object pose
+    // KDL::Frame object = robot_->getObject();
+    // data["object"] = frameToJson(object);
 
     // Hardware state
     nlohmann::json hw;

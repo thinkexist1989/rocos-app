@@ -70,7 +70,7 @@ add_subdirectory(3rdparty/trac_ik)
 add_subdirectory(3rdparty/kdl_parser)
 add_subdirectory(3rdparty/ruckig)
 add_subdirectory(3rdparty/plog)
-add_subdirectory(3rdparty/gripper)
+#add_subdirectory(3rdparty/gripper)
 add_subdirectory(3rdparty/gflags)
 add_subdirectory(3rdparty/spdlog)
 add_subdirectory(3rdparty/sml)
@@ -134,7 +134,9 @@ add_library(drive
         SHARED
         src/drive.cpp
         src/drive_guard.cpp
-        )
+        src/utilities/utility.hpp
+        src/utilities/utility.cpp
+)
 target_link_libraries(drive
         PUBLIC
         $<BUILD_INTERFACE:rocos::hardware>
@@ -188,6 +190,7 @@ add_library(rocos::dynamics ALIAS dynamics)
 ########## Library robot #################
 add_library(robot
         SHARED
+        src/types.cpp
         src/robot.cpp
         src/velocity_profile.cpp
 #        src/JC_helper_kinematics.cpp
@@ -211,7 +214,7 @@ target_link_libraries(robot
         $<BUILD_INTERFACE:rocos::kinematics>
         $<BUILD_INTERFACE:rocos::dynamics>
         $<BUILD_INTERFACE:plog::plog>
-        $<BUILD_INTERFACE:JC_helper::gripper>
+#        $<BUILD_INTERFACE:JC_helper::gripper>
         $<BUILD_INTERFACE:ruckig::ruckig>
         OpenSSL::SSL
         sml::sml

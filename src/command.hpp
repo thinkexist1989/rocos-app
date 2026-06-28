@@ -27,7 +27,7 @@
 #include <mutex>
 #include <string>
 
-#include "mode_of_operation.h"
+#include "../include/rocos_app/ethercat/mode_of_operation.h"
 
 namespace rocos {
 

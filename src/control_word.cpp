@@ -20,7 +20,7 @@
  * Modified: Yang Luo, luoyang@sia.cn
  */
 
-#include <rocos_app/ethercat/control_word.h>
+#include "control_word.hpp"
 
 #include <iomanip>
 
