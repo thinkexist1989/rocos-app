@@ -54,9 +54,7 @@ set(${PROJECT_NAME}_INSTALL_CMAKEDIR ${CMAKE_INSTALL_LIBDIR}/cmake/${PROJECT_NAM
 find_package(Boost REQUIRED COMPONENTS date_time filesystem system chrono thread)
 find_package(yaml-cpp REQUIRED)
 find_package(Threads REQUIRED)
-#find_package(Qt5 REQUIRED COMPONENTS Core)
 find_package(Eigen3 REQUIRED)
-find_package(OpenSSL REQUIRED)
 
 # find_package(rocos_ecm REQUIRED)
 
@@ -103,6 +101,7 @@ set(DEP_LIBS
         Boost::chrono
         Boost::thread
         yaml-cpp
+        Eigen3::Eigen
         )
 
 
@@ -123,8 +122,6 @@ add_library(hardware
 target_link_libraries(hardware
         PUBLIC
         ${DEP_LIBS}
-        # Boost::thread
-        # rocos::ecat_config
         )
 add_library(rocos::hardware ALIAS hardware)
 
@@ -133,58 +130,12 @@ add_library(drive
         SHARED
         src/drive.cpp
         src/drive_guard.cpp
-        src/utilities/utility.cpp
-        src/executor.cpp
 )
 target_link_libraries(drive
         PUBLIC
-        Eigen3::Eigen
         $<BUILD_INTERFACE:rocos::hardware>
         )
 add_library(rocos::drive ALIAS drive)
-
-########## Library kinematics #################
-add_library(kinematics
-        SHARED
-        src/kinematics.cpp
-        
-        )
-target_include_directories(kinematics
-        PUBLIC
-        $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>
-        $<INSTALL_INTERFACE:include>
-        )
-target_link_libraries(kinematics
-        PUBLIC
-        Eigen3::Eigen
-        orocos-kdl
-        $<BUILD_INTERFACE:nlopt>
-        $<BUILD_INTERFACE:trac_ik>
-        $<BUILD_INTERFACE:rocos::logger>
-)
-add_library(rocos::kinematics ALIAS kinematics)
-
-########## Library dynamics #################
-add_library(dynamics
-        SHARED
-        src/dynamics.cpp
-
-)
-target_include_directories(dynamics
-        PUBLIC
-        $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>
-        $<INSTALL_INTERFACE:include>
-)
-target_link_libraries(dynamics
-        PUBLIC
-        Eigen3::Eigen
-        orocos-kdl
-        $<BUILD_INTERFACE:rocos::logger>
-
-)
-add_library(rocos::dynamics ALIAS dynamics)
-
-
 
 
 ########## Library robot #################
@@ -193,7 +144,6 @@ add_library(robot
         src/types.cpp
         src/robot.cpp
         src/velocity_profile.cpp
-        src/dh_params_loader.cpp
         src/robot_http_server.cpp
 )
 target_include_directories(robot
@@ -209,13 +159,9 @@ target_link_libraries(robot
         $<BUILD_INTERFACE:rocos::logger>
         $<BUILD_INTERFACE:rocos::hardware>
         $<BUILD_INTERFACE:rocos::drive>
-        $<BUILD_INTERFACE:rocos::kinematics>
-        $<BUILD_INTERFACE:rocos::dynamics>
-        $<BUILD_INTERFACE:plog::plog>
-#        $<BUILD_INTERFACE:JC_helper::gripper>
         $<BUILD_INTERFACE:ruckig::ruckig>
-        OpenSSL::SSL
         sml::sml
+        orocos-kdl
         PRIVATE
         spdlog::spdlog_header_only
         )
@@ -228,7 +174,6 @@ target_link_libraries(rocos_app
         INTERFACE
         hardware
         drive
-        kinematics
         robot
         )
 add_library(rocos::rocos_app ALIAS rocos_app)
@@ -244,7 +189,6 @@ target_link_libraries(rocosAppMain
         PRIVATE
         hardware
         drive
-        kinematics
         robot
         gflags::gflags
         pthread
@@ -271,7 +215,7 @@ install(DIRECTORY include/rocos_app
         DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}
         )
 
-install(TARGETS hardware drive kinematics robot rocos_app rocosAppMain
+install(TARGETS hardware drive robot rocos_app rocosAppMain
         EXPORT rocos_app-targets
         LIBRARY DESTINATION ${CMAKE_INSTALL_LIBDIR}  # 动态库安装路径
         ARCHIVE DESTINATION ${CMAKE_INSTALL_LIBDIR}  # 静态库安装路径
@@ -320,7 +264,7 @@ target_link_libraries(unit_test
         PRIVATE
         hardware
         drive
-        kinematics
+#        kinematics
         robot
         )
 add_test(NAME unit_test COMMAND unit_test)

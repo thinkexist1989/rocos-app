@@ -20,10 +20,8 @@
 
 #include "types.hpp"
 
-#include "dh_params_loader.hpp"
-#include "dynamics.hpp"
+// #include "dh_params_loader.hpp"
 #include "hardware_interface.hpp"
-#include "kinematics.hpp"
 #include "logger.hpp"
 
 namespace rocos {
@@ -107,10 +105,10 @@ class Robot {
 
  public:
   int JntToCart(const JntArray &q_in, Frame &p_out) {
-    return kinematics_.JntToCart(q_in, p_out);
+    // return kinematics_.JntToCart(q_in, p_out);
   }
   int CartToJnt(const JntArray &q_init, const Frame &p_in, JntArray &q_out) {
-    return kinematics_.CartToJnt(q_init, p_in, q_out);
+    // return kinematics_.CartToJnt(q_init, p_in, q_out);
   }
 
  private:
@@ -119,22 +117,12 @@ class Robot {
  protected:
   HardwareInterface *hw_interface_{nullptr};
 
-  // std::unique_ptr<motion::MotionSafetyGuard> motion_safety_guard_{nullptr};
-
-  // std::unique_ptr<motion::PositionController> motion_position_controller_{nullptr};
-  // std::unique_ptr<motion::RobotMotionContext<Robot>> motion_context_{nullptr};
-  // std::unique_ptr<motion::MotionExecutor> motion_executor_{nullptr};
-  // motion::ModelProvider model_provider_;
-
 
   std::string cali_yaml_path_ = "/opt/rocos/yaml/calibration.yaml";
 
-  // YAML::Node yaml_node;
 
 
  public:
-  Kinematics kinematics_;
-  Dynamics dynamics_;
 
   friend class RobotHttpServer;  // 允许 Server 直接访问 Robot 的私有/保护成员
                                  // TODO: ================================
@@ -142,7 +130,7 @@ class Robot {
  private:
 
   std::mutex mtx;  // 互斥锁
-  DHParamsLoader loader;
+  // DHParamsLoader loader;
 
   //// 机器人状态机封装
   struct Impl;

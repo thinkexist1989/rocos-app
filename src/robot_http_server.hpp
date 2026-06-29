@@ -23,6 +23,7 @@
 #include <atomic>
 #include <condition_variable>
 #include <json.hpp>
+#include <kdl/frames.hpp>
 #include <map>
 #include <memory>
 #include <mutex>
