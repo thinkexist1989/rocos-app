@@ -19,6 +19,7 @@
 #pragma once
 
 #include "types.hpp"
+#include "result.hpp"
 
 // #include "dh_params_loader.hpp"
 #include "hardware_interface.hpp"
@@ -41,7 +42,7 @@ class Robot {
 
   ~Robot();
 
-  std::string GetRobotState() const;
+  [[nodiscard]] std::string GetRobotState() const;
 
   int Start();
 
@@ -59,7 +60,39 @@ class Robot {
 
   bool IsDisabled();
 
-  bool isMotionRunning() const;
+  bool IsMotionRunning() const;
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
   void waitControlCycle();
 
@@ -103,23 +136,9 @@ class Robot {
 
   Frame getObject() { return Frame(); }
 
- public:
-  int JntToCart(const JntArray &q_in, Frame &p_out) {
-    // return kinematics_.JntToCart(q_in, p_out);
-  }
-  int CartToJnt(const JntArray &q_init, const Frame &p_in, JntArray &q_out) {
-    // return kinematics_.CartToJnt(q_init, p_in, q_out);
-  }
-
- private:
-  void initializeMotionExecutor();
 
  protected:
   HardwareInterface *hw_interface_{nullptr};
-
-
-  std::string cali_yaml_path_ = "/opt/rocos/yaml/calibration.yaml";
-
 
 
  public:
@@ -129,8 +148,7 @@ class Robot {
 
  private:
 
-  std::mutex mtx;  // 互斥锁
-  // DHParamsLoader loader;
+  std::mutex mtx_;  // 互斥锁
 
   //// 机器人状态机封装
   struct Impl;
@@ -157,6 +175,8 @@ class Robot {
   void on_fsm_continue();
 
   void on_fsm_identify();
+
+  void on_fsm_servo();
 };
 
 }  // namespace rocos

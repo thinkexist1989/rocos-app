@@ -141,7 +141,6 @@ add_library(rocos::drive ALIAS drive)
 ########## Library robot #################
 add_library(robot
         SHARED
-        src/types.cpp
         src/robot.cpp
         src/velocity_profile.cpp
         src/robot_http_server.cpp
