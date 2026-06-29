@@ -58,7 +58,7 @@ public:
                 !isFinite(params_.max_jerk[i])) {
                 return MotionResult::failWithApiCode(
                     MotionResultCode::InvalidNumber,
-                    static_cast<int>(ErrorCode::ParameterNanOrInf),
+                    static_cast<int>(Result::ParameterNanOrInf),
                     "MoveJ parameter contains NaN or Inf");
             }
             if (params_.max_velocity[i] <= 0.0 ||

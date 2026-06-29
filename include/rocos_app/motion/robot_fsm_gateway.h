@@ -58,7 +58,7 @@ private:
         }
         return MotionResult::failWithApiCode(
             MotionResultCode::InvalidState,
-            static_cast<int>(ErrorCode::NotAllAtOpState),
+            static_cast<int>(Result::NotAllAtOpState),
             std::move(message));
     }
 

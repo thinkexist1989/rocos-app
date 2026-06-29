@@ -2,7 +2,7 @@
 
 namespace rocos {
 
-enum class ErrorCode : int {
+enum class Result : int {
   NoError = 0,
 
   // API套接字错误
@@ -122,6 +122,25 @@ enum class ErrorCode : int {
   DumpLogFailed = -3003,
   ResetDhFailed = -3004,
   IllegalParameter = -3006,
+
 };
+
+
+inline bool operator<(const Result& lhs, const Result& rhs) {
+  return static_cast<int>(lhs) < static_cast<int>(rhs);
+}
+
+inline bool operator==(const Result& lhs, const Result& rhs) {
+  return static_cast<int>(lhs) == static_cast<int>(rhs);
+}
+
+inline bool operator<(const Result& lhs, const int& rhs) {
+  return static_cast<int>(lhs) < rhs;
+}
+
+inline bool operator==(const Result& lhs, const int& rhs) {
+  return static_cast<int>(lhs) == rhs;
+}
+
 
 }

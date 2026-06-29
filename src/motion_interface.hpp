@@ -19,6 +19,7 @@
 #pragma once
 
 #include "types.hpp"
+#include "result.hpp"
 
 #include <variant>
 
@@ -30,7 +31,7 @@ class MotionInterface {
  public:
   virtual ~MotionInterface() = default;
 
-  virtual int UpdateRef(Ref& ref_out) = 0;
+  virtual Result UpdateRef(Ref& ref_out) = 0;
 };
 
 }  // namespace rocos

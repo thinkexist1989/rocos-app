@@ -18,25 +18,27 @@
 // email: luoyang@sia.cn
 #pragma once
 
+#include "controller_interface.hpp"
+#include "hardware_interface.hpp"
+#include "motion_interface.hpp"
+#include "result.hpp"
+#include "types.hpp"
+
 namespace rocos {
 
 class Executor {
  public:
+  explicit Executor(MotionInterface* motion, ControllerInterface* controller,
+                    HardwareInterface* hardware);
 
+  virtual ~Executor();
 
+  Result Update();
 
-  // explicit Robot(
-  //   HardwareInterface *hw, const std::string &urdf_file_path = "robot.urdf",
-  //   const std::string &base_link = "base_link",
-  //   const std::string &tip =
-  //       "link7");  // std::string yaml_path = "joint_impedance_control.yaml"
-
-
-
-
-
-
-
+ private:
+  MotionInterface* motion_;
+  ControllerInterface* controller_;
+  HardwareInterface* hardware_;
 };
 
 }  // namespace rocos

@@ -26,7 +26,7 @@ public:
         if (!hasReferenceSpace(reference.space, ReferenceSpace::Joint)) {
             return MotionResult::failWithApiCode(
                 MotionResultCode::Unsupported,
-                static_cast<int>(ErrorCode::MoveUnknown),
+                static_cast<int>(Result::MoveUnknown),
                 "position controller requires a joint reference");
         }
 
@@ -41,7 +41,7 @@ public:
             !allFinite(joint.acceleration)) {
             return MotionResult::failWithApiCode(
                 MotionResultCode::InvalidNumber,
-                static_cast<int>(ErrorCode::ParameterNanOrInf),
+                static_cast<int>(Result::ParameterNanOrInf),
                 "joint reference contains NaN or Inf");
         }
 

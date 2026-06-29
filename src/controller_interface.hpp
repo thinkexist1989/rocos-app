@@ -19,6 +19,8 @@
 #pragma once
 
 #include "types.hpp"
+#include "result.hpp"
+
 #include "motion_interface.hpp"
 
 namespace rocos {
@@ -27,7 +29,7 @@ class ControllerInterface {
  public:
   virtual ~ControllerInterface() = default;
 
-  virtual int UpdateCmd(const Ref& ref_in, JntArray& q_cmd) = 0;
+  virtual Result UpdateCmd(const Ref& ref_in, JntArray& q_cmd) = 0;
 };
 
 }  // namespace rocos

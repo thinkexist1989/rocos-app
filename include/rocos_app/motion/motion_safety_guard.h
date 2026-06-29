@@ -58,7 +58,7 @@ struct SafetyCheckResult {
     }
 
     static SafetyCheckResult fail(SafetyViolationCode code,
-                                  ErrorCode api_code,
+                                  Result api_code,
                                   std::string message) {
         return SafetyCheckResult{false,
                                  code,
@@ -78,14 +78,14 @@ public:
         if (!actual.enabled) {
             return SafetyCheckResult::fail(
                 SafetyViolationCode::NotEnabled,
-                ErrorCode::NotAllAtOpState,
+                Result::NotAllAtOpState,
                 "robot is not enabled");
         }
 
         if (dt <= 0.0 || !std::isfinite(dt)) {
             return SafetyCheckResult::fail(
                 SafetyViolationCode::InvalidNumber,
-                ErrorCode::ParameterNanOrInf,
+                Result::ParameterNanOrInf,
                 "control period is invalid");
         }
 
@@ -143,7 +143,7 @@ private:
             limits_.max_following_error.size() != n) {
             return SafetyCheckResult::fail(
                 SafetyViolationCode::InvalidNumber,
-                ErrorCode::IllegalParameter,
+                Result::IllegalParameter,
                 "position command dimensions do not match safety limits");
         }
         return SafetyCheckResult::success();
@@ -154,7 +154,7 @@ private:
             if (!std::isfinite(value)) {
                 return SafetyCheckResult::fail(
                     SafetyViolationCode::InvalidNumber,
-                    ErrorCode::ParameterNanOrInf,
+                    Result::ParameterNanOrInf,
                     "position command contains NaN or Inf");
             }
         }
@@ -168,7 +168,7 @@ private:
                 target_position[i] > limits_.max_position[i]) {
                 return SafetyCheckResult::fail(
                     SafetyViolationCode::PositionLimitExceeded,
-                    ErrorCode::PosLimit,
+                    Result::PosLimit,
                     "position command exceeds joint limits");
             }
         }
@@ -187,7 +187,7 @@ private:
             target_position.size()) {
             return SafetyCheckResult::fail(
                 SafetyViolationCode::InvalidNumber,
-                ErrorCode::IllegalParameter,
+                Result::IllegalParameter,
                 "accepted command dimensions do not match current command");
         }
 
@@ -199,7 +199,7 @@ private:
             if (velocity > limits_.max_command_velocity[i]) {
                 return SafetyCheckResult::fail(
                     SafetyViolationCode::CommandVelocityLimitExceeded,
-                    ErrorCode::SpeedLimit,
+                    Result::SpeedLimit,
                     "position command velocity exceeds limit");
             }
         }
@@ -214,7 +214,7 @@ private:
                 limits_.max_following_error[i]) {
                 return SafetyCheckResult::fail(
                     SafetyViolationCode::FollowingErrorExceeded,
-                    ErrorCode::NotFollowPositionCmd,
+                    Result::NotFollowPositionCmd,
                     "position following error exceeds limit");
             }
         }

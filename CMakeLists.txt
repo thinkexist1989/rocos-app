@@ -133,13 +133,12 @@ add_library(drive
         SHARED
         src/drive.cpp
         src/drive_guard.cpp
-        src/utilities/utility.hpp
         src/utilities/utility.cpp
         src/executor.cpp
-        src/executor.hpp
 )
 target_link_libraries(drive
         PUBLIC
+        Eigen3::Eigen
         $<BUILD_INTERFACE:rocos::hardware>
         )
 add_library(rocos::drive ALIAS drive)

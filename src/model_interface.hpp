@@ -19,6 +19,7 @@
 #pragma once
 
 #include "types.hpp"
+#include "result.hpp"
 
 namespace rocos {
 
@@ -29,11 +30,11 @@ class ModelInterface {
  public:
   virtual ~ModelInterface() = default;
 
-  virtual int ForwardKinematics(const JntArray& q_in, Frame& p_out);
-  virtual int InverseKinematics(const JntArray& q_in, const Frame& p_in, JntArray& q_out) = 0;
+  virtual Result ForwardKinematics(const JntArray& q_in, Frame& p_out);
+  virtual Result InverseKinematics(const JntArray& q_in, const Frame& p_in, JntArray& q_out) = 0;
 
-  virtual int ForwardDynamics(const JntArray &q, const JntArray &q_dot, const JntArray &torques, const Wrenches& f_ext,JntArray &q_dotdot) = 0;
-  virtual int InverseDynamics(const JntArray &q, const JntArray &q_dot, const JntArray &q_dotdot, const Wrenches& f_ext,JntArray &torques) = 0;
+  virtual Result ForwardDynamics(const JntArray &q, const JntArray &q_dot, const JntArray &torques, const Wrenches& f_ext,JntArray &q_dotdot) = 0;
+  virtual Result InverseDynamics(const JntArray &q, const JntArray &q_dot, const JntArray &q_dotdot, const Wrenches& f_ext,JntArray &torques) = 0;
 
 };
 }  // namespace rocos

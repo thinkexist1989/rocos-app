@@ -77,7 +77,7 @@ private:
     static MotionResult dimensionError(std::string message) {
         return MotionResult::failWithApiCode(
             MotionResultCode::InvalidCommand,
-            static_cast<int>(ErrorCode::UnmatchedJointsNumber),
+            static_cast<int>(Result::UnmatchedJointsNumber),
             std::move(message));
     }
 
