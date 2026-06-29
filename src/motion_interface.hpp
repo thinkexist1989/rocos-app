@@ -18,11 +18,19 @@
 // email: luoyang@sia.cn
 #pragma once
 
+#include "types.hpp"
+
+#include <variant>
+
 namespace rocos {
+
+typedef std::variant<JntArray, Frame> Ref;
 
 class MotionInterface {
  public:
   virtual ~MotionInterface() = default;
+
+  virtual int UpdateRef(Ref& ref_out) = 0;
 };
 
 }  // namespace rocos

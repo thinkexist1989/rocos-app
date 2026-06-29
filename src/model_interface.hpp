@@ -18,9 +18,22 @@
 // email: luoyang@sia.cn
 #pragma once
 
+#include "types.hpp"
+
 namespace rocos {
+
+typedef std::vector<Wrench> Wrenches;
+
+
 class ModelInterface {
  public:
   virtual ~ModelInterface() = default;
+
+  virtual int ForwardKinematics(const JntArray& q_in, Frame& p_out);
+  virtual int InverseKinematics(const JntArray& q_in, const Frame& p_in, JntArray& q_out) = 0;
+
+  virtual int ForwardDynamics(const JntArray &q, const JntArray &q_dot, const JntArray &torques, const Wrenches& f_ext,JntArray &q_dotdot) = 0;
+  virtual int InverseDynamics(const JntArray &q, const JntArray &q_dot, const JntArray &q_dotdot, const Wrenches& f_ext,JntArray &torques) = 0;
+
 };
 }  // namespace rocos

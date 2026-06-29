@@ -30,14 +30,14 @@
 #include <string>
 #include <thread>
 
-#include "executor.hpp"
 #include "logger.hpp"
+#include "robot.hpp"
 
 namespace rocos {
 
 class RobotHttpServer {
 public:
-    explicit RobotHttpServer(Executor* robot);
+    explicit RobotHttpServer(Robot* robot);
     ~RobotHttpServer();
 
     /// Start server (blocking)
@@ -113,7 +113,7 @@ private:
     // ---- Thread Pool ----
     void submitTask(std::function<void()> func);
 
-    Executor* robot_;
+    Robot* robot_;
     std::unique_ptr<httplib::Server> server_;
     std::unique_ptr<std::thread> thread_;
     std::mutex taskMutex_;

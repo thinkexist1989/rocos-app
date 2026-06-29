@@ -9,7 +9,7 @@
 #include <kdl_parser/kdl_parser.hpp>
 #include <sstream>
 
-#include "executor.hpp"
+#include "robot.hpp"
 
 namespace rocos {
 
@@ -17,7 +17,7 @@ namespace rocos {
 // Construction / Destruction
 // ============================================================================
 
-RobotHttpServer::RobotHttpServer(Executor* robot)
+RobotHttpServer::RobotHttpServer(Robot* robot)
     : robot_(robot), server_(new httplib::Server()), taskCounter_(0),
       poolShutdown_(false), activeWorkers_(0) {
 

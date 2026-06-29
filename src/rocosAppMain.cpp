@@ -6,8 +6,8 @@
 #include <iostream>
 #include <string>
 
-#include "executor.hpp"
 #include "drive.hpp"
+#include "robot.hpp"
 #include "robot_http_server.hpp"
 
 DEFINE_string(urdf, "robot.urdf", "Urdf file path");
@@ -20,7 +20,7 @@ DEFINE_int32(http_port, 8080, "HTTP server listen port");
 
 bool isRuning = true;
 
-rocos::Executor *robot_ptr = nullptr;
+rocos::Robot *robot_ptr = nullptr;
 
 void signalHandler(int signo) {
     if (signo == SIGINT) {
@@ -58,7 +58,7 @@ int main(int argc, char *argv[]) {
     else
         hw = new Hardware(FLAGS_urdf, FLAGS_id); // 真实机械臂
 
-    Executor executor{};
+    Robot executor{};
 
     robot_ptr = &executor;
 

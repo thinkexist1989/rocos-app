@@ -18,11 +18,16 @@
 // email: luoyang@sia.cn
 #pragma once
 
+#include "types.hpp"
+#include "motion_interface.hpp"
+
 namespace rocos {
 
 class ControllerInterface {
  public:
   virtual ~ControllerInterface() = default;
+
+  virtual int UpdateCmd(const Ref& ref_in, JntArray& q_cmd) = 0;
 };
 
 }  // namespace rocos

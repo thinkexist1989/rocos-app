@@ -135,8 +135,8 @@ add_library(drive
         src/drive_guard.cpp
         src/utilities/utility.hpp
         src/utilities/utility.cpp
-        src/robot.cpp
-        src/robot.hpp
+        src/executor.cpp
+        src/executor.hpp
 )
 target_link_libraries(drive
         PUBLIC
@@ -192,7 +192,7 @@ add_library(rocos::dynamics ALIAS dynamics)
 add_library(robot
         SHARED
         src/types.cpp
-        src/executor.cpp
+        src/robot.cpp
         src/velocity_profile.cpp
         src/dh_params_loader.cpp
         src/robot_http_server.cpp
