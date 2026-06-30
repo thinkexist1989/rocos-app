@@ -138,9 +138,12 @@ add_library(rocos::drive ALIAS drive)
 ########## Library robot #################
 add_library(robot
         SHARED
+        src/executor.cpp
         src/robot.cpp
-        src/velocity_profile.cpp
-        src/robot_http_server.cpp
+        src/model.cpp
+
+#        src/velocity_profile.cpp
+#        src/robot_http_server.cpp
 )
 target_include_directories(robot
         PUBLIC
@@ -156,6 +159,7 @@ target_link_libraries(robot
         $<BUILD_INTERFACE:rocos::hardware>
         $<BUILD_INTERFACE:rocos::drive>
         $<BUILD_INTERFACE:ruckig::ruckig>
+        $<BUILD_INTERFACE:trac_ik>
         sml::sml
         orocos-kdl
         PRIVATE

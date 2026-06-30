@@ -38,6 +38,8 @@ OF THE POSSIBILITY OF SUCH DAMAGE.
 #include <thread>
 #include <trac_ik/nlopt_ik.hpp>
 
+#include <kdl/chainiksolver.hpp>
+
 namespace TRAC_IK
 {
 
@@ -49,7 +51,7 @@ namespace TRAC_IK
         Manip2
     };
 
-    class TRAC_IK
+    class TRAC_IK : public KDL::ChainIkSolverPos
     {
     public:
         TRAC_IK(const KDL::Chain &_chain, const KDL::JntArray &_q_min, const KDL::JntArray &_q_max, double _maxtime = 0.005, double _eps = 1e-5, SolveType _type = Speed);
@@ -111,7 +113,11 @@ namespace TRAC_IK
             solvetype = _type;
         }
 
-    private:
+        int CartToJnt(const KDL::JntArray &q_init, const KDL::Frame &p_in, KDL::JntArray &q_out) override {
+            CartToJnt(q_init, p_in, q_out, bounds);
+        }
+
+       private:
         bool initialized;
         KDL::Chain chain;
         KDL::JntArray lb, ub;

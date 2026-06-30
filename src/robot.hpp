@@ -106,13 +106,15 @@ class Robot {
 
   void waitControlCycle();
 
-  void setEnabled();
 
-  inline void setJointEnabled(int id) { }
 
-  void setDisabled();
+  void setEnabled(); //
 
-  inline void setJointDisabled(int id) { }
+  inline void setJointEnabled(int id) { }  //
+
+  void setDisabled(); //
+
+  inline void setJointDisabled(int id) { } //
 
   inline void setJointMode(int id, ModeOfOperation mode) { }
 

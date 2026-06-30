@@ -19,18 +19,44 @@
 #pragma once
 
 #include "types.hpp"
-#include "result.hpp"
 
 namespace rocos {
 
 class DriveInterface {
+ public:
+  virtual ~DriveInterface() = default;
 
-  public:
-        virtual ~DriveInterface() = default;
+  /////////////同时设置/获取所有关节////////////////
+  virtual JntArray GetPosition() = 0;
+  virtual JntArray GetVelocity() = 0;
+  virtual JntArray GetTorque() = 0;
+  virtual JntArray GetLoadTorque() = 0;
 
+  virtual void SetPosition(const JntArray& q) = 0;
+  virtual void SetVelocity(const JntArray& q_dot) = 0;
+  virtual void SetTorque(const JntArray& tau) = 0;
 
+  virtual void SetMode(const int8_t mode) = 0;
 
+  virtual void SetEnabled() = 0;
+  virtual void SetDisabled() = 0;
 
+  /////////////单独设置/获取每个关节/////////////////
+  virtual double GetJointPosition(int32_t id) = 0;
+  virtual double GetJointVelocity(int32_t id) = 0;
+  virtual double GetJointTorque(int32_t id) = 0;
+  virtual double GetJointLoadTorque(int32_t id) = 0;
+
+  virtual void SetJointPosition(int32_t id, double pos) = 0;
+  virtual void SetJointVelocity(int32_t id, double vel) = 0;
+  virtual void SetJointTorque(int32_t id, double tau) = 0;
+
+  virtual void SetJointMode(int32_t id, int8_t mode) = 0;
+
+  virtual void SetJointEnabled(int32_t id) = 0;
+  virtual void SetJointDisabled(int32_t id) = 0;
+
+  virtual std::string getJointName(int32_t id) = 0;
 };
 
 }  // namespace rocos

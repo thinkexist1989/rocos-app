@@ -18,10 +18,14 @@
 // email: luoyang@sia.cn
 #pragma once
 
-#include <kdl/jntarray.hpp>
+#include <kdl/chain.hpp>
+#include <kdl/chainfksolver.hpp>
+#include <kdl/chainiksolver.hpp>
+#include <kdl/chainfdsolver.hpp>
+#include <kdl/chainidsolver.hpp>
 #include <kdl/frames.hpp>
 #include <kdl/jacobian.hpp>
-#include <kdl/chain.hpp>
+#include <kdl/jntarray.hpp>
 
 namespace rocos {
 
@@ -31,6 +35,10 @@ namespace rocos {
   using Frame = KDL::Frame;
   using Wrench = KDL::Wrench;
   using Chain = KDL::Chain;
+  using ChainIkSolverPos = KDL::ChainIkSolverPos;
+  using ChainFkSolverPos = KDL::ChainFkSolverPos;
+  using ChainFdSolver = KDL::ChainFdSolver;
+  using ChainIdSolver = KDL::ChainIdSolver;
 
 
 }  // namespace rocos

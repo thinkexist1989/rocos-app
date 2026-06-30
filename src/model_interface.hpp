@@ -30,7 +30,7 @@ class ModelInterface {
  public:
   virtual ~ModelInterface() = default;
 
-  virtual Result ForwardKinematics(const JntArray& q_in, Frame& p_out);
+  virtual Result ForwardKinematics(const JntArray& q_in, Frame& p_out) = 0;
   virtual Result InverseKinematics(const JntArray& q_in, const Frame& p_in, JntArray& q_out) = 0;
 
   virtual Result ForwardDynamics(const JntArray &q, const JntArray &q_dot, const JntArray &torques, const Wrenches& f_ext,JntArray &q_dotdot) = 0;
