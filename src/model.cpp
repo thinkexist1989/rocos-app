@@ -25,14 +25,10 @@ Model::Model(const std::string& urdf_file_path,
 
   if (!ParseUrdf(urdf_string_, base_link, tip)) {
     log_ptr_->error("Could not extract  urdf!");
-
-
+    throw std::runtime_error("Could not extract urdf");
   }
 
-
-
-
-
+  UpdateSolvers();
 }
 
 Result Model::ForwardKinematics(const JntArray& q_in, Frame& p_out) {
@@ -88,11 +84,15 @@ bool Model::SetChain(const Tree& tree, const std::string& base_link,
 
 void Model::SetGravity(const Vector& gravity) {
   gravity_ = gravity;
+
+  UpdateSolvers();  // 更新动力学求解器以使用新的重力向量
 }
 
 void Model::SetPosLimits(const JntArray& q_min, const JntArray& q_max) {
   q_min_ = q_min;
   q_max_ = q_max;
+
+  UpdateSolvers();
 }
 
 void Model::UpdateSolvers() {
@@ -106,35 +106,49 @@ void Model::UpdateSolvers() {
 
 bool Model::ParseUrdf(const std::string& urdf_string,
                       const std::string& base_link, const std::string& tip) {
+  static const double kDefaultLowerLimit = -KDL::PI;  // -180 deg
+  static const double kDefaultUpperLimit = KDL::PI;   //  180 deg
 
-  auto model = urdf::parseURDF(urdf_string);
-  KDL::Tree tree;
-  if (!kdl_parser::treeFromUrdfModel(*model, tree)) {
-    // 解析失败
-    log_ptr_->error("Could not extract urdf to Tree!");
-
+  const auto model = urdf::parseURDF(urdf_string);
+  if (model == nullptr) {
+    log_ptr_->error("Could not parse urdf string!");
     return false;
   }
 
-  if (!SetChain(tree, base_link, tip)) {
+  KDL::Tree tree;
+  if (!kdl_parser::treeFromUrdfModel(*model, tree)) {
+    log_ptr_->error("Could not extract urdf to Tree!");
+    return false;
+  }
+  tree_ = tree;
+
+  if (!SetChain(tree_, base_link, tip)) {
     log_ptr_->error("Could not set kinematic chain!");
     return false;
   }
-  
-  const double kDefaultLowerLimit = -KDL::PI;
-  const double kDefaultUpperLimit = KDL::PI;
 
+  // 按 Chain 中的关节顺序逐段解析 URDF limit 约束
+  unsigned int joint_index = 0;
+  for (unsigned int i = 0; i < chain_.getNrOfSegments(); ++i) {
+    const auto& kdl_joint = chain_.getSegment(i).getJoint();
+    if (kdl_joint.getType() == KDL::Joint::None) {
+      continue;  // 固定关节不占 JntArray 位置，跳过
+    }
 
+    // 先写默认值，再尝试从 URDF 覆盖
+    q_min_(joint_index) = kDefaultLowerLimit;
+    q_max_(joint_index) = kDefaultUpperLimit;
 
+    const auto urdf_joint = model->getJoint(kdl_joint.getName());
+    if (urdf_joint != nullptr && urdf_joint->limits != nullptr) {
+      q_min_(joint_index) = urdf_joint->limits->lower;
+      q_max_(joint_index) = urdf_joint->limits->upper;
+    }
 
-
-
-
+    ++joint_index;
+  }
 
   return true;
-
-
-
 }
 
 }  // namespace rocos

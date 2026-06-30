@@ -55,9 +55,13 @@ class Model : public ModelInterface {
 
   void UpdateSolvers();
 
-  bool ParseUrdf(const std::string &urdf_file_path,
-               const std::string &base_link,
-               const std::string &tip);
+  bool ParseUrdf(const std::string& urdf_string,
+                 const std::string& base_link,
+                 const std::string& tip);
+
+  const JntArray& GetQMin() const noexcept { return q_min_; }
+  const JntArray& GetQMax() const noexcept { return q_max_; }
+  const Chain& GetChain() const noexcept { return chain_; }
 
  private:
   Tree tree_;
