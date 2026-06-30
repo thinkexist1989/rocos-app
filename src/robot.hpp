@@ -20,22 +20,28 @@
 
 #include "types.hpp"
 #include "result.hpp"
+#include "logger.hpp"
+
 
 // #include "dh_params_loader.hpp"
+#include "model_interface.hpp"
+#include "motion_interface.hpp"
 #include "hardware_interface.hpp"
-#include "logger.hpp"
+
+#include "executor.hpp"
+
 
 namespace rocos {
 
 class Robot {
 
-  enum class WorkMode {
-    Position = 0,
-    EeAdmitTeach = 1,
-    JntAdmitTeach = 2,
-    JntImp = 3,
-    CartImp = 4
-  };
+  // enum class WorkMode {
+  //   Position = 0,
+  //   EeAdmitTeach = 1,
+  //   JntAdmitTeach = 2,
+  //   JntImp = 3,
+  //   CartImp = 4
+  // };
 
  public:
   explicit Robot();
@@ -44,21 +50,25 @@ class Robot {
 
   [[nodiscard]] std::string GetRobotState() const;
 
-  int Start();
+  Result Start();
 
-  int Pause();
+  Result Pause();
 
-  int Continue();
+  Result Continue();
 
-  int Stop();
+  Result Stop();
 
-  int SetEnabled();
+  Result SetEnabled();
 
-  int SetDisabled();
+  Result SetDisabled();
 
-  bool IsEnabled();
 
-  bool IsDisabled();
+
+
+
+  bool IsEnabled() const;
+
+  bool IsDisabled() const;
 
   bool IsMotionRunning() const;
 
@@ -137,9 +147,13 @@ class Robot {
   Frame getObject() { return Frame(); }
 
 
- protected:
-  HardwareInterface *hw_interface_{nullptr};
+ public:
+  ModelInterface* model {nullptr};  //TODO: 机器人里可以保存子类指针，因为机器人会用到很多子类的功能，但是其他的模块接收接口指针即可
+  HardwareInterface *hardware {nullptr};  //TODO: 同理，机器人里直接保存子类指针
+  std::vector<MotionInterface*> motion {nullptr}; // movej, movel, movec
+  std::vector<ControllerInterface*> controller {nullptr}; // position, CartAdmit, JntAdmit, JntImp, CartImp
 
+  std::unique_ptr<Executor> executor {nullptr}; //执行器
 
  public:
 

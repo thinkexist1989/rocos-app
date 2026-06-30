@@ -1,5 +1,7 @@
 #include "drive.hpp"
 
+#include <iostream>
+
 namespace rocos {
 
     Drive::Drive(HardwareInterface *hw, int id) : hw_interface_(hw),

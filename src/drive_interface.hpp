@@ -18,19 +18,19 @@
 // email: luoyang@sia.cn
 #pragma once
 
-#include <kdl/jntarray.hpp>
-#include <kdl/frames.hpp>
-#include <kdl/jacobian.hpp>
-#include <kdl/chain.hpp>
+#include "types.hpp"
+#include "result.hpp"
 
 namespace rocos {
 
-  using Vector = KDL::Vector;
-  using Jacobian = KDL::Jacobian;
-  using JntArray = KDL::JntArray;
-  using Frame = KDL::Frame;
-  using Wrench = KDL::Wrench;
-  using Chain = KDL::Chain;
+class DriveInterface {
 
+  public:
+        virtual ~DriveInterface() = default;
+
+
+
+
+};
 
 }  // namespace rocos

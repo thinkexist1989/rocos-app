@@ -1,6 +1,6 @@
 #include <gflags/gflags.h>
-#include <rocos_app/ethercat/hardware.h>
-#include <rocos_app/ethercat/hardware_sim.h>
+// #include "hardware2.hpp"
+// #include <rocos_app/ethercat/hardware_sim.h>
 
 #include <csignal>
 #include <iostream>
@@ -50,28 +50,28 @@ int main(int argc, char *argv[]) {
     gflags::ParseCommandLineFlags(&argc, &argv, true);
     //**-------------------------------**//
 
-    //**-------------启动admittance_joint-----------**//
-    // 初始化类
-    HardwareInterface* hw;
-    if (FLAGS_sim)
-        hw = new HardwareSim(20);  // 仿真
-    else
-        hw = new Hardware(FLAGS_urdf, FLAGS_id); // 真实机械臂
-
-    Robot executor{};
-
-    robot_ptr = &executor;
-
-    rocos::RobotHttpServer httpServer(&executor);
-
-    //------------------------wait----------------------------------
-    httpServer.runAsync(FLAGS_http_host, FLAGS_http_port);
-    // Keep main thread alive
-    std::cout << "\033[1;32m" << "[HTTP Server] Running on "
-          << FLAGS_http_host << ":" << FLAGS_http_port << "\033[0m" << std::endl;
-    while (isRuning) {
-        std::this_thread::sleep_for(std::chrono::seconds(1));
-    }
+    // //**-------------启动admittance_joint-----------**//
+    // // 初始化类
+    // HardwareInterface* hw;
+    // if (FLAGS_sim)
+    //     hw = new HardwareSim(20);  // 仿真
+    // else
+    //     hw = new Hardware(FLAGS_urdf, FLAGS_id); // 真实机械臂
+    //
+    // Robot executor{};
+    //
+    // robot_ptr = &executor;
+    //
+    // rocos::RobotHttpServer httpServer(&executor);
+    //
+    // //------------------------wait----------------------------------
+    // httpServer.runAsync(FLAGS_http_host, FLAGS_http_port);
+    // // Keep main thread alive
+    // std::cout << "\033[1;32m" << "[HTTP Server] Running on "
+    //       << FLAGS_http_host << ":" << FLAGS_http_port << "\033[0m" << std::endl;
+    // while (isRuning) {
+    //     std::this_thread::sleep_for(std::chrono::seconds(1));
+    // }
 
     return 0;
 }

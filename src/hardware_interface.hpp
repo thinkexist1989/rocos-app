@@ -29,12 +29,7 @@
 
 #include <string>
 
-#include "../include/rocos_app/ethercat/mode_of_operation.h"
-#include "../include/rocos_app/ethercat/status_word.h"
-#include "control_word.hpp"
-#include "drive_state.hpp"
-
-// #include <boost/chrono.hpp>
+#include "ecat_type.hpp"
 
 namespace rocos {
 

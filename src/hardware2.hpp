@@ -20,15 +20,14 @@
 #ifndef ROCOS_APP_HARDWARE_H
 #define ROCOS_APP_HARDWARE_H
 
-
-#include "../../../src/control_word.hpp"
-#include "../../../src/drive_state.hpp"
-#include "mode_of_operation.h"
-#include "status_word.h"
+#include "../include/rocos_app/ethercat/mode_of_operation.h"
+#include "../include/rocos_app/ethercat/status_word.h"
+#include "control_word.hpp"
+#include "drive_state.hpp"
 
 // #include <rocos_ecm/ecat_config.h>
-#include "../../../src/ecat_config.hpp"
-#include "../../../src/hardware_interface.hpp"
+#include "ecat_config.hpp"
+#include "hardware_interface.hpp"
 
 namespace rocos {
 

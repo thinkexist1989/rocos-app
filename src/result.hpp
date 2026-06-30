@@ -31,6 +31,7 @@ enum class Result : int {
   MsSignalZError = -2014,
   ThreePhaseCurrent = -2015,
   TorqueSensorReadError = -2016,
+  JointStateError = -2017,
 
   // 内部通信错误
   CommunicateError = -2101,

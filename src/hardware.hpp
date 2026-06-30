@@ -18,19 +18,25 @@
 // email: luoyang@sia.cn
 #pragma once
 
-#include <kdl/jntarray.hpp>
-#include <kdl/frames.hpp>
-#include <kdl/jacobian.hpp>
-#include <kdl/chain.hpp>
+#include "drive_interface.hpp"
+#include "ft_sensor_interface.hpp"
+#include "io_inteface.hpp"
 
 namespace rocos {
 
-  using Vector = KDL::Vector;
-  using Jacobian = KDL::Jacobian;
-  using JntArray = KDL::JntArray;
-  using Frame = KDL::Frame;
-  using Wrench = KDL::Wrench;
-  using Chain = KDL::Chain;
+class Hardware : public DriveInterface,
+                 public FTSensorInterface,
+                 public IOInteface {
 
+public:
+  explicit Hardware();
+  ~Hardware();
+
+
+
+
+
+
+};
 
 }  // namespace rocos

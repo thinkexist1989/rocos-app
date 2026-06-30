@@ -112,12 +112,9 @@ add_library(rocos::logger ALIAS logger)
 ######### Library Hardware ###############
 add_library(hardware
         SHARED
-        src/status_word.cpp
-        src/control_word.cpp
-        src/drive_state.cpp
-        src/hardware.cpp
-        src/hardware_sim.cpp
         src/ecat_config.cpp
+        src/hardware.cpp
+
         )
 target_link_libraries(hardware
         PUBLIC
@@ -177,7 +174,7 @@ target_link_libraries(rocos_app
         )
 add_library(rocos::rocos_app ALIAS rocos_app)
 
-########## Executable RocosAppMain ################
+########### Executable RocosAppMain ################
 # move rocosAppMain to test. Due to rocos_app is a robot library.
 add_executable(rocosAppMain
         src/rocosAppMain.cpp
@@ -204,68 +201,68 @@ file(COPY ${CONFIG_FILE} DESTINATION ${CMAKE_BINARY_DIR}/bin)
 #############
 
 # Add support for installation
-include(CMakePackageConfigHelpers)
-
-install(FILES ${CMAKE_BINARY_DIR}/ver.h
-        DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}/rocos_app
-        )
-
-install(DIRECTORY include/rocos_app
-        DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}
-        )
-
-install(TARGETS hardware drive robot rocos_app rocosAppMain
-        EXPORT rocos_app-targets
-        LIBRARY DESTINATION ${CMAKE_INSTALL_LIBDIR}  # 动态库安装路径
-        ARCHIVE DESTINATION ${CMAKE_INSTALL_LIBDIR}  # 静态库安装路径
-        RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR}  # 可执行文件安装路径
-        PUBLIC_HEADER DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}  # 头文件安装路径
-        )
-
-# Install config files
-install(FILES ${CONFIG_FILE}
-        DESTINATION ${${PROJECT_NAME}_INSTALL_CONFIGDIR}
-        )
-
-install(EXPORT rocos_app-targets
-        FILE rocos_app-targets.cmake
-        NAMESPACE rocos::
-        DESTINATION ${${PROJECT_NAME}_INSTALL_CMAKEDIR}
-        )
-
-
-configure_package_config_file(
-        cmake/rocos_app-config.cmake.in
-        rocos_app-config.cmake
-        INSTALL_DESTINATION ${${PROJECT_NAME}_INSTALL_CMAKEDIR}
-)
-
-# 写入库的版本信息
-write_basic_package_version_file(
-        rocos_app-config-version.cmake
-        VERSION ${PACKAGE_VERSION}
-        COMPATIBILITY AnyNewerVersion  # 表示该函数库向下兼容
-)
-
-install(FILES "${CMAKE_CURRENT_BINARY_DIR}/rocos_app-config.cmake"
-        "${CMAKE_CURRENT_BINARY_DIR}/rocos_app-config-version.cmake"
-        DESTINATION ${${PROJECT_NAME}_INSTALL_CMAKEDIR}
-        )
+#include(CMakePackageConfigHelpers)
+#
+#install(FILES ${CMAKE_BINARY_DIR}/ver.h
+#        DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}/rocos_app
+#        )
+#
+#install(DIRECTORY include/rocos_app
+#        DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}
+#        )
+#
+#install(TARGETS hardware drive robot rocos_app rocosAppMain
+#        EXPORT rocos_app-targets
+#        LIBRARY DESTINATION ${CMAKE_INSTALL_LIBDIR}  # 动态库安装路径
+#        ARCHIVE DESTINATION ${CMAKE_INSTALL_LIBDIR}  # 静态库安装路径
+#        RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR}  # 可执行文件安装路径
+#        PUBLIC_HEADER DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}  # 头文件安装路径
+#        )
+#
+## Install config files
+#install(FILES ${CONFIG_FILE}
+#        DESTINATION ${${PROJECT_NAME}_INSTALL_CONFIGDIR}
+#        )
+#
+#install(EXPORT rocos_app-targets
+#        FILE rocos_app-targets.cmake
+#        NAMESPACE rocos::
+#        DESTINATION ${${PROJECT_NAME}_INSTALL_CMAKEDIR}
+#        )
+#
+#
+#configure_package_config_file(
+#        cmake/rocos_app-config.cmake.in
+#        rocos_app-config.cmake
+#        INSTALL_DESTINATION ${${PROJECT_NAME}_INSTALL_CMAKEDIR}
+#)
+#
+## 写入库的版本信息
+#write_basic_package_version_file(
+#        rocos_app-config-version.cmake
+#        VERSION ${PACKAGE_VERSION}
+#        COMPATIBILITY AnyNewerVersion  # 表示该函数库向下兼容
+#)
+#
+#install(FILES "${CMAKE_CURRENT_BINARY_DIR}/rocos_app-config.cmake"
+#        "${CMAKE_CURRENT_BINARY_DIR}/rocos_app-config-version.cmake"
+#        DESTINATION ${${PROJECT_NAME}_INSTALL_CMAKEDIR}
+#        )
 
 
 #############
 ## Testing ##
 #############
 
-enable_testing()
-add_executable(unit_test test/unit_test.cc)
-target_link_libraries(unit_test
-        PRIVATE
-        hardware
-        drive
-#        kinematics
-        robot
-        )
-add_test(NAME unit_test COMMAND unit_test)
-set_tests_properties(unit_test PROPERTIES
-        WORKING_DIRECTORY ${CMAKE_SOURCE_DIR})
+#enable_testing()
+#add_executable(unit_test test/unit_test.cc)
+#target_link_libraries(unit_test
+#        PRIVATE
+#        hardware
+#        drive
+##        kinematics
+#        robot
+#        )
+#add_test(NAME unit_test COMMAND unit_test)
+#set_tests_properties(unit_test PROPERTIES
+#        WORKING_DIRECTORY ${CMAKE_SOURCE_DIR})

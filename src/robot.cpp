@@ -293,29 +293,33 @@ std::string Robot::GetRobotState() const {
   }
 }
 
-int Robot::SetEnabled() {
-  log_ptr_->info("Robot Enabling.....");
+Result Robot::SetEnabled() {
+  log_ptr_->info("Received enable command.");
   if (!impl_->process_event(EventEnableReq{})) {
-    log_ptr_->error("Failed to process EventEnableReq.");
-    return -1;  // TODO: 需要替换为错误码
+    log_ptr_->error("Can not execute enable command right now.");
+    return Result::JointStateError;
   }
 
-  return 0;
+  return Result::NoError;
 }
 
-int Robot::SetDisabled() {
-  log_ptr_->info("Robot Disabling.....");
+Result Robot::SetDisabled() {
+  log_ptr_->info("Received disable command.");
   if (!impl_->process_event(EventDisableReq{})) {
-    log_ptr_->error("Failed to process EventDisableReq.");
-    return -1;  // TODO: 需要替换为错误码
+    log_ptr_->error("Can not execute disable command right now.");
+    return Result::JointStateError;
   }
 
-  return 0;
+  return Result::NoError;
 }
 
-bool Robot::IsEnabled() { return true; }
 
-bool Robot::IsDisabled() { return true; }
+
+
+
+bool Robot::IsEnabled() const { return true; }
+
+bool Robot::IsDisabled() const { return true; }
 
 bool Robot::IsMotionRunning() const {
   return impl_->is(sml::state<class RUNNING>);
@@ -329,12 +333,22 @@ void Robot::setDisabled() {}
 
 /////// Motion Command /////////////
 
-int Robot::Pause() {}
+Result Robot::Pause() {
 
-int Robot::Continue() {}
+  return Result::NoError;
+}
 
-int Robot::Stop() {}
+Result Robot::Continue() {
 
-int Robot::Start() {}
+  return Result::NoError;
+}
+
+Result Robot::Stop() {
+  return Result::NoError;
+}
+
+Result Robot::Start() {
+  return Result::NoError;
+}
 
 }  // namespace rocos

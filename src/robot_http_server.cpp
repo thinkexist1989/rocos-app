@@ -339,11 +339,11 @@ void RobotHttpServer::handleGetRobotState(const httplib::Request& req, httplib::
 
     // Hardware state
     nlohmann::json hw;
-    hw["hw_type"] = static_cast<int>(robot_->hw_interface_->getHardwareType());
-    hw["min_cycle_time"] = robot_->hw_interface_->getMinCycleTime();
-    hw["max_cycle_time"] = robot_->hw_interface_->getMaxCycleTime();
-    hw["current_cycle_time"] = robot_->hw_interface_->getCurrCycleTime();
-    hw["slave_num"] = robot_->hw_interface_->getSlaveNumber();
+    hw["hw_type"] = static_cast<int>(robot_->hardware->getHardwareType());
+    hw["min_cycle_time"] = robot_->hardware->getMinCycleTime();
+    hw["max_cycle_time"] = robot_->hardware->getMaxCycleTime();
+    hw["current_cycle_time"] = robot_->hardware->getCurrCycleTime();
+    hw["slave_num"] = robot_->hardware->getSlaveNumber();
     data["hw_state"] = hw;
 
     sendJson(res, true, 0, "ok", data);

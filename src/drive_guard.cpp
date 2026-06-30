@@ -23,6 +23,8 @@
 
 #include "drive.hpp"
 
+#include <iostream>
+
 namespace rocos {
 
     DriveGuard::DriveGuard() {
