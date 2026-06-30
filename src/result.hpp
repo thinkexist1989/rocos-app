@@ -109,6 +109,10 @@ enum class Result : int {
   LoadIdentUfbFail = -2346,
   LoadIdentFitFail = -2347,
   LoadIdentNonLoaded = -2348,
+  IkCalcFail = -2349,
+  FkCalcFail = -2350,
+  IdCalcFail = -2351,
+  FdCalcFail = -2352,
 
   // API系统错误
   ParameterPointerEqualsNullptr = -2901,

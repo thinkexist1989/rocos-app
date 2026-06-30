@@ -20,14 +20,18 @@
 
 #include <memory>
 
+#include "logger.hpp"
 #include "model_interface.hpp"
 
 namespace rocos {
 
 class Model : public ModelInterface {
  public:
-  Model(std::string urdf_file_path);
-  ~Model();
+  explicit Model(const std::string& urdf_file_path,
+                 const std::string& base_link,
+                 const std::string& tip);
+
+  ~Model() override = default;
 
   Result ForwardKinematics(const JntArray& q_in, Frame& p_out) override;
   Result InverseKinematics(const JntArray& q_in, const Frame& p_in,
@@ -39,11 +43,28 @@ class Model : public ModelInterface {
                          const JntArray& q_dotdot, const Wrenches& f_ext,
                          JntArray& torques) override;
 
- private:
+  inline void SetChain(const Chain& chain) { chain_ = chain; }
 
+  bool SetChain(const Tree& tree, const std::string& base_link,
+                const std::string& tip);
+
+  void SetGravity(const Vector& gravity);
+
+  // TODO: 关节限位是给内部调用，不能外部设置，通过URDF配置
+  void SetPosLimits(const JntArray& q_min, const JntArray& q_max);
+
+  void UpdateSolvers();
+
+  bool ParseUrdf(const std::string &urdf_file_path,
+               const std::string &base_link,
+               const std::string &tip);
+
+ private:
+  Tree tree_;
   Chain chain_;
 
   std::string urdf_file_path_;
+  std::string urdf_string_;
 
   std::unique_ptr<ChainFkSolverPos> fk_solver_;
   std::unique_ptr<ChainIkSolverPos> ik_solver_;
@@ -51,8 +72,12 @@ class Model : public ModelInterface {
   std::unique_ptr<ChainFdSolver> fd_solver_;
   std::unique_ptr<ChainIdSolver> id_solver_;
 
+  JntArray q_min_;
+  JntArray q_max_;
 
+  Vector gravity_{0.0, 0.0, -9.81};
 
+  Logger::logger_ptr log_ptr_ = nullptr;
 };
 
 }  // namespace rocos

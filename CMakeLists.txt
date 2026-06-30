@@ -138,6 +138,8 @@ add_library(rocos::drive ALIAS drive)
 ########## Library robot #################
 add_library(robot
         SHARED
+        src/ecat_config.cpp
+        src/hardware.cpp
         src/executor.cpp
         src/robot.cpp
         src/model.cpp

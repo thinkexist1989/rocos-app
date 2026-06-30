@@ -19,13 +19,15 @@
 #pragma once
 
 #include <kdl/chain.hpp>
-#include <kdl/chainfksolver.hpp>
-#include <kdl/chainiksolver.hpp>
 #include <kdl/chainfdsolver.hpp>
+#include <kdl/chainfksolver.hpp>
 #include <kdl/chainidsolver.hpp>
+#include <kdl/chainiksolver.hpp>
 #include <kdl/frames.hpp>
 #include <kdl/jacobian.hpp>
 #include <kdl/jntarray.hpp>
+#include <kdl/tree.hpp>
+#include <kdl/utilities/utility.h>
 
 namespace rocos {
 
@@ -35,6 +37,7 @@ namespace rocos {
   using Frame = KDL::Frame;
   using Wrench = KDL::Wrench;
   using Chain = KDL::Chain;
+  using Tree  = KDL::Tree;
   using ChainIkSolverPos = KDL::ChainIkSolverPos;
   using ChainFkSolverPos = KDL::ChainFkSolverPos;
   using ChainFdSolver = KDL::ChainFdSolver;

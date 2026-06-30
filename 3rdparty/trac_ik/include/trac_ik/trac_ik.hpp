@@ -59,6 +59,7 @@ namespace TRAC_IK
         TRAC_IK(const std::string &base_link, const std::string &tip_link, const std::string &URDF_file_path, double _maxtime = 0.005, double _eps = 1e-5, SolveType _type = Speed);
 
         ~TRAC_IK();
+        void updateInternalDataStructures() override {}
 
         bool getKDLChain(KDL::Chain &chain_)
         {
@@ -106,7 +107,8 @@ namespace TRAC_IK
             return err;
         }
 
-        int CartToJnt(const KDL::JntArray &q_init, const KDL::Frame &p_in, KDL::JntArray &q_out, const KDL::Twist &bounds = KDL::Twist::Zero());
+        // int CartToJnt(const KDL::JntArray &q_init, const KDL::Frame &p_in, KDL::JntArray &q_out, const KDL::Twist &bounds = KDL::Twist::Zero());
+        int CartToJnt(const KDL::JntArray &q_init, const KDL::Frame &p_in, KDL::JntArray &q_out, const KDL::Twist &bounds);
 
         inline void SetSolveType(SolveType _type)
         {
@@ -114,7 +116,7 @@ namespace TRAC_IK
         }
 
         int CartToJnt(const KDL::JntArray &q_init, const KDL::Frame &p_in, KDL::JntArray &q_out) override {
-            CartToJnt(q_init, p_in, q_out, bounds);
+            return CartToJnt(q_init, p_in, q_out, KDL::Twist::Zero());
         }
 
        private:
