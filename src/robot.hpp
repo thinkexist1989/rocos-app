@@ -117,7 +117,7 @@ class Robot {
 
   inline void setJointDisabled(int id) { } //
 
-  inline void setJointMode(int id, ModeOfOperation mode) { }
+  // inline void setJointMode(int id, ModeOfOperation mode) { }
 
   inline int getJointNum() const { }
 

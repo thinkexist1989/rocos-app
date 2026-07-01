@@ -287,6 +287,8 @@
         <parent link="link_4"/>
         <child link="link_5"/>
         <axis xyz="0 0 1"/>
+        <limit lower="-2.71" upper="2.71" vel="3.0" effort="30.0" />
+
         <hardware id="4" type="driver">
             <limit lower="-2.71" upper="2.71" vel="3.0" acc="10.0" jerk="150.0" effort="30.0" />
             <transform ratio="1.0" offset_pos_cnt="0" cnt_per_unit="156455.678" torque_per_unit="1.0" user_unit_name="rad"/>
