@@ -30,6 +30,7 @@
 
 #include "executor.hpp"
 
+#include <random>
 
 namespace rocos {
 
@@ -50,7 +51,8 @@ class Robot {
 
   [[nodiscard]] std::string GetStateString() const;
 
-  Result Start();
+  // //! \brief 启动机器人运动，使机器人状态机进入 Running 状态
+  // Result Start();
 
   //! \brief 暂停机器人运动，使机器人状态机进入 Pause 状态
   Result Pause();
@@ -58,20 +60,20 @@ class Robot {
   Result Continue();
   //! \brief 停止机器人运动，使机器人状态机进入 Stopped 状态
   Result Stop();
+  //! \brief 启动机器人运动，使机器人状态机进入 Running 状态
+  Result Start();
   //! \brief 机器人上使能请求
   Result SetEnabled();
-  //! \brief机器人下使能请求
+  //! \brief 机器人下使能请求
   Result SetDisabled();
 
 
-
-
   //! \brief 获取机器人当前是否上使能状态
-  bool IsEnabled() const;
+  [[nodiscard]] bool IsEnabled() const;
   //！ \brief 获取机器人当前是否上使能状态
-  bool IsDisabled() const;
+  [[nodiscard]] bool IsDisabled() const;
   //！ \brief 获取机器人当前是否正在运动
-  bool IsRunning() const;
+  [[nodiscard]] bool IsRunning() const;
 
 
 
@@ -107,15 +109,9 @@ class Robot {
 
   void waitControlCycle();
 
+  void setEnabled();
 
-
-  void setEnabled(); //
-
-  inline void setJointEnabled(int id) { }  //
-
-  void setDisabled(); //
-
-  inline void setJointDisabled(int id) { } //
+  void setDisabled();
 
   // inline void setJointMode(int id, ModeOfOperation mode) { }
 
@@ -194,6 +190,20 @@ class Robot {
   void on_fsm_identify();
 
   void on_fsm_servo();
+
+
+  //////////测试用///////////
+  /// 使用 Bernoulli 分布随机生成一个 bool 值（概率各 50%）
+  inline bool randomBool() noexcept {
+    static std::mt19937 rng_{std::random_device{}()};
+    static std::bernoulli_distribution dist_(0.5);
+    return dist_(rng_);
+  }
+
+
+
 };
+
+
 
 }  // namespace rocos

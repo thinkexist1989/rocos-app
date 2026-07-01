@@ -185,13 +185,20 @@ class Robot::Impl {
   mutable std::recursive_mutex mtx_;  // 保护状态机的并发访问（允许同线程重入）
 };
 
+////////////////////////////////////////////////////////////////////
 void Robot::on_fsm_enable() {
-  setEnabled();
-  if (IsEnabled()) {
+  log_ptr_->info("机器人正在使能中");
+
+  // IsEnabled();
+
+  if (randomBool()) {
+    log_ptr_->info("机器人使能成功，准备进入STOPPED状态");
     impl_->process_event(EventSuccess{});
   } else {
+    log_ptr_->error("机器人使能失败，准备进入ERROR_STATE");
     impl_->process_event(EventErrorOccurred{});
   }
+
 }
 void Robot::on_fsm_disable() {
   setDisabled();
@@ -230,21 +237,33 @@ void Robot::on_fsm_identify() {
   impl_->process_event(EventSuccess{});
 }
 void Robot::on_fsm_reset() {
-  log_ptr_->info("Robot is initializing...");
+  // log_ptr_->info("Robot is initializing...");
+  log_ptr_->info("机器人正在Resetting，执行on_fsm_reset");
 
-  if (IsEnabled()) {
+
+  // IsEnabled(); //TODO：要根据当前是否使能来确定状态
+
+  if (randomBool()) {
+    log_ptr_->info("机器人已经使能，准备进入STOPPED状态");
     impl_->process_event(EventIsEnabled{});  // 模拟初始化成功事件
   } else {
+    log_ptr_->info("机器人未使能，准备进入IDLE状态");
     impl_->process_event(EventSuccess{});  // 模拟初始化失败事件
   }
 }
 void Robot::on_fsm_servo() {
   log_ptr_->info("Robot is servoing...");
 }
+////////////////////////////////////////////////////////////////////
+
+
+
 
 Robot::Robot() : impl_(std::make_unique<Impl>(*this)) {
   log_ptr_ = Logger::getInstance("Robot");
 
+
+  log_ptr_->info("机器人开始初始化");
   impl_->process_event(EventResetReq{});  // 进入初始化状态
 }
 
@@ -294,9 +313,9 @@ std::string Robot::GetStateString() const {
 }
 
 Result Robot::SetEnabled() {
-  log_ptr_->info("Received enable command.");
+  log_ptr_->info("收到上使能指令");
   if (!impl_->process_event(EventEnableReq{})) {
-    log_ptr_->error("Can not execute enable command right now.");
+    log_ptr_->error("当前状态无法执行上使能指令");
     return Result::JointStateError;
   }
 
@@ -304,9 +323,9 @@ Result Robot::SetEnabled() {
 }
 
 Result Robot::SetDisabled() {
-  log_ptr_->info("Received disable command.");
+  log_ptr_->info("收到下使能指令");
   if (!impl_->process_event(EventDisableReq{})) {
-    log_ptr_->error("Can not execute disable command right now.");
+    log_ptr_->error("当前状态无法执行下使能指令");
     return Result::JointStateError;
   }
 

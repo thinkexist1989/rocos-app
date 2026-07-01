@@ -110,29 +110,29 @@ target_link_libraries(logger PUBLIC spdlog::spdlog_header_only)
 add_library(rocos::logger ALIAS logger)
 
 ######### Library Hardware ###############
-add_library(hardware
-        SHARED
-        src/ecat_config.cpp
-        src/hardware.cpp
-
-        )
-target_link_libraries(hardware
-        PUBLIC
-        ${DEP_LIBS}
-        )
-add_library(rocos::hardware ALIAS hardware)
+#add_library(hardware
+#        SHARED
+#        src/ecat_config.cpp
+#        src/hardware.cpp
+#
+#        )
+#target_link_libraries(hardware
+#        PUBLIC
+#        ${DEP_LIBS}
+#        )
+#add_library(rocos::hardware ALIAS hardware)
 
 ########## Library Drive #################
-add_library(drive
-        SHARED
-        src/drive.cpp
-        src/drive_guard.cpp
-)
-target_link_libraries(drive
-        PUBLIC
-        $<BUILD_INTERFACE:rocos::hardware>
-        )
-add_library(rocos::drive ALIAS drive)
+#add_library(drive
+#        SHARED
+#        src/drive.cpp
+#        src/drive_guard.cpp
+#)
+#target_link_libraries(drive
+#        PUBLIC
+#        $<BUILD_INTERFACE:rocos::hardware>
+#        )
+#add_library(rocos::drive ALIAS drive)
 
 
 ########## Library robot #################
@@ -158,8 +158,8 @@ target_link_libraries(robot
         PUBLIC
         ${DEP_LIBS}
         $<BUILD_INTERFACE:rocos::logger>
-        $<BUILD_INTERFACE:rocos::hardware>
-        $<BUILD_INTERFACE:rocos::drive>
+#        $<BUILD_INTERFACE:rocos::hardware>
+#        $<BUILD_INTERFACE:rocos::drive>
         $<BUILD_INTERFACE:ruckig::ruckig>
         $<BUILD_INTERFACE:trac_ik>
         sml::sml
@@ -174,8 +174,8 @@ add_library(rocos::robot ALIAS robot)
 add_library(rocos_app INTERFACE)
 target_link_libraries(rocos_app
         INTERFACE
-        hardware
-        drive
+#        hardware
+#        drive
         robot
         )
 add_library(rocos::rocos_app ALIAS rocos_app)
@@ -189,8 +189,8 @@ add_executable(rocosAppMain
 ## Specify libraries to link a library or executable target against
 target_link_libraries(rocosAppMain
         PRIVATE
-        hardware
-        drive
+#        hardware
+#        drive
         robot
         gflags::gflags
         pthread
@@ -264,8 +264,8 @@ enable_testing()
 add_executable(unit_test test/unit_test.cc)
 target_link_libraries(unit_test
         PRIVATE
-        hardware
-        drive
+#        hardware
+#        drive
 #        kinematics
         robot
         )

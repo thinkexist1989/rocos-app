@@ -1,5 +1,8 @@
 #pragma once
 
+#include <ostream>
+#include <string>
+
 namespace rocos {
 
 enum class Result : int {
@@ -135,10 +138,6 @@ inline bool operator<(const Result& lhs, const Result& rhs) {
   return static_cast<int>(lhs) < static_cast<int>(rhs);
 }
 
-inline bool operator==(const Result& lhs, const Result& rhs) {
-  return static_cast<int>(lhs) == static_cast<int>(rhs);
-}
-
 inline bool operator<(const Result& lhs, const int& rhs) {
   return static_cast<int>(lhs) < rhs;
 }
@@ -147,5 +146,126 @@ inline bool operator==(const Result& lhs, const int& rhs) {
   return static_cast<int>(lhs) == rhs;
 }
 
+inline std::string to_string(Result r) {
+#define RESULT_CASE(name) case Result::name: return #name
+  switch (r) {
+    RESULT_CASE(NoError);
+    RESULT_CASE(WsastartFail);
+    RESULT_CASE(CreateSocketFail);
+    RESULT_CASE(BindPortFail);
+    RESULT_CASE(SocketReadFail);
+    RESULT_CASE(SocketTimeout);
+    RESULT_CASE(RecvfromFail);
+    RESULT_CASE(SendtoFail);
+    RESULT_CASE(LostHeartbeat);
+    RESULT_CASE(LostRobotState);
+    RESULT_CASE(GetDhFailed);
+    RESULT_CASE(ReleaseBrakeFailed);
+    RESULT_CASE(HoldBrakeFailed);
+    RESULT_CASE(IpAddressNotRegister);
+    RESULT_CASE(RobotArmOverNumber);
+    RESULT_CASE(SocketOtherError);
+    RESULT_CASE(JointRegistError);
+    RESULT_CASE(EepromRead);
+    RESULT_CASE(EepromWrite);
+    RESULT_CASE(LsEncoderOverspeed);
+    RESULT_CASE(LsEncoderFbError);
+    RESULT_CASE(MsSignalZError);
+    RESULT_CASE(ThreePhaseCurrent);
+    RESULT_CASE(TorqueSensorReadError);
+    RESULT_CASE(JointStateError);
+    RESULT_CASE(CommunicateError);
+    RESULT_CASE(LostHeartWithDianaRobotError);
+    RESULT_CASE(CallingConflictError);
+    RESULT_CASE(CollisionError);
+    RESULT_CASE(NotFollowPositionCmd);
+    RESULT_CASE(NotFollowTcpCmd);
+    RESULT_CASE(NotAllAtOpState);
+    RESULT_CASE(OutRangeFeedback);
+    RESULT_CASE(EmergencyStop);
+    RESULT_CASE(NoInitParameter);
+    RESULT_CASE(NotMatchLoad);
+    RESULT_CASE(CannotMoveWhileFreeDriving);
+    RESULT_CASE(CannotMoveWhileZeroSpaceFreeDriving);
+    RESULT_CASE(RobotInVirtualWall);
+    RESULT_CASE(ConflictTaskRunning);
+    RESULT_CASE(OutOfPhysicalRangeFeedback);
+    RESULT_CASE(OutSoftRangeFeedback);
+    RESULT_CASE(ConveyorNotOnline);
+    RESULT_CASE(ConveyorIsTracked);
+    RESULT_CASE(ConveyorCannotTrack);
+    RESULT_CASE(InputOutOfExtremePositionRange);
+    RESULT_CASE(SlopoverVirtualWall);
+    RESULT_CASE(SlopoverReduceVirtualWall);
+    RESULT_CASE(PlanError);
+    RESULT_CASE(InterpolatePositionError);
+    RESULT_CASE(InterpolateTorqueError);
+    RESULT_CASE(SingularValueError);
+    RESULT_CASE(PlannerError);
+    RESULT_CASE(HomePositionError);
+    RESULT_CASE(Fatal);
+    RESULT_CASE(PosLimit);
+    RESULT_CASE(ForceLimit);
+    RESULT_CASE(SpeedLimit);
+    RESULT_CASE(AccLimit);
+    RESULT_CASE(JerkLimit);
+    RESULT_CASE(MotionLimit);
+    RESULT_CASE(IkTrack);
+    RESULT_CASE(IkGeneral);
+    RESULT_CASE(PlanInput);
+    RESULT_CASE(PlanMoveJ);
+    RESULT_CASE(PlanMoveL);
+    RESULT_CASE(PlanMoveC);
+    RESULT_CASE(PlanBlend);
+    RESULT_CASE(PlanSpeedJ);
+    RESULT_CASE(PlanSpeedL);
+    RESULT_CASE(PlanServoJ);
+    RESULT_CASE(PlanServoL);
+    RESULT_CASE(MoveUnknown);
+    RESULT_CASE(MoveUnplan);
+    RESULT_CASE(MoveInput);
+    RESULT_CASE(MoveInterp);
+    RESULT_CASE(PlanTranslation);
+    RESULT_CASE(PlanRotation);
+    RESULT_CASE(PlanJoints);
+    RESULT_CASE(UnmatchedJointsNumber);
+    RESULT_CASE(TcpCaliFutileWps);
+    RESULT_CASE(TcpCaliFitFail);
+    RESULT_CASE(DhCaliFitWfFail);
+    RESULT_CASE(DhCaliFitTfFail);
+    RESULT_CASE(DhCaliFitDhFail);
+    RESULT_CASE(DhCaliInitFail);
+    RESULT_CASE(SlfMovSingular);
+    RESULT_CASE(SlfMovFutile);
+    RESULT_CASE(SlfMovJntLim);
+    RESULT_CASE(SlfMovSpdLim);
+    RESULT_CASE(SlfMovFail);
+    RESULT_CASE(SlfMovFfcFail);
+    RESULT_CASE(LoadIdentInitFail);
+    RESULT_CASE(LoadIdentUfbFail);
+    RESULT_CASE(LoadIdentFitFail);
+    RESULT_CASE(LoadIdentNonLoaded);
+    RESULT_CASE(IkCalcFail);
+    RESULT_CASE(FkCalcFail);
+    RESULT_CASE(IdCalcFail);
+    RESULT_CASE(FdCalcFail);
+    RESULT_CASE(ParameterPointerEqualsNullptr);
+    RESULT_CASE(ParameterNanOrInf);
+    RESULT_CASE(EnterForceModeError);
+    RESULT_CASE(CannotSetVelocityPercentValue);
+    RESULT_CASE(InputOutOfPhysicalPositionRange);
+    RESULT_CASE(ResourceUnavailable);
+    RESULT_CASE(DumpLogTimeout);
+    RESULT_CASE(DumpLogFailed);
+    RESULT_CASE(ResetDhFailed);
+    RESULT_CASE(IllegalParameter);
+    default: return "Unknown(" + std::to_string(static_cast<int>(r)) + ")";
+  }
+#undef RESULT_CASE
+}
+
+inline std::ostream& operator<<(std::ostream& os, Result r) {
+  return os << to_string(r);
+}
 
 }
