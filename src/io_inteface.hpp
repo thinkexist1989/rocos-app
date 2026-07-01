@@ -24,10 +24,11 @@ class IOInteface {
  public:
   virtual ~IOInteface() = default;
 
-  
+  virtual bool GetDigitalInput(int id, int channel = 0) = 0;
+  virtual void SetDigitalOutput(int id, int channel, bool value) = 0;
 
-
-
+  virtual double GetAnalogInput(int id, int channel = 0) = 0;
+  virtual void SetAnalogOutput(int id, int channel, double value) = 0;
 
 };
 

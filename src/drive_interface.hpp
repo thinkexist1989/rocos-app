@@ -36,7 +36,7 @@ class DriveInterface {
   virtual void SetVelocity(const JntArray& q_dot) = 0;
   virtual void SetTorque(const JntArray& tau) = 0;
 
-  virtual void SetMode(const int8_t mode) = 0;
+  virtual void SetMode(int8_t mode) = 0;
 
   virtual void SetEnabled() = 0;
   virtual void SetDisabled() = 0;

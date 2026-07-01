@@ -259,7 +259,7 @@ Robot::~Robot() {
   impl_.reset();
 }
 
-std::string Robot::GetRobotState() const {
+std::string Robot::GetStateString() const {
   if (impl_->is(sml::state<class IDLE>)) {
     return "IDLE";
   } else if (impl_->is(sml::state<class ENABLING>)) {
@@ -321,7 +321,7 @@ bool Robot::IsEnabled() const { return true; }
 
 bool Robot::IsDisabled() const { return true; }
 
-bool Robot::IsMotionRunning() const {
+bool Robot::IsRunning() const {
   return impl_->is(sml::state<class RUNNING>);
 }
 

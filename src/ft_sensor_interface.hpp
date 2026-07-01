@@ -18,8 +18,8 @@
 // email: luoyang@sia.cn
 #pragma once
 
-#include "types.hpp"
 #include "result.hpp"
+#include "types.hpp"
 
 namespace rocos {
 
@@ -28,20 +28,7 @@ namespace rocos {
     public:
         virtual ~FTSensorInterface() = default;
 
-        virtual Result GetData(Wrench& wrench_out) = 0; //TODO: 直接获取力旋量
-
-        virtual float getFx() const = 0;
-
-        virtual float getFy() const= 0;
-
-        virtual float getFz() const= 0;
-
-        virtual float getMx() const= 0;
-
-        virtual float getMy() const= 0;
-
-        virtual float getMz() const= 0;
-
+        virtual Wrench GetWrench() = 0; //TODO: 直接获取力旋量
 
     };
 

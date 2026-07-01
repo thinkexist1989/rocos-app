@@ -48,29 +48,30 @@ class Robot {
 
   ~Robot();
 
-  [[nodiscard]] std::string GetRobotState() const;
+  [[nodiscard]] std::string GetStateString() const;
 
   Result Start();
 
+  //! \brief 暂停机器人运动，使机器人状态机进入 Pause 状态
   Result Pause();
-
+  //! \brief 继续机器人运动，使机器人状态机进入 Running 状态
   Result Continue();
-
+  //! \brief 停止机器人运动，使机器人状态机进入 Stopped 状态
   Result Stop();
-
+  //! \brief 机器人上使能请求
   Result SetEnabled();
-
+  //! \brief机器人下使能请求
   Result SetDisabled();
 
 
 
 
-
+  //! \brief 获取机器人当前是否上使能状态
   bool IsEnabled() const;
-
+  //！ \brief 获取机器人当前是否上使能状态
   bool IsDisabled() const;
-
-  bool IsMotionRunning() const;
+  //！ \brief 获取机器人当前是否正在运动
+  bool IsRunning() const;
 
 
 

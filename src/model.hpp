@@ -59,8 +59,8 @@ class Model : public ModelInterface {
                  const std::string& base_link,
                  const std::string& tip);
 
-  const JntArray& GetQMin() const noexcept { return q_min_; }
-  const JntArray& GetQMax() const noexcept { return q_max_; }
+  const JntArray& GetPosLowerLimit() const noexcept { return q_min_; }
+  const JntArray& GetPosUpperLimit() const noexcept { return q_max_; }
   const Chain& GetChain() const noexcept { return chain_; }
 
  private:
@@ -78,6 +78,10 @@ class Model : public ModelInterface {
 
   JntArray q_min_;
   JntArray q_max_;
+
+  JntArray q_vel_;
+  JntArray q_acc_;
+  JntArray q_jerk_;
 
   Vector gravity_{0.0, 0.0, -9.81};
 
