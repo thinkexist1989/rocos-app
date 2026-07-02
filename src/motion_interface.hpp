@@ -21,17 +21,13 @@
 #include "types.hpp"
 #include "result.hpp"
 
-#include <variant>
-
 namespace rocos {
-
-typedef std::variant<JntArray, Frame> Ref;
 
 class MotionInterface {
  public:
   virtual ~MotionInterface() = default;
 
-  virtual Result GenerateRef(Ref& ref_out) = 0;
+  virtual Result GenerateRef(Reference& ref_out) = 0;
   virtual bool Reset() = 0;
 
   virtual bool supportsPause() const = 0;

@@ -32,6 +32,7 @@ class Executor {
  public:
   explicit Executor(MotionInterface* motion, ControllerInterface* controller,
                     HardwareInterface* hardware);
+  Executor();
 
   virtual ~Executor();
 
@@ -43,11 +44,11 @@ class Executor {
  private:
 
   //TODO: 之所以保存接口的裸指针，是因为Executor只是拼装作用，不管理指针的生命周期
-  MotionInterface* motion_;
-  ControllerInterface* controller_;
-  HardwareInterface* hardware_;
+  MotionInterface* motion_ {nullptr};
+  ControllerInterface* controller_ {nullptr};
+  HardwareInterface* hardware_ {nullptr};
 
-  std::mutex mtx_;
+  // std::mutex mtx_;
 };
 
 }  // namespace rocos

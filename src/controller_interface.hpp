@@ -20,17 +20,19 @@
 
 #include "types.hpp"
 
-#include "motion_interface.hpp"
+#include "hardware_interface.hpp"
+#include "model_interface.hpp"
 
 namespace rocos {
 
 class ControllerInterface {
  public:
   virtual ~ControllerInterface() = default;
+  virtual bool Reset() = 0;
 
-  virtual Result SetContext(HardwareInterface* hardware) = 0;
+  virtual Result SetHardware(HardwareInterface* hardware) = 0;
   virtual Result SetModel(ModelInterface* model) = 0;
-  virtual Result GenerateCmd(const Ref& ref_in, JntArray& q_cmd) = 0; //TODO: 更新Cmd但是不发送
+  virtual Result GenerateCmd(const Reference& ref_in, JntArray& q_cmd) = 0; //TODO: 更新Cmd但是不发送
   virtual Result UpdateCmd(const JntArray& q_cmd) = 0; //TODO: 发送Cmd
 };
 

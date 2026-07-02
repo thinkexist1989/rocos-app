@@ -22,8 +22,6 @@
 #include <boost/sml.hpp>
 #include <kdl_parser/kdl_parser.hpp>  // 用于将urdf文件解析为KDL::Tree
 
-#define EPS 1e-7
-
 namespace {
 // 状态定义
 class IDLE {};         // 空闲状态，机器人传感器与执行器就绪，等待使能命令
@@ -161,6 +159,7 @@ struct StateMachine {
 }  // namespace
 
 namespace rocos {
+
 class Robot::Impl {
  public:
   explicit Impl(Robot& owner) : sm_{owner} {}
@@ -185,7 +184,8 @@ class Robot::Impl {
   mutable std::recursive_mutex mtx_;  // 保护状态机的并发访问（允许同线程重入）
 };
 
-////////////////////////////////////////////////////////////////////
+#pragma region 状态机action处理函数
+
 void Robot::on_fsm_enable() {
   log_ptr_->info("机器人正在使能中");
 
@@ -254,13 +254,19 @@ void Robot::on_fsm_reset() {
 void Robot::on_fsm_servo() {
   log_ptr_->info("Robot is servoing...");
 }
-////////////////////////////////////////////////////////////////////
 
+#pragma endregion
 
 
 
 Robot::Robot() : impl_(std::make_unique<Impl>(*this)) {
   log_ptr_ = Logger::getInstance("Robot");
+
+
+
+
+
+  executor = std::make_unique<Executor>();
 
 
   log_ptr_->info("机器人开始初始化");

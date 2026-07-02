@@ -18,6 +18,8 @@
 // email: luoyang@sia.cn
 #pragma once
 
+#include <kdl/utilities/utility.h>
+
 #include <kdl/chain.hpp>
 #include <kdl/chainfdsolver.hpp>
 #include <kdl/chainfksolver.hpp>
@@ -27,7 +29,8 @@
 #include <kdl/jacobian.hpp>
 #include <kdl/jntarray.hpp>
 #include <kdl/tree.hpp>
-#include <kdl/utilities/utility.h>
+
+#include <variant>
 
 namespace rocos {
 
@@ -42,6 +45,8 @@ namespace rocos {
   using ChainFkSolverPos = KDL::ChainFkSolverPos;
   using ChainFdSolver = KDL::ChainFdSolver;
   using ChainIdSolver = KDL::ChainIdSolver;
+
+  typedef std::variant<JntArray, Frame> Reference;
 
 
 }  // namespace rocos
