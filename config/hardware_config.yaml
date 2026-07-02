@@ -55,6 +55,7 @@ hardware:
       target_position: "Target position"    # 目标位置 (int32)
       target_velocity: "Target velocity"    # 目标速度 (int32)
       target_torque: "Target torque"        # 目标力矩 (int16)
+      digital_outputs: "Digital Outputs"    # 数字输出（DO 写值）
 
   # ===========================================================================
   # 示例 2: 六维力/力矩传感器配置（独立从站，非驱动器内置）
@@ -62,14 +63,23 @@ hardware:
   - id: 5
     type: ft_sensor
 
-    # 六维力/力矩偏置/补偿值 (Fx,Fy,Fz,Tx,Ty,Tz)
-    wrench:
-      fx: 0.0     # 力 X [N]
-      fy: 0.0     # 力 Y [N]
-      fz: 0.0     # 力 Z [N]
-      tx: 0.0     # 力矩 X [Nm]
-      ty: 0.0     # 力矩 Y [Nm]
-      tz: 0.0     # 力矩 Z [Nm]
+    # 6 通道 PDO 变量名映射（从站 → 主站），值与 ethercat 配置中 pd_var 的 name 一致
+    inputs:
+      fx: "Fx"    # Fx 力 X [N]
+      fy: "Fy"    # Fy 力 Y [N]
+      fz: "Fz"    # Fz 力 Z [N]
+      tx: "Tx"    # Tx 力矩 X [Nm]
+      ty: "Ty"    # Ty 力矩 Y [Nm]
+      tz: "Tz"    # Tz 力矩 Z [Nm]
+
+    # 标定偏置值
+    offset:
+      fx: 0.0     # 力 X 偏置 [N]
+      fy: 0.0     # 力 Y 偏置 [N]
+      fz: 0.0     # 力 Z 偏置 [N]
+      tx: 0.0     # 力矩 X 偏置 [Nm]
+      ty: 0.0     # 力矩 Y 偏置 [Nm]
+      tz: 0.0     # 力矩 Z 偏置 [Nm]
 
   # ===========================================================================
   # 示例 3: 独立 IO 模块配置

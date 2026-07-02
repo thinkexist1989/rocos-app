@@ -107,6 +107,7 @@ Drive Hardware::parseDrive(const YAML::Node& node) {
         d.outputs.target_position   = yamlGetStr(out, "target_position");
         d.outputs.target_velocity   = yamlGetStr(out, "target_velocity");
         d.outputs.target_torque     = yamlGetStr(out, "target_torque");
+        d.outputs.digital_outputs   = yamlGetStr(out, "digital_outputs");
     }
 
     return d;
@@ -116,16 +117,27 @@ FTSensor Hardware::parseFTSensor(const YAML::Node& node) {
     FTSensor ft;
     ft.id = node["id"].as<int>();
 
-    // 解析六维力/力矩偏置/补偿值
-    if (node["wrench"]) {
-        const auto& wr = node["wrench"];
-        ft.wrench = Wrench(
-            KDL::Vector(yamlGetDouble(wr, "fx", 0.0),
-                        yamlGetDouble(wr, "fy", 0.0),
-                        yamlGetDouble(wr, "fz", 0.0)),
-            KDL::Vector(yamlGetDouble(wr, "tx", 0.0),
-                        yamlGetDouble(wr, "ty", 0.0),
-                        yamlGetDouble(wr, "tz", 0.0))
+    // 解析 6 通道 PDO 变量名映射
+    if (node["inputs"]) {
+        const auto& in = node["inputs"];
+        ft.inputs.fx = yamlGetStr(in, "fx");
+        ft.inputs.fy = yamlGetStr(in, "fy");
+        ft.inputs.fz = yamlGetStr(in, "fz");
+        ft.inputs.tx = yamlGetStr(in, "tx");
+        ft.inputs.ty = yamlGetStr(in, "ty");
+        ft.inputs.tz = yamlGetStr(in, "tz");
+    }
+
+    // 解析标定偏置值
+    if (node["offset"]) {
+        const auto& off = node["offset"];
+        ft.offset = Wrench(
+            KDL::Vector(yamlGetDouble(off, "fx", 0.0),
+                        yamlGetDouble(off, "fy", 0.0),
+                        yamlGetDouble(off, "fz", 0.0)),
+            KDL::Vector(yamlGetDouble(off, "tx", 0.0),
+                        yamlGetDouble(off, "ty", 0.0),
+                        yamlGetDouble(off, "tz", 0.0))
         );
     }
 
@@ -196,7 +208,7 @@ Hardware::~Hardware() {
 // ==========================================================================
 
 void Hardware::loadFromYAML(const std::string& yaml_file_path) {
-    // auto log_ptr = Logger::getInstance("Hardware");
+    auto log_ptr = Logger::getInstance("Hardware");
 
     try {
         YAML::Node root = YAML::LoadFile(yaml_file_path);
@@ -469,12 +481,23 @@ Wrench Hardware::GetWrench() {
         return Wrench::Zero();
     }
 
-    // 取第一个力传感器数据，加上配置中的偏置 Wrench
     const auto& ft = config_.ft_sensors[0];
 
-    // TODO: 从 FTSensor 从站 PDO 读取完整的 6 维原始数据并解算
-    // 当前返回配置中的偏置值（用于标定场景）
-    return ft.wrench;
+    // 从 PDO 读取各通道原始值（int16），加上偏置
+    auto readCh = [&](const std::string& var_name) -> double {
+        if (var_name.empty()) return 0.0;
+        return static_cast<double>(
+            ec_ptr_->getSlaveInputVarValueByName<int16_t>(ft.id, var_name));
+    };
+
+    return Wrench(
+        KDL::Vector(readCh(ft.inputs.fx) + ft.offset.force.x(),
+                    readCh(ft.inputs.fy) + ft.offset.force.y(),
+                    readCh(ft.inputs.fz) + ft.offset.force.z()),
+        KDL::Vector(readCh(ft.inputs.tx) + ft.offset.torque.x(),
+                    readCh(ft.inputs.ty) + ft.offset.torque.y(),
+                    readCh(ft.inputs.tz) + ft.offset.torque.z())
+    );
 }
 
 // ==========================================================================
@@ -526,8 +549,8 @@ void Hardware::SetDigitalOutput(int id, int channel, bool value) {
 
     // 2. 在驱动器中查找（驱动器自带 DO）
     const Drive* drive = findDriveById(id);
-    if (drive != nullptr && !drive->outputs.control_word.empty()) {
-        // 驱动器通过 PDO input 区回读 DO 实际状态
+    if (drive != nullptr && !drive->outputs.digital_outputs.empty()) {
+        // 通过 PDO input 区回读当前 DO 状态，修改指定位后写入输出 PDO
         int32_t current = ec_ptr_->getSlaveInputVarValueByName<int32_t>(
             id, drive->inputs.digital_outputs);
         if (value) {
@@ -535,8 +558,9 @@ void Hardware::SetDigitalOutput(int id, int channel, bool value) {
         } else {
             current &= ~(1 << channel);
         }
-        // 驱动器 DO 可能通过 PDO output 区域控制，也可能通过 SDO
-        // 这里仅做占位实现
+        ec_ptr_->setSlaveOutputVarValueByName<int32_t>(
+            id, drive->outputs.digital_outputs, current);
+        return;
     }
 }
 

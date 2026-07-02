@@ -102,6 +102,7 @@ struct Drive {
         std::string target_position;
         std::string target_velocity;
         std::string target_torque;
+        std::string digital_outputs;             // 数字输出（DO）
     } outputs;
 
 };
@@ -112,8 +113,18 @@ struct Drive {
 struct FTSensor {
     int id{-1};                        // EtherCAT 从站 ID
 
-    /// @brief 六维力/力矩传感器读数 (Fx,Fy,Fz,Tx,Ty,Tz)
-    Wrench wrench;
+    /// @brief 输入 PDO 变量名（从站 → 主站），6 通道映射
+    struct InputVar {
+        std::string fx;    // Fx 通道
+        std::string fy;    // Fy 通道
+        std::string fz;    // Fz 通道
+        std::string tx;    // Tx 通道
+        std::string ty;    // Ty 通道
+        std::string tz;    // Tz 通道
+    } inputs;
+
+    /// @brief 六维力/力矩标定偏置值 (Fx,Fy,Fz,Tx,Ty,Tz)
+    Wrench offset;
 };
 
 // ==========================================================================
