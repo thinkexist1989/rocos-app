@@ -261,14 +261,23 @@ file(COPY ${CONFIG_FILE} DESTINATION ${CMAKE_BINARY_DIR}/bin)
 #############
 
 enable_testing()
-add_executable(unit_test test/unit_test.cc)
-target_link_libraries(unit_test
+add_executable(model_test test/model_test.cc)
+target_link_libraries(model_test
         PRIVATE
 #        hardware
 #        drive
 #        kinematics
         robot
         )
-add_test(NAME unit_test COMMAND unit_test)
-set_tests_properties(unit_test PROPERTIES
+add_test(NAME model_test COMMAND unit_test)
+set_tests_properties(model_test PROPERTIES
+        WORKING_DIRECTORY ${CMAKE_SOURCE_DIR})
+
+add_executable(robot_fsm_test test/robot_fsm_test.cc)
+target_link_libraries(robot_fsm_test
+        PRIVATE
+        robot
+        )
+add_test(NAME robot_fsm_test COMMAND robot_fsm_test)
+set_tests_properties(robot_fsm_test PROPERTIES
         WORKING_DIRECTORY ${CMAKE_SOURCE_DIR})
