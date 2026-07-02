@@ -1,0 +1,93 @@
+# =============================================================================
+# ROCOS 硬件描述配置文件 (hardware_config.yaml)
+# 支持三种从站类型：
+#   - driver      : 伺服驱动器（CiA 402 兼容）
+#   - ft_sensor   : 力/力矩传感器
+#   - io          : 独立 IO 模块
+# =============================================================================
+
+hardware:
+  # ===========================================================================
+  # 示例 1: 伺服驱动器配置
+  # ===========================================================================
+  - id: 4
+    type: driver
+    joint_name: joint_1
+
+    # 关节力矩传感器数据来源（对使用者透明）
+    #   load_torque          : 从 load_torque_value 读取 int16 Analog Input 原始值
+    #   secondary_position   : 从 secondary_position_value 读取底层滤波后的数据
+    torque_source: load_torque
+
+    # 运动限位
+    limit:
+      lower: -2.71       # 位置下限 [rad] 或 [m]
+      upper: 2.71        # 位置上限 [rad] 或 [m]
+      vel: 3.0           # 最大速度 [rad/s] 或 [m/s]
+      acc: 10.0          # 最大加速度
+      jerk: 150.0        # 最大加加速度
+      effort: 30.0       # 最大力矩/力 [Nm] 或 [N]
+
+    # 编码器 / 力矩变换（物理单位 ↔ 编码器计数）
+    transform:
+      ratio: 1.0                    # 减速比（关节侧 / 电机侧）
+      offset_pos_cnt: 0             # 零点偏移 [cnt]
+      cnt_per_unit: 156455.678      # 每物理单位的编码器计数
+      torque_per_unit: 1.0          # 每物理单位的力矩值
+      user_unit_name: rad           # 用户单位名称
+
+    # 输入 PDO 变量名（从站 → 主站），需与 ethercat 配置中 pd_var 的 name 一致
+    inputs:
+      status_word: "Statusword"
+      position_actual_value: "Position actual value"
+      velocity_actual_value: "Velocity actual value"
+      torque_actual_value: "Torque actual value"
+      load_torque_value: "Analog Input 1"          # 可用于作为力矩传感器数据源
+      secondary_position_value: "Auxiliary position actual value"  # 底层滤波后的力数据
+      secondary_velocity_value: "Secondary velocity value"
+      digital_inputs: "Digital Inputs"             # DI 位掩码
+      digital_outputs: "Digital Outputs"           # DO 回读（状态反馈）
+
+    # 输出 PDO 变量名（主站 → 从站）
+    outputs:
+      control_word: "Controlword"           # CiA 402 Controlword (uint16)
+      mode_of_operation: "Modes of operation"  # CiA 402 Mode of Operation (int8)
+      target_position: "Target position"    # 目标位置 (int32)
+      target_velocity: "Target velocity"    # 目标速度 (int32)
+      target_torque: "Target torque"        # 目标力矩 (int16)
+
+  # ===========================================================================
+  # 示例 2: 六维力/力矩传感器配置（独立从站，非驱动器内置）
+  # ===========================================================================
+  - id: 5
+    type: ft_sensor
+
+    # 六维力/力矩偏置/补偿值 (Fx,Fy,Fz,Tx,Ty,Tz)
+    wrench:
+      fx: 0.0     # 力 X [N]
+      fy: 0.0     # 力 Y [N]
+      fz: 0.0     # 力 Z [N]
+      tx: 0.0     # 力矩 X [Nm]
+      ty: 0.0     # 力矩 Y [Nm]
+      tz: 0.0     # 力矩 Z [Nm]
+
+  # ===========================================================================
+  # 示例 3: 独立 IO 模块配置
+  # ===========================================================================
+  - id: 6
+    type: io
+
+    # IO 通道数量（用于参数合法性校验）
+    digital_in_channels: 8      # DI 点数
+    digital_out_channels: 8     # DO 点数
+    analog_in_channels: 4       # AI 通道数
+    analog_out_channels: 2      # AO 通道数
+
+    inputs:
+      digital_inputs: "Digital Inputs"    # DI 位掩码 (int32)
+      digital_outputs: "Digital Outputs"  # DO 回读 (int32)
+      analog_inputs: "Analog Inputs"      # AI 数据
+
+    outputs:
+      digital_outputs: "Digital Outputs"  # DO 值 (int32)
+      analog_outputs: "Analog Outputs"    # AO 值
