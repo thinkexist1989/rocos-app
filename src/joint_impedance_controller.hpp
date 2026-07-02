@@ -22,5 +22,10 @@
 
 namespace rocos {
     class JointImpedanceController : public ControllerInterface {
+
+
+
+
+
     };
 } // rocos
