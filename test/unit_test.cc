@@ -154,7 +154,7 @@ TEST_CASE("Robot FSM - IsRunning 仅在 RUNNING 时为真") {
     // Pause/Continue/Stop 为空桩，不触发 FSM 事件，状态不变
     robot.Pause();
     CHECK_FALSE(robot.IsRunning());
-    robot.Continue();
+    robot.Resume();
     CHECK_FALSE(robot.IsRunning());
     robot.Stop();
     CHECK_FALSE(robot.IsRunning());

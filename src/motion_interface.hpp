@@ -31,7 +31,17 @@ class MotionInterface {
  public:
   virtual ~MotionInterface() = default;
 
-  virtual Result UpdateRef(Ref& ref_out) = 0;
+  virtual Result GenerateRef(Ref& ref_out) = 0;
+  virtual bool Reset() = 0;
+
+  virtual bool supportsPause() const = 0;
+  virtual bool supportsResume() const = 0;
+  virtual bool supportsStop() const = 0;
+
+  virtual Result Pause() = 0;
+  virtual Result Resume() = 0;
+  virtual Result Stop() = 0;
+  virtual Result Update() = 0;
 };
 
 }  // namespace rocos

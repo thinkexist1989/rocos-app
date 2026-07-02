@@ -19,7 +19,6 @@
 #pragma once
 
 #include "types.hpp"
-#include "result.hpp"
 
 #include "motion_interface.hpp"
 
@@ -29,7 +28,10 @@ class ControllerInterface {
  public:
   virtual ~ControllerInterface() = default;
 
-  virtual Result UpdateCmd(const Ref& ref_in, JntArray& q_cmd) = 0;
+  virtual Result SetContext(HardwareInterface* hardware) = 0;
+  virtual Result SetModel(ModelInterface* model) = 0;
+  virtual Result GenerateCmd(const Ref& ref_in, JntArray& q_cmd) = 0; //TODO: 更新Cmd但是不发送
+  virtual Result UpdateCmd(const JntArray& q_cmd) = 0; //TODO: 发送Cmd
 };
 
 }  // namespace rocos

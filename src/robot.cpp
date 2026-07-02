@@ -41,7 +41,7 @@ class DISABLING {};
 class STARTING {};  // 启动状态，机器人正在启动
 class STOPPING {};
 class PAUSING {};
-class CONTINUING {};
+class RESUMING {};
 
 // 事件定义
 struct EventResetReq {};       // 恢复请求
@@ -51,7 +51,7 @@ struct EventSuccess {};        // 成功事件
 struct EventStartReq {};       // 启动请求
 struct EventStopReq {};        // 停止请求
 struct EventPauseReq {};       // 暂停请求
-struct EventContinueReq {};    // 继续请求
+struct EventResumeReq {};    // 继续请求
 struct EventErrorOccurred {};  // 发生错误
 struct EventServoReq {};       // 伺服请求
 struct EventIdentifyReq {};    // 动力学参数辨识请求
@@ -62,8 +62,8 @@ namespace sml = boost::sml;
 const auto action_start = [](rocos::Robot& robot) { robot.on_fsm_start(); };
 const auto action_run = [](rocos::Robot& robot) { robot.on_fsm_run(); };
 const auto action_pause = [](rocos::Robot& robot) { robot.on_fsm_pause(); };
-const auto action_continue = [](rocos::Robot& robot) {
-  robot.on_fsm_continue();
+const auto action_resume = [](rocos::Robot& robot) {
+  robot.on_fsm_resume();
 };
 const auto action_stop = [](rocos::Robot& robot) { robot.on_fsm_stop(); };
 const auto action_reset = [](rocos::Robot& robot) { robot.on_fsm_reset(); };
@@ -113,9 +113,9 @@ struct StateMachine {
         state<class PAUSING> + event<EventSuccess> =
             state<class PAUSED>,  // 中间状态直接跳转
 
-        state<class PAUSED> + event<EventContinueReq> = state<class CONTINUING>,
-        state<class CONTINUING> + sml::on_entry<_> / action_continue,
-        state<class CONTINUING> + event<EventSuccess> =
+        state<class PAUSED> + event<EventResumeReq> = state<class RESUMING>,
+        state<class RESUMING> + sml::on_entry<_> / action_resume,
+        state<class RESUMING> + event<EventSuccess> =
             state<class RUNNING>,  // 中间状态直接跳转
 
         state<class PAUSED> + event<EventStopReq> = state<class STOPPING>,
@@ -148,7 +148,7 @@ struct StateMachine {
             state<class ERROR_STATE>,  // 9
         state<class PAUSING> + event<EventErrorOccurred> =
             state<class ERROR_STATE>,  // 10
-        state<class CONTINUING> + event<EventErrorOccurred> =
+        state<class RESUMING> + event<EventErrorOccurred> =
             state<class ERROR_STATE>,  // 11
         state<class RESETTING> + event<EventErrorOccurred> =
             state<class ERROR_STATE>,  // 12
@@ -225,7 +225,7 @@ void Robot::on_fsm_pause() {
   // PAUSING 进入：确认暂停并转入 PAUSED。
   impl_->process_event(EventSuccess{});
 }
-void Robot::on_fsm_continue() {
+void Robot::on_fsm_resume() {
   // CONTINUING 进入：确认继续并转回 RUNNING。
   impl_->process_event(EventSuccess{});
 }
@@ -291,7 +291,7 @@ std::string Robot::GetStateString() const {
     return "STOPPING";
   } else if (impl_->is(sml::state<class PAUSING>)) {
     return "PAUSING";
-  } else if (impl_->is(sml::state<class CONTINUING>)) {
+  } else if (impl_->is(sml::state<class RESUMING>)) {
     return "CONTINUING";
   } else if (impl_->is(sml::state<class RESETTING>)) {
     return "RESETTING";
@@ -357,7 +357,7 @@ Result Robot::Pause() {
   return Result::NoError;
 }
 
-Result Robot::Continue() {
+Result Robot::Resume() {
 
   return Result::NoError;
 }

@@ -30,7 +30,5 @@ class HardwareInterface : public DriveInterface,
  public:
   virtual ~HardwareInterface() = default;
 
-
-
 };
 }  // namespace rocos

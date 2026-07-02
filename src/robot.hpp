@@ -57,7 +57,7 @@ class Robot {
   //! \brief 暂停机器人运动，使机器人状态机进入 Pause 状态
   Result Pause();
   //! \brief 继续机器人运动，使机器人状态机进入 Running 状态
-  Result Continue();
+  Result Resume();
   //! \brief 停止机器人运动，使机器人状态机进入 Stopped 状态
   Result Stop();
   //! \brief 启动机器人运动，使机器人状态机进入 Running 状态
@@ -185,7 +185,7 @@ class Robot {
 
   void on_fsm_pause();
 
-  void on_fsm_continue();
+  void on_fsm_resume();
 
   void on_fsm_identify();
 
