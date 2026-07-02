@@ -22,7 +22,18 @@
 
 namespace rocos {
     class MoveJoint : public MotionInterface {
-
-    };
+ public:
+    MoveJoint() = default;
+    ~MoveJoint() override;
+    Result GenerateRef(Reference& ref_out) override;
+    bool Reset() override;
+    bool supportsPause() const override;
+    bool supportsResume() const override;
+    bool supportsStop() const override;
+    Result Pause() override;
+    Result Resume() override;
+    Result Stop() override;
+    Result Update() override;
+};
 } // rocos
 

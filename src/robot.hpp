@@ -147,10 +147,10 @@ class Robot {
 
 
  public:
-  ModelInterface* model {nullptr};  //TODO: 机器人里可以保存子类指针，因为机器人会用到很多子类的功能，但是其他的模块接收接口指针即可
-  HardwareInterface *hardware {nullptr};  //TODO: 同理，机器人里直接保存子类指针
-  std::vector<MotionInterface*> motion {nullptr}; // movej, movel, movec
-  std::vector<ControllerInterface*> controller {nullptr}; // position, CartAdmit, JntAdmit, JntImp, CartImp
+  std::unique_ptr<ModelInterface> model {nullptr};  //TODO: 机器人里可以保存子类指针，因为机器人会用到很多子类的功能，但是其他的模块接收接口指针即可
+  std::unique_ptr<HardwareInterface> hardware {nullptr};  //TODO: 同理，机器人里直接保存子类指针
+  std::unique_ptr<MotionInterface> motion {nullptr}; // movej, movel, movec
+  std::unique_ptr<ControllerInterface> controller {nullptr}; // position, CartAdmit, JntAdmit, JntImp, CartImp
 
   std::unique_ptr<Executor> executor {nullptr}; //执行器
 

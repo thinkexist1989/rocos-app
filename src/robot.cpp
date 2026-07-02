@@ -22,6 +22,18 @@
 #include <boost/sml.hpp>
 #include <kdl_parser/kdl_parser.hpp>  // 用于将urdf文件解析为KDL::Tree
 
+#include "hardware.hpp"
+
+#include "move_joint.hpp"
+#include "move_line.hpp"
+#include "move_circle.hpp"
+
+#include "position_controller.hpp"
+#include "joint_impedance_controller.hpp"
+#include "cartesian_impedance_controller.hpp"
+
+
+
 namespace {
 // 状态定义
 class IDLE {};         // 空闲状态，机器人传感器与执行器就绪，等待使能命令
@@ -269,11 +281,17 @@ void Robot::on_fsm_servo() {
 Robot::Robot() : impl_(std::make_unique<Impl>(*this)) {
   log_ptr_ = Logger::getInstance("Robot");
 
-
-
-
+  hardware = std::make_unique<Hardware>("./config/hardware.yaml", 0);
 
   executor = std::make_unique<Executor>();
+
+  // motion = std::make_unique<MoveJoint>();
+  // controller = std::make_unique<PositionController>(); //TODO: 默认加载位置控制器
+
+
+
+
+
 
 
   log_ptr_->info("机器人开始初始化");

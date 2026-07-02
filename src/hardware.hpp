@@ -172,6 +172,8 @@ public:
     explicit Hardware(const std::string& yaml_file_path, int ecat_id = 0);
     ~Hardware();
 
+    bool Reset() override;
+
     // ========== DriveInterface 接口实现 ==========
     JntArray GetPosition() override;
     JntArray GetVelocity() override;
