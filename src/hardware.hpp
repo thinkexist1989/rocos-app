@@ -22,10 +22,9 @@
 #include <string>
 #include <vector>
 
-#include "drive_interface.hpp"
+#include "hardware_interface.hpp"
 #include "ecat_config.hpp"
-#include "ft_sensor_interface.hpp"
-#include "io_inteface.hpp"
+
 
 // 前向声明，避免在头文件中引入 yaml-cpp
 namespace YAML {
@@ -165,9 +164,7 @@ struct HardwareConfig {
 // ==========================================================================
 // 硬件抽象层
 // ==========================================================================
-class Hardware : public DriveInterface,
-                 public FTSensorInterface,
-                 public IOInteface {
+class Hardware : public HardwareInterface {
 public:
     /// @brief 从 YAML 配置文件构造硬件抽象层
     /// @param yaml_file_path 硬件描述 YAML 文件路径

@@ -24,5 +24,3 @@ namespace rocos {
     class CartesianImpedanceController : public ControllerInterface {
     };
 } // rocos
-
-#endif //ROCOS_APP_CARTESIAN_IMPEDANCE_CONTROLLER_HPP

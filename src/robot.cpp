@@ -196,7 +196,7 @@ void Robot::on_fsm_enable() {
     impl_->process_event(EventSuccess{});
   } else {
     log_ptr_->error("机器人上使能失败，准备进入ERROR_STATE状态");
-    impl_->process_event(EventErrorOccurred{});1ddd
+    impl_->process_event(EventErrorOccurred{});
   }
 
 }
