@@ -144,6 +144,16 @@ add_library(robot
         src/robot.cpp
         src/model.cpp
 
+        src/move_joint.cpp
+        src/move_line.cpp
+        src/move_circle.cpp
+
+        src/position_controller.cpp
+        src/joint_impedance_controller.cpp
+        src/cartesian_impedance_controller.cpp
+
+
+
 #        src/velocity_profile.cpp
 #        src/robot_http_server.cpp
 )

@@ -187,24 +187,31 @@ class Robot::Impl {
 #pragma region 状态机action处理函数
 
 void Robot::on_fsm_enable() {
-  log_ptr_->info("机器人正在使能中");
+  log_ptr_->info("机器人正在上使能中");
 
   // IsEnabled();
 
   if (randomBool()) {
-    log_ptr_->info("机器人使能成功，准备进入STOPPED状态");
+    log_ptr_->info("机器人上使能成功，准备进入STOPPED状态");
     impl_->process_event(EventSuccess{});
   } else {
-    log_ptr_->error("机器人使能失败，准备进入ERROR_STATE");
-    impl_->process_event(EventErrorOccurred{});
+    log_ptr_->error("机器人上使能失败，准备进入ERROR_STATE状态");
+    impl_->process_event(EventErrorOccurred{});1ddd
   }
 
 }
 void Robot::on_fsm_disable() {
-  setDisabled();
-  if (!IsDisabled()) {
+  log_ptr_->info("机器人正在下使能中");
+
+  // IsDisabled();
+
+
+
+  if (randomBool()) {
+    log_ptr_->info("机器人下使能成功，准备进入IDLE状态");
     impl_->process_event(EventSuccess{});
   } else {
+    log_ptr_->error("机器人下使能失败，准备进入ERROR_STATE状态");
     impl_->process_event(EventErrorOccurred{});
   }
 }
