@@ -6,6 +6,11 @@
 namespace rocos {
 
 enum class Result : int {
+
+
+  PlanFinnished = 1000,
+
+
   NoError = 0,
 
   // API套接字错误

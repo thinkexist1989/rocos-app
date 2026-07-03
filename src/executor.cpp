@@ -44,6 +44,9 @@ Result Executor::Update() {
   if (res < 0) {
     return res;
   }
+  else if (res > 0) {
+    return res;
+  }
 
   JntArray q_cmd;
 
