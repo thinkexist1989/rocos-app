@@ -21,7 +21,22 @@
 #include "controller_interface.hpp"
 
 namespace rocos {
-    class PositionController : public ControllerInterface {
 
-    };
-} // rocos
+class PositionController : public ControllerInterface {
+public:
+    PositionController() = default;
+    ~PositionController() override = default;
+
+    bool Reset() override;
+    Result SetHardware(HardwareInterface* hardware) override;
+    Result SetModel(ModelInterface* model) override;
+    Result GenerateCmd(const Reference& ref_in, JntArray& q_cmd) override;
+    Result UpdateCmd(const JntArray& q_cmd) override;
+
+private:
+    HardwareInterface* hardware_{nullptr};
+    ModelInterface* model_{nullptr};
+    bool mode_set_{false};  // 确保 CSP 模式只设置一次
+};
+
+} // namespace rocos

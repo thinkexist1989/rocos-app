@@ -300,3 +300,12 @@ target_link_libraries(hardware_test
 add_test(NAME hardware_test COMMAND hardware_test)
 set_tests_properties(hardware_test PROPERTIES
         WORKING_DIRECTORY ${CMAKE_SOURCE_DIR})
+
+add_executable(position_controller_test test/position_controller_test.cc)
+target_link_libraries(position_controller_test
+        PRIVATE
+        robot
+        )
+add_test(NAME position_controller_test COMMAND position_controller_test)
+set_tests_properties(position_controller_test PROPERTIES
+        WORKING_DIRECTORY ${CMAKE_SOURCE_DIR})
