@@ -22,12 +22,12 @@ find_package(urdfdom REQUIRED)
 find_package(TinyXML REQUIRED)
 find_package(TinyXML2 REQUIRED)
 find_package(rosconsole QUIET)
-find_package(urdf QUIET)
+# find_package(urdf QUIET)
 
-if(urdf_FOUND)
-  add_definitions(-DHAS_URDF)
-  include_directories(${urdf_INCLUDE_DIRS})
-endif()
+# if(urdf_FOUND)
+#   add_definitions(-DHAS_URDF)
+#   include_directories(${urdf_INCLUDE_DIRS})
+# endif()
 
 include_directories(include ${TinyXML_INCLUDE_DIRS} ${TinyXML2_INCLUDE_DIRS} ${urdfdom_INCLUDE_DIRS}   ${EIGEN3_INCLUDE_DIR} )
 

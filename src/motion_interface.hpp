@@ -26,13 +26,17 @@ namespace rocos {
 class MotionInterface {
  public:
   virtual ~MotionInterface() = default;
-
+  // TODO：记得添加model指针在构造的时候传入
   virtual Result GenerateRef(Reference& ref_out) = 0;
-  virtual bool Reset() = 0;
+
+  /// @brief 校验参数并初始化规划（合并 support + Reset）
+  /// @return NoError=成功启动, PlanFinished=已到位无需运动, <0=错误
+  virtual Result Reset() = 0;
 
   virtual bool supportsPause() const = 0;
   virtual bool supportsResume() const = 0;
   virtual bool supportsStop() const = 0;
+  virtual Result support() const = 0;
 
   virtual Result Pause() = 0;
   virtual Result Resume() = 0;
