@@ -291,3 +291,12 @@ target_link_libraries(robot_fsm_test
 add_test(NAME robot_fsm_test COMMAND robot_fsm_test)
 set_tests_properties(robot_fsm_test PROPERTIES
         WORKING_DIRECTORY ${CMAKE_SOURCE_DIR})
+
+add_executable(hardware_test test/hardware_test.cc)
+target_link_libraries(hardware_test
+        PRIVATE
+        robot
+        )
+add_test(NAME hardware_test COMMAND hardware_test)
+set_tests_properties(hardware_test PROPERTIES
+        WORKING_DIRECTORY ${CMAKE_SOURCE_DIR})

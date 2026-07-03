@@ -181,7 +181,7 @@ Hardware::Hardware(const std::string& yaml_file_path, int ecat_id) {
     log_ptr->info("Loading hardware config from: {}", yaml_file_path);
 
     // 1. 加载 YAML 配置
-    loadFromYAML(yaml_file_path);
+    config_ = loadFromYAML(yaml_file_path);
 
     // 2. 连接 EtherCAT 共享内存
     ec_ptr_ = EcatConfig::getInstance(ecat_id);
@@ -212,8 +212,9 @@ bool Hardware::Reset() {
 // YAML 加载
 // ==========================================================================
 
-void Hardware::loadFromYAML(const std::string& yaml_file_path) {
+HardwareConfig Hardware::loadFromYAML(const std::string& yaml_file_path) {
     auto log_ptr = Logger::getInstance("Hardware");
+    HardwareConfig config;
 
     try {
         YAML::Node root = YAML::LoadFile(yaml_file_path);
@@ -236,11 +237,11 @@ void Hardware::loadFromYAML(const std::string& yaml_file_path) {
             if (type_str == "driver") {
                 Drive d = parseDrive(node);
                 log_ptr->info("  Parsed drive: id={}, joint={}", d.id, d.joint_name);
-                config_.drives.push_back(std::move(d));
+                config.drives.push_back(std::move(d));
             } else if (type_str == "ft_sensor") {
                 FTSensor ft = parseFTSensor(node);
                 log_ptr->info("  Parsed ft_sensor: id={}", ft.id);
-                config_.ft_sensors.push_back(std::move(ft));
+                config.ft_sensors.push_back(std::move(ft));
             } else if (type_str == "io") {
                 IO io = parseIO(node);
                 log_ptr->info("  Parsed io: id={}, DI={}, DO={}, AI={}, AO={}",
@@ -249,7 +250,7 @@ void Hardware::loadFromYAML(const std::string& yaml_file_path) {
                               io.digital_out_channels,
                               io.analog_in_channels,
                               io.analog_out_channels);
-                config_.ios.push_back(std::move(io));
+                config.ios.push_back(std::move(io));
             } else {
                 log_ptr->warn("Unknown hardware type '{}' for id={}, skipping",
                               type_str,
@@ -261,6 +262,12 @@ void Hardware::loadFromYAML(const std::string& yaml_file_path) {
         log_ptr->error("YAML parse error in {}: {}", yaml_file_path, e.what());
         throw;
     }
+
+    return config;
+}
+
+HardwareConfig Hardware::LoadConfigFromYAML(const std::string& yaml_file_path) {
+    return loadFromYAML(yaml_file_path);
 }
 
 // ==========================================================================

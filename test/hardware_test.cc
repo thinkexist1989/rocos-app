@@ -1,0 +1,423 @@
+#define DOCTEST_CONFIG_IMPLEMENT_WITH_MAIN
+
+#include <algorithm>
+#include <cmath>
+#include <fstream>
+#include <string>
+
+#include <test/doctest.h>
+
+#include "src/hardware.hpp"
+
+namespace {
+
+// 临时 YAML 文件路径（写 /tmp，绝不能覆盖真实配置）
+const std::string kTmpConfig = "/tmp/hardware_test_tmp.yaml";
+
+}  // namespace
+
+// ==========================================================================
+// 辅助函数
+// ==========================================================================
+
+/// @brief 解析配置文件路径，依次尝试: cwd/build/ → ../ (源码根目录)
+///        支持 `./bin/hardware_test` 直接运行和 `ctest` 两种方式
+static std::string cfg(const std::string& name) {
+    // 从 build/ 子目录运行时，config/ 在 ../config/
+    std::string path = "../../config/" + name;
+    std::ifstream test(path);
+    if (test.good()) {
+        return path;
+    }
+    // ctest 或从源码根目录运行时
+    return "config/" + name;
+}
+
+/// @brief 写入临时 YAML 文件，返回路径
+static std::string writeTmpYaml(const std::string& content) {
+    std::ofstream ofs(kTmpConfig);
+    ofs << content;
+    ofs.close();
+    return kTmpConfig;
+}
+
+// ==========================================================================
+// 1. 纯驱动器配置测试
+// ==========================================================================
+
+TEST_CASE("Hardware YAML - 纯驱动器配置 (6 轴)") {
+    auto config = rocos::Hardware::LoadConfigFromYAML(cfg("hardware_driver_config.yaml"));
+
+    SUBCASE("驱动器数量") {
+        CHECK(config.drives.size() == 6);
+    }
+    SUBCASE("无其他类型") {
+        CHECK(config.ft_sensors.empty());
+        CHECK(config.ios.empty());
+    }
+
+    SUBCASE("第 1 关节 (id=1)") {
+        REQUIRE(config.drives.size() >= 1);
+        const auto& d = config.drives[0];
+        CHECK(d.id == 1);
+        CHECK(d.joint_name == "joint_1");
+        CHECK(d.torque_source == rocos::TorqueSource::LoadTorque);
+        CHECK(d.limit.lower == doctest::Approx(-2.967));
+        CHECK(d.limit.upper == doctest::Approx(2.967));
+        CHECK(d.transform.cnt_per_unit == doctest::Approx(200000.0));
+        CHECK(d.transform.user_unit_name == "rad");
+        CHECK(d.inputs.status_word == "Statusword");
+        CHECK(d.inputs.load_torque_value == "Analog Input 1");
+        CHECK(d.inputs.digital_inputs == "Digital Inputs");
+        CHECK(d.outputs.control_word == "Controlword");
+        CHECK(d.outputs.digital_outputs == "Digital Outputs");
+    }
+
+    SUBCASE("第 3 关节使用 secondary_position 通道") {
+        REQUIRE(config.drives.size() >= 3);
+        const auto& d = config.drives[2];
+        CHECK(d.id == 3);
+        CHECK(d.torque_source == rocos::TorqueSource::SecondaryPosition);
+        CHECK(d.transform.offset_pos_cnt == 100);
+        CHECK(d.transform.torque_per_unit == doctest::Approx(0.8));
+    }
+
+    SUBCASE("第 6 关节极限校验") {
+        REQUIRE(config.drives.size() >= 6);
+        const auto& d = config.drives[5];
+        CHECK(d.id == 6);
+        CHECK(d.limit.effort == doctest::Approx(10.0));
+        CHECK(d.transform.cnt_per_unit == doctest::Approx(50000.0));
+    }
+}
+
+// ==========================================================================
+// 2. 纯六维力传感器配置测试
+// ==========================================================================
+
+TEST_CASE("Hardware YAML - 纯六维力传感器配置") {
+    auto config = rocos::Hardware::LoadConfigFromYAML(cfg("hardware_ft_config.yaml"));
+
+    SUBCASE("力传感器数量") {
+        CHECK(config.ft_sensors.size() == 1);
+    }
+    SUBCASE("无其他类型") {
+        CHECK(config.drives.empty());
+        CHECK(config.ios.empty());
+    }
+
+    SUBCASE("传感器字段验证") {
+        REQUIRE(!config.ft_sensors.empty());
+        const auto& ft = config.ft_sensors[0];
+        CHECK(ft.id == 10);
+
+        // PDO 变量名
+        CHECK(ft.inputs.fx == "Channel 1");
+        CHECK(ft.inputs.fy == "Channel 2");
+        CHECK(ft.inputs.fz == "Channel 3");
+        CHECK(ft.inputs.tx == "Channel 4");
+        CHECK(ft.inputs.ty == "Channel 5");
+        CHECK(ft.inputs.tz == "Channel 6");
+
+        // 偏置值
+        CHECK(ft.offset.force.x()  == doctest::Approx(0.5));
+        CHECK(ft.offset.force.y()  == doctest::Approx(-0.3));
+        CHECK(ft.offset.force.z()  == doctest::Approx(12.0));
+        CHECK(ft.offset.torque.x() == doctest::Approx(0.01));
+        CHECK(ft.offset.torque.y() == doctest::Approx(-0.02));
+        CHECK(ft.offset.torque.z() == doctest::Approx(0.005));
+    }
+}
+
+// ==========================================================================
+// 3. 纯 IO 模块配置测试
+// ==========================================================================
+
+TEST_CASE("Hardware YAML - 纯 IO 模块配置") {
+    auto config = rocos::Hardware::LoadConfigFromYAML(cfg("hardware_io_config.yaml"));
+
+    SUBCASE("IO 模块数量") {
+        CHECK(config.ios.size() == 1);
+    }
+    SUBCASE("无其他类型") {
+        CHECK(config.drives.empty());
+        CHECK(config.ft_sensors.empty());
+    }
+
+    SUBCASE("IO 通道数和 PDO 映射") {
+        REQUIRE(!config.ios.empty());
+        const auto& io = config.ios[0];
+        CHECK(io.id == 20);
+        CHECK(io.digital_in_channels == 16);
+        CHECK(io.digital_out_channels == 16);
+        CHECK(io.analog_in_channels == 8);
+        CHECK(io.analog_out_channels == 4);
+
+        CHECK(io.inputs.digital_inputs  == "Digital Inputs");
+        CHECK(io.inputs.digital_outputs == "Digital Outputs");
+        CHECK(io.inputs.analog_inputs   == "Analog Inputs");
+        CHECK(io.outputs.digital_outputs == "Digital Outputs");
+        CHECK(io.outputs.analog_outputs  == "Analog Outputs");
+    }
+}
+
+// ==========================================================================
+// 4. 六维力 + 驱动器组合配置测试
+// ==========================================================================
+
+TEST_CASE("Hardware YAML - 六维力 + 驱动器组合") {
+    auto config = rocos::Hardware::LoadConfigFromYAML(
+        cfg("hardware_ft_and_driver_config.yaml"));
+
+    SUBCASE("数量校验") {
+        CHECK(config.drives.size() == 2);
+        CHECK(config.ft_sensors.size() == 1);
+        CHECK(config.ios.empty());
+    }
+
+    SUBCASE("力传感器在前") {
+        REQUIRE(!config.ft_sensors.empty());
+        const auto& ft = config.ft_sensors[0];
+        CHECK(ft.id == 7);
+        // 该配置中无偏置
+        CHECK(ft.offset.force.x() == doctest::Approx(0.0));
+    }
+
+    SUBCASE("第 1 个驱动器使用 secondary_position") {
+        REQUIRE(config.drives.size() >= 1);
+        const auto& d = config.drives[0];
+        CHECK(d.id == 1);
+        CHECK(d.torque_source == rocos::TorqueSource::SecondaryPosition);
+        CHECK(d.limit.effort == doctest::Approx(40.0));
+    }
+
+    SUBCASE("第 2 个驱动器使用 load_torque") {
+        REQUIRE(config.drives.size() >= 2);
+        const auto& d = config.drives[1];
+        CHECK(d.id == 2);
+        CHECK(d.torque_source == rocos::TorqueSource::LoadTorque);
+        CHECK(d.transform.offset_pos_cnt == 50);
+        CHECK(d.transform.ratio == doctest::Approx(1.2));
+    }
+}
+
+// ==========================================================================
+// 5. 全类型配置测试
+// ==========================================================================
+
+TEST_CASE("Hardware YAML - 全类型配置") {
+    auto config = rocos::Hardware::LoadConfigFromYAML(cfg("hardware_all_config.yaml"));
+
+    SUBCASE("数量校验") {
+        CHECK(config.drives.size() == 2);
+        CHECK(config.ft_sensors.size() == 1);
+        CHECK(config.ios.size() == 1);
+    }
+
+    SUBCASE("查找函数验证") {
+        // 这里测试 Hardware 实例的查找方法需要 EcatConfig，
+        // 但我们可以手动遍历验证 ID 唯一性
+        std::vector<int> drive_ids;
+        for (const auto& d : config.drives) drive_ids.push_back(d.id);
+        CHECK(drive_ids == std::vector<int>{1, 2});
+
+        REQUIRE(!config.ft_sensors.empty());
+        CHECK(config.ft_sensors[0].id == 10);
+
+        REQUIRE(!config.ios.empty());
+        CHECK(config.ios[0].id == 20);
+    }
+
+    SUBCASE("各类字段完整性抽查") {
+        const auto& io = config.ios[0];
+        CHECK(io.digital_in_channels == 8);
+        CHECK(io.analog_out_channels == 2);
+
+        const auto& ft = config.ft_sensors[0];
+        CHECK(ft.inputs.fz == "Channel 3");
+    }
+}
+
+// ==========================================================================
+// 6. 缺失可选字段 → 默认值测试
+// ==========================================================================
+
+TEST_CASE("Hardware YAML - 缺失可选字段默认值") {
+    std::string yaml = R"(hardware:
+  - id: 100
+    type: driver
+    joint_name: bare_joint
+  - id: 200
+    type: ft_sensor
+  - id: 300
+    type: io
+)";
+    auto config = rocos::Hardware::LoadConfigFromYAML(writeTmpYaml(yaml));
+
+    SUBCASE("Drive 默认值") {
+        REQUIRE(config.drives.size() == 1);
+        const auto& d = config.drives[0];
+        CHECK(d.id == 100);
+        CHECK(d.joint_name == "bare_joint");
+        // 未指定时取默认值
+        CHECK(d.torque_source == rocos::TorqueSource::LoadTorque);
+        CHECK(d.limit.lower == doctest::Approx(-2.71));
+        CHECK(d.limit.upper == doctest::Approx(2.71));
+        CHECK(d.transform.ratio == doctest::Approx(1.0));
+        CHECK(d.transform.cnt_per_unit == doctest::Approx(1.0));
+        CHECK(d.transform.user_unit_name == "rad");
+        // 未指定 PDO 变量名时为空串
+        CHECK(d.inputs.status_word.empty());
+        CHECK(d.outputs.control_word.empty());
+    }
+
+    SUBCASE("FTSensor 默认值") {
+        REQUIRE(config.ft_sensors.size() == 1);
+        const auto& ft = config.ft_sensors[0];
+        CHECK(ft.id == 200);
+        CHECK(ft.inputs.fx.empty());
+        CHECK(ft.offset.force.x() == doctest::Approx(0.0));
+    }
+
+    SUBCASE("IO 默认值") {
+        REQUIRE(config.ios.size() == 1);
+        const auto& io = config.ios[0];
+        CHECK(io.id == 300);
+        CHECK(io.digital_in_channels == 0);
+        CHECK(io.digital_out_channels == 0);
+        CHECK(io.analog_in_channels == 0);
+        CHECK(io.analog_out_channels == 0);
+    }
+}
+
+// ==========================================================================
+// 7. 异常情况测试
+// ==========================================================================
+
+TEST_CASE("Hardware YAML - 异常输入") {
+    SUBCASE("缺少 hardware 顶层 key 应抛异常") {
+        CHECK_THROWS_AS(
+            rocos::Hardware::LoadConfigFromYAML(
+                writeTmpYaml("other_key:\n  - id: 1\n    type: driver\n")),
+            std::runtime_error);
+    }
+
+    SUBCASE("空列表正常返回") {
+        auto config = rocos::Hardware::LoadConfigFromYAML(
+            writeTmpYaml("hardware: []"));
+        CHECK(config.drives.empty());
+        CHECK(config.ft_sensors.empty());
+        CHECK(config.ios.empty());
+    }
+
+    SUBCASE("未知 type 跳过") {
+        auto config = rocos::Hardware::LoadConfigFromYAML(
+            writeTmpYaml(R"(hardware:
+  - id: 1
+    type: unknown_type
+  - id: 2
+    type: driver
+    joint_name: ok_joint
+)"));
+        // unknown_type 被跳过，只解析 driver
+        CHECK(config.drives.size() == 1);
+        CHECK(config.drives[0].id == 2);
+    }
+
+    SUBCASE("缺少 type 字段跳过") {
+        auto config = rocos::Hardware::LoadConfigFromYAML(
+            writeTmpYaml(R"(hardware:
+  - id: 1
+  - id: 2
+    type: io
+)"));
+        CHECK(config.ios.size() == 1);
+        CHECK(config.ios[0].id == 2);
+    }
+}
+
+// ==========================================================================
+// 8. 配置查找辅助函数测试（不需要 EcatConfig）
+// ==========================================================================
+
+TEST_CASE("Hardware YAML - 配置查询函数") {
+    auto config = rocos::Hardware::LoadConfigFromYAML(
+        cfg("hardware_all_config.yaml"));
+
+    SUBCASE("findDriveById 模拟") {
+        auto it = std::find_if(config.drives.begin(), config.drives.end(),
+                               [](const rocos::Drive& d) { return d.id == 1; });
+        REQUIRE(it != config.drives.end());
+        CHECK(it->joint_name == "joint_1");
+        CHECK(it->torque_source == rocos::TorqueSource::LoadTorque);
+    }
+
+    SUBCASE("findDriveByName 模拟") {
+        auto it = std::find_if(config.drives.begin(), config.drives.end(),
+            [](const rocos::Drive& d) { return d.joint_name == "joint_2"; });
+        REQUIRE(it != config.drives.end());
+        CHECK(it->id == 2);
+    }
+
+    SUBCASE("findFTSensorById 模拟") {
+        auto it = std::find_if(config.ft_sensors.begin(), config.ft_sensors.end(),
+                               [](const rocos::FTSensor& ft) { return ft.id == 10; });
+        REQUIRE(it != config.ft_sensors.end());
+    }
+
+    SUBCASE("findIOById 模拟") {
+        auto it = std::find_if(config.ios.begin(), config.ios.end(),
+                               [](const rocos::IO& io) { return io.id == 20; });
+        REQUIRE(it != config.ios.end());
+        CHECK(it->digital_out_channels == 8);
+    }
+}
+
+// ==========================================================================
+// 9. 所有 torque_source 组合测试
+// ==========================================================================
+
+TEST_CASE("Hardware YAML - torque_source 解析") {
+    SUBCASE("显式 load_torque") {
+        auto config = rocos::Hardware::LoadConfigFromYAML(
+            writeTmpYaml(R"(hardware:
+  - id: 1
+    type: driver
+    joint_name: j1
+    torque_source: load_torque
+)"));
+        CHECK(config.drives[0].torque_source == rocos::TorqueSource::LoadTorque);
+    }
+
+    SUBCASE("显式 secondary_position") {
+        auto config = rocos::Hardware::LoadConfigFromYAML(
+            writeTmpYaml(R"(hardware:
+  - id: 1
+    type: driver
+    joint_name: j1
+    torque_source: secondary_position
+)"));
+        CHECK(config.drives[0].torque_source == rocos::TorqueSource::SecondaryPosition);
+    }
+
+    SUBCASE("不写 torque_source 默认 load_torque") {
+        auto config = rocos::Hardware::LoadConfigFromYAML(
+            writeTmpYaml(R"(hardware:
+  - id: 1
+    type: driver
+    joint_name: j1
+)"));
+        CHECK(config.drives[0].torque_source == rocos::TorqueSource::LoadTorque);
+    }
+
+    SUBCASE("非法值默认 load_torque") {
+        auto config = rocos::Hardware::LoadConfigFromYAML(
+            writeTmpYaml(R"(hardware:
+  - id: 1
+    type: driver
+    joint_name: j1
+    torque_source: invalid_value
+)"));
+        CHECK(config.drives[0].torque_source == rocos::TorqueSource::LoadTorque);
+    }
+}

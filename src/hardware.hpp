@@ -220,9 +220,12 @@ public:
     /// @brief 获取硬件类型
     HardwareType getHardwareType(int slave_id) const;
 
+    /// @brief [测试用] 从 YAML 文件加载并返回配置，不初始化 EcatConfig
+    static HardwareConfig LoadConfigFromYAML(const std::string& yaml_file_path);
+
 private:
     /// @brief 从 YAML 文件加载硬件配置
-    void loadFromYAML(const std::string& yaml_file_path);
+    static HardwareConfig loadFromYAML(const std::string& yaml_file_path);
 
     /// @brief 从 YAML 节点解析单个 Drive
     static Drive parseDrive(const YAML::Node& node);
