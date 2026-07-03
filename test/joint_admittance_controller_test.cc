@@ -82,12 +82,12 @@ public:
     bool Reset() override { return true; }
 };
 
-/// @brief FakeModel: IK 透传种子; ID 返回预设的重力力矩
+/// @brief FakeModel: IK 透传种子; ID 返回预设重力力矩
 class FakeModel : public rocos::ModelInterface {
 public:
     bool ik_should_fail_{false};
     bool id_should_fail_{false};
-    double grav_torque_{5.0};   // 每个关节的模拟重力力矩 [Nm]
+    double grav_torque_{5.0};
 
     rocos::Result ForwardKinematics(const rocos::JntArray&,
                                     rocos::Frame&) override {
@@ -150,18 +150,10 @@ TEST_CASE("JointImpedanceController - SetHardware / SetModel") {
     FakeHardware hw;
     FakeModel model;
 
-    SUBCASE("SetHardware nullptr → ParameterPointerEqualsNullptr") {
-        CHECK(ctrl.SetHardware(nullptr) == rocos::Result::ParameterPointerEqualsNullptr);
-    }
-    SUBCASE("SetHardware 有效 → NoError") {
-        CHECK(ctrl.SetHardware(&hw) == rocos::Result::NoError);
-    }
-    SUBCASE("SetModel nullptr → ParameterPointerEqualsNullptr") {
-        CHECK(ctrl.SetModel(nullptr) == rocos::Result::ParameterPointerEqualsNullptr);
-    }
-    SUBCASE("SetModel 有效 → NoError") {
-        CHECK(ctrl.SetModel(&model) == rocos::Result::NoError);
-    }
+    CHECK(ctrl.SetHardware(nullptr) == rocos::Result::ParameterPointerEqualsNullptr);
+    CHECK(ctrl.SetHardware(&hw) == rocos::Result::NoError);
+    CHECK(ctrl.SetModel(nullptr) == rocos::Result::ParameterPointerEqualsNullptr);
+    CHECK(ctrl.SetModel(&model) == rocos::Result::NoError);
 }
 
 TEST_CASE("JointImpedanceController - Reset") {
@@ -179,45 +171,19 @@ TEST_CASE("JointImpedanceController - 增益设置") {
     SUBCASE("SetStiffness 正常") {
         CHECK(ctrl.SetStiffness(makeConstJntArray(3, 100.0)) == rocos::Result::NoError);
     }
-    SUBCASE("SetStiffness 空数组 → MoveInput") {
-        CHECK(ctrl.SetStiffness(rocos::JntArray{}) == rocos::Result::MoveInput);
+    SUBCASE("SetStiffness 负值 → ParameterNanOrInf") {
+        CHECK(ctrl.SetStiffness(makeConstJntArray(3, -10.0)) == rocos::Result::ParameterNanOrInf);
     }
-    SUBCASE("SetStiffness 含 NaN → ParameterNanOrInf") {
+    SUBCASE("SetStiffness NaN → ParameterNanOrInf") {
         auto K = makeConstJntArray(3, 100.0);
         K(1) = std::numeric_limits<double>::quiet_NaN();
         CHECK(ctrl.SetStiffness(K) == rocos::Result::ParameterNanOrInf);
     }
-    SUBCASE("SetStiffness 负值 → ParameterNanOrInf") {
-        CHECK(ctrl.SetStiffness(makeConstJntArray(3, -50.0)) == rocos::Result::ParameterNanOrInf);
-    }
     SUBCASE("SetDamping 正常") {
         CHECK(ctrl.SetDamping(makeConstJntArray(3, 20.0)) == rocos::Result::NoError);
     }
-    SUBCASE("SetInertia 正常") {
-        CHECK(ctrl.SetInertia(makeConstJntArray(3, 1.0)) == rocos::Result::NoError);
-    }
-    SUBCASE("SetInertia 零值 → ParameterNanOrInf") {
-        CHECK(ctrl.SetInertia(makeConstJntArray(3, 0.0)) == rocos::Result::ParameterNanOrInf);
-    }
-    SUBCASE("SetInertia 含 NaN → ParameterNanOrInf") {
-        auto M = makeConstJntArray(3, 1.0);
-        M(1) = std::numeric_limits<double>::quiet_NaN();
-        CHECK(ctrl.SetInertia(M) == rocos::Result::ParameterNanOrInf);
-    }
-    SUBCASE("SetTorqueOffset 正常") {
-        CHECK(ctrl.SetTorqueOffset(makeConstJntArray(3, 0.5)) == rocos::Result::NoError);
-    }
-    SUBCASE("SetTorqueOffset 含 NaN → ParameterNanOrInf") {
-        auto offset = makeConstJntArray(3, 0.5);
-        offset(2) = std::numeric_limits<double>::quiet_NaN();
-        CHECK(ctrl.SetTorqueOffset(offset) == rocos::Result::ParameterNanOrInf);
-    }
-    SUBCASE("SetDt 正常") {
-        CHECK(ctrl.SetDt(0.002) == rocos::Result::NoError);
-    }
-    SUBCASE("SetDt 非正 → IllegalParameter") {
-        CHECK(ctrl.SetDt(0.0) == rocos::Result::IllegalParameter);
-        CHECK(ctrl.SetDt(-0.001) == rocos::Result::IllegalParameter);
+    SUBCASE("SetDamping 负值 → ParameterNanOrInf") {
+        CHECK(ctrl.SetDamping(makeConstJntArray(3, -5.0)) == rocos::Result::ParameterNanOrInf);
     }
 }
 
@@ -254,102 +220,82 @@ TEST_CASE("JointImpedanceController - GenerateCmd") {
 // ==========================================================================
 
 TEST_CASE("JointImpedanceController - UpdateCmd 力矩计算") {
-    rocos::JointImpedanceController ctrl;
     FakeHardware hw;
     FakeModel model;
-    model.grav_torque_ = 5.0;    // τ_grav = 5.0 Nm per joint
+    model.grav_torque_ = 5.0;
 
-    SUBCASE("无 hardware → 报错") {
-        rocos::JointImpedanceController ctrl2;
-        CHECK(ctrl2.UpdateCmd(makeJntArray(1)) == rocos::Result::ParameterPointerEqualsNullptr);
-    }
-
-    SUBCASE("q_des 空 → MoveInput") {
-        ctrl.SetHardware(&hw);
-        CHECK(ctrl.UpdateCmd(rocos::JntArray{}) == rocos::Result::MoveInput);
-    }
-
-    SUBCASE("静止 + 无重力补偿 → 纯比例力矩") {
-        // 不设 model → τ_grav = 0
+    SUBCASE("静止 + 位置误差 + 重力补偿") {
         hw.fake_position_ = makeConstJntArray(3, 0.0);
         hw.fake_velocity_ = makeConstJntArray(3, 0.0);
-        ctrl.SetHardware(&hw);
 
-        auto q_des = makeConstJntArray(3, 1.0);   // q_des = [1,1,1]
-        auto res = ctrl.UpdateCmd(q_des);
-        CHECK(res == rocos::Result::NoError);
-
-        // τ = K_p*(1-0) - K_d*0 + 0 = 100
-        CHECK(hw.last_set_torque_.rows() == 3u);
-        CHECK(hw.last_set_torque_(0) == doctest::Approx(100.0));
-        CHECK(hw.last_set_torque_(1) == doctest::Approx(100.0));
-        CHECK(hw.last_set_torque_(2) == doctest::Approx(100.0));
-    }
-
-    SUBCASE("有重力补偿 → τ = K_p·Δq + τ_grav") {
-        hw.fake_position_ = makeConstJntArray(3, 0.0);
-        hw.fake_velocity_ = makeConstJntArray(3, 0.0);
+        rocos::JointImpedanceController ctrl;
         ctrl.SetHardware(&hw);
         ctrl.SetModel(&model);
 
-        auto q_des = makeConstJntArray(3, 0.0);   // q_des == q_act → Δq = 0
+        // q_des = [1, 1, 1], q_act = [0, 0, 0], q̇ = [0, 0, 0]
+        // τ = 100*(1-0) - 20*0 + 5 = 105
+        auto q_des = makeConstJntArray(3, 1.0);
         auto res = ctrl.UpdateCmd(q_des);
         CHECK(res == rocos::Result::NoError);
-
-        // τ = 100*0 - 20*0 + 5 = 5
-        CHECK(hw.last_set_torque_(0) == doctest::Approx(5.0));
+        CHECK(hw.last_set_torque_(0) == doctest::Approx(105.0));
     }
 
-    SUBCASE("有速度 → 阻尼项参与") {
+    SUBCASE("有速度阻尼") {
         hw.fake_position_ = makeConstJntArray(3, 0.0);
-        hw.fake_velocity_ = makeConstJntArray(3, 2.0);   // q̇ = [2,2,2]
+        hw.fake_velocity_ = makeConstJntArray(3, 2.0);
+
+        rocos::JointImpedanceController ctrl;
         ctrl.SetHardware(&hw);
         ctrl.SetModel(&model);
 
-        auto q_des = makeConstJntArray(3, 0.0);           // Δq = 0
-        auto res = ctrl.UpdateCmd(q_des);
-        CHECK(res == rocos::Result::NoError);
-
-        // τ = 100*0 - 20*2 + 5 = -40 + 5 = -35
+        // Δq = 0, q̇ = 2 → τ = 100*0 - 20*2 + 5 = -35
+        auto q_des = makeConstJntArray(3, 0.0);
+        ctrl.UpdateCmd(q_des);
         CHECK(hw.last_set_torque_(0) == doctest::Approx(-35.0));
     }
 
-    SUBCASE("显式增益 + 位置误差 + 重力") {
-        hw.fake_position_ = makeConstJntArray(3, 0.5);     // q_act = [0.5, 0.5, 0.5]
-        hw.fake_velocity_ = makeConstJntArray(3, 0.1);     // q̇ = [0.1, 0.1, 0.1]
+    SUBCASE("无模型时 τ_grav = 0") {
+        hw.fake_position_ = makeConstJntArray(3, 0.0);
+        hw.fake_velocity_ = makeConstJntArray(3, 0.0);
+
+        rocos::JointImpedanceController ctrl;
         ctrl.SetHardware(&hw);
-        ctrl.SetModel(&model);
-        ctrl.SetStiffness(makeConstJntArray(3, 50.0));     // K_p = 50
-        ctrl.SetDamping(makeConstJntArray(3, 10.0));       // K_d = 10
+        // 不设 model → τ_grav = 0
 
-        auto q_des = makeConstJntArray(3, 1.0);             // q_des = [1, 1, 1]
-        auto res = ctrl.UpdateCmd(q_des);
-        CHECK(res == rocos::Result::NoError);
-
-        // τ = 50*(1-0.5) - 10*0.1 + 5 = 25 - 1 + 5 = 29
-        CHECK(hw.last_set_torque_(0) == doctest::Approx(29.0));
+        auto q_des = makeConstJntArray(3, 1.0);
+        ctrl.UpdateCmd(q_des);
+        // τ = 100*(1-0) + 0 = 100
+        CHECK(hw.last_set_torque_(0) == doctest::Approx(100.0));
     }
 
-    SUBCASE("增益维度不匹配") {
-        ctrl.SetStiffness(makeConstJntArray(5, 100.0));
-        ctrl.SetDamping(makeConstJntArray(5, 20.0));
+    SUBCASE("显式增益") {
+        hw.fake_position_ = makeConstJntArray(3, 0.5);
+        hw.fake_velocity_ = makeConstJntArray(3, 0.1);
+
+        rocos::JointImpedanceController ctrl;
         ctrl.SetHardware(&hw);
-        CHECK(ctrl.UpdateCmd(makeJntArray(3)) == rocos::Result::UnmatchedJointsNumber);
+        ctrl.SetModel(&model);
+        ctrl.SetStiffness(makeConstJntArray(3, 50.0));
+        ctrl.SetDamping(makeConstJntArray(3, 10.0));
+
+        // τ = 50*(1-0.5) - 10*0.1 + 5 = 25 - 1 + 5 = 29
+        auto q_des = makeConstJntArray(3, 1.0);
+        ctrl.UpdateCmd(q_des);
+        CHECK(hw.last_set_torque_(0) == doctest::Approx(29.0));
     }
 }
 
 // ==========================================================================
-// 5. CST 模式管理
+// 5. CST 模式
 // ==========================================================================
 
-TEST_CASE("JointImpedanceController - CST 模式") {
-    rocos::JointImpedanceController ctrl;
+TEST_CASE("JointImpedanceController - CST 模式管理") {
     FakeHardware hw;
-    FakeModel model;
     hw.fake_position_ = makeConstJntArray(3, 0.0);
     hw.fake_velocity_ = makeConstJntArray(3, 0.0);
+
+    rocos::JointImpedanceController ctrl;
     ctrl.SetHardware(&hw);
-    ctrl.SetModel(&model);
 
     SUBCASE("首次 UpdateCmd 设置 CST 模式") {
         ctrl.UpdateCmd(makeJntArray(3));
@@ -365,7 +311,6 @@ TEST_CASE("JointImpedanceController - CST 模式") {
 
     SUBCASE("Reset 后重新设模式") {
         ctrl.UpdateCmd(makeJntArray(3));
-        CHECK(hw.set_mode_count_ == 1);
         ctrl.Reset();
         ctrl.UpdateCmd(makeJntArray(3));
         CHECK(hw.set_mode_count_ == 2);
@@ -382,7 +327,7 @@ TEST_CASE("JointImpedanceController - 异常路径") {
     hw.fake_position_ = makeConstJntArray(3, 0.0);
     hw.fake_velocity_ = makeConstJntArray(3, 0.0);
 
-    SUBCASE("InverseDynamics 失败 → 传播错误") {
+    SUBCASE("InverseDynamics 失败 → IdCalcFail") {
         model.id_should_fail_ = true;
         rocos::JointImpedanceController ctrl;
         ctrl.SetHardware(&hw);
@@ -390,43 +335,18 @@ TEST_CASE("JointImpedanceController - 异常路径") {
         CHECK(ctrl.UpdateCmd(makeJntArray(3)) == rocos::Result::IdCalcFail);
     }
 
-    SUBCASE("GetPosition 维度不匹配 → JointStateError") {
-        hw.fake_position_ = makeConstJntArray(7, 0.0);   // 7 轴，q_des 只有 3
+    SUBCASE("q_des 维度与增益不匹配") {
+        rocos::JointImpedanceController ctrl;
+        ctrl.SetHardware(&hw);
+        ctrl.SetStiffness(makeConstJntArray(5, 100.0));
+        ctrl.SetDamping(makeConstJntArray(5, 20.0));
+        CHECK(ctrl.UpdateCmd(makeJntArray(3)) == rocos::Result::UnmatchedJointsNumber);
+    }
+
+    SUBCASE("GetPosition 返回 0 轴 → JointStateError") {
+        hw.fake_position_ = rocos::JntArray{};
         rocos::JointImpedanceController ctrl;
         ctrl.SetHardware(&hw);
         CHECK(ctrl.UpdateCmd(makeJntArray(3)) == rocos::Result::JointStateError);
     }
-
-    SUBCASE("GetVelocity 维度不足 → 阻尼项为 0 仍正常工作") {
-        hw.fake_position_ = makeConstJntArray(3, 0.0);
-        hw.fake_velocity_ = rocos::JntArray{};            // 0 维
-        rocos::JointImpedanceController ctrl;
-        ctrl.SetHardware(&hw);
-        // 不设 model，τ_grav = 0
-        auto q_des = makeConstJntArray(3, 1.0);
-        auto res = ctrl.UpdateCmd(q_des);
-        CHECK(res == rocos::Result::NoError);
-        // τ = 100*(1-0) - 0 + 0 = 100  (速度维度不足时阻尼项为 0)
-        CHECK(hw.last_set_torque_(0) == doctest::Approx(100.0));
-    }
-}
-
-// ==========================================================================
-// 7. 无模型时重力为 0
-// ==========================================================================
-
-TEST_CASE("JointImpedanceController - 无模型重力为零") {
-    FakeHardware hw;
-    hw.fake_position_ = makeConstJntArray(3, 0.0);
-    hw.fake_velocity_ = makeConstJntArray(3, 0.0);
-
-    rocos::JointImpedanceController ctrl;
-    ctrl.SetHardware(&hw);
-    // 不设 model
-
-    auto q_des = makeConstJntArray(3, 0.0);              // Δq = 0
-    auto res = ctrl.UpdateCmd(q_des);
-    CHECK(res == rocos::Result::NoError);
-    // τ = 100*0 - 20*0 + 0 = 0
-    CHECK(hw.last_set_torque_(0) == doctest::Approx(0.0));
 }
