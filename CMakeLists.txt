@@ -147,12 +147,11 @@ add_library(robot
         src/move_joint.cpp
         src/move_line.cpp
         src/move_circle.cpp
+        src/move_circle_three_point.cpp
 
         src/position_controller.cpp
         src/joint_impedance_controller.cpp
         src/cartesian_impedance_controller.cpp
-        src/unit_velocity_profile.cpp
-
         src/unit_velocity_profile.cpp
 
 #        src/velocity_profile.cpp
@@ -363,4 +362,13 @@ target_link_libraries(move_circle_test
         )
 add_test(NAME move_circle_test COMMAND move_circle_test)
 set_tests_properties(move_circle_test PROPERTIES
+        WORKING_DIRECTORY ${CMAKE_SOURCE_DIR})
+
+add_executable(move_circle_three_point_test test/move_circle_three_point_test.cc)
+target_link_libraries(move_circle_three_point_test
+        PRIVATE
+        robot
+        )
+add_test(NAME move_circle_three_point_test COMMAND move_circle_three_point_test)
+set_tests_properties(move_circle_three_point_test PROPERTIES
         WORKING_DIRECTORY ${CMAKE_SOURCE_DIR})

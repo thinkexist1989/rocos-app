@@ -17,7 +17,7 @@
 // Shenyang Institute of Automation, Chinese Academy of Sciences.
 // email: luoyang@sia.cn
 
-#include "move_circle.hpp"
+#include "move_circle_three_point.hpp"
 
 #include <algorithm>
 #include <cmath>
@@ -30,84 +30,119 @@ constexpr double kArcEpsilon = 1e-7;
 }  // namespace
 
 // ============================================================================
-// 内部重建圆弧局部坐标系
+// 三点解算圆弧：圆心 + 转角 → 正交标架
 //
-// 仅信任外部传入的圆心位置 p 和圆弧平面法向（Z 轴），主动重建正交标架、
-// 强制 X 轴 = (pose_start.p - center) 方向。保证 s=0 时 arc_pos = (R,0,0)
-// 精确映射到 pose_start_.p，消除起始跳变风险和 TNB 标架歧义。
+// 参考 cartesian_geometry.h 的 computeCircleCenter / computeCircleArcParams，
+// 内部重建正交化标架，X 轴强制对齐起点。
 // ============================================================================
 
-Frame MoveCircle::buildArcFrame(const Frame& pose_start,
-                                const Frame& center_frame,
-                                double& radius_out) {
-    const KDL::Vector center = center_frame.p;
+bool MoveCircleThreePoint::solveThreePoints(const Frame& start,
+                                             const Frame& via,
+                                             const Frame& goal,
+                                             Frame& arc_frame_out,
+                                             double& radius_out,
+                                             double& theta_out) {
+    // ─── Step 1: 解圆心 ───
+    KDL::Vector v1 = via.p - start.p;
+    KDL::Vector v2 = goal.p - start.p;
 
-    // X 轴：圆心 → 起始点（强制对齐）
-    KDL::Vector axis_x = pose_start.p - center;
-    radius_out = axis_x.Normalize();
-    if (radius_out < kArcEpsilon) {
-        // 半径为零，返回退化标架
-        return center_frame;
-    }
+    if (v1.Normalize() < kArcEpsilon) return false;
+    if (v2.Normalize() < kArcEpsilon) return false;
 
-    // 从外部输入提取圆弧平面法向
-    KDL::Vector axis_z = center_frame.M.UnitZ();
+    // 圆弧平面法向：Start → Via → Goal 右手螺旋
+    KDL::Vector axis_z = v1 * v2;
+    if (axis_z.Normalize() < kArcEpsilon) return false;
 
-    // Gram-Schmidt 正交化：去除 axis_z 在 axis_x 上的投影
-    const double proj = KDL::dot(axis_z, axis_x);
-    axis_z -= proj * axis_x;
-    if (axis_z.Normalize() < kArcEpsilon) {
-        // Z 与 X 共线：回退到从 X 和世界 Z/Y 构建
-        axis_z = KDL::Vector(0, 0, 1);
-        if (std::abs(KDL::dot(axis_z, axis_x)) > 0.999) {
-            axis_z = KDL::Vector(0, 1, 0);
-        }
-        axis_z -= KDL::dot(axis_z, axis_x) * axis_x;
-        axis_z.Normalize();
-    }
-
-    // Y 轴 = Z × X（右手系）
+    // 局部坐标系
+    KDL::Vector axis_x = v1;
     KDL::Vector axis_y = axis_z * axis_x;
     axis_y.Normalize();
 
-    return KDL::Frame(KDL::Rotation(axis_x, axis_y, axis_z), center);
+    // 投影几何解 h = ((cx - bx/2)² + cy² - (bx/2)²) / (2·cy)
+    const KDL::Vector d1 = via.p - start.p;
+    const KDL::Vector d2 = goal.p - start.p;
+    const double bx = KDL::dot(d1, axis_x);
+    const double cx = KDL::dot(d2, axis_x);
+    const double cy = KDL::dot(d2, axis_y);
+
+    if (std::abs(cy) < kArcEpsilon) return false;
+
+    const double h = ((cx - bx / 2.0) * (cx - bx / 2.0) + cy * cy -
+                      (bx / 2.0) * (bx / 2.0)) / (2.0 * cy);
+    const KDL::Vector center = start.p + axis_x * (bx / 2.0) + axis_y * h;
+
+    // ─── Step 2: 构建圆弧局部标架（X 轴强制指向起点）───
+    KDL::Vector arc_x = start.p - center;
+    radius_out = arc_x.Normalize();
+    if (radius_out < kArcEpsilon) return false;
+
+    // 正交化 Z
+    KDL::Vector arc_z = axis_z;
+    arc_z -= KDL::dot(arc_z, arc_x) * arc_x;
+    if (arc_z.Normalize() < kArcEpsilon) return false;
+
+    KDL::Vector arc_y = arc_z * arc_x;
+    arc_y.Normalize();
+
+    arc_frame_out = KDL::Frame(KDL::Rotation(arc_x, arc_y, arc_z), center);
+
+    // ─── Step 3: 计算转角 theta（起点 → 终点）───
+    const KDL::Vector end_local = arc_frame_out.Inverse() * goal.p;
+    double theta = std::atan2(end_local(1), end_local(0));
+    if (theta < 0.0) {
+        theta += 2.0 * M_PI;
+    }
+    theta_out = theta;
+
+    return true;
 }
 
 // ============================================================================
 // 构造 / 析构
 // ============================================================================
 
-MoveCircle::MoveCircle(const Frame& pose_start,
-                       const Frame& center_frame,
-                       double theta,
-                       double v_limit,
-                       double a_limit,
-                       double j_limit,
-                       double dt)
+MoveCircleThreePoint::MoveCircleThreePoint(const Frame& pose_start,
+                                           const Frame& pose_via,
+                                           const Frame& pose_goal,
+                                           double v_limit,
+                                           double a_limit,
+                                           double j_limit,
+                                           double dt)
     : dt_(dt)
     , profile_(dt)
     , pose_start_(pose_start)
-    , theta_(theta)
     , v_limit_(v_limit)
     , a_limit_(a_limit)
     , j_limit_(j_limit) {
-    arc_frame_ = buildArcFrame(pose_start_, center_frame, radius_);
+    if (!solveThreePoints(pose_start_, pose_via, pose_goal,
+                          arc_frame_, radius_, theta_)) {
+        // 解算失败：标记无运动，后续 support/Reset 返回错误
+        has_motion_ = false;
+        theta_ = 0.0;
+        radius_ = 0.0;
+        arc_frame_ = pose_start_;
+    }
 }
 
-MoveCircle::~MoveCircle() = default;
+MoveCircleThreePoint::~MoveCircleThreePoint() = default;
 
 // ============================================================================
 // 参数校验
 // ============================================================================
 
-Result MoveCircle::support() const {
+Result MoveCircleThreePoint::support() const {
+    // 纯参数校验：仅检查有限性 + 正值性，不做几何阈值拦截。
+    // 圆心解算失败 / 运动量太小 → 由 computeNormalizedLimits 设 has_motion_=false，
+    // Reset() 返回 PlanFinished 优雅退出，不报错。
     if (!std::isfinite(dt_) || dt_ <= 0.0) {
         return Result::ParameterNanOrInf;
     }
     if (!std::isfinite(theta_)) {
         return Result::ParameterNanOrInf;
     }
-    // 不做 theta 阈值拦截：小角度由 computeNormalizedLimits 设 has_motion_=false
+    if (!std::isfinite(radius_)) {
+        return Result::ParameterNanOrInf;
+    }
     if (!std::isfinite(v_limit_) || !std::isfinite(a_limit_) || !std::isfinite(j_limit_)) {
         return Result::ParameterNanOrInf;
     }
@@ -134,8 +169,8 @@ Result MoveCircle::support() const {
 // 归一化限制计算
 // ============================================================================
 
-bool MoveCircle::computeNormalizedLimits() {
-    if (radius_ < kArcEpsilon) {
+bool MoveCircleThreePoint::computeNormalizedLimits() {
+    if (radius_ < kArcEpsilon || std::abs(theta_) < kArcEpsilon) {
         has_motion_ = false;
         norm_v_ = 1.0; norm_a_ = 1.0; norm_j_ = 1.0;
         return true;
@@ -157,10 +192,10 @@ bool MoveCircle::computeNormalizedLimits() {
 }
 
 // ============================================================================
-// 圆弧插值：arc_pos = (R·cos(sθ), R·sin(sθ), 0) in local frame, then to world
+// 圆弧插值
 // ============================================================================
 
-Frame MoveCircle::interpolateCircular(double s) const {
+Frame MoveCircleThreePoint::interpolateCircular(double s) const {
     const double angle = s * theta_;
     const KDL::Vector arc_pos(radius_ * std::cos(angle),
                                radius_ * std::sin(angle),
@@ -172,7 +207,7 @@ Frame MoveCircle::interpolateCircular(double s) const {
 // 校验 + 初始化
 // ============================================================================
 
-Result MoveCircle::Reset() {
+Result MoveCircleThreePoint::Reset() {
     const Result validation = support();
     if (validation != Result::NoError) return validation;
 
@@ -187,7 +222,7 @@ Result MoveCircle::Reset() {
 // 单步推进
 // ============================================================================
 
-Result MoveCircle::Update() {
+Result MoveCircleThreePoint::Update() {
     if (!has_motion_) return Result::PlanFinished;
 
     const int rc = profile_.Update();
@@ -197,10 +232,10 @@ Result MoveCircle::Update() {
 }
 
 // ============================================================================
-// 笛卡尔参考输出
+// 输出笛卡尔参考
 // ============================================================================
 
-Result MoveCircle::GenerateRef(Reference& ref_out) {
+Result MoveCircleThreePoint::GenerateRef(Reference& ref_out) {
     ref_out = interpolateCircular(profile_.position());
     return Result::NoError;
 }
@@ -209,19 +244,19 @@ Result MoveCircle::GenerateRef(Reference& ref_out) {
 // 暂停 / 继续 / 停止
 // ============================================================================
 
-Result MoveCircle::Pause() {
+Result MoveCircleThreePoint::Pause() {
     if (!has_motion_) return Result::NoError;
     if (!profile_.Pause(norm_a_, norm_j_)) return Result::PlanError;
     return Result::NoError;
 }
 
-Result MoveCircle::Resume() {
+Result MoveCircleThreePoint::Resume() {
     if (!has_motion_) return Result::NoError;
     profile_.Resume();
     return Result::NoError;
 }
 
-Result MoveCircle::Stop() {
+Result MoveCircleThreePoint::Stop() {
     if (!has_motion_) return Result::NoError;
     if (!profile_.Stop(norm_a_, norm_j_)) return Result::PlanError;
     return Result::NoError;

@@ -1,0 +1,253 @@
+// Copyright 2026, Yang Luo"
+// This program is free software: you can redistribute it and/or modify
+// it under the terms of the GNU General Public License as published by
+// the Free Software Foundation, either version 3 of the License, or
+// (at your option) any later version.
+//
+// This program is distributed in the hope that it will be useful,
+// but WITHOUT ANY WARRANTY; without even the implied warranty of
+// MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+// GNU General Public License for more details.
+//
+// You should have received a copy of the GNU General Public License
+// along with this program.  If not, see <http://www.gnu.org/licenses/>.
+//
+// @Author
+// Yang Luo, PHD
+// Shenyang Institute of Automation, Chinese Academy of Sciences.
+// email: luoyang@sia.cn
+
+#define DOCTEST_CONFIG_IMPLEMENT_WITH_MAIN
+
+#include <cmath>
+#include <fstream>
+#include <string>
+#include <variant>
+#include <vector>
+
+#include <test/doctest.h>
+
+#include "src/move_circle_three_point.hpp"
+
+namespace {
+
+struct DataPoint {
+    int    step;
+    double time;
+    double px, py, pz;
+    double qx, qy, qz, qw;
+};
+
+constexpr double kDt     = 0.001;
+constexpr double kVLimit = 1.0;
+constexpr double kALimit = 2.0;
+constexpr double kJLimit = 10.0;
+
+constexpr int kMaxSteps    = 10000;
+constexpr int kPauseAtStep = 200;
+
+const std::string kCsvDir = "/tmp/move_circle_three_point_csv/";
+
+// ─── 辅助 ───
+
+rocos::Frame makePose(double x, double y, double z) {
+    return rocos::Frame(KDL::Rotation::Identity(), KDL::Vector(x, y, z));
+}
+
+DataPoint extractData(int step, double time, rocos::MoveCircleThreePoint& move) {
+    rocos::Reference ref;
+    move.GenerateRef(ref);
+    const auto& f = std::get<rocos::Frame>(ref);
+
+    DataPoint dp{};
+    dp.step = step;
+    dp.time = time;
+    dp.px = f.p.x();  dp.py = f.p.y();  dp.pz = f.p.z();
+    f.M.GetQuaternion(dp.qx, dp.qy, dp.qz, dp.qw);
+    return dp;
+}
+
+void writeCsv(const std::string& filename, const std::vector<DataPoint>& data) {
+    std::string full_path = kCsvDir + filename;
+    std::ofstream ofs(full_path);
+    ofs << "step,time,px,py,pz,qx,qy,qz,qw\n";
+    for (const auto& dp : data) {
+        ofs << dp.step << "," << dp.time << ","
+            << dp.px << "," << dp.py << "," << dp.pz << ","
+            << dp.qx << "," << dp.qy << "," << dp.qz << "," << dp.qw << "\n";
+    }
+}
+
+}  // namespace
+
+// ==========================================================================
+// 测试辅助函数
+// ==========================================================================
+
+static void runNormal(rocos::MoveCircleThreePoint& move,
+                      std::vector<DataPoint>& data,
+                      const std::string& csv_name) {
+    data.clear();
+    int step = 0; double time = 0.0;
+    while (step < kMaxSteps) {
+        data.push_back(extractData(step, time, move));
+        if (move.Update() != rocos::Result::NoError) break;
+        ++step; time += kDt;
+    }
+    data.push_back(extractData(step, time, move));
+    writeCsv(csv_name, data);
+    MESSAGE(csv_name, " — ", data.size(), " data points");
+}
+
+static void runPauseResume(rocos::MoveCircleThreePoint& move,
+                           std::vector<DataPoint>& data,
+                           const std::string& csv_name) {
+    data.clear();
+    int step = 0; double time = 0.0;
+    while (step < kPauseAtStep && step < kMaxSteps) {
+        data.push_back(extractData(step, time, move));
+        if (move.Update() != rocos::Result::NoError) break;
+        ++step; time += kDt;
+    }
+    move.Pause();
+    while (step < kMaxSteps) {
+        data.push_back(extractData(step, time, move));
+        if (move.Update() == rocos::Result::PlanFinished) break;
+        ++step; time += kDt;
+    }
+    move.Resume();
+    ++step; time += kDt;
+    while (step < kMaxSteps) {
+        data.push_back(extractData(step, time, move));
+        if (move.Update() != rocos::Result::NoError) break;
+        ++step; time += kDt;
+    }
+    data.push_back(extractData(step, time, move));
+    writeCsv(csv_name, data);
+    MESSAGE(csv_name, " — ", data.size(), " data points");
+}
+
+static void runPauseStop(rocos::MoveCircleThreePoint& move,
+                         std::vector<DataPoint>& data,
+                         const std::string& csv_name) {
+    data.clear();
+    int step = 0; double time = 0.0;
+    while (step < kPauseAtStep && step < kMaxSteps) {
+        data.push_back(extractData(step, time, move));
+        if (move.Update() != rocos::Result::NoError) break;
+        ++step; time += kDt;
+    }
+    move.Pause();
+    while (step < kMaxSteps) {
+        data.push_back(extractData(step, time, move));
+        if (move.Update() == rocos::Result::PlanFinished) break;
+        ++step; time += kDt;
+    }
+    move.Stop();
+    while (step < kMaxSteps) {
+        data.push_back(extractData(step, time, move));
+        if (move.Update() == rocos::Result::PlanFinished) break;
+        ++step; time += kDt;
+    }
+    writeCsv(csv_name, data);
+    MESSAGE(csv_name, " — ", data.size(), " data points");
+}
+
+// ==========================================================================
+// 正向：Start(1,0,0) → Via(0,1,0) → Goal(-1,0,0)
+// 逆时针上半圆弧，圆心 (0,0,0), R=1.0, theta=π
+// path_length = 1.0 × π ≈ 3.142
+// ==========================================================================
+
+TEST_CASE("MoveCircleThreePoint 正向 — 正常执行") {
+    auto start = makePose( 1,  0, 0);
+    auto via   = makePose( 0,  1, 0);
+    auto goal  = makePose(-1,  0, 0);
+    rocos::MoveCircleThreePoint move(start, via, goal, kVLimit, kALimit, kJLimit, kDt);
+    REQUIRE(move.Reset() == rocos::Result::NoError);
+
+    std::vector<DataPoint> data;
+    runNormal(move, data, "forward_normal.csv");
+
+    const auto& last = data.back();
+    CHECK(last.px == doctest::Approx(-1.0).epsilon(1e-3));
+    CHECK(last.py == doctest::Approx( 0.0).epsilon(1e-3));
+    CHECK(last.pz == doctest::Approx( 0.0).epsilon(1e-3));
+}
+
+TEST_CASE("MoveCircleThreePoint 正向 — 暂停继续") {
+    auto start = makePose( 1,  0, 0);
+    auto via   = makePose( 0,  1, 0);
+    auto goal  = makePose(-1,  0, 0);
+    rocos::MoveCircleThreePoint move(start, via, goal, kVLimit, kALimit, kJLimit, kDt);
+    REQUIRE(move.Reset() == rocos::Result::NoError);
+
+    std::vector<DataPoint> data;
+    runPauseResume(move, data, "forward_pause_resume.csv");
+
+    const auto& last = data.back();
+    CHECK(last.px == doctest::Approx(-1.0).epsilon(1e-3));
+}
+
+TEST_CASE("MoveCircleThreePoint 正向 — 暂停后Stop") {
+    auto start = makePose( 1,  0, 0);
+    auto via   = makePose( 0,  1, 0);
+    auto goal  = makePose(-1,  0, 0);
+    rocos::MoveCircleThreePoint move(start, via, goal, kVLimit, kALimit, kJLimit, kDt);
+    REQUIRE(move.Reset() == rocos::Result::NoError);
+
+    std::vector<DataPoint> data;
+    runPauseStop(move, data, "forward_pause_stop.csv");
+
+    const auto& last = data.back();
+    CHECK(last.px > 0.9);  // 暂停点早，仍在起点附近
+}
+
+// ==========================================================================
+// 反向：Start(-1,0,0) → Via(0,1,0) → Goal(1,0,0)
+// 逆时针下半圆弧，圆心 (0,0,0), R=1.0, theta=π
+// path_length 同正向
+// ==========================================================================
+
+TEST_CASE("MoveCircleThreePoint 反向 — 正常执行") {
+    auto start = makePose(-1,  0, 0);
+    auto via   = makePose( 0,  1, 0);
+    auto goal  = makePose( 1,  0, 0);
+    rocos::MoveCircleThreePoint move(start, via, goal, kVLimit, kALimit, kJLimit, kDt);
+    REQUIRE(move.Reset() == rocos::Result::NoError);
+
+    std::vector<DataPoint> data;
+    runNormal(move, data, "reverse_normal.csv");
+
+    const auto& last = data.back();
+    CHECK(last.px == doctest::Approx( 1.0).epsilon(1e-3));
+    CHECK(last.py == doctest::Approx( 0.0).epsilon(1e-3));
+}
+
+TEST_CASE("MoveCircleThreePoint 反向 — 暂停继续") {
+    auto start = makePose(-1,  0, 0);
+    auto via   = makePose( 0,  1, 0);
+    auto goal  = makePose( 1,  0, 0);
+    rocos::MoveCircleThreePoint move(start, via, goal, kVLimit, kALimit, kJLimit, kDt);
+    REQUIRE(move.Reset() == rocos::Result::NoError);
+
+    std::vector<DataPoint> data;
+    runPauseResume(move, data, "reverse_pause_resume.csv");
+
+    const auto& last = data.back();
+    CHECK(last.px == doctest::Approx(1.0).epsilon(1e-3));
+}
+
+TEST_CASE("MoveCircleThreePoint 反向 — 暂停后Stop") {
+    auto start = makePose(-1,  0, 0);
+    auto via   = makePose( 0,  1, 0);
+    auto goal  = makePose( 1,  0, 0);
+    rocos::MoveCircleThreePoint move(start, via, goal, kVLimit, kALimit, kJLimit, kDt);
+    REQUIRE(move.Reset() == rocos::Result::NoError);
+
+    std::vector<DataPoint> data;
+    runPauseStop(move, data, "reverse_pause_stop.csv");
+
+    const auto& last = data.back();
+    CHECK(last.px < -0.9);  // 暂停点早，仍在起点附近
+}
