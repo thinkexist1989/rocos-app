@@ -309,3 +309,12 @@ target_link_libraries(position_controller_test
 add_test(NAME position_controller_test COMMAND position_controller_test)
 set_tests_properties(position_controller_test PROPERTIES
         WORKING_DIRECTORY ${CMAKE_SOURCE_DIR})
+
+add_executable(joint_impedance_controller_test test/joint_impedance_controller_test.cc)
+target_link_libraries(joint_impedance_controller_test
+        PRIVATE
+        robot
+        )
+add_test(NAME joint_impedance_controller_test COMMAND joint_impedance_controller_test)
+set_tests_properties(joint_impedance_controller_test PROPERTIES
+        WORKING_DIRECTORY ${CMAKE_SOURCE_DIR})
