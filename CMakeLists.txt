@@ -153,7 +153,7 @@ add_library(robot
         src/cartesian_impedance_controller.cpp
         src/unit_velocity_profile.cpp
 
-
+        src/unit_velocity_profile.cpp
 
 #        src/velocity_profile.cpp
 #        src/robot_http_server.cpp
@@ -327,4 +327,40 @@ target_link_libraries(joint_impedance_controller_test
         )
 add_test(NAME joint_impedance_controller_test COMMAND joint_impedance_controller_test)
 set_tests_properties(joint_impedance_controller_test PROPERTIES
+        WORKING_DIRECTORY ${CMAKE_SOURCE_DIR})
+
+add_executable(unit_velocity_profile_test test/unit_velocity_profile_test.cc)
+target_link_libraries(unit_velocity_profile_test
+        PRIVATE
+        robot
+        )
+add_test(NAME unit_velocity_profile_test COMMAND unit_velocity_profile_test)
+set_tests_properties(unit_velocity_profile_test PROPERTIES
+        WORKING_DIRECTORY ${CMAKE_SOURCE_DIR})
+
+add_executable(move_joint_test test/move_joint_test.cc)
+target_link_libraries(move_joint_test
+        PRIVATE
+        robot
+        )
+add_test(NAME move_joint_test COMMAND move_joint_test)
+set_tests_properties(move_joint_test PROPERTIES
+        WORKING_DIRECTORY ${CMAKE_SOURCE_DIR})
+
+add_executable(move_line_test test/move_line_test.cc)
+target_link_libraries(move_line_test
+        PRIVATE
+        robot
+        )
+add_test(NAME move_line_test COMMAND move_line_test)
+set_tests_properties(move_line_test PROPERTIES
+        WORKING_DIRECTORY ${CMAKE_SOURCE_DIR})
+
+add_executable(move_circle_test test/move_circle_test.cc)
+target_link_libraries(move_circle_test
+        PRIVATE
+        robot
+        )
+add_test(NAME move_circle_test COMMAND move_circle_test)
+set_tests_properties(move_circle_test PROPERTIES
         WORKING_DIRECTORY ${CMAKE_SOURCE_DIR})
