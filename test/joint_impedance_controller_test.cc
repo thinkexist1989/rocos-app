@@ -73,10 +73,10 @@ public:
     rocos::Wrench GetWrench() override { return rocos::Wrench::Zero(); }
 
     // IOInteface
-    bool GetDigitalInput(int, int) override { return false; }
-    void SetDigitalOutput(int, int, bool) override {}
-    double GetAnalogInput(int, int) override { return 0.0; }
-    void SetAnalogOutput(int, int, double) override {}
+    bool GetDigitalInput(int32_t, int32_t) override { return false; }
+    void SetDigitalOutput(int32_t, int32_t, bool) override {}
+    double GetAnalogInput(int32_t, int32_t) override { return 0.0; }
+    void SetAnalogOutput(int32_t, int32_t, double) override {}
 
     // HardwareInterface
     bool Reset() override { return true; }

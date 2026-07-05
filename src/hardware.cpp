@@ -516,7 +516,7 @@ Wrench Hardware::GetWrench() {
 // IOInteface
 // ==========================================================================
 
-bool Hardware::GetDigitalInput(int id, int channel) {
+bool Hardware::GetDigitalInput(int32_t id, int32_t channel) {
     // 1. 先在 IO 模块中查找
     const IO* io = findIOById(id);
     if (io != nullptr) {
@@ -539,7 +539,7 @@ bool Hardware::GetDigitalInput(int id, int channel) {
     return false;
 }
 
-void Hardware::SetDigitalOutput(int id, int channel, bool value) {
+void Hardware::SetDigitalOutput(int32_t id, int32_t channel, bool value) {
     // 1. 先在 IO 模块中查找
     const IO* io = findIOById(id);
     if (io != nullptr) {
@@ -576,7 +576,7 @@ void Hardware::SetDigitalOutput(int id, int channel, bool value) {
     }
 }
 
-double Hardware::GetAnalogInput(int id, int channel) {
+double Hardware::GetAnalogInput(int32_t id, int32_t channel) {
     // 1. 先在 IO 模块中查找
     const IO* io = findIOById(id);
     if (io != nullptr) {
@@ -592,7 +592,7 @@ double Hardware::GetAnalogInput(int id, int channel) {
     return 0.0;
 }
 
-void Hardware::SetAnalogOutput(int id, int channel, double value) {
+void Hardware::SetAnalogOutput(int32_t id, int32_t channel, double value) {
     // 1. 先在 IO 模块中查找
     const IO* io = findIOById(id);
     if (io != nullptr) {
@@ -611,7 +611,7 @@ void Hardware::SetAnalogOutput(int id, int channel, double value) {
 // 配置查询
 // ==========================================================================
 
-const Drive* Hardware::findDriveById(int id) const {
+const Drive* Hardware::findDriveById(int32_t id) const {
     auto it = std::find_if(config_.drives.begin(), config_.drives.end(),
                            [id](const Drive& d) { return d.id == id; });
     return (it != config_.drives.end()) ? &(*it) : nullptr;
@@ -623,19 +623,19 @@ const Drive* Hardware::findDriveByName(const std::string& name) const {
     return (it != config_.drives.end()) ? &(*it) : nullptr;
 }
 
-const FTSensor* Hardware::findFTSensorById(int id) const {
+const FTSensor* Hardware::findFTSensorById(int32_t id) const {
     auto it = std::find_if(config_.ft_sensors.begin(), config_.ft_sensors.end(),
                            [id](const FTSensor& ft) { return ft.id == id; });
     return (it != config_.ft_sensors.end()) ? &(*it) : nullptr;
 }
 
-const IO* Hardware::findIOById(int id) const {
+const IO* Hardware::findIOById(int32_t id) const {
     auto it = std::find_if(config_.ios.begin(), config_.ios.end(),
                            [id](const IO& io) { return io.id == id; });
     return (it != config_.ios.end()) ? &(*it) : nullptr;
 }
 
-HardwareType Hardware::getHardwareType(int slave_id) const {
+HardwareType Hardware::getHardwareType(int32_t slave_id) const {
     if (findDriveById(slave_id) != nullptr) {
         return HardwareType::Driver;
     }

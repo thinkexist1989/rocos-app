@@ -154,6 +154,8 @@ add_library(robot
         src/cartesian_impedance_controller.cpp
         src/unit_velocity_profile.cpp
 
+        src/performance_profiler.cpp
+
 #        src/velocity_profile.cpp
 #        src/robot_http_server.cpp
 )
@@ -335,6 +337,15 @@ target_link_libraries(unit_velocity_profile_test
         )
 add_test(NAME unit_velocity_profile_test COMMAND unit_velocity_profile_test)
 set_tests_properties(unit_velocity_profile_test PROPERTIES
+        WORKING_DIRECTORY ${CMAKE_SOURCE_DIR})
+
+add_executable(performance_profiler_test test/performance_profiler_test.cc)
+target_link_libraries(performance_profiler_test
+        PRIVATE
+        robot
+        )
+add_test(NAME performance_profiler_test COMMAND performance_profiler_test)
+set_tests_properties(performance_profiler_test PROPERTIES
         WORKING_DIRECTORY ${CMAKE_SOURCE_DIR})
 
 add_executable(move_joint_test test/move_joint_test.cc)

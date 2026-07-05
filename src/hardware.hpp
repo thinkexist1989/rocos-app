@@ -201,24 +201,24 @@ public:
     Wrench GetWrench() override;
 
     // ========== IOInteface 接口实现 ==========
-    bool GetDigitalInput(int id, int channel) override;
-    void SetDigitalOutput(int id, int channel, bool value) override;
-    double GetAnalogInput(int id, int channel) override;
-    void SetAnalogOutput(int id, int channel, double value) override;
+    bool GetDigitalInput(int32_t id, int32_t channel) override;
+    void SetDigitalOutput(int32_t id, int32_t channel, bool value) override;
+    double GetAnalogInput(int32_t id, int32_t channel) override;
+    void SetAnalogOutput(int32_t id, int32_t channel, double value) override;
 
     // ========== 配置访问 ==========
     const HardwareConfig& getConfig() const { return config_; }
 
     /// @brief 根据从站 ID 查找驱动
-    const Drive* findDriveById(int id) const;
+    const Drive* findDriveById(int32_t id) const;
     /// @brief 根据关节名查找驱动
     const Drive* findDriveByName(const std::string& name) const;
     /// @brief 根据从站 ID 查找力矩传感器
-    const FTSensor* findFTSensorById(int id) const;
+    const FTSensor* findFTSensorById(int32_t id) const;
     /// @brief 根据从站 ID 查找 IO 模块
-    const IO* findIOById(int id) const;
+    const IO* findIOById(int32_t id) const;
     /// @brief 获取硬件类型
-    HardwareType getHardwareType(int slave_id) const;
+    HardwareType getHardwareType(int32_t slave_id) const;
 
     /// @brief [测试用] 从 YAML 文件加载并返回配置，不初始化 EcatConfig
     static HardwareConfig LoadConfigFromYAML(const std::string& yaml_file_path);
