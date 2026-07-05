@@ -43,14 +43,10 @@ namespace rocos {
 /// 输出 Reference 类型为 Frame（笛卡尔位姿），不涉及逆运动学。
 class MoveCircle : public MotionInterface {
 public:
-    /// @brief 构造并配置全部运动参数
+    /// @brief 圆心+角度模式
     /// @param pose_start   起始笛卡尔位姿
     /// @param center_frame 圆心信息（仅信任 p=圆心, M.UnitZ()=圆弧平面法向）
     /// @param theta        圆弧角度 [rad]
-    /// @param v_limit      速度限制（一维标量 m/s），默认 1.0
-    /// @param a_limit      加速度限制（一维标量 m/s²），默认 2.0
-    /// @param j_limit      jerk 限制（一维标量 m/s³），默认 10.0
-    /// @param dt           控制周期 [秒]，默认 0.001
     explicit MoveCircle(const Frame& pose_start,
                         const Frame& center_frame,
                         double theta,
@@ -58,6 +54,19 @@ public:
                         double a_limit   = 2.0,
                         double j_limit   = 10.0,
                         double dt        = 0.001);
+
+    /// @brief 三点圆弧模式（内部解算圆心+转角）
+    /// @param pose_start  起始位姿
+    /// @param pose_via    途经位姿（仅用位置）
+    /// @param pose_goal   目标位姿
+    explicit MoveCircle(const Frame& pose_start,
+                        const Frame& pose_via,
+                        const Frame& pose_goal,
+                        double v_limit   = 1.0,
+                        double a_limit   = 2.0,
+                        double j_limit   = 10.0,
+                        double dt        = 0.001);
+
     ~MoveCircle() override;
 
     // ─── MotionInterface 接口 ───
@@ -77,9 +86,18 @@ public:
 
 private:
     /// @brief 内部重建正交化的圆弧局部坐标系（X 轴强制指向起始点）
-    static Frame buildArcFrame(const Frame& pose_start,
-                               const Frame& center_frame,
-                               double& radius_out);
+    static bool buildArcFrame(const Frame& pose_start,
+                              const Frame& center_frame,
+                              Frame& arc_frame_out,
+                              double& radius_out);
+
+    /// @brief 三点解算圆心 + 转角 + 正交标架
+    static bool solveThreePoints(const Frame& start,
+                                  const Frame& via,
+                                  const Frame& goal,
+                                  Frame& arc_frame_out,
+                                  double& radius_out,
+                                  double& theta_out);
 
     /// @brief 计算弧长和归一化限制
     bool computeNormalizedLimits();
