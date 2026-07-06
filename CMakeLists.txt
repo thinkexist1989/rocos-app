@@ -147,12 +147,14 @@ add_library(robot
         src/move_joint.cpp
         src/move_line.cpp
         src/move_circle.cpp
+        src/move_circle_three_point.cpp
 
         src/position_controller.cpp
         src/joint_impedance_controller.cpp
         src/cartesian_impedance_controller.cpp
+        src/unit_velocity_profile.cpp
 
-
+        src/performance_profiler.cpp
 
 #        src/velocity_profile.cpp
 #        src/robot_http_server.cpp
@@ -310,6 +312,15 @@ add_test(NAME position_controller_test COMMAND position_controller_test)
 set_tests_properties(position_controller_test PROPERTIES
         WORKING_DIRECTORY ${CMAKE_SOURCE_DIR})
 
+add_executable(joint_admittance_controller_test test/joint_admittance_controller_test.cc)
+target_link_libraries(joint_admittance_controller_test
+        PRIVATE
+        robot
+        )
+add_test(NAME joint_admittance_controller_test COMMAND joint_admittance_controller_test)
+set_tests_properties(joint_admittance_controller_test PROPERTIES
+        WORKING_DIRECTORY ${CMAKE_SOURCE_DIR})
+
 add_executable(joint_impedance_controller_test test/joint_impedance_controller_test.cc)
 target_link_libraries(joint_impedance_controller_test
         PRIVATE
@@ -317,4 +328,58 @@ target_link_libraries(joint_impedance_controller_test
         )
 add_test(NAME joint_impedance_controller_test COMMAND joint_impedance_controller_test)
 set_tests_properties(joint_impedance_controller_test PROPERTIES
+        WORKING_DIRECTORY ${CMAKE_SOURCE_DIR})
+
+add_executable(unit_velocity_profile_test test/unit_velocity_profile_test.cc)
+target_link_libraries(unit_velocity_profile_test
+        PRIVATE
+        robot
+        )
+add_test(NAME unit_velocity_profile_test COMMAND unit_velocity_profile_test)
+set_tests_properties(unit_velocity_profile_test PROPERTIES
+        WORKING_DIRECTORY ${CMAKE_SOURCE_DIR})
+
+add_executable(performance_profiler_test test/performance_profiler_test.cc)
+target_link_libraries(performance_profiler_test
+        PRIVATE
+        robot
+        )
+add_test(NAME performance_profiler_test COMMAND performance_profiler_test)
+set_tests_properties(performance_profiler_test PROPERTIES
+        WORKING_DIRECTORY ${CMAKE_SOURCE_DIR})
+
+add_executable(move_joint_test test/move_joint_test.cc)
+target_link_libraries(move_joint_test
+        PRIVATE
+        robot
+        )
+add_test(NAME move_joint_test COMMAND move_joint_test)
+set_tests_properties(move_joint_test PROPERTIES
+        WORKING_DIRECTORY ${CMAKE_SOURCE_DIR})
+
+add_executable(move_line_test test/move_line_test.cc)
+target_link_libraries(move_line_test
+        PRIVATE
+        robot
+        )
+add_test(NAME move_line_test COMMAND move_line_test)
+set_tests_properties(move_line_test PROPERTIES
+        WORKING_DIRECTORY ${CMAKE_SOURCE_DIR})
+
+add_executable(move_circle_test test/move_circle_test.cc)
+target_link_libraries(move_circle_test
+        PRIVATE
+        robot
+        )
+add_test(NAME move_circle_test COMMAND move_circle_test)
+set_tests_properties(move_circle_test PROPERTIES
+        WORKING_DIRECTORY ${CMAKE_SOURCE_DIR})
+
+add_executable(move_circle_three_point_test test/move_circle_three_point_test.cc)
+target_link_libraries(move_circle_three_point_test
+        PRIVATE
+        robot
+        )
+add_test(NAME move_circle_three_point_test COMMAND move_circle_three_point_test)
+set_tests_properties(move_circle_three_point_test PROPERTIES
         WORKING_DIRECTORY ${CMAKE_SOURCE_DIR})

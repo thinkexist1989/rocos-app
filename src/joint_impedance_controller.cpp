@@ -30,7 +30,6 @@ namespace rocos {
 
 bool JointImpedanceController::Reset() {
     mode_set_ = false;
-    adm_initialized_ = false;
     return true;
 }
 
@@ -114,14 +113,11 @@ Result JointImpedanceController::GenerateCmd(const Reference& ref_in,
 }
 
 // ==========================================================================
-// UpdateCmd — 关节空间导纳控制
+// UpdateCmd — 关节空间阻抗控制（输出力矩 + 重力补偿）
 //
-//   1. τ_ext = τ_act - τ_grav - τ_offset
-//   2. M·q̈_adm + B·q̇_adm = τ_ext
-//      → q̈_adm = (τ_ext - B·q̇_adm) / M
-//   3. 半隐式欧拉积分: q̇_adm += q̈_adm·dt,  q_adm += q̇_adm·dt
-//   4. q_out = q_des + q_adm
-//   5. 以 CSP 模式下发位置
+//   τ_cmd = K_p·(q_des - q_act) - K_d·q̇_act + τ_grav
+//
+//   其中 τ_grav = InverseDynamics(q_act, 0, 0, ∅)
 // ==========================================================================
 
 Result JointImpedanceController::UpdateCmd(const JntArray& q_des) {
@@ -134,112 +130,103 @@ Result JointImpedanceController::UpdateCmd(const JntArray& q_des) {
         return Result::MoveInput;
     }
 
-    // ---- 参数懒初始化 ----
-    if (M_.rows() != n) {
-        M_.resize(n);
-        for (unsigned int i = 0; i < n; ++i) {
-            M_(i) = kDefaultInertia;
-        }
-    }
-    if (B_.rows() != n) {
-        B_.resize(n);
-        for (unsigned int i = 0; i < n; ++i) {
-            B_(i) = kDefaultDamping;
-        }
-    }
-    if (tau_offset_.rows() != n) {
-        tau_offset_.resize(n);
-        for (unsigned int i = 0; i < n; ++i) {
-            tau_offset_(i) = 0.0;
-        }
-    }
-
-    // ---- 导纳积分状态初始化 ----
-    if (!adm_initialized_) {
-        q_adm_.resize(n);
-        q_dot_adm_.resize(n);
-        for (unsigned int i = 0; i < n; ++i) {
-            q_adm_(i) = 0.0;
-            q_dot_adm_(i) = 0.0;
-        }
-        adm_initialized_ = true;
-    }
-
-    // ---- 校验维度 ----
-    if (M_.rows() != n || B_.rows() != n || tau_offset_.rows() != n) {
+    // ---- 增益懒初始化 ----
+    // 先检查已显式设置的增益维度是否与 q_des 一致
+    if ((K_p_.rows() > 0 && K_p_.rows() != n) ||
+        (K_d_.rows() > 0 && K_d_.rows() != n)) {
         return Result::UnmatchedJointsNumber;
     }
-    if (dt_ <= 0.0 || !std::isfinite(dt_)) {
-        return Result::IllegalParameter;
+    // 对尚未设置的增益赋默认值
+    if (K_p_.rows() == 0) {
+        K_p_.resize(n);
+        for (unsigned int i = 0; i < n; ++i) {
+            K_p_(i) = kDefaultStiffness;
+        }
+    }
+    if (K_d_.rows() == 0) {
+        K_d_.resize(n);
+        for (unsigned int i = 0; i < n; ++i) {
+            K_d_(i) = kDefaultDamping;
+        }
     }
 
-    // ---- 读取实际状态 ----
+    // ---- 读取实际关节状态 ----
     JntArray q_act = hardware_->GetPosition();
-    JntArray q_dot_act = hardware_->GetVelocity();   // 仅用于日志/调试，不参与导纳计算
-    JntArray tau_act = hardware_->GetTorque();
+    JntArray q_dot_act = hardware_->GetVelocity();
 
-    if (q_act.rows() != n || tau_act.rows() != n) {
+    if (q_act.rows() != n) {
         return Result::JointStateError;
     }
 
-    // ---- 重力补偿 ----
+    // ---- 重力补偿: τ_grav = InverseDynamics(q, 0, 0, ∅) ----
     JntArray tau_grav;
     if (model_ != nullptr) {
         tau_grav.resize(n);
-        JntArray zero_vec(n);
+        JntArray zero(n);
         for (unsigned int i = 0; i < n; ++i) {
-            zero_vec(i) = 0.0;
+            zero(i) = 0.0;
         }
-        Wrenches f_ext;  // 空 = 无外力旋量
+        Wrenches f_ext;
 
-        Result id_res = model_->InverseDynamics(q_act, zero_vec, zero_vec,
-                                                 f_ext, tau_grav);
+        Result id_res = model_->InverseDynamics(q_act, zero, zero, f_ext, tau_grav);
         if (id_res != Result::NoError) {
             return id_res;
         }
     } else {
-        // 无模型时跳过重力补偿
+        // 无模型时 τ_grav = 0
         tau_grav.resize(n);
         for (unsigned int i = 0; i < n; ++i) {
             tau_grav(i) = 0.0;
         }
     }
 
-    // ---- 导纳控制律 ----
-    // τ_ext = τ_act - τ_grav - τ_offset
-    // q̈_adm = (τ_ext - B·q̇_adm) / M
-    // 半隐式欧拉: q̇_adm ← q̇_adm + q̈_adm·dt,  q_adm ← q_adm + q̇_adm·dt
-    JntArray q_out(n);
+    // ---- 阻抗控制律: τ = K_p·(q_des - q_act) - K_d·q̇_act + τ_grav ----
+    JntArray tau(n);
     for (unsigned int i = 0; i < n; ++i) {
-        const double tau_ext = tau_act(i) - tau_grav(i) - tau_offset_(i);
-        const double q_ddot_adm = (tau_ext - B_(i) * q_dot_adm_(i)) / M_(i);
-
-        q_dot_adm_(i) += q_ddot_adm * dt_;
-        q_adm_(i)     += q_dot_adm_(i) * dt_;
-
-        q_out(i) = q_des(i) + q_adm_(i);
+        const double pos_err = q_des(i) - q_act(i);
+        const double vel_damp = (q_dot_act.rows() == n) ? K_d_(i) * q_dot_act(i) : 0.0;
+        tau(i) = K_p_(i) * pos_err - vel_damp + tau_grav(i);
     }
 
-    // ---- 校验输出有效性 ----
-    for (unsigned int i = 0; i < n; ++i) {
-        if (!std::isfinite(q_out(i))) {
-            return Result::IkCalcFail;
-        }
-    }
-
-    // ---- 下发位置指令（CSP 模式） ----
+    // ---- 下发力矩指令（CST 模式） ----
     if (!mode_set_) {
-        hardware_->SetMode(CSP_MODE);
+        hardware_->SetMode(CST_MODE);
         mode_set_ = true;
     }
 
-    hardware_->SetPosition(q_out);
+    hardware_->SetTorque(tau);
     return Result::NoError;
 }
 
 // ==========================================================================
-// 导纳参数设置
+// 阻抗参数设置
 // ==========================================================================
+
+Result JointImpedanceController::SetStiffness(const JntArray& K) {
+    if (K.rows() == 0) {
+        return Result::MoveInput;
+    }
+    for (unsigned int i = 0; i < K.rows(); ++i) {
+        if (!std::isfinite(K(i)) || K(i) < 0.0) {
+            return Result::ParameterNanOrInf;
+        }
+    }
+    K_p_ = K;
+    return Result::NoError;
+}
+
+Result JointImpedanceController::SetDamping(const JntArray& D) {
+    if (D.rows() == 0) {
+        return Result::MoveInput;
+    }
+    for (unsigned int i = 0; i < D.rows(); ++i) {
+        if (!std::isfinite(D(i)) || D(i) < 0.0) {
+            return Result::ParameterNanOrInf;
+        }
+    }
+    K_d_ = D;
+    return Result::NoError;
+}
 
 Result JointImpedanceController::SetInertia(const JntArray& M) {
     if (M.rows() == 0) {
@@ -251,19 +238,6 @@ Result JointImpedanceController::SetInertia(const JntArray& M) {
         }
     }
     M_ = M;
-    return Result::NoError;
-}
-
-Result JointImpedanceController::SetDamping(const JntArray& B) {
-    if (B.rows() == 0) {
-        return Result::MoveInput;
-    }
-    for (unsigned int i = 0; i < B.rows(); ++i) {
-        if (!std::isfinite(B(i)) || B(i) < 0.0) {
-            return Result::ParameterNanOrInf;
-        }
-    }
-    B_ = B;
     return Result::NoError;
 }
 

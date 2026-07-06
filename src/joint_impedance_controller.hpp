@@ -22,16 +22,15 @@
 
 namespace rocos {
 
-/// @brief 关节空间导纳控制器
+/// @brief 关节空间阻抗控制器（输出力矩 + 重力补偿）
 ///
-/// 控制律（在每个控制周期执行）：
-///   1. τ_ext = τ_act - τ_grav - τ_offset
-///   2. M·q̈_adm + B·q̇_adm = τ_ext   →   q̈_adm = (τ_ext - B·q̇_adm) / M
-///   3. 半隐式欧拉积分:  q̇_adm += q̈_adm·dt ,  q_adm += q̇_adm·dt
-///   4. q_out = q_des + q_adm
-///   5. 以 CSP 模式下发位置指令到硬件
+/// 控制律（每个周期执行）：
+///   1. τ_grav = InverseDynamics(q_act, 0, 0, ∅)   ← 重力补偿
+///   2. τ_imp  = K_p·(q_des - q_act) - K_d·q̇_act  ← PD 阻抗
+///   3. τ_cmd  = τ_imp + τ_grav
+///   4. SetTorque(τ_cmd)，CST 模式 (mode=10)
 ///
-/// 注意: 最终下发的始终是关节角度（SetPosition），不是力矩。
+/// 最终下发的始终是关节力矩。
 class JointImpedanceController : public ControllerInterface {
 public:
     JointImpedanceController() = default;
@@ -43,13 +42,16 @@ public:
     Result GenerateCmd(const Reference& ref_in, JntArray& q_cmd) override;
     Result UpdateCmd(const JntArray& q_cmd) override;
 
-    /// @brief 设置导纳虚拟惯量 M [kg·m²]，需与关节数一致
+    /// @brief 设置关节刚度系数 K_p [Nm/rad]
+    Result SetStiffness(const JntArray& K);
+    /// @brief 设置关节阻尼系数 K_d [Nm·s/rad]
+    Result SetDamping(const JntArray& D);
+
+    /// @brief 设置导纳虚拟惯量 M [kg·m²]（导纳模式参数）
     Result SetInertia(const JntArray& M);
-    /// @brief 设置导纳阻尼系数 B [Nm·s/rad]，需与关节数一致
-    Result SetDamping(const JntArray& B);
-    /// @brief 设置关节力矩零飘 τ_offset [Nm]，需与关节数一致
+    /// @brief 设置关节力矩零飘 τ_offset [Nm]（导纳模式参数）
     Result SetTorqueOffset(const JntArray& tau_offset);
-    /// @brief 设置控制周期 dt [s]（默认 0.001 = 1ms）
+    /// @brief 设置控制周期 dt [s]（导纳模式参数）
     Result SetDt(double dt);
 
 private:
@@ -57,22 +59,18 @@ private:
     ModelInterface* model_{nullptr};
     bool mode_set_{false};
 
-    // 导纳参数
-    JntArray M_;            // 虚拟惯量 [kg·m²]
-    JntArray B_;            // 阻尼系数 [Nm·s/rad]
-    JntArray tau_offset_;   // 关节力矩零飘 [Nm]
-    double dt_{0.001};      // 控制周期 [s]
+    JntArray K_p_;           // 刚度系数 [Nm/rad]
+    JntArray K_d_;           // 阻尼系数 [Nm·s/rad]
 
-    // 导纳积分状态
-    JntArray q_adm_;        // 导纳位置偏移
-    JntArray q_dot_adm_;    // 导纳速度
-    bool adm_initialized_{false};
+    // 导纳模式参数
+    JntArray M_;             // 虚拟惯量 [kg·m²]
+    JntArray tau_offset_;    // 关节力矩零飘 [Nm]
+    double dt_{0.001};       // 控制周期 [s]
 
-    // 默认值
-    static constexpr double kDefaultInertia = 1.0;    // kg·m²
-    static constexpr double kDefaultDamping = 20.0;   // Nm·s/rad
-    static constexpr double kDefaultDt = 0.001;       // s
-    static constexpr int8_t CSP_MODE = 8;             // Cyclic Synchronous Position
+    static constexpr double kDefaultStiffness = 100.0;   // Nm/rad
+    static constexpr double kDefaultDamping  = 20.0;     // Nm·s/rad
+    static constexpr double kDefaultInertia  = 1.0;      // kg·m²
+    static constexpr int8_t CST_MODE = 10;               // Cyclic Synchronous Torque
 };
 
 } // namespace rocos
