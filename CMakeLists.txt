@@ -153,6 +153,9 @@ add_library(robot
         src/cartesian_impedance_controller.cpp
         src/unit_velocity_profile.cpp
 
+        src/virtual_wall.cpp
+        src/virtual_wall_guard.cpp
+
         src/performance_profiler.cpp
 )
 target_include_directories(robot
@@ -193,6 +196,17 @@ target_link_libraries(rocosAppMain
         PRIVATE
         robot
         gflags::gflags
+        pthread
+        )
+
+########### Executable VirtualWallMain ################
+add_executable(VirtualWallMain
+        src/VirtualWallMain.cpp
+        )
+
+target_link_libraries(VirtualWallMain
+        PRIVATE
+        robot
         pthread
         )
 
@@ -367,4 +381,13 @@ target_link_libraries(move_circle_three_point_test
         )
 add_test(NAME move_circle_three_point_test COMMAND move_circle_three_point_test)
 set_tests_properties(move_circle_three_point_test PROPERTIES
+        WORKING_DIRECTORY ${CMAKE_SOURCE_DIR})
+
+add_executable(virtual_wall_test test/virtual_wall_test.cc)
+target_link_libraries(virtual_wall_test
+        PRIVATE
+        robot
+        )
+add_test(NAME virtual_wall_test COMMAND virtual_wall_test)
+set_tests_properties(virtual_wall_test PROPERTIES
         WORKING_DIRECTORY ${CMAKE_SOURCE_DIR})
