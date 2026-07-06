@@ -263,7 +263,7 @@ file(COPY ${CONFIG_FILE} DESTINATION ${CMAKE_BINARY_DIR}/bin)
 enable_testing()
 add_executable(model_test test/model_test.cc)
 target_link_libraries(model_test
-        PUBLIC
+        PRIVATE
         robot
         )
 add_test(NAME model_test COMMAND unit_test)
@@ -272,7 +272,7 @@ set_tests_properties(model_test PROPERTIES
 
 add_executable(robot_fsm_test test/robot_fsm_test.cc)
 target_link_libraries(robot_fsm_test
-        PUBLIC
+        PRIVATE
         robot
         )
 add_test(NAME robot_fsm_test COMMAND robot_fsm_test)
@@ -281,7 +281,7 @@ set_tests_properties(robot_fsm_test PROPERTIES
 
 add_executable(hardware_test test/hardware_test.cc)
 target_link_libraries(hardware_test
-        PUBLIC
+        PRIVATE
         robot
         )
 add_test(NAME hardware_test COMMAND hardware_test)
@@ -290,7 +290,7 @@ set_tests_properties(hardware_test PROPERTIES
 
 add_executable(position_controller_test test/position_controller_test.cc)
 target_link_libraries(position_controller_test
-        PUBLIC
+        PRIVATE
         robot
         )
 add_test(NAME position_controller_test COMMAND position_controller_test)
@@ -299,7 +299,7 @@ set_tests_properties(position_controller_test PROPERTIES
 
 add_executable(joint_admittance_controller_test test/joint_admittance_controller_test.cc)
 target_link_libraries(joint_admittance_controller_test
-        PUBLIC
+        PRIVATE
         robot
         )
 add_test(NAME joint_admittance_controller_test COMMAND joint_admittance_controller_test)
@@ -308,7 +308,7 @@ set_tests_properties(joint_admittance_controller_test PROPERTIES
 
 add_executable(joint_impedance_controller_test test/joint_impedance_controller_test.cc)
 target_link_libraries(joint_impedance_controller_test
-        PUBLIC
+        PRIVATE
         robot
         )
 add_test(NAME joint_impedance_controller_test COMMAND joint_impedance_controller_test)
@@ -317,7 +317,7 @@ set_tests_properties(joint_impedance_controller_test PROPERTIES
 
 add_executable(unit_velocity_profile_test test/unit_velocity_profile_test.cc)
 target_link_libraries(unit_velocity_profile_test
-        PUBLIC
+        PRIVATE
         robot
         )
 add_test(NAME unit_velocity_profile_test COMMAND unit_velocity_profile_test)
@@ -326,7 +326,7 @@ set_tests_properties(unit_velocity_profile_test PROPERTIES
 
 add_executable(performance_profiler_test test/performance_profiler_test.cc)
 target_link_libraries(performance_profiler_test
-        PUBLIC
+        PRIVATE
         robot
         )
 add_test(NAME performance_profiler_test COMMAND performance_profiler_test)
@@ -335,7 +335,7 @@ set_tests_properties(performance_profiler_test PROPERTIES
 
 add_executable(move_joint_test test/move_joint_test.cc)
 target_link_libraries(move_joint_test
-        PUBLIC
+        PRIVATE
         robot
         )
 add_test(NAME move_joint_test COMMAND move_joint_test)
@@ -344,7 +344,7 @@ set_tests_properties(move_joint_test PROPERTIES
 
 add_executable(move_line_test test/move_line_test.cc)
 target_link_libraries(move_line_test
-        PUBLIC
+        PRIVATE
         robot
         )
 add_test(NAME move_line_test COMMAND move_line_test)
@@ -353,7 +353,7 @@ set_tests_properties(move_line_test PROPERTIES
 
 add_executable(move_circle_test test/move_circle_test.cc)
 target_link_libraries(move_circle_test
-        PUBLIC
+        PRIVATE
         robot
         )
 add_test(NAME move_circle_test COMMAND move_circle_test)
