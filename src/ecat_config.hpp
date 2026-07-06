@@ -19,11 +19,13 @@
 #pragma once
 
 #include <boost/format.hpp>
-#include <boost/interprocess/managed_shared_memory.hpp>
-#include <boost/interprocess/mapped_region.hpp>
-#include <boost/interprocess/shared_memory_object.hpp>
+#include <cstddef>
+#include <cstring>
+#include <limits>
 #include <map>
+#include <string>
 #include <thread>
+#include <vector>
 
 #include "ecat_type.hpp"
 
@@ -272,6 +274,9 @@ class EcatConfig {
 
   bool getPdDataMemoryProvider();
 
+  bool mapSharedMemory(const std::string &name, std::size_t size, int *fd,
+                       void **ptr, bool *created);
+
   std::vector<std::thread::id> threadId;
 
   std::string ecmName{EC_SHM};
@@ -279,20 +284,20 @@ class EcatConfig {
   std::string pdInputName{"pd_input"};
   std::string pdOutputName{"pd_output"};
 
-  boost::interprocess::managed_shared_memory *managedSharedMemory = nullptr;
-
   // PD Input and Output memory
-  boost::interprocess::shared_memory_object *pdInputShm = nullptr;
-  boost::interprocess::shared_memory_object *pdOutputShm = nullptr;
-  boost::interprocess::mapped_region *pdInputRegion = nullptr;
-  boost::interprocess::mapped_region *pdOutputRegion = nullptr;
+  int ecm_fd_{-1};
+  int pd_input_fd_{-1};
+  int pd_output_fd_{-1};
+  std::size_t ecm_size_{EC_SHM_MAX_SIZE};
+  std::size_t pd_input_size_{EC_SHM_MAX_SIZE};
+  std::size_t pd_output_size_{EC_SHM_MAX_SIZE};
 
   void *pdInputPtr = nullptr;
   void *pdOutputPtr = nullptr;
 
   EcatBus *ecatBus = nullptr;
 
-  sem_t *sem_mutex[EC_SEM_NUM];
+  sem_t *sem_mutex[EC_SEM_NUM]{};
 
   //////////// OUTPUT FORMAT SETTINGS ////////////////////
   // Terminal Color Show
