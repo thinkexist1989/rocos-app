@@ -23,32 +23,36 @@
 #include "motion_interface.hpp"
 #include "result.hpp"
 #include "types.hpp"
+#include "performance_profiler.hpp"
 
 #include <mutex>
 
 namespace rocos {
+    class Executor {
+    public:
+        explicit Executor(MotionInterface *motion, ControllerInterface *controller,
+                          HardwareInterface *hardware);
 
-class Executor {
- public:
-  explicit Executor(MotionInterface* motion, ControllerInterface* controller,
-                    HardwareInterface* hardware);
-  Executor();
+        Executor();
 
-  virtual ~Executor();
+        virtual ~Executor();
 
-  Result Update();
-  bool SwitchController(ControllerInterface* new_contorller);
-  bool SwitchHardware(HardwareInterface* new_hardware);
-  bool SwitchMotion(MotionInterface* new_motion);
+        Result Update();
 
- private:
+        bool SwitchController(ControllerInterface *new_contorller);
 
-  //TODO: 之所以保存接口的裸指针，是因为Executor只是拼装作用，不管理指针的生命周期
-  MotionInterface* motion_ {nullptr};
-  ControllerInterface* controller_ {nullptr};
-  HardwareInterface* hardware_ {nullptr};
+        bool SwitchHardware(HardwareInterface *new_hardware);
 
-  // std::mutex mtx_;
-};
+        bool SwitchMotion(MotionInterface *new_motion);
 
-}  // namespace rocos
+    private:
+        //TODO: 之所以保存接口的裸指针，是因为Executor只是拼装作用，不管理指针的生命周期
+        MotionInterface *motion_{nullptr};
+        ControllerInterface *controller_{nullptr};
+        HardwareInterface *hardware_{nullptr};
+
+        PerformanceProfiler *profiler_{nullptr};
+
+        // std::mutex mtx_;
+    };
+} // namespace rocos

@@ -71,7 +71,7 @@ public:
 
     // ─── MotionInterface 接口 ───
 
-    Result support() const override;
+    [[nodiscard]] Result support() const override;
     Result Reset() override;
     Result GenerateRef(Reference& ref_out) override;
     Result Update() override;
