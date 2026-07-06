@@ -9,9 +9,19 @@ Executor::Executor(MotionInterface* motion, ControllerInterface* controller,
   SwitchController(controller);
   SwitchHardware(hardware);
 
+  profiler_ = std::make_unique<PerformanceProfiler>(
+    std::vector<PerformanceMeasureInfo>{
+        {kMotionMeasurement, "Motion"},
+        {kControllerMeasurement, "Controller"},
+        {kExecutorMeasurement, "Executor Update"},
+        {kExecutorMeasurement, "Cycle Time"}});
+
 }
 
 Executor::Executor() {
+
+
+
 
 }
 
@@ -37,9 +47,14 @@ Result Executor::Update() {
   // 更新过程需要加锁
   // std::lock_guard<std::mutex> lock(mtx_);
 
-  Reference ref;
+  profiler_->MeasureEnd(kCycleMeasurement); //这个是测量循环周期，所以要在结束时Start，下次进入时End
+  profiler_->MeasureStart(kExecutorMeasurement);
 
-  auto res = motion_->GenerateRef(ref);  //
+
+  Reference ref;
+  profiler_->MeasureStart(kMotionMeasurement);
+  auto res = motion_->GenerateRef(ref);
+  profiler_->MeasureEnd(kMotionMeasurement);
 
   if (res < 0) {
     return res;
@@ -49,15 +64,20 @@ Result Executor::Update() {
   }
 
   JntArray q_cmd;
-
+  profiler_->MeasureStart(kControllerMeasurement);
   res = controller_->GenerateCmd(
       ref, q_cmd);  // TODO：生成指令，没有发是因为有可能在Executor中有额外处理
-
+  profiler_->MeasureEnd(kControllerMeasurement);
   if (res < 0) {
     return res;
   }
 
   controller_->UpdateCmd(q_cmd);  // TODO: 给Hardware发送指令
+
+  profiler_->MeasureEnd(kExecutorMeasurement);
+
+  profiler_->MeasureStart(kCycleMeasurement); //这个是测量循环周期，所以要在结束时Start，下次进入时End
+
 
   return Result::NoError;
 }

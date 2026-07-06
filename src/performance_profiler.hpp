@@ -20,6 +20,7 @@
 
 #include <chrono>
 #include <cstdint>
+#include <optional>
 #include <string>
 #include <vector>
 
@@ -30,57 +31,43 @@ struct PerformanceMeasureInfo {
   std::string name;
 };
 
-struct PerformanceMeasurementStats {
-  int32_t channel{0};
-  std::string name;
-  uint64_t count{0};
-  double last_us{0.0};
-  double min_us{0.0};
-  double max_us{0.0};
-  double avg_us{0.0};
-  double total_us{0.0};
-};
-
 class PerformanceProfiler {
  public:
+  struct ChannelMeasurement {
+    int32_t channel{0};
+    std::string name;
+    uint64_t count{0};
+    double last_us{0.0};
+    double min_us{0.0};
+    double max_us{0.0};
+    double avg_us{0.0};
+    std::chrono::steady_clock::time_point start_time{};
+    bool is_running{false};
+  };
+
   explicit PerformanceProfiler(const std::vector<PerformanceMeasureInfo>& measure_infos);
 
   void MeasureStart(int32_t channel);
   void MeasureEnd(int32_t channel);
 
   bool GetMeasurementStats(int32_t channel,
-                           PerformanceMeasurementStats& stats) const;
-  double GetMinUs(int32_t channel) const;
-  double GetMaxUs(int32_t channel) const;
-  double GetAvgUs(int32_t channel) const;
-  double GetLastUs(int32_t channel) const;
-  uint64_t GetCount(int32_t channel) const;
+                           ChannelMeasurement& measurement) const;
+  std::optional<double> GetMinUs(int32_t channel) const;
+  std::optional<double> GetMaxUs(int32_t channel) const;
+  std::optional<double> GetAvgUs(int32_t channel) const;
+  std::optional<double> GetLastUs(int32_t channel) const;
+  std::optional<uint64_t> GetCount(int32_t channel) const;
 
   void Reset();
   void Reset(int32_t channel);
 
   void PrintMeasurement(int32_t channel) const;
   void PrintMeasurements() const;
-
  private:
   using Clock = std::chrono::steady_clock;
-
-  struct ChannelMeasurement {
-    std::string name_;
-    uint64_t count_{0};
-    double last_us_{0.0};
-    double min_us_{0.0};
-    double max_us_{0.0};
-    double total_us_{0.0};
-    Clock::time_point start_time_{};
-    bool is_running_{false};
-  };
-
   ChannelMeasurement* findMeasurement(int32_t channel);
   const ChannelMeasurement* findMeasurement(int32_t channel) const;
-  static PerformanceMeasurementStats makeStats(int32_t channel,
-                                               const ChannelMeasurement& measurement);
-  static void printStats(const PerformanceMeasurementStats& stats);
+  static void printStats(const ChannelMeasurement& measurement);
 
   std::vector<int32_t> channels_;
   std::vector<int32_t> channel_to_index_;

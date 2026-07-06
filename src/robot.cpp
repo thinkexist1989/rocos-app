@@ -290,10 +290,6 @@ Robot::Robot() : impl_(std::make_unique<Impl>(*this)) {
 
 
 
-
-
-
-
   log_ptr_->info("机器人开始初始化");
   impl_->process_event(EventResetReq{});  // 进入初始化状态
 }

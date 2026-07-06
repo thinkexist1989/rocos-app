@@ -42,7 +42,7 @@ TEST_CASE("PerformanceProfiler - 统计单个通道") {
     sleepForProfilerSample();
     profiler.MeasureEnd(1);
 
-    rocos::PerformanceMeasurementStats stats;
+    rocos::PerformanceProfiler::ChannelMeasurement stats;
     REQUIRE(profiler.GetMeasurementStats(1, stats));
     CHECK(stats.channel == 1);
     CHECK(stats.name == "GenerateRef");
@@ -51,7 +51,6 @@ TEST_CASE("PerformanceProfiler - 统计单个通道") {
     CHECK(stats.min_us > 0.0);
     CHECK(stats.max_us >= stats.min_us);
     CHECK(stats.avg_us >= stats.min_us);
-    CHECK(stats.total_us == doctest::Approx(stats.last_us));
 }
 
 TEST_CASE("PerformanceProfiler - 多次采样更新 Min Max Avg") {
@@ -65,11 +64,19 @@ TEST_CASE("PerformanceProfiler - 多次采样更新 Min Max Avg") {
     std::this_thread::sleep_for(std::chrono::milliseconds(2));
     profiler.MeasureEnd(2);
 
-    CHECK(profiler.GetCount(2) == 2);
-    CHECK(profiler.GetMinUs(2) > 0.0);
-    CHECK(profiler.GetMaxUs(2) >= profiler.GetMinUs(2));
-    CHECK(profiler.GetAvgUs(2) >= profiler.GetMinUs(2));
-    CHECK(profiler.GetAvgUs(2) <= profiler.GetMaxUs(2));
+    const auto count = profiler.GetCount(2);
+    const auto min_us = profiler.GetMinUs(2);
+    const auto max_us = profiler.GetMaxUs(2);
+    const auto avg_us = profiler.GetAvgUs(2);
+    REQUIRE(count.has_value());
+    REQUIRE(min_us.has_value());
+    REQUIRE(max_us.has_value());
+    REQUIRE(avg_us.has_value());
+    CHECK(*count == 2);
+    CHECK(*min_us > 0.0);
+    CHECK(*max_us >= *min_us);
+    CHECK(*avg_us >= *min_us);
+    CHECK(*avg_us <= *max_us);
 }
 
 TEST_CASE("PerformanceProfiler - Reset 清空统计") {
@@ -78,25 +85,35 @@ TEST_CASE("PerformanceProfiler - Reset 清空统计") {
     profiler.MeasureStart(3);
     sleepForProfilerSample();
     profiler.MeasureEnd(3);
-    REQUIRE(profiler.GetCount(3) == 1);
+    const auto count_before_reset = profiler.GetCount(3);
+    REQUIRE(count_before_reset.has_value());
+    REQUIRE(*count_before_reset == 1);
 
     profiler.Reset(3);
 
-    CHECK(profiler.GetCount(3) == 0);
-    CHECK(profiler.GetMinUs(3) == doctest::Approx(0.0));
-    CHECK(profiler.GetMaxUs(3) == doctest::Approx(0.0));
-    CHECK(profiler.GetAvgUs(3) == doctest::Approx(0.0));
+    const auto count_after_reset = profiler.GetCount(3);
+    const auto min_after_reset = profiler.GetMinUs(3);
+    const auto max_after_reset = profiler.GetMaxUs(3);
+    const auto avg_after_reset = profiler.GetAvgUs(3);
+    REQUIRE(count_after_reset.has_value());
+    REQUIRE(min_after_reset.has_value());
+    REQUIRE(max_after_reset.has_value());
+    REQUIRE(avg_after_reset.has_value());
+    CHECK(*count_after_reset == 0);
+    CHECK(*min_after_reset == doctest::Approx(0.0));
+    CHECK(*max_after_reset == doctest::Approx(0.0));
+    CHECK(*avg_after_reset == doctest::Approx(0.0));
 }
 
 TEST_CASE("PerformanceProfiler - 未知通道返回空统计") {
     rocos::PerformanceProfiler profiler({{4, "UpdateTotal"}});
 
-    rocos::PerformanceMeasurementStats stats;
+    rocos::PerformanceProfiler::ChannelMeasurement stats;
     CHECK_FALSE(profiler.GetMeasurementStats(99, stats));
-    CHECK(profiler.GetCount(99) == 0);
-    CHECK(profiler.GetMinUs(99) == doctest::Approx(0.0));
-    CHECK(profiler.GetMaxUs(99) == doctest::Approx(0.0));
-    CHECK(profiler.GetAvgUs(99) == doctest::Approx(0.0));
+    CHECK_FALSE(profiler.GetCount(99).has_value());
+    CHECK_FALSE(profiler.GetMinUs(99).has_value());
+    CHECK_FALSE(profiler.GetMaxUs(99).has_value());
+    CHECK_FALSE(profiler.GetAvgUs(99).has_value());
 }
 
 TEST_CASE("PerformanceProfiler - 打印接口可调用") {
@@ -109,4 +126,3 @@ TEST_CASE("PerformanceProfiler - 打印接口可调用") {
     profiler.PrintMeasurement(5);
     profiler.PrintMeasurements();
 }
-

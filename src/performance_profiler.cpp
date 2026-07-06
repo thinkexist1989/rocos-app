@@ -38,7 +38,8 @@ PerformanceProfiler::PerformanceProfiler(
     }
 
     ChannelMeasurement measurement;
-    measurement.name_ = measure_info.name;
+    measurement.channel = measure_info.channel;
+    measurement.name = measure_info.name;
     measurements_.push_back(measurement);
     channels_.push_back(measure_info.channel);
     index = static_cast<int32_t>(measurements_.size() - 1);
@@ -51,8 +52,8 @@ void PerformanceProfiler::MeasureStart(int32_t channel) {
     return;
   }
 
-  measurement->start_time_ = Clock::now();
-  measurement->is_running_ = true;
+  measurement->start_time = Clock::now();
+  measurement->is_running = true;
 }
 
 void PerformanceProfiler::MeasureEnd(int32_t channel) {
@@ -61,78 +62,94 @@ void PerformanceProfiler::MeasureEnd(int32_t channel) {
     return;
   }
 
-  if (!measurement->is_running_) {
+  if (!measurement->is_running) {
     return;
   }
 
   const auto end_time = Clock::now();
   const auto elapsed_us = std::chrono::duration<double, std::micro>(
-                              end_time - measurement->start_time_)
+                              end_time - measurement->start_time)
                               .count();
 
-  measurement->last_us_ = elapsed_us;
-  measurement->total_us_ += elapsed_us;
-  ++measurement->count_;
+  measurement->last_us = elapsed_us;
+  ++measurement->count;
+  measurement->avg_us +=
+      (elapsed_us - measurement->avg_us) / static_cast<double>(measurement->count);
 
-  if (measurement->count_ == 1) {
-    measurement->min_us_ = elapsed_us;
-    measurement->max_us_ = elapsed_us;
+  if (measurement->count == 1) {
+    measurement->min_us = elapsed_us;
+    measurement->max_us = elapsed_us;
   } else {
-    if (elapsed_us < measurement->min_us_) {
-      measurement->min_us_ = elapsed_us;
+    if (elapsed_us < measurement->min_us) {
+      measurement->min_us = elapsed_us;
     }
-    if (elapsed_us > measurement->max_us_) {
-      measurement->max_us_ = elapsed_us;
+    if (elapsed_us > measurement->max_us) {
+      measurement->max_us = elapsed_us;
     }
   }
 
-  measurement->is_running_ = false;
+  measurement->is_running = false;
 }
 
 bool PerformanceProfiler::GetMeasurementStats(
-    int32_t channel, PerformanceMeasurementStats& stats) const {
+    int32_t channel, ChannelMeasurement& measurement_out) const {
   const auto* measurement = findMeasurement(channel);
   if (measurement == nullptr) {
     return false;
   }
 
-  stats = makeStats(channel, *measurement);
+  measurement_out = *measurement;
   return true;
 }
 
-double PerformanceProfiler::GetMinUs(int32_t channel) const {
-  PerformanceMeasurementStats stats;
-  return GetMeasurementStats(channel, stats) ? stats.min_us : 0.0;
+std::optional<double> PerformanceProfiler::GetMinUs(int32_t channel) const {
+  ChannelMeasurement measurement;
+  if (!GetMeasurementStats(channel, measurement)) {
+    return std::nullopt;
+  }
+  return measurement.min_us;
 }
 
-double PerformanceProfiler::GetMaxUs(int32_t channel) const {
-  PerformanceMeasurementStats stats;
-  return GetMeasurementStats(channel, stats) ? stats.max_us : 0.0;
+std::optional<double> PerformanceProfiler::GetMaxUs(int32_t channel) const {
+  ChannelMeasurement measurement;
+  if (!GetMeasurementStats(channel, measurement)) {
+    return std::nullopt;
+  }
+  return measurement.max_us;
 }
 
-double PerformanceProfiler::GetAvgUs(int32_t channel) const {
-  PerformanceMeasurementStats stats;
-  return GetMeasurementStats(channel, stats) ? stats.avg_us : 0.0;
+std::optional<double> PerformanceProfiler::GetAvgUs(int32_t channel) const {
+  ChannelMeasurement measurement;
+  if (!GetMeasurementStats(channel, measurement)) {
+    return std::nullopt;
+  }
+  return measurement.avg_us;
 }
 
-double PerformanceProfiler::GetLastUs(int32_t channel) const {
-  PerformanceMeasurementStats stats;
-  return GetMeasurementStats(channel, stats) ? stats.last_us : 0.0;
+std::optional<double> PerformanceProfiler::GetLastUs(int32_t channel) const {
+  ChannelMeasurement measurement;
+  if (!GetMeasurementStats(channel, measurement)) {
+    return std::nullopt;
+  }
+  return measurement.last_us;
 }
 
-uint64_t PerformanceProfiler::GetCount(int32_t channel) const {
-  PerformanceMeasurementStats stats;
-  return GetMeasurementStats(channel, stats) ? stats.count : 0;
+std::optional<uint64_t> PerformanceProfiler::GetCount(int32_t channel) const {
+  ChannelMeasurement measurement;
+  if (!GetMeasurementStats(channel, measurement)) {
+    return std::nullopt;
+  }
+  return measurement.count;
 }
 
 void PerformanceProfiler::Reset() {
   for (auto& measurement : measurements_) {
-    measurement.count_ = 0;
-    measurement.last_us_ = 0.0;
-    measurement.min_us_ = 0.0;
-    measurement.max_us_ = 0.0;
-    measurement.total_us_ = 0.0;
-    measurement.is_running_ = false;
+    measurement.count = 0;
+    measurement.last_us = 0.0;
+    measurement.min_us = 0.0;
+    measurement.max_us = 0.0;
+    measurement.avg_us = 0.0;
+    measurement.is_running = false;
   }
 }
 
@@ -144,23 +161,23 @@ void PerformanceProfiler::Reset(int32_t channel) {
     return;
   }
 
-  measurement->count_ = 0;
-  measurement->last_us_ = 0.0;
-  measurement->min_us_ = 0.0;
-  measurement->max_us_ = 0.0;
-  measurement->total_us_ = 0.0;
-  measurement->is_running_ = false;
+  measurement->count = 0;
+  measurement->last_us = 0.0;
+  measurement->min_us = 0.0;
+  measurement->max_us = 0.0;
+  measurement->avg_us = 0.0;
+  measurement->is_running = false;
 }
 
 void PerformanceProfiler::PrintMeasurement(int32_t channel) const {
-  PerformanceMeasurementStats stats;
-  if (!GetMeasurementStats(channel, stats)) {
+  ChannelMeasurement measurement;
+  if (!GetMeasurementStats(channel, measurement)) {
     std::cerr << "PerformanceProfiler unknown channel in PrintMeasurement: "
               << channel << std::endl;
     return;
   }
 
-  printStats(stats);
+  printStats(measurement);
 }
 
 void PerformanceProfiler::PrintMeasurements() const {
@@ -168,7 +185,7 @@ void PerformanceProfiler::PrintMeasurements() const {
             << "name" << std::right << std::setw(12) << "count"
             << std::setw(14) << "last(us)" << std::setw(14) << "min(us)"
             << std::setw(14) << "max(us)" << std::setw(14) << "avg(us)"
-            << std::setw(14) << "total(us)" << std::endl;
+            << std::endl;
 
   for (const auto channel : channels_) {
     PrintMeasurement(channel);
@@ -203,29 +220,13 @@ const PerformanceProfiler::ChannelMeasurement* PerformanceProfiler::findMeasurem
   return &measurements_[static_cast<size_t>(index)];
 }
 
-PerformanceMeasurementStats PerformanceProfiler::makeStats(
-    int32_t channel, const ChannelMeasurement& measurement) {
-  PerformanceMeasurementStats stats;
-  stats.channel = channel;
-  stats.name = measurement.name_;
-  stats.count = measurement.count_;
-  stats.last_us = measurement.last_us_;
-  stats.min_us = measurement.count_ > 0 ? measurement.min_us_ : 0.0;
-  stats.max_us = measurement.count_ > 0 ? measurement.max_us_ : 0.0;
-  stats.avg_us = measurement.count_ > 0
-                     ? measurement.total_us_ / static_cast<double>(measurement.count_)
-                     : 0.0;
-  stats.total_us = measurement.total_us_;
-  return stats;
-}
-
-void PerformanceProfiler::printStats(const PerformanceMeasurementStats& stats) {
-  std::cout << std::left << std::setw(10) << stats.channel << std::setw(24)
-            << stats.name << std::right << std::setw(12) << stats.count
+void PerformanceProfiler::printStats(const ChannelMeasurement& measurement) {
+  std::cout << std::left << std::setw(10) << measurement.channel << std::setw(24)
+            << measurement.name << std::right << std::setw(12) << measurement.count
             << std::setw(14) << std::fixed << std::setprecision(3)
-            << stats.last_us << std::setw(14) << stats.min_us << std::setw(14)
-            << stats.max_us << std::setw(14) << stats.avg_us << std::setw(14)
-            << stats.total_us << std::endl;
+            << measurement.last_us << std::setw(14) << measurement.min_us
+            << std::setw(14) << measurement.max_us << std::setw(14)
+            << measurement.avg_us << std::endl;
 }
 
 }  // namespace rocos

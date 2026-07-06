@@ -36,14 +36,6 @@ namespace rocos {
 
 class Robot {
 
-  // enum class WorkMode {
-  //   Position = 0,
-  //   EeAdmitTeach = 1,
-  //   JntAdmitTeach = 2,
-  //   JntImp = 3,
-  //   CartImp = 4
-  // };
-
  public:
   explicit Robot();
 

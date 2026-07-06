@@ -18,6 +18,8 @@
 // email: luoyang@sia.cn
 #pragma once
 
+#include <memory>
+
 #include "controller_interface.hpp"
 #include "hardware_interface.hpp"
 #include "motion_interface.hpp"
@@ -51,7 +53,12 @@ namespace rocos {
         ControllerInterface *controller_{nullptr};
         HardwareInterface *hardware_{nullptr};
 
-        PerformanceProfiler *profiler_{nullptr};
+
+        const int kMotionMeasurement = 0;
+        const int kControllerMeasurement = 1;
+        const int kExecutorMeasurement = 3;
+        const int kCycleMeasurement = 4;
+        std::unique_ptr<PerformanceProfiler> profiler_ {nullptr};
 
         // std::mutex mtx_;
     };
