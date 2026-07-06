@@ -7,7 +7,7 @@
 
 #include "ft_sensor_interface.h"
 // #include <rocos_ecm/ecat_config.h>
-#include "../../../src/ecat_config.hpp"
+#include "../../../src/shared_memory_config.hpp"
 
 namespace rocos {
 

@@ -28,29 +28,10 @@ Yang Luo, PHD
  *---------------------------------------------------------------------------*/
 #pragma once
 
-#include <semaphore.h>  //sem
+
 
 #include <cinttypes>
 #include <iomanip>
-
-#define MAX_SLAVE_NUM 50     // Maximal number of slaves in the EtherCAT network
-#define MAX_PDINPUT_NUM 25   // Maximal number of PD Inputs per slave
-#define MAX_PDOUTPUT_NUM 25  // Maximal number of PD Outputs per slave
-
-#define MAX_PD_NAME_LEN 72     // Maximal length of a PD Variable name
-#define MAX_SLAVE_NAME_LEN 80  // Maximal length of a slave name
-
-#define EC_SEM_MUTEX "sync"
-#define EC_SEM_NUM 10
-
-#define EC_SHM "ecm"
-#define EC_SHM_MAX_SIZE 5242880  // 5MB
-
-#define ECAT_STATE_INIT 1
-#define ECAT_STATE_PREOP 2
-#define ECAT_STATE_SAFEOP 4
-#define ECAT_STATE_OP 8
-#define ECAT_STATE_BOOTSTRAP 3
 
 namespace rocos {
 

@@ -112,7 +112,6 @@ add_library(rocos::logger ALIAS logger)
 ######### Library Hardware ###############
 #add_library(hardware
 #        SHARED
-#        src/ecat_config.cpp
 #        src/hardware.cpp
 #
 #        )
@@ -138,7 +137,6 @@ add_library(rocos::logger ALIAS logger)
 ########## Library robot #################
 add_library(robot
         SHARED
-        src/ecat_config.cpp
         src/hardware.cpp
         src/executor.cpp
         src/robot.cpp

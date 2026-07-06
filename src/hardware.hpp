@@ -24,7 +24,7 @@
 #include <vector>
 
 #include "hardware_interface.hpp"
-#include "ecat_config.hpp"
+#include "shared_memory_config.hpp"
 
 
 // 前向声明，避免在头文件中引入 yaml-cpp
