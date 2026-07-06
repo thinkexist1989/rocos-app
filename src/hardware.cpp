@@ -6,7 +6,6 @@
 
 #include <yaml-cpp/yaml.h>
 
-#include <algorithm>
 #include <stdexcept>
 
 #include "logger.hpp"
@@ -183,15 +182,22 @@ Hardware::Hardware(const std::string& yaml_file_path, int ecat_id) {
     // 1. 加载 YAML 配置
     config_ = loadFromYAML(yaml_file_path);
 
-    // 2. 连接 EtherCAT 共享内存
+    // 2. 构建 ID → 索引 O(1) 查找表（vector 预分配 + -1 哨兵）
+    buildIDLookupTables();
+
+    // 3. 连接 EtherCAT 共享内存
     ec_ptr_ = EcatConfig::getInstance(ecat_id);
     if (ec_ptr_ == nullptr) {
         log_ptr->error("Failed to get EcatConfig instance (id={})", ecat_id);
         throw std::runtime_error("EcatConfig initialization failed");
     }
 
-    // 3. 等待 EtherCAT 总线进入 OP 状态
+    // 4. 等待 EtherCAT 总线进入 OP 状态
     ec_ptr_->wait();
+
+    // 5. 初始化阶段：一次性解析所有 PDO 变量名 → 缓存指针
+    //    运行阶段直接通过指针读写，不再有字符串查找开销
+    buildPDOCache();
 
     log_ptr->info("Hardware initialized: {} drives, {} ft_sensors, {} io modules",
                   config_.drives.size(),
@@ -364,176 +370,167 @@ void Hardware::SetDisabled() {
 }
 
 // ==========================================================================
-// DriveInterface — 单关节操作
+// DriveInterface — 单关节操作（使用缓存 PDO 指针，无字符串查找）
 // ==========================================================================
 
 double Hardware::GetJointPosition(int32_t id) {
-    const Drive* drive = findDriveById(id);
-    if (drive == nullptr) {
-        return 0.0;
-    }
-    // 注意：输入 PDO（从站→主站）使用 getSlaveInputVarValueByName
-    int32_t raw = ec_ptr_->getSlaveInputVarValueByName<int32_t>(
-        id, drive->inputs.position_actual_value);
-    return cntToUnit(*drive, raw);
+    auto idx = getDriveIdx(id);
+    if (idx < 0) return 0.0;
+    const auto& cache = drive_pdo_cache_[static_cast<size_t>(idx)];
+    if (cache.position_actual_value == nullptr) return 0.0;
+    return cntToUnit(config_.drives[static_cast<size_t>(idx)],
+                     *cache.position_actual_value);
 }
 
 double Hardware::GetJointVelocity(int32_t id) {
-    const Drive* drive = findDriveById(id);
-    if (drive == nullptr) {
-        return 0.0;
-    }
-    int32_t raw = ec_ptr_->getSlaveInputVarValueByName<int32_t>(
-        id, drive->inputs.velocity_actual_value);
-    return cntToUnit(*drive, raw);
+    auto idx = getDriveIdx(id);
+    if (idx < 0) return 0.0;
+    const auto& cache = drive_pdo_cache_[static_cast<size_t>(idx)];
+    if (cache.velocity_actual_value == nullptr) return 0.0;
+    return cntToUnit(config_.drives[static_cast<size_t>(idx)],
+                     *cache.velocity_actual_value);
 }
 
 double Hardware::GetJointTorque(int32_t id) {
-    const Drive* drive = findDriveById(id);
-    if (drive == nullptr) {
-        return 0.0;
-    }
-    int16_t raw = ec_ptr_->getSlaveInputVarValueByName<int16_t>(
-        id, drive->inputs.torque_actual_value);
-    return torqueToUnit(*drive, raw);
+    auto idx = getDriveIdx(id);
+    if (idx < 0) return 0.0;
+    const auto& cache = drive_pdo_cache_[static_cast<size_t>(idx)];
+    if (cache.torque_actual_value == nullptr) return 0.0;
+    return torqueToUnit(config_.drives[static_cast<size_t>(idx)],
+                        *cache.torque_actual_value);
 }
 
 double Hardware::GetJointLoadTorque(int32_t id) {
-    const Drive* drive = findDriveById(id);
-    if (drive == nullptr) {
-        return 0.0;
-    }
+    auto idx = getDriveIdx(id);
+    if (idx < 0) return 0.0;
+    const auto& drive = config_.drives[static_cast<size_t>(idx)];
+    const auto& cache = drive_pdo_cache_[static_cast<size_t>(idx)];
+
     // 根据 torque_source 选择读取通道，对调用者透明
-    if (drive->torque_source == TorqueSource::SecondaryPosition) {
-        int32_t raw = ec_ptr_->getSlaveInputVarValueByName<int32_t>(
-            id, drive->inputs.secondary_position_value);
-        return cntToUnit(*drive, raw);   // 底层已滤波，按位置变换
+    if (drive.torque_source == TorqueSource::SecondaryPosition) {
+        if (cache.secondary_position_value == nullptr) return 0.0;
+        return cntToUnit(drive, *cache.secondary_position_value);
     } else {
-        int16_t raw = ec_ptr_->getSlaveInputVarValueByName<int16_t>(
-            id, drive->inputs.load_torque_value);
-        return torqueToUnit(*drive, raw);  // Analog Input 原始值
+        if (cache.load_torque_value == nullptr) return 0.0;
+        return torqueToUnit(drive, *cache.load_torque_value);
     }
 }
 
 void Hardware::SetJointPosition(int32_t id, double pos) {
-    const Drive* drive = findDriveById(id);
-    if (drive == nullptr) {
-        return;
-    }
-    int32_t raw = unitToCnt(*drive, pos);
-    ec_ptr_->setSlaveOutputVarValueByName<int32_t>(
-        id, drive->outputs.target_position, raw);
+    auto idx = getDriveIdx(id);
+    if (idx < 0) return;
+    const auto& cache = drive_pdo_cache_[static_cast<size_t>(idx)];
+    if (cache.target_position == nullptr) return;
+    *cache.target_position = unitToCnt(
+        config_.drives[static_cast<size_t>(idx)], pos);
 }
 
 void Hardware::SetJointVelocity(int32_t id, double vel) {
-    const Drive* drive = findDriveById(id);
-    if (drive == nullptr) {
-        return;
-    }
+    auto idx = getDriveIdx(id);
+    if (idx < 0) return;
+    const auto& cache = drive_pdo_cache_[static_cast<size_t>(idx)];
+    if (cache.target_velocity == nullptr) return;
     // 速度值也使用 cnt_per_unit 变换（单位: unit/s → cnt/s）
-    double raw_val = vel * drive->transform.cnt_per_unit * drive->transform.ratio;
-    int32_t raw = static_cast<int32_t>(raw_val);
-    ec_ptr_->setSlaveOutputVarValueByName<int32_t>(
-        id, drive->outputs.target_velocity, raw);
+    double raw_val = vel * config_.drives[static_cast<size_t>(idx)].transform.cnt_per_unit
+                     * config_.drives[static_cast<size_t>(idx)].transform.ratio;
+    *cache.target_velocity = static_cast<int32_t>(raw_val);
 }
 
 void Hardware::SetJointTorque(int32_t id, double tau) {
-    const Drive* drive = findDriveById(id);
-    if (drive == nullptr) {
-        return;
-    }
-    int16_t raw = static_cast<int16_t>(tau * drive->transform.torque_per_unit);
-    ec_ptr_->setSlaveOutputVarValueByName<int16_t>(
-        id, drive->outputs.target_torque, raw);
+    auto idx = getDriveIdx(id);
+    if (idx < 0) return;
+    const auto& cache = drive_pdo_cache_[static_cast<size_t>(idx)];
+    if (cache.target_torque == nullptr) return;
+    *cache.target_torque = static_cast<int16_t>(
+        tau * config_.drives[static_cast<size_t>(idx)].transform.torque_per_unit);
 }
 
 void Hardware::SetJointMode(int32_t id, int8_t mode) {
-    const Drive* drive = findDriveById(id);
-    if (drive == nullptr) {
-        return;
-    }
-    ec_ptr_->setSlaveOutputVarValueByName<int8_t>(
-        id, drive->outputs.mode_of_operation, mode);
+    auto idx = getDriveIdx(id);
+    if (idx < 0) return;
+    const auto& cache = drive_pdo_cache_[static_cast<size_t>(idx)];
+    if (cache.mode_of_operation == nullptr) return;
+    *cache.mode_of_operation = mode;
 }
 
 void Hardware::SetJointEnabled(int32_t id) {
-    const Drive* drive = findDriveById(id);
-    if (drive == nullptr) {
-        return;
-    }
+    auto idx = getDriveIdx(id);
+    if (idx < 0) return;
+    auto* cw = drive_pdo_cache_[static_cast<size_t>(idx)].control_word;
+    if (cw == nullptr) return;
     // 写入 CiA 402 Controlword：Shutdown (0x06) → Switch On (0x07) → Enable Operation (0x0F)
-    ec_ptr_->setSlaveOutputVarValueByName<uint16_t>(id, drive->outputs.control_word, 0x0006);
-    ec_ptr_->setSlaveOutputVarValueByName<uint16_t>(id, drive->outputs.control_word, 0x0007);
-    ec_ptr_->setSlaveOutputVarValueByName<uint16_t>(id, drive->outputs.control_word, 0x000F);
+    *cw = 0x0006;
+    *cw = 0x0007;
+    *cw = 0x000F;
 }
 
 void Hardware::SetJointDisabled(int32_t id) {
-    const Drive* drive = findDriveById(id);
-    if (drive == nullptr) {
-        return;
-    }
+    auto idx = getDriveIdx(id);
+    if (idx < 0) return;
+    auto* cw = drive_pdo_cache_[static_cast<size_t>(idx)].control_word;
+    if (cw == nullptr) return;
     // 写入 CiA 402 Controlword：Disable Voltage (0x0000)
-    ec_ptr_->setSlaveOutputVarValueByName<uint16_t>(id, drive->outputs.control_word, 0x0000);
+    *cw = 0x0000;
 }
 
 std::string Hardware::getJointName(int32_t id) {
-    const Drive* drive = findDriveById(id);
-    if (drive == nullptr) {
-        return "";
-    }
-    return drive->joint_name;
+    auto idx = getDriveIdx(id);
+    if (idx < 0) return "";
+    return config_.drives[static_cast<size_t>(idx)].joint_name;
 }
 
 // ==========================================================================
-// FTSensorInterface
+// FTSensorInterface（使用缓存 PDO 指针，无字符串查找）
 // ==========================================================================
 
 Wrench Hardware::GetWrench() {
-    if (config_.ft_sensors.empty()) {
+    if (ft_sensor_pdo_cache_.empty()) {
         return Wrench::Zero();
     }
 
+    const auto& cache = ft_sensor_pdo_cache_[0];
     const auto& ft = config_.ft_sensors[0];
 
-    // 从 PDO 读取各通道原始值（int16），加上偏置
-    auto readCh = [&](const std::string& var_name) -> double {
-        if (var_name.empty()) return 0.0;
-        return static_cast<double>(
-            ec_ptr_->getSlaveInputVarValueByName<int16_t>(ft.id, var_name));
+    // 安全读取 PDO 通道：指针为空 → 返回 0.0
+    auto safeRead = [](const int16_t* ptr) -> double {
+        return ptr ? static_cast<double>(*ptr) : 0.0;
     };
 
     return Wrench(
-        KDL::Vector(readCh(ft.inputs.fx) + ft.offset.force.x(),
-                    readCh(ft.inputs.fy) + ft.offset.force.y(),
-                    readCh(ft.inputs.fz) + ft.offset.force.z()),
-        KDL::Vector(readCh(ft.inputs.tx) + ft.offset.torque.x(),
-                    readCh(ft.inputs.ty) + ft.offset.torque.y(),
-                    readCh(ft.inputs.tz) + ft.offset.torque.z())
+        KDL::Vector(safeRead(cache.fx) + ft.offset.force.x(),
+                    safeRead(cache.fy) + ft.offset.force.y(),
+                    safeRead(cache.fz) + ft.offset.force.z()),
+        KDL::Vector(safeRead(cache.tx) + ft.offset.torque.x(),
+                    safeRead(cache.ty) + ft.offset.torque.y(),
+                    safeRead(cache.tz) + ft.offset.torque.z())
     );
 }
 
 // ==========================================================================
-// IOInteface
+// IOInteface（使用缓存 PDO 指针，无字符串查找）
 // ==========================================================================
 
 bool Hardware::GetDigitalInput(int32_t id, int32_t channel) {
     // 1. 先在 IO 模块中查找
-    const IO* io = findIOById(id);
-    if (io != nullptr) {
-        if (channel < 0 || channel >= io->digital_in_channels) {
-            return false;
+    {
+        auto idx = getIOIdx(id);
+        if (idx >= 0) {
+            const auto& io = config_.ios[static_cast<size_t>(idx)];
+            if (channel < 0 || channel >= io.digital_in_channels) return false;
+            const auto& cache = io_pdo_cache_[static_cast<size_t>(idx)];
+            if (cache.digital_inputs == nullptr) return false;
+            return (*cache.digital_inputs >> channel) & 0x01;
         }
-        int32_t di = ec_ptr_->getSlaveInputVarValueByName<int32_t>(
-            id, io->inputs.digital_inputs);
-        return (di >> channel) & 0x01;
     }
 
     // 2. 在驱动器中查找（驱动器自带 DI）
-    const Drive* drive = findDriveById(id);
-    if (drive != nullptr && !drive->inputs.digital_inputs.empty()) {
-        int32_t di = ec_ptr_->getSlaveInputVarValueByName<int32_t>(
-            id, drive->inputs.digital_inputs);
-        return (di >> channel) & 0x01;
+    {
+        auto idx = getDriveIdx(id);
+        if (idx >= 0) {
+            const auto& cache = drive_pdo_cache_[static_cast<size_t>(idx)];
+            if (cache.digital_inputs == nullptr) return false;
+            return (*cache.digital_inputs >> channel) & 0x01;
+        }
     }
 
     return false;
@@ -541,52 +538,55 @@ bool Hardware::GetDigitalInput(int32_t id, int32_t channel) {
 
 void Hardware::SetDigitalOutput(int32_t id, int32_t channel, bool value) {
     // 1. 先在 IO 模块中查找
-    const IO* io = findIOById(id);
-    if (io != nullptr) {
-        if (channel < 0 || channel >= io->digital_out_channels) {
+    {
+        auto idx = getIOIdx(id);
+        if (idx >= 0) {
+            const auto& io = config_.ios[static_cast<size_t>(idx)];
+            if (channel < 0 || channel >= io.digital_out_channels) return;
+            auto& cache = io_pdo_cache_[static_cast<size_t>(idx)];
+            if (cache.digital_outputs_input == nullptr
+                || cache.digital_outputs == nullptr) return;
+            int32_t current = *cache.digital_outputs_input;
+            if (value) {
+                current |= (1 << channel);
+            } else {
+                current &= ~(1 << channel);
+            }
+            *cache.digital_outputs = current;
             return;
         }
-        // 从输入 PDO 回读当前 DO 实际状态，修改指定位后写入输出 PDO
-        int32_t current = ec_ptr_->getSlaveInputVarValueByName<int32_t>(
-            id, io->inputs.digital_outputs);
-        if (value) {
-            current |= (1 << channel);
-        } else {
-            current &= ~(1 << channel);
-        }
-        ec_ptr_->setSlaveOutputVarValueByName<int32_t>(
-            id, io->outputs.digital_outputs, current);
-        return;
     }
 
     // 2. 在驱动器中查找（驱动器自带 DO）
-    const Drive* drive = findDriveById(id);
-    if (drive != nullptr && !drive->outputs.digital_outputs.empty()) {
-        // 通过 PDO input 区回读当前 DO 状态，修改指定位后写入输出 PDO
-        int32_t current = ec_ptr_->getSlaveInputVarValueByName<int32_t>(
-            id, drive->inputs.digital_outputs);
-        if (value) {
-            current |= (1 << channel);
-        } else {
-            current &= ~(1 << channel);
+    {
+        auto idx = getDriveIdx(id);
+        if (idx >= 0) {
+            auto& cache = drive_pdo_cache_[static_cast<size_t>(idx)];
+            if (cache.digital_outputs_input == nullptr
+                || cache.digital_outputs == nullptr) return;
+            int32_t current = *cache.digital_outputs_input;
+            if (value) {
+                current |= (1 << channel);
+            } else {
+                current &= ~(1 << channel);
+            }
+            *cache.digital_outputs = current;
+            return;
         }
-        ec_ptr_->setSlaveOutputVarValueByName<int32_t>(
-            id, drive->outputs.digital_outputs, current);
-        return;
     }
 }
 
 double Hardware::GetAnalogInput(int32_t id, int32_t channel) {
     // 1. 先在 IO 模块中查找
-    const IO* io = findIOById(id);
-    if (io != nullptr) {
-        if (channel < 0 || channel >= io->analog_in_channels) {
-            return 0.0;
+    {
+        auto idx = getIOIdx(id);
+        if (idx >= 0) {
+            const auto& io = config_.ios[static_cast<size_t>(idx)];
+            if (channel < 0 || channel >= io.analog_in_channels) return 0.0;
+            const auto& cache = io_pdo_cache_[static_cast<size_t>(idx)];
+            if (cache.analog_inputs == nullptr) return 0.0;
+            return static_cast<double>(*cache.analog_inputs);
         }
-        // TODO: 根据具体 IO 模块的 AI 数组读取实现
-        int16_t raw = ec_ptr_->getSlaveInputVarValueByName<int16_t>(
-            id, io->inputs.analog_inputs);
-        return static_cast<double>(raw);
     }
 
     return 0.0;
@@ -594,16 +594,163 @@ double Hardware::GetAnalogInput(int32_t id, int32_t channel) {
 
 void Hardware::SetAnalogOutput(int32_t id, int32_t channel, double value) {
     // 1. 先在 IO 模块中查找
-    const IO* io = findIOById(id);
-    if (io != nullptr) {
-        if (channel < 0 || channel >= io->analog_out_channels) {
+    {
+        auto idx = getIOIdx(id);
+        if (idx >= 0) {
+            const auto& io = config_.ios[static_cast<size_t>(idx)];
+            if (channel < 0 || channel >= io.analog_out_channels) return;
+            auto& cache = io_pdo_cache_[static_cast<size_t>(idx)];
+            if (cache.analog_outputs == nullptr) return;
+            *cache.analog_outputs = static_cast<int16_t>(value);
             return;
         }
-        // TODO: 根据具体 IO 模块的 AO 数组写入实现
-        int16_t raw = static_cast<int16_t>(value);
-        ec_ptr_->setSlaveOutputVarValueByName<int16_t>(
-            id, io->outputs.analog_outputs, raw);
-        return;
+    }
+}
+
+// ==========================================================================
+// 查找表构建（初始化阶段）
+// ==========================================================================
+
+void Hardware::buildIDLookupTables() {
+    // Lambda: 根据 items 的 id 构建 max_id+1 大小的 vector，哨兵值 -1
+    auto build = [](const auto& items, std::vector<int32_t>& table) {
+        table.clear();
+        if (items.empty()) return;
+        int32_t max_id = -1;
+        for (const auto& item : items) {
+            if (item.id > max_id) max_id = item.id;
+        }
+        if (max_id < 0) return;
+        table.assign(static_cast<size_t>(max_id) + 1, -1);
+        for (size_t i = 0; i < items.size(); ++i) {
+            table[static_cast<size_t>(items[i].id)] = static_cast<int32_t>(i);
+        }
+    };
+
+    build(config_.drives, drive_id_to_index_);
+    build(config_.ft_sensors, ft_sensor_id_to_index_);
+    build(config_.ios, io_id_to_index_);
+
+    // 名称查找仍用 unordered_map（string key 无法用 vector）
+    drive_name_to_index_.clear();
+    for (size_t i = 0; i < config_.drives.size(); ++i) {
+        drive_name_to_index_[config_.drives[i].joint_name] = i;
+    }
+}
+
+void Hardware::buildPDOCache() {
+    auto log_ptr = Logger::getInstance("Hardware");
+
+    // ========== 1. 驱动器 PDO 指针缓存 ==========
+    drive_pdo_cache_.resize(config_.drives.size());
+    for (size_t i = 0; i < config_.drives.size(); ++i) {
+        const auto& drive = config_.drives[i];
+        auto& cache = drive_pdo_cache_[i];
+        const int sid = drive.id;
+
+        // 输入 PDO（从站 → 主站）
+        if (!drive.inputs.status_word.empty())
+            cache.status_word = ec_ptr_->findSlaveInputVarPtrByName<uint16_t>(
+                sid, drive.inputs.status_word);
+        if (!drive.inputs.position_actual_value.empty())
+            cache.position_actual_value = ec_ptr_->findSlaveInputVarPtrByName<int32_t>(
+                sid, drive.inputs.position_actual_value);
+        if (!drive.inputs.velocity_actual_value.empty())
+            cache.velocity_actual_value = ec_ptr_->findSlaveInputVarPtrByName<int32_t>(
+                sid, drive.inputs.velocity_actual_value);
+        if (!drive.inputs.torque_actual_value.empty())
+            cache.torque_actual_value = ec_ptr_->findSlaveInputVarPtrByName<int16_t>(
+                sid, drive.inputs.torque_actual_value);
+        if (!drive.inputs.load_torque_value.empty())
+            cache.load_torque_value = ec_ptr_->findSlaveInputVarPtrByName<int16_t>(
+                sid, drive.inputs.load_torque_value);
+        if (!drive.inputs.secondary_position_value.empty())
+            cache.secondary_position_value = ec_ptr_->findSlaveInputVarPtrByName<int32_t>(
+                sid, drive.inputs.secondary_position_value);
+        if (!drive.inputs.secondary_velocity_value.empty())
+            cache.secondary_velocity_value = ec_ptr_->findSlaveInputVarPtrByName<int32_t>(
+                sid, drive.inputs.secondary_velocity_value);
+        if (!drive.inputs.digital_inputs.empty())
+            cache.digital_inputs = ec_ptr_->findSlaveInputVarPtrByName<int32_t>(
+                sid, drive.inputs.digital_inputs);
+        if (!drive.inputs.digital_outputs.empty())
+            cache.digital_outputs_input = ec_ptr_->findSlaveInputVarPtrByName<int32_t>(
+                sid, drive.inputs.digital_outputs);
+
+        // 输出 PDO（主站 → 从站）
+        if (!drive.outputs.control_word.empty())
+            cache.control_word = ec_ptr_->findSlaveOutputVarPtrByName<uint16_t>(
+                sid, drive.outputs.control_word);
+        if (!drive.outputs.mode_of_operation.empty())
+            cache.mode_of_operation = ec_ptr_->findSlaveOutputVarPtrByName<int8_t>(
+                sid, drive.outputs.mode_of_operation);
+        if (!drive.outputs.target_position.empty())
+            cache.target_position = ec_ptr_->findSlaveOutputVarPtrByName<int32_t>(
+                sid, drive.outputs.target_position);
+        if (!drive.outputs.target_velocity.empty())
+            cache.target_velocity = ec_ptr_->findSlaveOutputVarPtrByName<int32_t>(
+                sid, drive.outputs.target_velocity);
+        if (!drive.outputs.target_torque.empty())
+            cache.target_torque = ec_ptr_->findSlaveOutputVarPtrByName<int16_t>(
+                sid, drive.outputs.target_torque);
+        if (!drive.outputs.digital_outputs.empty())
+            cache.digital_outputs = ec_ptr_->findSlaveOutputVarPtrByName<int32_t>(
+                sid, drive.outputs.digital_outputs);
+
+        // 关键 PDO 变量未找到时记录警告
+        if (cache.position_actual_value == nullptr) {
+            log_ptr->warn("Drive {}: position_actual_value PDO ptr is null (var='{}')",
+                          sid, drive.inputs.position_actual_value);
+        }
+        if (cache.control_word == nullptr) {
+            log_ptr->warn("Drive {}: control_word PDO ptr is null (var='{}')",
+                          sid, drive.outputs.control_word);
+        }
+    }
+
+    // ========== 2. 力传感器 PDO 指针缓存 ==========
+    ft_sensor_pdo_cache_.resize(config_.ft_sensors.size());
+    for (size_t i = 0; i < config_.ft_sensors.size(); ++i) {
+        const auto& ft = config_.ft_sensors[i];
+        auto& cache = ft_sensor_pdo_cache_[i];
+        const int sid = ft.id;
+
+        if (!ft.inputs.fx.empty())
+            cache.fx = ec_ptr_->findSlaveInputVarPtrByName<int16_t>(sid, ft.inputs.fx);
+        if (!ft.inputs.fy.empty())
+            cache.fy = ec_ptr_->findSlaveInputVarPtrByName<int16_t>(sid, ft.inputs.fy);
+        if (!ft.inputs.fz.empty())
+            cache.fz = ec_ptr_->findSlaveInputVarPtrByName<int16_t>(sid, ft.inputs.fz);
+        if (!ft.inputs.tx.empty())
+            cache.tx = ec_ptr_->findSlaveInputVarPtrByName<int16_t>(sid, ft.inputs.tx);
+        if (!ft.inputs.ty.empty())
+            cache.ty = ec_ptr_->findSlaveInputVarPtrByName<int16_t>(sid, ft.inputs.ty);
+        if (!ft.inputs.tz.empty())
+            cache.tz = ec_ptr_->findSlaveInputVarPtrByName<int16_t>(sid, ft.inputs.tz);
+    }
+
+    // ========== 3. IO 模块 PDO 指针缓存 ==========
+    io_pdo_cache_.resize(config_.ios.size());
+    for (size_t i = 0; i < config_.ios.size(); ++i) {
+        const auto& io = config_.ios[i];
+        auto& cache = io_pdo_cache_[i];
+        const int sid = io.id;
+
+        if (!io.inputs.digital_inputs.empty())
+            cache.digital_inputs = ec_ptr_->findSlaveInputVarPtrByName<int32_t>(
+                sid, io.inputs.digital_inputs);
+        if (!io.inputs.digital_outputs.empty())
+            cache.digital_outputs_input = ec_ptr_->findSlaveInputVarPtrByName<int32_t>(
+                sid, io.inputs.digital_outputs);
+        if (!io.inputs.analog_inputs.empty())
+            cache.analog_inputs = ec_ptr_->findSlaveInputVarPtrByName<int16_t>(
+                sid, io.inputs.analog_inputs);
+        if (!io.outputs.digital_outputs.empty())
+            cache.digital_outputs = ec_ptr_->findSlaveOutputVarPtrByName<int32_t>(
+                sid, io.outputs.digital_outputs);
+        if (!io.outputs.analog_outputs.empty())
+            cache.analog_outputs = ec_ptr_->findSlaveOutputVarPtrByName<int16_t>(
+                sid, io.outputs.analog_outputs);
     }
 }
 
@@ -612,37 +759,36 @@ void Hardware::SetAnalogOutput(int32_t id, int32_t channel, double value) {
 // ==========================================================================
 
 const Drive* Hardware::findDriveById(int32_t id) const {
-    auto it = std::find_if(config_.drives.begin(), config_.drives.end(),
-                           [id](const Drive& d) { return d.id == id; });
-    return (it != config_.drives.end()) ? &(*it) : nullptr;
+    auto idx = getDriveIdx(id);
+    return (idx >= 0) ? &config_.drives[static_cast<size_t>(idx)] : nullptr;
 }
 
 const Drive* Hardware::findDriveByName(const std::string& name) const {
-    auto it = std::find_if(config_.drives.begin(), config_.drives.end(),
-                           [&name](const Drive& d) { return d.joint_name == name; });
-    return (it != config_.drives.end()) ? &(*it) : nullptr;
+    auto it = drive_name_to_index_.find(name);
+    if (it == drive_name_to_index_.end()) {
+        return nullptr;
+    }
+    return &config_.drives[it->second];
 }
 
 const FTSensor* Hardware::findFTSensorById(int32_t id) const {
-    auto it = std::find_if(config_.ft_sensors.begin(), config_.ft_sensors.end(),
-                           [id](const FTSensor& ft) { return ft.id == id; });
-    return (it != config_.ft_sensors.end()) ? &(*it) : nullptr;
+    auto idx = getFTSensorIdx(id);
+    return (idx >= 0) ? &config_.ft_sensors[static_cast<size_t>(idx)] : nullptr;
 }
 
 const IO* Hardware::findIOById(int32_t id) const {
-    auto it = std::find_if(config_.ios.begin(), config_.ios.end(),
-                           [id](const IO& io) { return io.id == id; });
-    return (it != config_.ios.end()) ? &(*it) : nullptr;
+    auto idx = getIOIdx(id);
+    return (idx >= 0) ? &config_.ios[static_cast<size_t>(idx)] : nullptr;
 }
 
 HardwareType Hardware::getHardwareType(int32_t slave_id) const {
-    if (findDriveById(slave_id) != nullptr) {
+    if (getDriveIdx(slave_id) >= 0) {
         return HardwareType::Driver;
     }
-    if (findFTSensorById(slave_id) != nullptr) {
+    if (getFTSensorIdx(slave_id) >= 0) {
         return HardwareType::FTSensor;
     }
-    if (findIOById(slave_id) != nullptr) {
+    if (getIOIdx(slave_id) >= 0) {
         return HardwareType::IO;
     }
     // 默认返回 Driver 类型

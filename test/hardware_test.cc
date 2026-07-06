@@ -1,9 +1,10 @@
 #define DOCTEST_CONFIG_IMPLEMENT_WITH_MAIN
 
-#include <algorithm>
 #include <cmath>
 #include <fstream>
 #include <string>
+#include <unordered_map>
+#include <vector>
 
 #include <test/doctest.h>
 
@@ -344,32 +345,95 @@ TEST_CASE("Hardware YAML - 配置查询函数") {
     auto config = rocos::Hardware::LoadConfigFromYAML(
         cfg("hardware_all_config.yaml"));
 
-    SUBCASE("findDriveById 模拟") {
-        auto it = std::find_if(config.drives.begin(), config.drives.end(),
-                               [](const rocos::Drive& d) { return d.id == 1; });
-        REQUIRE(it != config.drives.end());
-        CHECK(it->joint_name == "joint_1");
-        CHECK(it->torque_source == rocos::TorqueSource::LoadTorque);
+    SUBCASE("findDriveById - 使用 vector 预分配查找表（PerformanceProfiler 模式）") {
+        // 构建 ID → 索引 O(1) 查找表，与 Hardware 内部实现一致
+        // 参考 PerformanceProfiler::channel_to_index_：vector 预分配 + -1 哨兵
+        int32_t max_id = -1;
+        for (const auto& d : config.drives) {
+            if (d.id > max_id) max_id = d.id;
+        }
+        REQUIRE(max_id >= 0);
+
+        std::vector<int32_t> id_to_index(
+            static_cast<size_t>(max_id) + 1, -1);
+        for (size_t i = 0; i < config.drives.size(); ++i) {
+            id_to_index[static_cast<size_t>(config.drives[i].id)] =
+                static_cast<int32_t>(i);
+        }
+
+        // 查找存在 id=1
+        auto idx1 = id_to_index[1];
+        REQUIRE(idx1 >= 0);
+        const auto& d = config.drives[static_cast<size_t>(idx1)];
+        CHECK(d.joint_name == "joint_1");
+        CHECK(d.torque_source == rocos::TorqueSource::LoadTorque);
+
+        // 查找不存在的 id：超出 vector 范围 或 哨兵值 -1
+        bool not_found = (999 >= static_cast<int32_t>(id_to_index.size()))
+                         || id_to_index[999] < 0;
+        CHECK(not_found);
     }
 
-    SUBCASE("findDriveByName 模拟") {
-        auto it = std::find_if(config.drives.begin(), config.drives.end(),
-            [](const rocos::Drive& d) { return d.joint_name == "joint_2"; });
-        REQUIRE(it != config.drives.end());
-        CHECK(it->id == 2);
+    SUBCASE("findDriveByName - 使用 unordered_map 查找（string key 不变）") {
+        std::unordered_map<std::string, size_t> name_to_index;
+        for (size_t i = 0; i < config.drives.size(); ++i) {
+            name_to_index[config.drives[i].joint_name] = i;
+        }
+        auto it = name_to_index.find("joint_2");
+        REQUIRE(it != name_to_index.end());
+        CHECK(config.drives[it->second].id == 2);
+
+        // 查找不存在的名称，直接返回
+        auto it_missing = name_to_index.find("nonexistent");
+        CHECK(it_missing == name_to_index.end());
     }
 
-    SUBCASE("findFTSensorById 模拟") {
-        auto it = std::find_if(config.ft_sensors.begin(), config.ft_sensors.end(),
-                               [](const rocos::FTSensor& ft) { return ft.id == 10; });
-        REQUIRE(it != config.ft_sensors.end());
+    SUBCASE("findFTSensorById - 使用 vector 预分配查找表") {
+        int32_t max_id = -1;
+        for (const auto& ft : config.ft_sensors) {
+            if (ft.id > max_id) max_id = ft.id;
+        }
+        REQUIRE(max_id >= 0);
+
+        std::vector<int32_t> id_to_index(
+            static_cast<size_t>(max_id) + 1, -1);
+        for (size_t i = 0; i < config.ft_sensors.size(); ++i) {
+            id_to_index[static_cast<size_t>(config.ft_sensors[i].id)] =
+                static_cast<int32_t>(i);
+        }
+
+        // 查找存在 id=10
+        REQUIRE(id_to_index[10] >= 0);
+
+        // 查找不存在的 id
+        bool not_found = (999 >= static_cast<int32_t>(id_to_index.size()))
+                         || id_to_index[999] < 0;
+        CHECK(not_found);
     }
 
-    SUBCASE("findIOById 模拟") {
-        auto it = std::find_if(config.ios.begin(), config.ios.end(),
-                               [](const rocos::IO& io) { return io.id == 20; });
-        REQUIRE(it != config.ios.end());
-        CHECK(it->digital_out_channels == 8);
+    SUBCASE("findIOById - 使用 vector 预分配查找表") {
+        int32_t max_id = -1;
+        for (const auto& io : config.ios) {
+            if (io.id > max_id) max_id = io.id;
+        }
+        REQUIRE(max_id >= 0);
+
+        std::vector<int32_t> id_to_index(
+            static_cast<size_t>(max_id) + 1, -1);
+        for (size_t i = 0; i < config.ios.size(); ++i) {
+            id_to_index[static_cast<size_t>(config.ios[i].id)] =
+                static_cast<int32_t>(i);
+        }
+
+        // 查找存在 id=20
+        auto idx20 = id_to_index[20];
+        REQUIRE(idx20 >= 0);
+        CHECK(config.ios[static_cast<size_t>(idx20)].digital_out_channels == 8);
+
+        // 查找不存在的 id
+        bool not_found = (999 >= static_cast<int32_t>(id_to_index.size()))
+                         || id_to_index[999] < 0;
+        CHECK(not_found);
     }
 }
 

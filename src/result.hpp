@@ -8,7 +8,7 @@ namespace rocos {
 enum class Result : int {
 
 
-  PlanFinnished = 1000,
+  PlanFinished = 1000,
 
 
   NoError = 0,
@@ -145,6 +145,10 @@ inline bool operator<(const Result& lhs, const Result& rhs) {
 
 inline bool operator<(const Result& lhs, const int& rhs) {
   return static_cast<int>(lhs) < rhs;
+}
+
+inline bool operator>(const Result& lhs, const int& rhs) {
+  return static_cast<int>(lhs) > rhs;
 }
 
 inline bool operator==(const Result& lhs, const int& rhs) {

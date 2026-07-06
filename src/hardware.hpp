@@ -20,6 +20,7 @@
 
 #include <cstdint>
 #include <string>
+#include <unordered_map>
 #include <vector>
 
 #include "hardware_interface.hpp"
@@ -242,8 +243,91 @@ private:
     /// @brief 将力矩原始值转换为物理单位
     double torqueToUnit(const Drive& drive, int16_t raw_torque) const;
 
+    // ========== PDO 指针缓存结构体（初始化阶段一次性解析，运行阶段直接解引用）==========
+
+    /// @brief 驱动器 PDO 指针缓存
+    struct DrivePDOCache {
+        // 输入 PDO 指针（从站 → 主站）
+        uint16_t* status_word{nullptr};
+        int32_t* position_actual_value{nullptr};
+        int32_t* velocity_actual_value{nullptr};
+        int16_t* torque_actual_value{nullptr};
+        int16_t* load_torque_value{nullptr};
+        int32_t* secondary_position_value{nullptr};
+        int32_t* secondary_velocity_value{nullptr};
+        int32_t* digital_inputs{nullptr};
+        int32_t* digital_outputs_input{nullptr};  // DO 状态回读（输入 PDO 区）
+
+        // 输出 PDO 指针（主站 → 从站）
+        uint16_t* control_word{nullptr};
+        int8_t* mode_of_operation{nullptr};
+        int32_t* target_position{nullptr};
+        int32_t* target_velocity{nullptr};
+        int16_t* target_torque{nullptr};
+        int32_t* digital_outputs{nullptr};
+    };
+
+    /// @brief 力传感器 PDO 指针缓存
+    struct FTSensorPDOCache {
+        int16_t* fx{nullptr};
+        int16_t* fy{nullptr};
+        int16_t* fz{nullptr};
+        int16_t* tx{nullptr};
+        int16_t* ty{nullptr};
+        int16_t* tz{nullptr};
+    };
+
+    /// @brief IO 模块 PDO 指针缓存
+    struct IOPDOCache {
+        // 输入 PDO 指针
+        int32_t* digital_inputs{nullptr};
+        int32_t* digital_outputs_input{nullptr};  // DO 回读
+        int16_t* analog_inputs{nullptr};
+
+        // 输出 PDO 指针
+        int32_t* digital_outputs{nullptr};
+        int16_t* analog_outputs{nullptr};
+    };
+
+    /// @brief 构建 ID → 索引 O(1) 查找表（vector 预分配 + -1 哨兵）
+    void buildIDLookupTables();
+
+    /// @brief 一次性解析所有 PDO 变量名 → 缓存指针（在 EcatConfig 就绪后调用）
+    void buildPDOCache();
+
+    /// @brief O(1) 查找：从站 ID → config_.drives 中的索引，未找到返回 -1
+    int32_t getDriveIdx(int32_t id) const {
+        if (id < 0 || static_cast<size_t>(id) >= drive_id_to_index_.size()) return -1;
+        return drive_id_to_index_[static_cast<size_t>(id)];
+    }
+
+    /// @brief O(1) 查找：从站 ID → config_.ft_sensors 中的索引，未找到返回 -1
+    int32_t getFTSensorIdx(int32_t id) const {
+        if (id < 0 || static_cast<size_t>(id) >= ft_sensor_id_to_index_.size()) return -1;
+        return ft_sensor_id_to_index_[static_cast<size_t>(id)];
+    }
+
+    /// @brief O(1) 查找：从站 ID → config_.ios 中的索引，未找到返回 -1
+    int32_t getIOIdx(int32_t id) const {
+        if (id < 0 || static_cast<size_t>(id) >= io_id_to_index_.size()) return -1;
+        return io_id_to_index_[static_cast<size_t>(id)];
+    }
+
     HardwareConfig config_;           // 硬件配置
     EcatConfig* ec_ptr_{nullptr};     // EtherCAT 配置单例指针（非拥有）
+
+    // O(1) ID → 索引查找表（vector 预分配 + -1 哨兵，参考 PerformanceProfiler::channel_to_index_）
+    std::vector<int32_t> drive_id_to_index_;
+    std::vector<int32_t> ft_sensor_id_to_index_;
+    std::vector<int32_t> io_id_to_index_;
+
+    // 名称 → 索引（string key 保留 unordered_map）
+    std::unordered_map<std::string, size_t> drive_name_to_index_;
+
+    // PDO 指针缓存（与 config_ 中对应 vector 等长，同一索引共用）
+    std::vector<DrivePDOCache> drive_pdo_cache_;
+    std::vector<FTSensorPDOCache> ft_sensor_pdo_cache_;
+    std::vector<IOPDOCache> io_pdo_cache_;
 };
 
 }  // namespace rocos
