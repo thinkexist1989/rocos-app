@@ -27,7 +27,7 @@
 #include "move_joint.hpp"
 #include "move_line.hpp"
 #include "move_circle.hpp"
-#include "move_jog.hpp"
+// #include "move_jog.hpp"
 
 #include "position_controller.hpp"
 #include "joint_impedance_controller.hpp"
@@ -407,36 +407,36 @@ Result Robot::Start() {
 //   3) 其它情况                        → 新建 MoveJog，装入 executor，触发 FSM
 // ============================================================================
 Result Robot::MoveJogging(const JogVec& jogvec, double timeout_sec, double threshold) {
-    std::lock_guard<std::mutex> lock(mtx_);
+    // std::lock_guard<std::mutex> lock(mtx_);
 
-    // 分支 1：已有活跃 MoveJog → 喂饭（不动 FSM，不重建 motion）
-    if (auto* jog = dynamic_cast<class MoveJog*>(motion.get())) {
-        if (!jog->IsFinished()) {
-            return jog->FeedJog(jogvec);
-        }
-        // 已 finished 的 MoveJog 不复活，落到分支 3 重建
-    }
+    // // 分支 1：已有活跃 MoveJog → 喂饭（不动 FSM，不重建 motion）
+    // if (auto* jog = dynamic_cast<class MoveJog*>(motion.get())) {
+    //     if (!jog->IsFinished()) {
+    //         return jog->FeedJog(jogvec);
+    //     }
+    //     // 已 finished 的 MoveJog 不复活，落到分支 3 重建
+    // }
 
-    // 分支 2：有其他类型 motion 正在执行
-    if (motion && IsRunning()) {
-        log_ptr_->error("MoveJog 拒绝：当前有其他运动任务在执行");
-        return Result::ConflictTaskRunning;
-    }
+    // // 分支 2：有其他类型 motion 正在执行
+    // if (motion && IsRunning()) {
+    //     log_ptr_->error("MoveJog 拒绝：当前有其他运动任务在执行");
+    //     return Result::ConflictTaskRunning;
+    // }
 
-    // 分支 3：全新启动
-    auto new_jog = std::make_unique<class MoveJog>(
-        jogvec, timeout_sec, threshold, /*dt=*/0.001);
-    const Result rc = new_jog->Reset();
-    if (rc != Result::NoError) {
-        log_ptr_->error("MoveJog 参数校验失败: {}", to_string(rc));
-        return rc;
-    }
-    motion = std::move(new_jog);
-    if (executor) executor->SwitchMotion(motion.get());
+    // // 分支 3：全新启动
+    // auto new_jog = std::make_unique<class MoveJog>(
+    //     jogvec, timeout_sec, threshold, /*dt=*/0.001);
+    // const Result rc = new_jog->Reset();
+    // if (rc != Result::NoError) {
+    //     log_ptr_->error("MoveJog 参数校验失败: {}", to_string(rc));
+    //     return rc;
+    // }
+    // motion = std::move(new_jog);
+    // if (executor) executor->SwitchMotion(motion.get());
 
-    // TODO: 触发 FSM EventStartReq（当前 process_event 为 private，
-    //       需要通过 Start() 或增加一个内部转发方法）
-    impl_->process_event(EventStartReq{});
+    // // TODO: 触发 FSM EventStartReq（当前 process_event 为 private，
+    // //       需要通过 Start() 或增加一个内部转发方法）
+    // impl_->process_event(EventStartReq{});
     return Result::NoError;
 }
 
