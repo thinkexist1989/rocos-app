@@ -18,11 +18,16 @@
 // email: luoyang@sia.cn
 #pragma once
 
+#include <atomic>
+#include <chrono>
 #include <cstdint>
+#include <memory>
 #include <string>
+#include <thread>
 #include <unordered_map>
 #include <vector>
 
+#include "ecat_type.hpp"
 #include "hardware_interface.hpp"
 #include "shared_memory_config.hpp"
 
@@ -90,7 +95,6 @@ struct Drive {
         std::string torque_actual_value;
         std::string load_torque_value;           // 负载力矩（可用于力矩传感器）
         std::string secondary_position_value;    // 辅助位置（可用于底层滤波后的力矩）
-        std::string secondary_velocity_value;
         std::string digital_inputs;              // 数字输入（DI）
         std::string digital_outputs;             // 数字输出回读（DO 状态反馈）
     } inputs;
@@ -174,9 +178,10 @@ public:
     ~Hardware();
 
 
-    void WaitForSignal();
-
     bool Reset() override;
+
+    /// @brief 等待 EtherCAT 周期同步信号（阻塞直至下一 PDO 交换完成，运动控制用）
+    void WaitForSignal();
 
     // ========== DriveInterface 接口实现 ==========
     JntArray GetPosition() override;
@@ -257,7 +262,6 @@ private:
         int16_t* torque_actual_value{nullptr};
         int16_t* load_torque_value{nullptr};
         int32_t* secondary_position_value{nullptr};
-        int32_t* secondary_velocity_value{nullptr};
         int32_t* digital_inputs{nullptr};
         int32_t* digital_outputs_input{nullptr};  // DO 状态回读（输入 PDO 区）
 
@@ -298,6 +302,35 @@ private:
     /// @brief 一次性解析所有 PDO 变量名 → 缓存指针（在 EcatConfig 就绪后调用）
     void buildPDOCache();
 
+    // ========== CiA 402 状态机（与 old_drive 完全一致）==========
+
+    /// @brief 单驱动器状态机状态
+    struct DriveSMState {
+        DriveState targetState{DriveState::NA};
+        bool conductStateChange{false};
+        bool stateChangeSuccessful{false};  // 仅 bg 线程写 / 调用线程读，x86 上 bool 读写原子
+        std::chrono::system_clock::time_point lastCwChangeTime;
+        int numOfSuccessfulReadings{0};
+    };
+
+    /// @brief 获取下一个状态转换控制字（与 old_drive getNextStateTransitionControlword 一致）
+    /// @param requestedDriveState 请求的目标状态
+    /// @param currentDriveState  当前驱动器状态
+    /// @return 对应的控制字
+    static Controlword getNextStateTransitionControlword(
+        const DriveState& requestedDriveState,
+        const DriveState& currentDriveState);
+
+    /// @brief 状态机单次迭代（由后台线程循环调用，对应 old_drive engageStateMachine）
+    void engageStateMachine(size_t idx);
+
+    /// @brief 启动状态切换并阻塞等待完成（对应 old_drive setDriverState + setEnabled/setDisabled）
+    /// @return true=切换成功, false=超时
+    bool setDriverState(size_t idx, const DriveState targetState);
+
+    /// @brief 状态机后台工作线程（对应 old_drive DriveGuard::workingThread）
+    void smWorkingThread();
+
     /// @brief O(1) 查找：从站 ID → config_.drives 中的索引，未找到返回 -1
     int32_t getDriveIdx(int32_t id) const {
         if (id < 0 || static_cast<size_t>(id) >= drive_id_to_index_.size()) return -1;
@@ -331,6 +364,11 @@ private:
     std::vector<DrivePDOCache> drive_pdo_cache_;
     std::vector<FTSensorPDOCache> ft_sensor_pdo_cache_;
     std::vector<IOPDOCache> io_pdo_cache_;
+
+    // CiA 402 状态机（与 drive_pdo_cache_ 并行，同一索引对应同一驱动器）
+    std::vector<DriveSMState> drive_sm_state_;
+    std::unique_ptr<std::thread> sm_thread_;
+    std::atomic<bool> sm_thread_running_{false};
 };
 
 }  // namespace rocos

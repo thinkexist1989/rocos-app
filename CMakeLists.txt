@@ -300,6 +300,14 @@ add_test(NAME hardware_test COMMAND hardware_test)
 set_tests_properties(hardware_test PROPERTIES
         WORKING_DIRECTORY ${CMAKE_SOURCE_DIR})
 
+add_executable(hardware_enable_test test/hardware_enable_test.cc)
+target_link_libraries(hardware_enable_test
+        PRIVATE
+        robot
+        )
+# 注意：本测试依赖真实 EtherCAT 硬件，仅在连接机械臂时手动运行
+# 使用方法: ./build/bin/hardware_enable_test [ecat_id] [config_path]
+
 add_executable(position_controller_test test/position_controller_test.cc)
 target_link_libraries(position_controller_test
         PRIVATE

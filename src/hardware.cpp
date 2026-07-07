@@ -6,8 +6,11 @@
 
 #include <yaml-cpp/yaml.h>
 
+#include <chrono>
 #include <stdexcept>
+#include <thread>
 
+#include "ecat_type.hpp"
 #include "logger.hpp"
 
 namespace rocos {
@@ -93,7 +96,6 @@ Drive Hardware::parseDrive(const YAML::Node& node) {
         d.inputs.torque_actual_value      = yamlGetStr(in, "torque_actual_value");
         d.inputs.load_torque_value        = yamlGetStr(in, "load_torque_value");
         d.inputs.secondary_position_value = yamlGetStr(in, "secondary_position_value");
-        d.inputs.secondary_velocity_value = yamlGetStr(in, "secondary_velocity_value");
         d.inputs.digital_inputs           = yamlGetStr(in, "digital_inputs");
         d.inputs.digital_outputs          = yamlGetStr(in, "digital_outputs");
     }
@@ -192,12 +194,33 @@ Hardware::Hardware(const std::string& yaml_file_path, int ecat_id) {
         throw std::runtime_error("EcatConfig initialization failed");
     }
 
-    // 4. 等待 EtherCAT 总线进入 OP 状态
-    ec_ptr_->wait();
-
+    // 4. 等待 EtherCAT 总线进入 OP 状态（注册线程并阻塞等待首个 PDO 同步信号）
+    // ec_ptr_->wait();
+     ec_ptr_->waitForSignal(8);
     // 5. 初始化阶段：一次性解析所有 PDO 变量名 → 缓存指针
     //    运行阶段直接通过指针读写，不再有字符串查找开销
     buildPDOCache();
+
+    // 6. 初始化 CiA 402 状态机（与 drive_pdo_cache_ 并行，同一索引）
+    drive_sm_state_.resize(config_.drives.size());
+    for (size_t i = 0; i < config_.drives.size(); ++i) {
+        if (drive_pdo_cache_[i].status_word != nullptr) {
+            Statusword sw;
+            sw.setFromRawStatusword(*drive_pdo_cache_[i].status_word);
+            drive_sm_state_[i].targetState = sw.getDriveState();
+        }
+
+        // 上使能前将目标位置同步为当前位置，防止 CSP 模式下飞车
+        if (drive_pdo_cache_[i].target_position != nullptr
+            && drive_pdo_cache_[i].position_actual_value != nullptr) {
+            *drive_pdo_cache_[i].target_position =
+                *drive_pdo_cache_[i].position_actual_value;
+        }
+    }
+
+    // 7. 启动状态机后台线程
+    sm_thread_running_ = true;
+    sm_thread_ = std::make_unique<std::thread>(&Hardware::smWorkingThread, this);
 
     log_ptr->info("Hardware initialized: {} drives, {} ft_sensors, {} io modules",
                   config_.drives.size(),
@@ -206,12 +229,16 @@ Hardware::Hardware(const std::string& yaml_file_path, int ecat_id) {
 }
 
 Hardware::~Hardware() {
+    sm_thread_running_ = false;
+    if (sm_thread_ && sm_thread_->joinable()) {
+        sm_thread_->join();
+    }
     // EcatConfig 是单例，不由 Hardware 管理生命周期
 }
 
 void Hardware::WaitForSignal() {
-
-
+    // ec_ptr_->wait();
+    ec_ptr_->waitForSignal(8);
 }
 
 bool Hardware::Reset() {
@@ -458,24 +485,188 @@ void Hardware::SetJointMode(int32_t id, int8_t mode) {
     *cache.mode_of_operation = mode;
 }
 
+// ==========================================================================
+// CiA 402 状态机 
+// ==========================================================================
+
+Controlword Hardware::getNextStateTransitionControlword(
+    const DriveState& requestedDriveState,
+    const DriveState& currentDriveState) {
+    Controlword controlword;
+    controlword.setAllFalse();
+    switch (requestedDriveState) {
+        case DriveState::SwitchOnDisabled:
+            switch (currentDriveState) {
+                case DriveState::SwitchOnDisabled:
+                    break;
+                case DriveState::ReadyToSwitchOn:
+                    controlword.setStateTransition7(); break;
+                case DriveState::SwitchedOn:
+                    controlword.setStateTransition10(); break;
+                case DriveState::OperationEnabled:
+                    controlword.setStateTransition9(); break;
+                case DriveState::QuickStopActive:
+                    controlword.setStateTransition12(); break;
+                case DriveState::Fault:
+                    controlword.setStateTransition15(); break;
+                default: break;
+            }
+            break;
+
+        case DriveState::ReadyToSwitchOn:
+            switch (currentDriveState) {
+                case DriveState::SwitchOnDisabled:
+                    controlword.setStateTransition2(); break;
+                case DriveState::ReadyToSwitchOn:
+                    break;
+                case DriveState::SwitchedOn:
+                    controlword.setStateTransition6(); break;
+                case DriveState::OperationEnabled:
+                    controlword.setStateTransition8(); break;
+                case DriveState::QuickStopActive:
+                    controlword.setStateTransition12(); break;
+                case DriveState::Fault:
+                    controlword.setStateTransition15(); break;
+                default: break;
+            }
+            break;
+
+        case DriveState::SwitchedOn:
+            switch (currentDriveState) {
+                case DriveState::SwitchOnDisabled:
+                    controlword.setStateTransition2(); break;
+                case DriveState::ReadyToSwitchOn:
+                    controlword.setStateTransition3(); break;
+                case DriveState::SwitchedOn:
+                    break;
+                case DriveState::OperationEnabled:
+                    controlword.setStateTransition5(); break;
+                case DriveState::QuickStopActive:
+                    controlword.setStateTransition12(); break;
+                case DriveState::Fault:
+                    controlword.setStateTransition15(); break;
+                default: break;
+            }
+            break;
+
+        case DriveState::OperationEnabled:
+            switch (currentDriveState) {
+                case DriveState::SwitchOnDisabled:
+                    controlword.setStateTransition2(); break;
+                case DriveState::ReadyToSwitchOn:
+                    controlword.setStateTransition3(); break;
+                case DriveState::SwitchedOn:
+                    controlword.setStateTransition4(); break;
+                case DriveState::OperationEnabled:
+                    break;
+                case DriveState::QuickStopActive:
+                    controlword.setStateTransition12(); break;
+                case DriveState::Fault:
+                    controlword.setStateTransition15(); break;
+                default: break;
+            }
+            break;
+
+        case DriveState::QuickStopActive:
+            switch (currentDriveState) {
+                case DriveState::SwitchOnDisabled:
+                    controlword.setStateTransition2(); break;
+                case DriveState::ReadyToSwitchOn:
+                    controlword.setStateTransition3(); break;
+                case DriveState::SwitchedOn:
+                    controlword.setStateTransition4(); break;
+                case DriveState::OperationEnabled:
+                    controlword.setStateTransition11(); break;
+                case DriveState::QuickStopActive:
+                    break;
+                case DriveState::Fault:
+                    controlword.setStateTransition15(); break;
+                default: break;
+            }
+            break;
+
+        default: break;
+    }
+    return controlword;
+}
+
+// ==========================================================================
+// 驱动器状态切换 
+// ==========================================================================
+
+void Hardware::engageStateMachine(size_t idx) {
+    auto& sm = drive_sm_state_[idx];
+    auto& cache = drive_pdo_cache_[idx];
+    if (cache.status_word == nullptr || cache.control_word == nullptr) return;
+
+    Statusword statusword;
+    statusword.setFromRawStatusword(*cache.status_word);
+    DriveState currentState = statusword.getDriveState();
+
+    // 已达目标状态，连续确认 3 次后标记成功（与 old_drive 一致）
+    if (currentState == sm.targetState) {
+        sm.numOfSuccessfulReadings++;
+        if (sm.numOfSuccessfulReadings >= 3) {
+            sm.conductStateChange = false;
+            sm.numOfSuccessfulReadings = 0;
+            sm.stateChangeSuccessful = true;
+        }
+        return;  // 状态已达目标，不再发送控制字
+    }
+
+    sm.numOfSuccessfulReadings = 0;
+
+    // 距上次控制字变更需等待 20ms（与 old_drive 20000us 一致）
+    auto now = std::chrono::system_clock::now();
+    auto since = std::chrono::duration_cast<std::chrono::microseconds>(
+        now - sm.lastCwChangeTime).count();
+    if (since < 20000) return;
+
+    Controlword controlword =
+        getNextStateTransitionControlword(sm.targetState, currentState);
+    *cache.control_word = controlword.getRawControlword();
+    sm.lastCwChangeTime = now;
+}
+
+bool Hardware::setDriverState(size_t idx, const DriveState targetState) {
+    auto& sm = drive_sm_state_[idx];
+    sm.stateChangeSuccessful = false;
+    sm.conductStateChange = true;
+    sm.targetState = targetState;
+    sm.lastCwChangeTime = std::chrono::system_clock::now();
+
+    // 阻塞等待状态切换完成
+    auto start = std::chrono::system_clock::now();
+    while (true) {
+        if (sm.stateChangeSuccessful) return true;
+        auto elapsed = std::chrono::duration_cast<std::chrono::microseconds>(
+            std::chrono::system_clock::now() - start).count();
+        if (elapsed > 150000) return false;
+        std::this_thread::sleep_for(std::chrono::milliseconds(1));
+    }
+}
+
+void Hardware::smWorkingThread() {
+    while (sm_thread_running_) {
+        for (size_t i = 0; i < drive_sm_state_.size(); ++i) {
+            if (drive_sm_state_[i].conductStateChange) {
+                engageStateMachine(i);
+            }
+        }
+        std::this_thread::sleep_for(std::chrono::milliseconds(10));
+    }
+}
+
 void Hardware::SetJointEnabled(int32_t id) {
     auto idx = getDriveIdx(id);
     if (idx < 0) return;
-    auto* cw = drive_pdo_cache_[static_cast<size_t>(idx)].control_word;
-    if (cw == nullptr) return;
-    // 写入 CiA 402 Controlword：Shutdown (0x06) → Switch On (0x07) → Enable Operation (0x0F)
-    *cw = 0x0006;
-    *cw = 0x0007;
-    *cw = 0x000F;
+    setDriverState(static_cast<size_t>(idx), DriveState::OperationEnabled);
 }
 
 void Hardware::SetJointDisabled(int32_t id) {
     auto idx = getDriveIdx(id);
     if (idx < 0) return;
-    auto* cw = drive_pdo_cache_[static_cast<size_t>(idx)].control_word;
-    if (cw == nullptr) return;
-    // 写入 CiA 402 Controlword：Disable Voltage (0x0000)
-    *cw = 0x0000;
+    setDriverState(static_cast<size_t>(idx), DriveState::SwitchOnDisabled);
 }
 
 std::string Hardware::getJointName(int32_t id) {
@@ -672,9 +863,6 @@ void Hardware::buildPDOCache() {
         if (!drive.inputs.secondary_position_value.empty())
             cache.secondary_position_value = ec_ptr_->findSlaveInputVarPtrByName<int32_t>(
                 sid, drive.inputs.secondary_position_value);
-        if (!drive.inputs.secondary_velocity_value.empty())
-            cache.secondary_velocity_value = ec_ptr_->findSlaveInputVarPtrByName<int32_t>(
-                sid, drive.inputs.secondary_velocity_value);
         if (!drive.inputs.digital_inputs.empty())
             cache.digital_inputs = ec_ptr_->findSlaveInputVarPtrByName<int32_t>(
                 sid, drive.inputs.digital_inputs);
