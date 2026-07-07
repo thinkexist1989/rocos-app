@@ -173,6 +173,9 @@ public:
     explicit Hardware(const std::string& yaml_file_path, int ecat_id = 0);
     ~Hardware();
 
+
+    void WaitForSignal();
+
     bool Reset() override;
 
     // ========== DriveInterface 接口实现 ==========

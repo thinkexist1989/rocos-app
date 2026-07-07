@@ -209,6 +209,11 @@ Hardware::~Hardware() {
     // EcatConfig 是单例，不由 Hardware 管理生命周期
 }
 
+void Hardware::WaitForSignal() {
+
+
+}
+
 bool Hardware::Reset() {
 
   return true;
