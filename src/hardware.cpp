@@ -197,6 +197,24 @@ Hardware::Hardware(const std::string& yaml_file_path, int ecat_id) {
     // 4. 等待 EtherCAT 总线进入 OP 状态（注册线程并阻塞等待首个 PDO 同步信号）
     // ec_ptr_->wait();
      ec_ptr_->waitForSignal(8);
+
+    // 4.5 主站用 boost::managed_shared_memory 管理 EcatBus，
+    //     ec_ptr_->ecatBus 初始化时指向 offset 0（boost 内部管理头），
+    //     扫描整个 mmap 段定位真正的 EcatBus 结构体
+    {
+        ecm_mmap_base_ = ec_ptr_->ecatBus;  // 保存 mmap 基址供析构还原
+        auto* realEcatBus = scanForEcatBus(ecm_mmap_base_, EC_SHM_MAX_SIZE);
+        if (realEcatBus != nullptr) {
+            ec_ptr_->ecatBus = realEcatBus;
+            log_ptr->info("EcatBus relocated from mmap base to +{} bytes",
+                          static_cast<const char*>(static_cast<const void*>(realEcatBus))
+                          - static_cast<const char*>(ecm_mmap_base_));
+        } else {
+            log_ptr->error("Failed to locate EcatBus in managed shared memory");
+            throw std::runtime_error("EcatBus not found in shared memory segment");
+        }
+    }
+
     // 5. 初始化阶段：一次性解析所有 PDO 变量名 → 缓存指针
     //    运行阶段直接通过指针读写，不再有字符串查找开销
     buildPDOCache();
@@ -228,10 +246,41 @@ Hardware::Hardware(const std::string& yaml_file_path, int ecat_id) {
                   config_.ios.size());
 }
 
+// ==========================================================================
+// 扫描定位 boost::managed_shared_memory 内的 EcatBus
+// ==========================================================================
+
+EcatBus* Hardware::scanForEcatBus(void* mmap_base, std::size_t size) {
+    auto* base = static_cast<char*>(mmap_base);
+    std::size_t max_off = size - sizeof(EcatBus);
+    for (std::size_t off = 0; off <= max_off; off += 8) {
+        auto* c = reinterpret_cast<EcatBus*>(base + off);
+        // 主站运行时 slave_num > 0 且 current_state 在合法范围内
+        if (c->slave_num > 0 && c->slave_num <= MAX_SLAVE_NUM
+            && c->current_state >= ECAT_STATE_INIT
+            && c->current_state <= ECAT_STATE_OP
+            && c->request_state >= ECAT_STATE_INIT
+            && c->request_state <= ECAT_STATE_OP) {
+            // 额外校验：第一个 slave 的 input/output_var_num 应当合理
+            if (c->slaves[0].input_var_num > 0
+                && c->slaves[0].input_var_num <= MAX_PDINPUT_NUM
+                && c->slaves[0].output_var_num > 0
+                && c->slaves[0].output_var_num <= MAX_PDOUTPUT_NUM) {
+                return c;
+            }
+        }
+    }
+    return nullptr;
+}
+
 Hardware::~Hardware() {
     sm_thread_running_ = false;
     if (sm_thread_ && sm_thread_->joinable()) {
         sm_thread_->join();
+    }
+    // 还原 ecatBus 为 mmap 基址，让 SharedMemoryConfig 析构时 munmap 不出错
+    if (ecm_mmap_base_ != nullptr && ec_ptr_ != nullptr) {
+        ec_ptr_->ecatBus = static_cast<EcatBus*>(ecm_mmap_base_);
     }
     // EcatConfig 是单例，不由 Hardware 管理生命周期
 }

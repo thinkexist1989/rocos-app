@@ -369,6 +369,14 @@ private:
     std::vector<DriveSMState> drive_sm_state_;
     std::unique_ptr<std::thread> sm_thread_;
     std::atomic<bool> sm_thread_running_{false};
+
+    void* ecm_mmap_base_{nullptr};  // mmap 基址，析构前还原给 SharedMemoryConfig 用
+
+public:
+    /// @brief 主站用 boost::managed_shared_memory，EcatBus 不在 offset 0 —
+    ///        在 mmap 段内扫描定位真正的 EcatBus，通过检查特征字段识别
+    /// @return 指向正确偏移处的 EcatBus 指针，未找到返回 nullptr
+    static EcatBus* scanForEcatBus(void* mmap_base, std::size_t size);
 };
 
 }  // namespace rocos

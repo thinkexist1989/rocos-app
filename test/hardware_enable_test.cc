@@ -86,6 +86,13 @@ int main(int argc, char* argv[]) {
     {
         auto* ec = rocos::EcatConfig::getInstance(ecat_id);
         if (ec && ec->ecatBus) {
+            // 主站用 boost::managed_shared_memory，ecatBus 不在 offset 0 — 先修正
+            constexpr std::size_t kShmSize = 5242880;  // EC_SHM_MAX_SIZE
+            auto* realBus = rocos::Hardware::scanForEcatBus(ec->ecatBus, kShmSize);
+            if (realBus != nullptr) {
+                ec->ecatBus = realBus;
+            }
+
             int state = ec->ecatBus->current_state;
             const char* state_str = "UNKNOWN";
             switch (state) {
