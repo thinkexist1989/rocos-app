@@ -27,6 +27,7 @@
 #include "move_joint.hpp"
 #include "move_line.hpp"
 #include "move_circle.hpp"
+#include "move_jog.hpp"
 
 #include "position_controller.hpp"
 #include "joint_impedance_controller.hpp"
@@ -395,6 +396,48 @@ Result Robot::Stop() {
 
 Result Robot::Start() {
   return Result::NoError;
+}
+
+// ============================================================================
+// MoveJog：连续点动 + 活性保持
+//
+// 语义分派（与 motion_fsm_executor_design.md 场景 8/9/10/11 对齐）：
+//   1) 当前 motion 已经是活跃 MoveJog  → 视为“喂饭”，转发 FeedJog()
+//   2) 当前存在其他 motion 且正在跑    → 冲突拒绝
+//   3) 其它情况                        → 新建 MoveJog，装入 executor，触发 FSM
+// ============================================================================
+Result Robot::MoveJogging(const JogVec& jogvec, double timeout_sec, double threshold) {
+    std::lock_guard<std::mutex> lock(mtx_);
+
+    // 分支 1：已有活跃 MoveJog → 喂饭（不动 FSM，不重建 motion）
+    if (auto* jog = dynamic_cast<class MoveJog*>(motion.get())) {
+        if (!jog->IsFinished()) {
+            return jog->FeedJog(jogvec);
+        }
+        // 已 finished 的 MoveJog 不复活，落到分支 3 重建
+    }
+
+    // 分支 2：有其他类型 motion 正在执行
+    if (motion && IsRunning()) {
+        log_ptr_->error("MoveJog 拒绝：当前有其他运动任务在执行");
+        return Result::ConflictTaskRunning;
+    }
+
+    // 分支 3：全新启动
+    auto new_jog = std::make_unique<class MoveJog>(
+        jogvec, timeout_sec, threshold, /*dt=*/0.001);
+    const Result rc = new_jog->Reset();
+    if (rc != Result::NoError) {
+        log_ptr_->error("MoveJog 参数校验失败: {}", to_string(rc));
+        return rc;
+    }
+    motion = std::move(new_jog);
+    if (executor) executor->SwitchMotion(motion.get());
+
+    // TODO: 触发 FSM EventStartReq（当前 process_event 为 private，
+    //       需要通过 Start() 或增加一个内部转发方法）
+    impl_->process_event(EventStartReq{});
+    return Result::NoError;
 }
 
 }  // namespace rocos

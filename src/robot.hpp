@@ -69,6 +69,9 @@ class Robot {
 
 
 
+  Result MoveJogging(const JogVec& jogvec, double timeout_sec = 0.01, double threshold = 0.9);
+
+
 
 
 

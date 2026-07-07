@@ -45,8 +45,10 @@ namespace rocos {
   using ChainFkSolverPos = KDL::ChainFkSolverPos;
   using ChainFdSolver = KDL::ChainFdSolver;
   using ChainIdSolver = KDL::ChainIdSolver;
+  using Twist = KDL::Twist;
 
   typedef std::variant<JntArray, Frame> Reference;
+  typedef std::variant<JntArray, Twist> JogVec; //点动方向向量
 
 
 }  // namespace rocos
