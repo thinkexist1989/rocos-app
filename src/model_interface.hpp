@@ -36,5 +36,8 @@ class ModelInterface {
   virtual Result ForwardDynamics(const JntArray &q, const JntArray &q_dot, const JntArray &torques, const Wrenches& f_ext,JntArray &q_dotdot) = 0;
   virtual Result InverseDynamics(const JntArray &q, const JntArray &q_dot, const JntArray &q_dotdot, const Wrenches& f_ext,JntArray &torques) = 0;
 
+  /// @brief 计算当前关节角下的 Jacobian 矩阵 (6×n)
+  virtual void GetJacobian(const JntArray& q, Jacobian& J_out) = 0;
+
 };
 }  // namespace rocos

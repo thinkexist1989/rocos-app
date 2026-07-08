@@ -74,8 +74,10 @@ MoveCircle::MoveCircle(const Frame& pose_start,
                        double v_limit,
                        double a_limit,
                        double j_limit,
-                       double dt)
-    : dt_(dt)
+                       double dt,
+                       ModelInterface* model)
+    : MotionInterface(model)
+    , dt_(dt)
     , profile_(dt)
     , pose_start_(pose_start)
     , theta_(theta)
@@ -95,8 +97,10 @@ MoveCircle::MoveCircle(const Frame& pose_start,
                        double v_limit,
                        double a_limit,
                        double j_limit,
-                       double dt)
-    : dt_(dt)
+                       double dt,
+                       ModelInterface* model)
+    : MotionInterface(model)
+    , dt_(dt)
     , profile_(dt)
     , pose_start_(pose_start)
     , v_limit_(v_limit)

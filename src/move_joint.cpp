@@ -40,8 +40,10 @@ MoveJoint::MoveJoint(const JntArray& q_start,
                      double v_limit,
                      double a_limit,
                      double j_limit,
-                     double dt)
-    : dt_(dt)
+                     double dt,
+                     ModelInterface* model)
+    : MotionInterface(model)
+    , dt_(dt)
     , profile_(dt)
     , q_start_(q_start)
     , q_goal_(q_goal)

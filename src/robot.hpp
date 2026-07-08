@@ -18,6 +18,10 @@
 // email: luoyang@sia.cn
 #pragma once
 
+#include <map>
+#include <string>
+#include <thread>
+
 #include "types.hpp"
 #include "result.hpp"
 #include "logger.hpp"
@@ -67,10 +71,30 @@ class Robot {
   //！ \brief 获取机器人当前是否正在运动
   [[nodiscard]] bool IsRunning() const;
 
+  /// @brief 控制循环主函数，每周期调用 (1000Hz)
+  void RunCycle();
 
+  Result MoveJogging(const JogVec& direction, double speed,
+                       double timeout = 0.1, double dir_threshold = 0.99);
 
-  Result MoveJogging(const JogVec& jogvec, double timeout_sec = 0.01, double threshold = 0.9);
+  Result MoveJ(const JntArray& q_goal,
+               double v_limit = 1.0, double a_limit = 2.0, double j_limit = 10.0);
 
+  Result MoveL(const Frame& pose_goal,
+               const std::string& tool_name = "",
+               double v_limit = 1.0, double a_limit = 2.0, double j_limit = 10.0);
+
+  void SetToolFrame(const std::string& name, const Frame& T_tool);
+  Frame GetToolFrame(const std::string& name) const;
+
+  // MoveC 圆心+角度
+  Result MoveC(const Frame& pose_start, const Frame& center_frame, double theta,
+               double v_limit = 1.0, double a_limit = 2.0, double j_limit = 10.0);
+
+  // MoveC 三点圆弧（重载：第三个参数是 Frame）
+  Result MoveC(const Frame& pose_start, const Frame& pose_via,
+               const Frame& pose_goal,
+               double v_limit = 1.0, double a_limit = 2.0, double j_limit = 10.0);
 
 
 
@@ -156,7 +180,10 @@ class Robot {
 
  private:
 
-  std::mutex mtx_;  // 互斥锁
+  void controlLoop();                        // 控制线程函数
+  std::thread control_thread_;               // 控制线程句柄
+  std::mutex mtx_;
+  std::map<std::string, Frame> tool_frames_;
 
   //// 机器人状态机封装
   struct Impl;

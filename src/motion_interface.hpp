@@ -23,10 +23,13 @@
 
 namespace rocos {
 
+class ModelInterface;
+
 class MotionInterface {
  public:
+  explicit MotionInterface(ModelInterface* model = nullptr) : model_(model) {}
   virtual ~MotionInterface() = default;
-  // TODO：记得添加model指针在构造的时候传入
+
   virtual Result GenerateRef(Reference& ref_out) = 0;
 
   /// @brief 校验参数并初始化规划（合并 support + Reset）
@@ -42,6 +45,9 @@ class MotionInterface {
   virtual Result Resume() = 0;
   virtual Result Stop() = 0;
   virtual Result Update() = 0;
+
+ protected:
+  ModelInterface* model_{nullptr};
 };
 
 }  // namespace rocos

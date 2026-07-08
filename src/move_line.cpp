@@ -19,6 +19,8 @@
 
 #include "move_line.hpp"
 
+#include <Eigen/Geometry>
+
 #include <algorithm>
 #include <cmath>
 #include <limits>
@@ -39,14 +41,28 @@ MoveLine::MoveLine(const Frame& pose_start,
                    double v_limit,
                    double a_limit,
                    double j_limit,
-                   double dt)
-    : dt_(dt)
+                   double dt,
+                   ModelInterface* model)
+    : MotionInterface(model)
+    , dt_(dt)
     , profile_(dt)
     , pose_start_(pose_start)
     , pose_goal_(pose_goal)
     , v_limit_(v_limit)
     , a_limit_(a_limit)
-    , j_limit_(j_limit) {}
+    , j_limit_(j_limit) {
+    // 缓存四元数，避免每周期 GetQuaternion
+    double qs[4], qe[4];
+    pose_start_.M.GetQuaternion(qs[0], qs[1], qs[2], qs[3]);
+    pose_goal_.M.GetQuaternion(qe[0], qe[1], qe[2], qe[3]);
+    q_start_ = Eigen::Quaterniond(qs[3], qs[0], qs[1], qs[2]);  // w,x,y,z
+    q_end_   = Eigen::Quaterniond(qe[3], qe[0], qe[1], qe[2]);
+
+    // 半球面对齐：dot<0 时翻转 q_end_，保证 slerp 走最短弧
+    if (q_start_.dot(q_end_) < 0.0) {
+        q_end_.coeffs() *= -1.0;
+    }
+}
 
 MoveLine::~MoveLine() = default;
 
@@ -95,10 +111,9 @@ bool MoveLine::computeNormalizedLimits() {
     // 平移距离
     const double translation = (pose_goal_.p - pose_start_.p).Norm();
 
-    // 旋转角度（从相对旋转矩阵中提取）
-    KDL::Vector axis;
-    const auto r_rel = pose_start_.M.Inverse() * pose_goal_.M;
-    const double rotation = std::abs(r_rel.GetRotAngle(axis));
+    // 旋转角度：从四元数点积 |cos(θ/2)| = |dot(q1,q2)|
+    const double cos_half = std::abs(q_start_.dot(q_end_));
+    const double rotation = 2.0 * std::acos(std::clamp(cos_half, 0.0, 1.0));
 
     // 等效路径长度：max(平移, 等效半径 × 旋转弧度)
     const double r_length = kEquivalentRadius * rotation;
@@ -121,68 +136,7 @@ bool MoveLine::computeNormalizedLimits() {
 }
 
 // ============================================================================
-// 四元数球面线性插值（Slerp）— 栈上 std::array，零堆分配
-// ============================================================================
-
-std::array<double, 4> MoveLine::slerpQuaternion(
-    const std::array<double, 4>& q_start,
-    const std::array<double, 4>& q_end,
-    double s) {
-
-    // s ≤ 0 → 返回精确起点
-    if (s <= 0.0) {
-        return q_start;
-    }
-    // s ≥ 1 → 返回精确终点（消除浮点累积误差导致的稳态偏差）
-    if (s >= 1.0) {
-        return q_end;
-    }
-
-    // 点积 = cos(θ)
-    double cos_theta = q_start[0] * q_end[0] + q_start[1] * q_end[1] +
-                       q_start[2] * q_end[2] + q_start[3] * q_end[3];
-
-    // 保证走最短弧
-    auto q1 = q_start;
-    if (cos_theta < 0.0) {
-        for (auto& v : q1) v *= -1.0;
-        cos_theta = -cos_theta;
-    }
-
-    const double theta = std::acos(std::clamp(cos_theta, -1.0, 1.0));
-    const double sin_theta = std::sin(theta);
-
-    // 夹角极小或 sinθ ≈ 0 → 退化为 NLerp（归一化线性插值），
-    // 不能返回 q1，否则 s→1 时旋转锁死在起点，产生不可消除的稳态误差
-    if (sin_theta < kPathEpsilon) {
-        std::array<double, 4> result{};
-        double norm_sq = 0.0;
-        for (int i = 0; i < 4; ++i) {
-            result[i] = (1.0 - s) * q1[i] + s * q_end[i];
-            norm_sq += result[i] * result[i];
-        }
-        const double inv_norm = 1.0 / std::sqrt(norm_sq);
-        for (auto& v : result) v *= inv_norm;
-        return result;
-    }
-
-    // 标准 Slerp
-    const double c1 = std::sin((1.0 - s) * theta) / sin_theta;
-    const double c2 = std::sin(s * theta) / sin_theta;
-
-    std::array<double, 4> result{};
-    for (int i = 0; i < 4; ++i) {
-        result[i] = c1 * q1[i] + c2 * q_end[i];
-        if (std::isnan(result[i])) {
-            // 防御性回退：NaN → NLerp
-            return slerpQuaternion(q_start, q_end, s < 0.5 ? 0.0 : 1.0);
-        }
-    }
-    return result;
-}
-
-// ============================================================================
-// 位姿插值：平移线性 + 旋转 Slerp
+// 位姿插值：平移线性 + 旋转 Slerp (Eigen)
 // ============================================================================
 
 Frame MoveLine::interpolatePose(double s) const {
@@ -191,14 +145,10 @@ Frame MoveLine::interpolatePose(double s) const {
     // 平移：线性
     result.p = pose_start_.p + (pose_goal_.p - pose_start_.p) * s;
 
-    // 旋转：四元数 Slerp（栈上 std::array，零堆分配，实时安全）
-    std::array<double, 4> q_start{}, q_end{};
-    pose_start_.M.GetQuaternion(q_start[0], q_start[1], q_start[2], q_start[3]);
-    pose_goal_.M.GetQuaternion(q_end[0], q_end[1], q_end[2], q_end[3]);
-
-    const auto q_interp = slerpQuaternion(q_start, q_end, s);
+    // 旋转：Eigen::Quaterniond::slerp（使用构造时缓存的四元数）
+    Eigen::Quaterniond q_interp = q_start_.slerp(s, q_end_);
     result.M = KDL::Rotation::Quaternion(
-        q_interp[0], q_interp[1], q_interp[2], q_interp[3]);
+        q_interp.x(), q_interp.y(), q_interp.z(), q_interp.w());
 
     return result;
 }

@@ -44,41 +44,30 @@ Executor::~Executor() {
 }
 
 Result Executor::Update() {
-  // 更新过程需要加锁
-  // std::lock_guard<std::mutex> lock(mtx_);
+  if (!motion_ || !controller_) return Result::PlanError;
 
-  profiler_->MeasureEnd(kCycleMeasurement); //这个是测量循环周期，所以要在结束时Start，下次进入时End
+  profiler_->MeasureEnd(kCycleMeasurement);
   profiler_->MeasureStart(kExecutorMeasurement);
 
-
-  Reference ref;
+  // ① Motion → 当前参考位姿
   profiler_->MeasureStart(kMotionMeasurement);
-  auto res = motion_->GenerateRef(ref);
+  Reference ref;
+  Result res = motion_->GenerateRef(ref);
   profiler_->MeasureEnd(kMotionMeasurement);
+  if (static_cast<int>(res) < 0) return res;
 
-  if (res < 0) {
-    return res;
-  }
-  else if (res > 0) {
-    return res;
-  }
-
-  JntArray q_cmd;
+  // ② Controller → 参考转关节指令
   profiler_->MeasureStart(kControllerMeasurement);
-  res = controller_->GenerateCmd(
-      ref, q_cmd);  // TODO：生成指令，没有发是因为有可能在Executor中有额外处理
+  JntArray q_cmd;
+  res = controller_->GenerateCmd(ref, q_cmd);
   profiler_->MeasureEnd(kControllerMeasurement);
-  if (res < 0) {
-    return res;
-  }
+  if (static_cast<int>(res) < 0) return res;
 
-  controller_->UpdateCmd(q_cmd);  // TODO: 给Hardware发送指令
+  // ③ 下发硬件
+  controller_->UpdateCmd(q_cmd);
 
   profiler_->MeasureEnd(kExecutorMeasurement);
-
-  profiler_->MeasureStart(kCycleMeasurement); //这个是测量循环周期，所以要在结束时Start，下次进入时End
-
-
+  profiler_->MeasureStart(kCycleMeasurement);
   return Result::NoError;
 }
 
@@ -103,9 +92,10 @@ bool Executor::SwitchHardware(HardwareInterface* new_hardware) {
 
 bool Executor::SwitchMotion(MotionInterface* new_motion) {
   // std::lock_guard<std::mutex> lock(mtx_);
+// TODO：：这个地方reset在 motion_ == nullptr 时解引用空指针，已经修改。但是我在外部已经reset了，还说把reset迁移到这
+  // if (motion_)
+  //   motion_->Reset(); //对之前的motion指针进行重置
 
-  if (!motion_)
-    motion_->Reset(); //对之前的motion指针进行重置
 
   motion_ = new_motion;
 }

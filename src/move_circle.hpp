@@ -53,19 +53,18 @@ public:
                         double v_limit   = 1.0,
                         double a_limit   = 2.0,
                         double j_limit   = 10.0,
-                        double dt        = 0.001);
+                        double dt        = 0.001,
+                        ModelInterface* model = nullptr);
 
     /// @brief 三点圆弧模式（内部解算圆心+转角）
-    /// @param pose_start  起始位姿
-    /// @param pose_via    途经位姿（仅用位置）
-    /// @param pose_goal   目标位姿
     explicit MoveCircle(const Frame& pose_start,
                         const Frame& pose_via,
                         const Frame& pose_goal,
                         double v_limit   = 1.0,
                         double a_limit   = 2.0,
                         double j_limit   = 10.0,
-                        double dt        = 0.001);
+                        double dt        = 0.001,
+                        ModelInterface* model = nullptr);
 
     ~MoveCircle() override;
 

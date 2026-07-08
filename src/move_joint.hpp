@@ -62,7 +62,8 @@ public:
                        double v_limit   = 1.0,
                        double a_limit   = 2.0,
                        double j_limit   = 10.0,
-                       double dt        = 0.001);
+                       double dt        = 0.001,
+                       ModelInterface* model = nullptr);
     ~MoveJoint() override;
 
     // ─── MotionInterface 接口 ───

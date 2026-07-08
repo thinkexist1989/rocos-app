@@ -54,6 +54,7 @@ namespace rocos {
         NotMatchLoad = -2209,
         CannotMoveWhileFreeDriving = -2210,
         CannotMoveWhileZeroSpaceFreeDriving = -2211,
+        NotEnabled = -2212,
         RobotInVirtualWall = -2214,
         ConflictTaskRunning = -2215,
         OutOfPhysicalRangeFeedback = -2216,
@@ -197,6 +198,7 @@ namespace rocos {
             RESULT_CASE(NotMatchLoad);
             RESULT_CASE(CannotMoveWhileFreeDriving);
             RESULT_CASE(CannotMoveWhileZeroSpaceFreeDriving);
+            RESULT_CASE(NotEnabled);
             RESULT_CASE(RobotInVirtualWall);
             RESULT_CASE(ConflictTaskRunning);
             RESULT_CASE(OutOfPhysicalRangeFeedback);

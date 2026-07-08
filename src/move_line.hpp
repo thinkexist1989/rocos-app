@@ -21,7 +21,7 @@
 #include "motion_interface.hpp"
 #include "unit_velocity_profile.hpp"
 
-#include <array>
+#include <Eigen/Geometry>
 
 namespace rocos {
 
@@ -69,7 +69,8 @@ public:
                       double v_limit   = 1.0,
                       double a_limit   = 2.0,
                       double j_limit   = 10.0,
-                      double dt        = 0.001);
+                      double dt        = 0.001,
+                      ModelInterface* model = nullptr);
     ~MoveLine() override;
 
     // ─── MotionInterface 接口 ───
@@ -88,14 +89,8 @@ public:
     Result Stop() override;
 
 private:
-    /// @brief 计算 path_length 和归一化限制
+    /// @brief 计算 path_length 和归一化限制（四元数点积得旋转角）
     bool computeNormalizedLimits();
-
-    /// @brief 四元数球面线性插值（栈上 std::array，零堆分配）
-    static std::array<double, 4> slerpQuaternion(
-        const std::array<double, 4>& q_start,
-        const std::array<double, 4>& q_end,
-        double s);
 
     /// @brief 当前 s ∈ [0,1] 处插值位姿
     Frame interpolatePose(double s) const;
@@ -105,8 +100,9 @@ private:
 
     Frame pose_start_;
     Frame pose_goal_;
+    Eigen::Quaterniond q_start_;   // 缓存，避免每周期 GetQuaternion
+    Eigen::Quaterniond q_end_;
 
-    // 等效路径长度 = max(平移距离, kEquivalentRadius * 旋转弧度)
     double path_length_{0.0};
 
     // 一维标量限制（保证平移和转动同步）

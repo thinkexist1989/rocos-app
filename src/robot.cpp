@@ -27,7 +27,7 @@
 #include "move_joint.hpp"
 #include "move_line.hpp"
 #include "move_circle.hpp"
-// #include "move_jog.hpp"
+#include "move_jog.hpp"
 
 #include "position_controller.hpp"
 #include "joint_impedance_controller.hpp"
@@ -118,6 +118,7 @@ struct StateMachine {
         state<class IDENTIFYING> + event<EventSuccess> = state<class STOPPED>,
 
         state<class RUNNING> + sml::on_entry<_> / action_run,
+        state<class RUNNING> + event<EventSuccess> = state<class STOPPED>,
         state<class RUNNING> + event<EventPauseReq> = state<class PAUSING>,
 
         state<class PAUSING> + sml::on_entry<_> / action_pause,
@@ -234,12 +235,22 @@ void Robot::on_fsm_start() {
   impl_->process_event(EventSuccess{});
 }
 void Robot::on_fsm_run() {
-  // 已进入 RUNNING 状态，运动正在执行。仅记录，不再触发事件。
   log_ptr_->info("Robot is running.");
+  control_thread_ = std::thread(&Robot::controlLoop, this);
+  control_thread_.detach();   // 线程自管理，自停时不需要外部 join
 }
+
 void Robot::on_fsm_stop() {
-  // STOPPING 进入：运动已结束/被中止，确认停止并转入 STOPPED。
+  if (control_thread_.joinable()) control_thread_.join();
   impl_->process_event(EventSuccess{});
+}
+
+void Robot::controlLoop() {
+  while (IsRunning()) {
+    auto t0 = std::chrono::steady_clock::now();
+    RunCycle();
+    std::this_thread::sleep_until(t0 + std::chrono::milliseconds(1));
+  }
 }
 void Robot::on_fsm_pause() {
   // PAUSING 进入：确认暂停并转入 PAUSED。
@@ -399,6 +410,170 @@ Result Robot::Start() {
 }
 
 // ============================================================================
+// RunCycle：控制循环主函数，1000Hz 调用
+// ============================================================================
+
+void Robot::RunCycle() {
+    if (!motion) return;
+
+    // ① 推进 motion 状态
+    Result r = motion->Update();
+
+    if (r == Result::PlanFinished) {
+        impl_->process_event(EventSuccess{});   // RUNNING → STOPPED
+        return;
+    }
+    if (static_cast<int>(r) < 0) {
+        impl_->process_event(EventErrorOccurred{});
+        return;
+    }
+
+    // ② 参考 → 指令 → 硬件
+    if (executor) executor->Update();
+}
+
+// ============================================================================
+// MoveJ：关节空间点到点，一次性下发跑完即停
+// ============================================================================
+
+Result Robot::MoveJ(const JntArray& q_goal,
+                    double v_limit, double a_limit, double j_limit) {
+    if (!IsEnabled())   return Result::NotEnabled;
+    if (motion && IsRunning()) return Result::ConflictTaskRunning;
+
+    const int n = getJointNum();
+    JntArray q_start(static_cast<unsigned int>(n));
+    for (int i = 0; i < n; ++i) q_start(i) = getJointPosition(i);
+
+    auto new_motion = std::make_unique<MoveJoint>(
+        q_start, q_goal, v_limit, a_limit, j_limit, /*dt=*/0.001);
+
+    Result rc = new_motion->support();
+    if (rc != Result::NoError) return rc;   // 参数非法，直接退出
+
+    rc = new_motion->Reset();
+    if (rc == Result::PlanFinished) return rc;   // 已在目标，无需运动
+    if (rc != Result::NoError) return rc;
+
+    motion = std::move(new_motion);
+    if (executor) executor->SwitchMotion(motion.get());
+
+    impl_->process_event(EventStartReq{});   // STOPPED → RUNNING
+    return Result::NoError;
+}
+
+// ============================================================================
+// MoveL：笛卡尔直线，支持多工具坐标系
+// ============================================================================
+
+Result Robot::MoveL(const Frame& pose_goal,
+                    const std::string& tool_name,
+                    double v_limit, double a_limit, double j_limit) {
+    if (!IsEnabled())   return Result::NotEnabled;
+    if (motion && IsRunning()) return Result::ConflictTaskRunning;
+
+    // 获取当前法兰位姿
+    const int n = getJointNum();
+    JntArray q_current(static_cast<unsigned int>(n));
+    for (int i = 0; i < n; ++i) q_current(i) = getJointPosition(i);
+
+    Frame pose_flange;
+    if (model) model->ForwardKinematics(q_current, pose_flange);
+
+    // 查找工具坐标系，默认单位阵
+    Frame T_tool;
+    if (!tool_name.empty()) {
+        auto it = tool_frames_.find(tool_name);
+        if (it != tool_frames_.end()) T_tool = it->second;
+    }
+
+    // 法兰系下的起止位姿
+    const Frame pose_start_flange = pose_flange;
+    const Frame pose_goal_flange  = pose_goal * T_tool.Inverse();
+
+    auto new_motion = std::make_unique<MoveLine>(
+        pose_start_flange, pose_goal_flange,
+        v_limit, a_limit, j_limit, /*dt=*/0.001, model.get());
+
+    Result rc = new_motion->support();
+    if (rc != Result::NoError) return rc;
+
+    rc = new_motion->Reset();
+    if (rc == Result::PlanFinished) return rc;   // 已在目标，无需运动
+    if (rc != Result::NoError) return rc;
+
+    motion = std::move(new_motion);
+    if (executor) executor->SwitchMotion(motion.get());
+
+    impl_->process_event(EventStartReq{});   // STOPPED → RUNNING
+    return Result::NoError;
+}
+
+void Robot::SetToolFrame(const std::string& name, const Frame& T_tool) {
+    tool_frames_[name] = T_tool;
+}
+
+Frame Robot::GetToolFrame(const std::string& name) const {
+    auto it = tool_frames_.find(name);
+    return (it != tool_frames_.end()) ? it->second : Frame();
+}
+
+// ============================================================================
+// MoveC 圆心+角度
+// ============================================================================
+
+Result Robot::MoveC(const Frame& pose_start, const Frame& center_frame,
+                    double theta, double v_limit, double a_limit, double j_limit) {
+    if (!IsEnabled())   return Result::NotEnabled;
+    if (motion && IsRunning()) return Result::ConflictTaskRunning;
+
+    auto new_motion = std::make_unique<MoveCircle>(
+        pose_start, center_frame, theta, v_limit, a_limit, j_limit, /*dt=*/0.001,
+        model.get());
+
+    Result rc = new_motion->support();
+    if (rc != Result::NoError) return rc;
+
+    rc = new_motion->Reset();
+    if (rc == Result::PlanFinished) return rc;   // 已在目标，无需运动
+    if (rc != Result::NoError) return rc;
+
+    motion = std::move(new_motion);
+    if (executor) executor->SwitchMotion(motion.get());
+
+    impl_->process_event(EventStartReq{});   // STOPPED → RUNNING
+    return Result::NoError;
+}
+
+// ============================================================================
+// MoveC 三点圆弧
+// ============================================================================
+
+Result Robot::MoveC(const Frame& pose_start, const Frame& pose_via,
+                    const Frame& pose_goal,
+                               double v_limit, double a_limit, double j_limit) {
+    if (!IsEnabled())   return Result::NotEnabled;
+    if (motion && IsRunning()) return Result::ConflictTaskRunning;
+
+    auto new_motion = std::make_unique<MoveCircle>(
+        pose_start, pose_via, pose_goal, v_limit, a_limit, j_limit, /*dt=*/0.001,
+        model.get());
+
+    Result rc = new_motion->support();
+    if (rc != Result::NoError) return rc;
+
+    rc = new_motion->Reset();
+    if (rc == Result::PlanFinished) return rc;   // 已在目标，无需运动
+    if (rc != Result::NoError) return rc;
+
+    motion = std::move(new_motion);
+    if (executor) executor->SwitchMotion(motion.get());
+
+    impl_->process_event(EventStartReq{});   // STOPPED → RUNNING
+    return Result::NoError;
+}
+
+// ============================================================================
 // MoveJog：连续点动 + 活性保持
 //
 // 语义分派（与 motion_fsm_executor_design.md 场景 8/9/10/11 对齐）：
@@ -406,37 +581,43 @@ Result Robot::Start() {
 //   2) 当前存在其他 motion 且正在跑    → 冲突拒绝
 //   3) 其它情况                        → 新建 MoveJog，装入 executor，触发 FSM
 // ============================================================================
-Result Robot::MoveJogging(const JogVec& jogvec, double timeout_sec, double threshold) {
-    // std::lock_guard<std::mutex> lock(mtx_);
+Result Robot::MoveJogging(const JogVec& direction, double speed,
+                          double timeout, double dir_threshold) {
+    if (!IsEnabled()) return Result::NotEnabled;
 
-    // // 分支 1：已有活跃 MoveJog → 喂饭（不动 FSM，不重建 motion）
-    // if (auto* jog = dynamic_cast<class MoveJog*>(motion.get())) {
-    //     if (!jog->IsFinished()) {
-    //         return jog->FeedJog(jogvec);
-    //     }
-    //     // 已 finished 的 MoveJog 不复活，落到分支 3 重建
-    // }
+    // ── 分支 1：已有活跃 MoveJog → 旁路喂饭 ──
+    if (auto* jog = dynamic_cast<MoveJog*>(motion.get())) {
+        const Result rc = jog->FeedJog(direction, speed);
+        if (rc == Result::NoError) return rc;
+        // feed 被拒（Decelerating/Stopped/方向突变）→ 落下去走分支 2/3
+    }
 
-    // // 分支 2：有其他类型 motion 正在执行
-    // if (motion && IsRunning()) {
-    //     log_ptr_->error("MoveJog 拒绝：当前有其他运动任务在执行");
-    //     return Result::ConflictTaskRunning;
-    // }
+    // ── 分支 2：其他 motion 正在运行 → 拒绝 ──
+    if (motion && IsRunning()) {
+        return Result::ConflictTaskRunning;
+    }
 
-    // // 分支 3：全新启动
-    // auto new_jog = std::make_unique<class MoveJog>(
-    //     jogvec, timeout_sec, threshold, /*dt=*/0.001);
-    // const Result rc = new_jog->Reset();
-    // if (rc != Result::NoError) {
-    //     log_ptr_->error("MoveJog 参数校验失败: {}", to_string(rc));
-    //     return rc;
-    // }
-    // motion = std::move(new_jog);
-    // if (executor) executor->SwitchMotion(motion.get());
+    // ── 分支 3：全新启动 ──
+    auto new_jog = std::make_unique<MoveJog>(
+        /*dt=*/0.001, timeout, model.get(), dir_threshold);
 
-    // // TODO: 触发 FSM EventStartReq（当前 process_event 为 private，
-    // //       需要通过 Start() 或增加一个内部转发方法）
-    // impl_->process_event(EventStartReq{});
+    // 获取当前关节位置作为积分起点
+    const int n = getJointNum();
+    JntArray q_current(static_cast<unsigned int>(n));
+    for (int i = 0; i < n; ++i) q_current(i) = getJointPosition(i);
+    new_jog->setInitialPosition(q_current);
+
+    // 喂入初始方向+速度
+    Result rc = new_jog->FeedJog(direction, speed);
+    if (rc != Result::NoError) return rc;
+
+    rc = new_jog->Reset();
+    if (rc != Result::NoError) return rc;
+
+    motion = std::move(new_jog);
+    if (executor) executor->SwitchMotion(motion.get());
+
+    impl_->process_event(EventStartReq{});   // STOPPED → RUNNING
     return Result::NoError;
 }
 

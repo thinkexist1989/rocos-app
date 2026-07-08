@@ -43,6 +43,8 @@ class Model : public ModelInterface {
                          const JntArray& q_dotdot, const Wrenches& f_ext,
                          JntArray& torques) override;
 
+  void GetJacobian(const JntArray& q, Jacobian& J_out) override;
+
   inline void SetChain(const Chain& chain) { chain_ = chain; }
 
   bool SetChain(const Tree& tree, const std::string& base_link,
