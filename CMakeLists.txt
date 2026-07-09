@@ -308,7 +308,14 @@ target_link_libraries(hardware_enable_test
         )
 # 注意：本测试依赖真实 EtherCAT 硬件，仅在连接机械臂时手动运行
 # 使用方法: ./build/bin/hardware_enable_test [ecat_id] [config_path]
-
+# ---- 模式切换测试（CSP ↔ CST）--------------------------------------------
+add_executable(mode_switch_test test/mode_switch_test.cc)
+target_link_libraries(mode_switch_test
+        PRIVATE
+        robot
+        )
+# 使用rocos-mujoco仿真时，启动仿真器后再运行本程序
+# ./build/bin/mode_switch_test [ecat_id] [config_path]
 add_executable(position_controller_test test/position_controller_test.cc)
 target_link_libraries(position_controller_test
         PRIVATE

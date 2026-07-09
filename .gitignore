@@ -6,6 +6,7 @@ old_drive/
 devel/
 logs/
 build/
+rocos-mujoco/
 bin/
 !lib/
 msg_gen/
