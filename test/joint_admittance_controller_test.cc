@@ -89,6 +89,10 @@ public:
     bool id_should_fail_{false};
     double grav_torque_{5.0};
 
+    rocos::Result GetJacobian(const rocos::JntArray &q, rocos::Jacobian &J_out) override {
+        return rocos::Result::NoError;
+    }
+
     rocos::Result ForwardKinematics(const rocos::JntArray&,
                                     rocos::Frame&) override {
         return rocos::Result::NoError;

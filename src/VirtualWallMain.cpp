@@ -118,9 +118,14 @@ public:
                                    rocos::JntArray&) override {
         return rocos::Result::NoError;
     }
+
+    rocos::Result GetJacobian(const rocos::JntArray &q, rocos::Jacobian &J_out) override {
+        return rocos::Result::NoError;
+    }
+
     rocos::Result InverseDynamics(const rocos::JntArray&, const rocos::JntArray&,
-                                   const rocos::JntArray&, const rocos::Wrenches&,
-                                   rocos::JntArray&) override {
+                                  const rocos::JntArray&, const rocos::Wrenches&,
+                                  rocos::JntArray&) override {
         return rocos::Result::NoError;
     }
 };

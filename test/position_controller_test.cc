@@ -88,6 +88,10 @@ public:
 ///        可通过标志位控制失败或输出 NaN。
 class FakeModel : public rocos::ModelInterface {
 public:
+    rocos::Result GetJacobian(const rocos::JntArray &q, rocos::Jacobian &J_out) override {
+        return rocos::Result::NoError;
+    }
+
     bool ik_should_fail_{false};   // InverseKinematics 返回 IkCalcFail
     bool ik_output_nan_{false};    // InverseKinematics 输出第一个元素为 NaN
 

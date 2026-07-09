@@ -87,6 +87,11 @@ class FakeModel : public rocos::ModelInterface {
 public:
     bool ik_should_fail_{false};
     bool id_should_fail_{false};
+
+    rocos::Result GetJacobian(const rocos::JntArray &q, rocos::Jacobian &J_out) override {
+        return rocos::Result::NoError;
+    }
+
     double grav_torque_{5.0};   // 每个关节的模拟重力力矩 [Nm]
 
     rocos::Result ForwardKinematics(const rocos::JntArray&,

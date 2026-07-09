@@ -8,21 +8,52 @@
 
 // =========================================================
 // Robot FSM 单元测试
-// 注意：on_fsm_reset 使用 randomBool() 模拟硬件检测，
-//       初始状态为 STOPPED 或 IDLE（各 50%），测试需兼容两者。
+//
+// 当前 FSM 关键行为（见 src/robot.cpp 中的 StateMachine 定义）：
+//   - 构造器发出 EventResetReq: ERROR_STATE → RESETTING
+//     on_fsm_reset() 使用 randomBool() 模拟硬件检测：
+//       true  → EventEnabled  → STOPPED
+//       false → EventDisabled → IDLE
+//   - IDLE + EventEnableReq → ENABLING
+//     on_fsm_enable() 使用 randomBool()：
+//       true  → EventEnabled       → STOPPED
+//       false → EventErrorOccurred → ERROR_STATE
+//   - STOPPED + EventDisableReq → DISABLING
+//     on_fsm_disable() 使用 randomBool()：
+//       true  → EventDisabled      → IDLE
+//       false → EventErrorOccurred → ERROR_STATE
+//   - ERROR_STATE 仅接受 EventResetReq / EventStopReq。当前没有公开
+//     API 触发这两个事件；SetEnabled/SetDisabled 会被拒绝。
+//   - Start/Pause/Resume/Stop 目前是占位实现，不向 FSM 派发事件。
+//   - IsRunning() 覆盖 RUNNING || STOPPING || PAUSING || RESUMING。
+// 由于 randomBool()，所有涉及状态迁移的用例都需容忍两种结果，
+// 部分用例通过重复构造收敛到目标初始状态。
 // =========================================================
 
 namespace {
 
+constexpr int kMaxRetry = 64;  // randomBool() 命中目标状态所需的最大重试次数
+
+std::unique_ptr<rocos::Robot> makeRobotInState(const std::string& target) {
+    for (int i = 0; i < kMaxRetry; ++i) {
+        auto robot = std::make_unique<rocos::Robot>();
+        if (robot->GetStateString() == target) {
+            return robot;
+        }
+    }
+    return nullptr;
+}
+
 std::unique_ptr<rocos::Robot> makeRobotInErrorState() {
+    // ERROR_STATE 仅能通过 ENABLING/DISABLING 时 on_fsm_* 失败到达。
     for (int i = 0; i < 256; ++i) {
         auto robot = std::make_unique<rocos::Robot>();
         const auto state = robot->GetStateString();
 
         if (state == "IDLE") {
-            robot->SetEnabled();
+            robot->SetEnabled();   // IDLE → ENABLING → (STOPPED | ERROR_STATE)
         } else if (state == "STOPPED") {
-            robot->SetDisabled();
+            robot->SetDisabled();  // STOPPED → DISABLING → (IDLE | ERROR_STATE)
         }
 
         if (robot->GetStateString() == "ERROR_STATE") {
@@ -35,75 +66,98 @@ std::unique_ptr<rocos::Robot> makeRobotInErrorState() {
 
 }  // namespace
 
-TEST_CASE("Robot FSM - 构造后进入有效初始状态") {
+TEST_CASE("Robot FSM - 构造后经 RESETTING 进入 STOPPED 或 IDLE") {
+    // 构造器发出 EventResetReq，RESETTING 内的 on_fsm_reset() 根据
+    // randomBool() 结果发出 EventEnabled(→STOPPED) 或 EventDisabled(→IDLE)。
     rocos::Robot robot;
     const auto state = robot.GetStateString();
-    // randomBool() 决定走 EventIsEnabled(→STOPPED) 还是 EventSuccess(→IDLE)
     CHECK((state == "STOPPED" || state == "IDLE"));
     CHECK_FALSE(robot.IsRunning());
 }
 
-TEST_CASE("Robot FSM - IDLE 下 SetEnabled 转入 STOPPED或ERROR_STATE") {
-    // IDLE + EventEnableReq → ENABLING → on_fsm_enable(IsEnabled()=true) → EventSuccess → STOPPED
-    // randomBool() 使初始状态随机，重复构造直到落在 IDLE 分支
-    std::unique_ptr<rocos::Robot> robot;
-    for (int i = 0; i < 32; ++i) {
-        robot = std::make_unique<rocos::Robot>();
-        if (robot->GetStateString() == "IDLE") break;
-    }
+TEST_CASE("Robot FSM - IDLE 下 SetEnabled 进入 STOPPED 或 ERROR_STATE") {
+    // IDLE + EventEnableReq → ENABLING
+    // on_fsm_enable() randomBool():
+    //   true  → EventEnabled       → STOPPED
+    //   false → EventErrorOccurred → ERROR_STATE
+    auto robot = makeRobotInState("IDLE");
+    REQUIRE(robot != nullptr);
     REQUIRE(robot->GetStateString() == "IDLE");
 
     const auto rc = robot->SetEnabled();
-    CHECK(rocos::Result::NoError == rc);
-    std::cout << "反馈结果: " << rc << std::endl;
-    std::cout << "当前状态: " << robot->GetStateString() << std::endl;
-    CHECK((robot->GetStateString() == "STOPPED" || robot->GetStateString() == "ERROR_STATE"));
+    CHECK(rc == rocos::Result::NoError);
+
+    const auto next = robot->GetStateString();
+    std::cout << "IDLE.SetEnabled → " << next << std::endl;
+    CHECK((next == "STOPPED" || next == "ERROR_STATE"));
 }
 
 TEST_CASE("Robot FSM - STOPPED 下 SetEnabled 无效") {
-    // FSM 中仅 IDLE 接受 EventEnableReq，STOPPED 无此转换
-    std::unique_ptr<rocos::Robot> robot;
-    for (int i = 0; i < 32; ++i) {
-        robot = std::make_unique<rocos::Robot>();
-        if (robot->GetStateString() == "STOPPED") break;
-    }
-    REQUIRE(robot->GetStateString() == "STOPPED");
+    // 转换表中仅 IDLE 接受 EventEnableReq，STOPPED 无匹配转换。
+    auto robot = makeRobotInState("STOPPED");
+    REQUIRE(robot != nullptr);
 
     const auto rc = robot->SetEnabled();
     CHECK(rc == rocos::Result::JointStateError);
     CHECK(robot->GetStateString() == "STOPPED");
 }
 
-TEST_CASE("Robot FSM - STOPPED 下 SetDisabled 转入 ERROR_STATE") {
-    // STOPPED + EventDisableReq → DISABLING → on_fsm_disable
-    // IsDisabled() 桩始终为 true → !true=false → EventErrorOccurred → ERROR_STATE
-    std::unique_ptr<rocos::Robot> robot;
-    for (int i = 0; i < 32; ++i) {
-        robot = std::make_unique<rocos::Robot>();
-        if (robot->GetStateString() == "STOPPED") break;
-    }
-    REQUIRE(robot->GetStateString() == "STOPPED");
+TEST_CASE("Robot FSM - IDLE 下 SetDisabled 无效") {
+    // 转换表中仅 STOPPED 接受 EventDisableReq，IDLE 无匹配转换。
+    auto robot = makeRobotInState("IDLE");
+    REQUIRE(robot != nullptr);
+
+    const auto rc = robot->SetDisabled();
+    CHECK(rc == rocos::Result::JointStateError);
+    CHECK(robot->GetStateString() == "IDLE");
+}
+
+TEST_CASE("Robot FSM - STOPPED 下 SetDisabled 进入 IDLE 或 ERROR_STATE") {
+    // STOPPED + EventDisableReq → DISABLING
+    // on_fsm_disable() randomBool():
+    //   true  → EventDisabled      → IDLE
+    //   false → EventErrorOccurred → ERROR_STATE
+    auto robot = makeRobotInState("STOPPED");
+    REQUIRE(robot != nullptr);
 
     const auto rc = robot->SetDisabled();
     CHECK(rc == rocos::Result::NoError);
-    std::cout << "Robot State: " << robot->GetStateString() << std::endl;
-    CHECK((robot->GetStateString() == "ERROR_STATE" || robot->GetStateString() == "IDLE"));
+
+    const auto next = robot->GetStateString();
+    std::cout << "STOPPED.SetDisabled → " << next << std::endl;
+    CHECK((next == "IDLE" || next == "ERROR_STATE"));
 }
 
-TEST_CASE("Robot FSM - IsRunning 仅在 RUNNING 时为真") {
+TEST_CASE("Robot FSM - 初始状态下 IsRunning 为 false") {
+    // IsRunning() 覆盖 RUNNING || STOPPING || PAUSING || RESUMING。
+    // 初始 STOPPED/IDLE 均不在其中；Start/Pause/Resume/Stop 是占位实现，
+    // 不派发 FSM 事件，因此状态不会变化。
     rocos::Robot robot;
-    // 初始状态无论 STOPPED 还是 IDLE，均不是 RUNNING
+    const auto initial = robot.GetStateString();
     CHECK_FALSE(robot.IsRunning());
-    // Pause/Continue/Stop 为空桩，不触发 FSM 事件，状态不变
+
+    robot.Start();
+    CHECK(robot.GetStateString() == initial);
+    CHECK_FALSE(robot.IsRunning());
+
     robot.Pause();
+    CHECK(robot.GetStateString() == initial);
     CHECK_FALSE(robot.IsRunning());
+
     robot.Resume();
+    CHECK(robot.GetStateString() == initial);
     CHECK_FALSE(robot.IsRunning());
+
     robot.Stop();
+    CHECK(robot.GetStateString() == initial);
     CHECK_FALSE(robot.IsRunning());
 }
 
-TEST_CASE("Robot FSM - Error_State状态下只能进行Reset，其他请求不响应") {
+TEST_CASE("Robot FSM - ERROR_STATE 拒绝 SetEnabled/SetDisabled 且 stub 命令不改变状态") {
+    // ERROR_STATE 仅接受 EventResetReq / EventStopReq，
+    // 目前公共 API 中没有能触发这两个事件的方法。
+    // SetEnabled/SetDisabled 事件会被 FSM 拒绝并返回 JointStateError。
+    // Start/Pause/Resume/Stop 是 stub，也不会改变状态。
     auto robot = makeRobotInErrorState();
     REQUIRE(robot != nullptr);
     REQUIRE(robot->GetStateString() == "ERROR_STATE");
@@ -125,4 +179,6 @@ TEST_CASE("Robot FSM - Error_State状态下只能进行Reset，其他请求不�
 
     robot->Stop();
     CHECK(robot->GetStateString() == "ERROR_STATE");
+
+    CHECK_FALSE(robot->IsRunning());
 }

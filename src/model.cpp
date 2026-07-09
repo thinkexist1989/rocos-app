@@ -68,10 +68,15 @@ Result Model::InverseDynamics(const JntArray& q, const JntArray& q_dot,
   return Result::NoError;
 }
 
-void Model::GetJacobian(const JntArray& q, Jacobian& J_out) {
+Result Model::GetJacobian(const JntArray& q, Jacobian& J_out) {
   KDL::ChainJntToJacSolver jac_solver(chain_);
   J_out.resize(chain_.getNrOfJoints());
-  jac_solver.JntToJac(q, J_out);
+  if (jac_solver.JntToJac(q, J_out) < 0) {
+    log_ptr_->error("Jacobian computation failed!");
+    return Result::JacobianCalcFail;
+  }
+
+  return Result::NoError;
 }
 
 bool Model::SetChain(const Tree& tree, const std::string& base_link,

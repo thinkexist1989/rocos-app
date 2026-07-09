@@ -119,6 +119,7 @@ namespace rocos {
         FkCalcFail = -2350,
         IdCalcFail = -2351,
         FdCalcFail = -2352,
+        JacobianCalcFail = -2353,
 
         // API系统错误
         ParameterPointerEqualsNullptr = -2901,

@@ -37,135 +37,123 @@
 
 namespace {
 // 状态定义
-class IDLE {};         // 空闲状态，机器人传感器与执行器就绪，等待使能命令
-class STOPPED {};      // 停止状态，机器人上使能，不会动
-class PAUSED {};       // 暂停状态，机器人暂停在当前位置，等待继续或停止命令
-class RUNNING {};      // 运行状态，机器人正在执行运动
-class ERROR_STATE {};  // 错误状态，任何状态发生错误都转到这个状态[初始状态]
-class SERVOING {};     // 伺服状态，用于高速udp伺服指令发送
-class IDENTIFYING {};  // 动力学参数辨识状态，从STOPPED进入，辨识完成回到STOPPED
+class ERROR_STATE {};  // 0 错误状态，任何状态发生错误都转到这个状态[初始状态]
+class IDLE        {};  // 1 空闲状态，机器人传感器与执行器就绪，等待使能命令
+class STOPPED     {};  // 2 停止状态，机器人上使能，不会动
+class RUNNING     {};  // 3 运行状态，机器人正在执行运动
+class PAUSED      {};  // 4 暂停状态，机器人暂停在当前位置，等待继续或停止命令
+class SERVOING    {};  // 5 伺服状态，用于高速udp伺服指令发送
+
+// class IDENTIFYING {};  // 动力学参数辨识状态，从STOPPED进入，辨识完成回到STOPPED
 
 // 中间状态定义
-class RESETTING {};
-class ENABLING {};
-class DISABLING {};
-class STARTING {};  // 启动状态，机器人正在启动
-class STOPPING {};
-class PAUSING {};
-class RESUMING {};
+class ENABLING  {}; // 6  正在上使能状态
+class DISABLING {}; // 7  正在下使能状态
+class STARTING  {}; // 8  正在启动状态，机器人正在启动
+class STOPPING  {}; // 9  正在停止状态，机器人正在停止
+class PAUSING   {}; // 10 正在暂停状态
+class RESUMING  {}; // 11 正在恢复状态
+class RESETTING {}; // 12 正在复位状态，机器人正在复位
 
-// 事件定义
-struct EventResetReq {};       // 恢复请求
-struct EventEnableReq {};      // 上使能请求
-struct EventDisableReq {};     // 下使能请求
-struct EventSuccess {};        // 成功事件
-struct EventStartReq {};       // 启动请求
-struct EventStopReq {};        // 停止请求
-struct EventPauseReq {};       // 暂停请求
-struct EventResumeReq {};    // 继续请求
-struct EventErrorOccurred {};  // 发生错误
-struct EventServoReq {};       // 伺服请求
-struct EventIdentifyReq {};    // 动力学参数辨识请求
-struct EventIsEnabled {};  // TODO: 检查使能状态事件(临时兼容性，要删除)
+// 机器人事件定义
+struct EventRunning       {}; // 机器人开始运行事件
+struct EventAtTarget      {}; // 机器人到达目标事件
+struct EventStopped       {}; // 机器人已停止事件
+struct EventEnabled       {}; // 机器人已上使能事件
+struct EventDisabled      {}; // 机器人已下使能事件
+struct EventErrorOccurred {}; // 发生错误
+
+// 指令事件定义
+struct EventEnableReq  {}; // 上使能请求
+struct EventDisableReq {}; // 下使能请求
+struct EventStartReq   {}; // 启动请求
+struct EventStopReq    {}; // 停止请求
+struct EventPauseReq   {}; // 暂停请求
+struct EventResumeReq  {}; // 继续请求
+struct EventServoReq   {}; // 伺服请求
+struct EventResetReq   {}; // 恢复请求
+
 
 namespace sml = boost::sml;
 
 const auto action_start = [](rocos::Robot& robot) { robot.on_fsm_start(); };
-const auto action_run = [](rocos::Robot& robot) { robot.on_fsm_run(); };
+const auto action_run = [](rocos::Robot& robot) { robot.on_fsm_run(); }; //TODO：目前没有任何处理
 const auto action_pause = [](rocos::Robot& robot) { robot.on_fsm_pause(); };
-const auto action_resume = [](rocos::Robot& robot) {
-  robot.on_fsm_resume();
-};
+const auto action_resume = [](rocos::Robot& robot) { robot.on_fsm_resume(); };
 const auto action_stop = [](rocos::Robot& robot) { robot.on_fsm_stop(); };
 const auto action_reset = [](rocos::Robot& robot) { robot.on_fsm_reset(); };
 const auto action_enable = [](rocos::Robot& robot) { robot.on_fsm_enable(); };
 const auto action_disable = [](rocos::Robot& robot) { robot.on_fsm_disable(); };
-const auto action_identify = [](rocos::Robot& robot) {
-  robot.on_fsm_identify();
-};
-
 const auto action_servo = [](rocos::Robot& robot) { robot.on_fsm_servo(); };
+const auto action_error = [](rocos::Robot& robot) {}; //TODO: 进入错误状态时的必要处理
 
 struct StateMachine {
   auto operator()() const noexcept {
     using namespace sml;
     return make_transition_table(
         // 初始化
-        *state<class ERROR_STATE> + event<EventResetReq> = state<class RESETTING>,
-        state<class RESETTING> + sml::on_entry<_> / action_reset,
-        state<class RESETTING> + event<EventSuccess> = state<class IDLE>,
-        state<class RESETTING> + event<EventIsEnabled> =state<class STOPPED>,
+        *state<class ERROR_STATE> + event<EventResetReq> = state<class RESETTING>,  // 0 ERROR_STATE->RESETTING
+        state<class ERROR_STATE> + event<EventStopReq> = state<class STOPPING>,     //   ERROR_STATE->STOPPING
+        state<class ERROR_STATE> + sml::on_entry<_> / action_error,                 //   ERROR_STATE->RESETTING
 
-        state<class IDLE> + event<EventEnableReq> = state<class ENABLING>,
-        state<class ENABLING> + sml::on_entry<_> / action_enable,
-        state<class ENABLING> + event<EventSuccess> = state<class STOPPED>,
+        state<class IDLE> + event<EventEnableReq> = state<class ENABLING>,   // 1 IDLE->ENABLING
 
-        state<class STOPPED> + event<EventDisableReq> = state<class DISABLING>,
-        state<class DISABLING> + sml::on_entry<_> / action_disable,
-        state<class DISABLING> + event<EventSuccess> = state<class IDLE>,
+        state<class STOPPED> + event<EventDisableReq> = state<class DISABLING>, // 2 STOPPED->DISABLING
+        state<class STOPPED> + event<EventStartReq> = state<class STARTING>,    //   STOPPED->STARING
+        state<class STOPPED> + event<EventServoReq> = state<class SERVOING>,    //   STOPPED->SERVOING
 
-        state<class STOPPED> + event<EventStartReq> = state<class STARTING>,
-        state<class STARTING> + sml::on_entry<_> / action_start,
-        state<class STARTING> + event<EventSuccess> = state<class RUNNING>,
+        state<class RUNNING> + sml::on_entry<_> / action_run,                   // 3 RUNNING
+        state<class RUNNING> + event<EventStopped> = state<class STOPPED>,      //   RUNNING->STOPPED
+        state<class RUNNING> + event<EventAtTarget> = state<class STOPPED>,     //   RUNNING->STOPPED
 
-        state<class STOPPED> + event<EventServoReq> = state<class SERVOING>,
-        state<class SERVOING> + sml::on_entry<_> / action_servo,
-        state<class SERVOING> + event<EventStopReq> = state<class STOPPING>,
+        state<class RUNNING> + event<EventPauseReq> = state<class PAUSING>,     //   RUNNING->PAUSING
+        state<class RUNNING> + event<EventStopReq> = state<class STOPPING>,     //   RUNNING->STOPPING
 
-        state<class STOPPED> + event<EventIdentifyReq> =
-            state<class IDENTIFYING>,
-        state<class IDENTIFYING> + sml::on_entry<_> / action_identify,
-        state<class IDENTIFYING> + event<EventSuccess> = state<class STOPPED>,
+        state<class PAUSED> + event<EventResumeReq> = state<class RESUMING>,    // 4 PAUSED->RESUMING
+        state<class PAUSED> + event<EventStopReq> = state<class STOPPING>,      //   PAUSED->STOPPING
 
-        state<class RUNNING> + sml::on_entry<_> / action_run,
-        state<class RUNNING> + event<EventSuccess> = state<class STOPPED>,
-        state<class RUNNING> + event<EventPauseReq> = state<class PAUSING>,
+        state<class SERVOING> + sml::on_entry<_> / action_servo,                // 5 SERVOING
+        state<class SERVOING> + event<EventStopReq> = state<class STOPPING>,    //   SERVOING->STOPPING
 
-        state<class PAUSING> + sml::on_entry<_> / action_pause,
-        state<class PAUSING> + event<EventSuccess> =
-            state<class PAUSED>,  // 中间状态直接跳转
+        state<class ENABLING> + sml::on_entry<_> / action_enable,               // 6 ENABLING
+        state<class ENABLING> + event<EventEnabled> = state<class STOPPED>,     // 6 ENABLING->STOPPED
 
-        state<class PAUSED> + event<EventResumeReq> = state<class RESUMING>,
-        state<class RESUMING> + sml::on_entry<_> / action_resume,
-        state<class RESUMING> + event<EventSuccess> =
-            state<class RUNNING>,  // 中间状态直接跳转
+        state<class DISABLING> + sml::on_entry<_> / action_disable,             // 7 DISABLING
+        state<class DISABLING> + event<EventDisabled> = state<class IDLE>,      //   DISABLING->IDLE
 
-        state<class PAUSED> + event<EventStopReq> = state<class STOPPING>,
-        state<class RUNNING> + event<EventStopReq> = state<class STOPPING>,
-        state<class ERROR_STATE> + event<EventStopReq> = state<class STOPPING>,
-        state<class STOPPING> + sml::on_entry<_> / action_stop,
-        state<class STOPPING> + event<EventSuccess> = state<class STOPPED>,
+
+        state<class STARTING> + sml::on_entry<_> / action_start,                // 8 STARTING
+        state<class STARTING> + event<EventAtTarget> = state<class STOPPED>,    //   STARTING->STOPPED
+        state<class STARTING> + event<EventRunning> = state<class RUNNING>,     //   STARTING->RUNNING
+
+        state<class STOPPING> + sml::on_entry<_> / action_stop,                 // 9 STOPPING
+        state<class STOPPING> + event<EventStopped> = state<class STOPPED>,     //   STOPPING->STOPPED
+
+        state<class PAUSING> + sml::on_entry<_> / action_pause,                 // 10 PAUSING
+        state<class PAUSING> + event<EventStopped> = state<class PAUSED>,       //   PAUSING->PAUSED
+
+        state<class RESUMING> + sml::on_entry<_> / action_resume,               // 11 RESUMING
+        state<class RESUMING> + event<EventRunning> = state<class RUNNING>,     //    RESUMING->RUNNING
+
+        state<class RESETTING> + sml::on_entry<_> / action_reset,               // 12 RESETTING
+        state<class RESETTING> + event<EventDisabled> = state<class IDLE>,      //    RESETTING->IDLE
+        state<class RESETTING> + event<EventEnabled> =state<class STOPPED>,     //    RESETTING->STOPPED
+
 
         // ANY STATE JUMP TO ERROR_STATE
-        state<class ERROR_STATE> + event<EventErrorOccurred> =
-            state<class ERROR_STATE>,  // 0
-        state<class IDLE> + event<EventErrorOccurred> =
-            state<class ERROR_STATE>,  // 1
-        state<class STOPPED> + event<EventErrorOccurred> =
-            state<class ERROR_STATE>,  // 2
-        state<class RUNNING> + event<EventErrorOccurred> =
-            state<class ERROR_STATE>,  // 3
-        state<class PAUSED> + event<EventErrorOccurred> =
-            state<class ERROR_STATE>,  // 4
-        state<class SERVOING> + event<EventErrorOccurred> =
-            state<class ERROR_STATE>,  // 5
-
-        state<class ENABLING> + event<EventErrorOccurred> =
-            state<class ERROR_STATE>,  // 6
-        state<class DISABLING> + event<EventErrorOccurred> =
-            state<class ERROR_STATE>,  // 7
-        state<class STARTING> + event<EventErrorOccurred> =
-            state<class ERROR_STATE>,  // 8
-        state<class STOPPING> + event<EventErrorOccurred> =
-            state<class ERROR_STATE>,  // 9
-        state<class PAUSING> + event<EventErrorOccurred> =
-            state<class ERROR_STATE>,  // 10
-        state<class RESUMING> + event<EventErrorOccurred> =
-            state<class ERROR_STATE>,  // 11
-        state<class RESETTING> + event<EventErrorOccurred> =
-            state<class ERROR_STATE>,  // 12
-        state<class IDENTIFYING> + event<EventErrorOccurred> =
-            state<class ERROR_STATE>  // 13
+        state<class ERROR_STATE> + event<EventErrorOccurred> =  state<class ERROR_STATE>,  // 0
+        state<class IDLE>        + event<EventErrorOccurred> =  state<class ERROR_STATE>,  // 1
+        state<class STOPPED>     + event<EventErrorOccurred> =  state<class ERROR_STATE>,  // 2
+        state<class RUNNING>     + event<EventErrorOccurred> =  state<class ERROR_STATE>,  // 3
+        state<class PAUSED>      + event<EventErrorOccurred> =  state<class ERROR_STATE>,  // 4
+        state<class SERVOING>    + event<EventErrorOccurred> =  state<class ERROR_STATE>,  // 5
+        state<class ENABLING>    + event<EventErrorOccurred> =  state<class ERROR_STATE>,  // 6
+        state<class DISABLING>   + event<EventErrorOccurred> =  state<class ERROR_STATE>,  // 7
+        state<class STARTING>    + event<EventErrorOccurred> =  state<class ERROR_STATE>,  // 8
+        state<class STOPPING>    + event<EventErrorOccurred> =  state<class ERROR_STATE>,  // 9
+        state<class PAUSING>     + event<EventErrorOccurred> =  state<class ERROR_STATE>,  // 10
+        state<class RESUMING>    + event<EventErrorOccurred> =  state<class ERROR_STATE>,  // 11
+        state<class RESETTING>   + event<EventErrorOccurred> =  state<class ERROR_STATE>   // 12
     );
   }
 };
@@ -207,7 +195,7 @@ void Robot::on_fsm_enable() {
 
   if (randomBool()) {
     log_ptr_->info("机器人上使能成功，准备进入STOPPED状态");
-    impl_->process_event(EventSuccess{});
+    impl_->process_event(EventEnabled{});
   } else {
     log_ptr_->error("机器人上使能失败，准备进入ERROR_STATE状态");
     impl_->process_event(EventErrorOccurred{});
@@ -223,7 +211,7 @@ void Robot::on_fsm_disable() {
 
   if (randomBool()) {
     log_ptr_->info("机器人下使能成功，准备进入IDLE状态");
-    impl_->process_event(EventSuccess{});
+    impl_->process_event(EventDisabled{});
   } else {
     log_ptr_->error("机器人下使能失败，准备进入ERROR_STATE状态");
     impl_->process_event(EventErrorOccurred{});
@@ -232,18 +220,20 @@ void Robot::on_fsm_disable() {
 void Robot::on_fsm_start() {
   // STARTING 进入：运动线程已由 MoveJ/MoveL 等在调用线程启动，
   // 此处确认启动成功并转入 RUNNING。
-  impl_->process_event(EventSuccess{});
+
+  control_thread_ = std::thread(&Robot::controlLoop, this);
+
+  impl_->process_event(EventRunning{});
 }
 void Robot::on_fsm_run() {
   log_ptr_->info("Robot is running.");
-  control_thread_ = std::thread(&Robot::controlLoop, this);
+
   
-  // control_thread_.detach();   // 线程自管理，自停时不需要外部 join
 }
 
 void Robot::on_fsm_stop() {
   if (control_thread_.joinable()) control_thread_.join();
-  impl_->process_event(EventSuccess{});
+  impl_->process_event(EventStopped{});
 }
 
 void Robot::controlLoop() {
@@ -263,18 +253,11 @@ void Robot::controlLoop() {
 }
 void Robot::on_fsm_pause() {
   // PAUSING 进入：确认暂停并转入 PAUSED。
-  impl_->process_event(EventSuccess{});
+  impl_->process_event(EventStopped{});
 }
 void Robot::on_fsm_resume() {
   // CONTINUING 进入：确认继续并转回 RUNNING。
-  impl_->process_event(EventSuccess{});
-}
-void Robot::on_fsm_identify() {
-  // 动力学参数辨识入口。具体辨识算法（激励轨迹、最小二乘求解等）后续实现，
-  // 此处仅占位：辨识流程结束后回报成功，状态机自动返回 STOPPED。
-  log_ptr_->info("Robot dynamics identification started...");
-  // TODO: 执行动力学参数辨识流程
-  impl_->process_event(EventSuccess{});
+  impl_->process_event(EventRunning{});
 }
 void Robot::on_fsm_reset() {
   // log_ptr_->info("Robot is initializing...");
@@ -285,10 +268,10 @@ void Robot::on_fsm_reset() {
 
   if (randomBool()) {
     log_ptr_->info("机器人已经使能，准备进入STOPPED状态");
-    impl_->process_event(EventIsEnabled{});  // 模拟初始化成功事件
+    impl_->process_event(EventEnabled{});  // 模拟初始化成功事件
   } else {
     log_ptr_->info("机器人未使能，准备进入IDLE状态");
-    impl_->process_event(EventSuccess{});  // 模拟初始化失败事件
+    impl_->process_event(EventDisabled{});  // 模拟初始化失败事件
   }
 }
 void Robot::on_fsm_servo() {
@@ -351,8 +334,6 @@ std::string Robot::GetStateString() const {
     return "STOPPED";
   } else if (impl_->is(sml::state<class SERVOING>)) {
     return "SERVOING";
-  } else if (impl_->is(sml::state<class IDENTIFYING>)) {
-    return "IDENTIFYING";
   } else if (impl_->is(sml::state<class ERROR_STATE>)) {
     return "ERROR_STATE";
   } else {
@@ -389,7 +370,7 @@ bool Robot::IsEnabled() const { return true; }
 bool Robot::IsDisabled() const { return true; }
 
 bool Robot::IsRunning() const {
-  return impl_->is(sml::state<class RUNNING>);
+  return impl_->is(sml::state<class RUNNING>) || impl_->is(sml::state<class STOPPING>) || impl_->is(sml::state<class PAUSING>) || impl_->is(sml::state<class RESUMING>);
 }
 
 void Robot::waitControlCycle() {}
@@ -429,7 +410,7 @@ void Robot::RunCycle() {
     Result r = motion->Update();
 
     if (r == Result::PlanFinished) {
-        impl_->process_event(EventSuccess{});   // RUNNING → STOPPED
+        impl_->process_event(EventStopped{});   // RUNNING → STOPPED
         return;
     }
     if (static_cast<int>(r) < 0) {

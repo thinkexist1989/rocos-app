@@ -86,8 +86,12 @@ public:
     bool fk_should_fail_{false};
     bool ik_should_fail_{false};
 
+    rocos::Result GetJacobian(const rocos::JntArray &q, rocos::Jacobian &J_out) override {
+        return rocos::Result::NoError;
+    }
+
     rocos::Result ForwardKinematics(const rocos::JntArray& q_in,
-                                     rocos::Frame& p_out) override {
+                                    rocos::Frame& p_out) override {
         if (fk_should_fail_) return rocos::Result::FkCalcFail;
         if (q_in.rows() >= 3)
             p_out.p = rocos::Vector(q_in(0), q_in(1), q_in(2));
