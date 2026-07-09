@@ -237,7 +237,8 @@ void Robot::on_fsm_start() {
 void Robot::on_fsm_run() {
   log_ptr_->info("Robot is running.");
   control_thread_ = std::thread(&Robot::controlLoop, this);
-  control_thread_.detach();   // 线程自管理，自停时不需要外部 join
+  
+  // control_thread_.detach();   // 线程自管理，自停时不需要外部 join
 }
 
 void Robot::on_fsm_stop() {
@@ -246,10 +247,18 @@ void Robot::on_fsm_stop() {
 }
 
 void Robot::controlLoop() {
+  // ToDo: 这里的while (IsRunning()) 改成while (IsControlActive())，只要处于需要控制周期的状态，就持续循环
+  // bool Robot::IsControlActive() const {
+//   return IsRunning()
+//       || IsPausing()
+//       || IsPaused()
+//       || IsResuming()
+//       || IsStopping();
+// }然后while (IsRunning()) 改成while (IsControlActive())，只要处于需要控制周期的状态，就持续循环 
   while (IsRunning()) {
-    auto t0 = std::chrono::steady_clock::now();
+    
     RunCycle();
-    std::this_thread::sleep_until(t0 + std::chrono::milliseconds(1));
+    
   }
 }
 void Robot::on_fsm_pause() {
