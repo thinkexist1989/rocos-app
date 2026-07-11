@@ -34,6 +34,7 @@
 #include "position_controller.hpp"
 #include "joint_impedance_controller.hpp"
 #include "cartesian_impedance_controller.hpp"
+#include "model.hpp"
 
 
 
@@ -65,6 +66,8 @@ struct EventEnabled       {}; // 机器人已上使能事件
 struct EventDisabled      {}; // 机器人已下使能事件
 struct EventErrorOccurred {}; // 发生错误
 struct EventStartFailedReq {}; // 启动失败请求
+struct EventPauseFailed{};
+struct EventSuccessed{};
 
 // 指令事件定义
 struct EventEnableReq  {}; // 上使能请求
@@ -106,8 +109,10 @@ struct StateMachine {
         state<class STOPPED> + event<EventServoReq> = state<class SERVOING>,    //   STOPPED->SERVOING
 
         state<class RUNNING> + sml::on_entry<_> / action_run,                   // 3 RUNNING
-        state<class RUNNING> + event<EventStopped> = state<class STOPPED>,      //   RUNNING->STOPPED
-        state<class RUNNING> + event<EventAtTarget> = state<class STOPPED>,     //   RUNNING->STOPPED
+        state<class RUNNING> + event<EventStopped> = state<class STOPPED>, 
+        //todo     EventAtTarget不是必要的应该直接success
+        state<class RUNNING> + event<EventAtTarget> = state<class STOPPED>, 
+        state<class RUNNING> + event<EventSuccessed> = state<class STOPPED>,   //   RUNNING->STOPPED
 
         state<class RUNNING> + event<EventPauseReq> = state<class PAUSING>,     //   RUNNING->PAUSING
         state<class RUNNING> + event<EventStopReq> = state<class STOPPING>,     //   RUNNING->STOPPING
@@ -131,13 +136,19 @@ struct StateMachine {
         state<class STARTING> + event<EventRunning> = state<class RUNNING>,     //   STARTING->RUNNING
 
         state<class STOPPING> + sml::on_entry<_> / action_stop,                 // 9 STOPPING
-        state<class STOPPING> + event<EventStopped> = state<class STOPPED>,     //   STOPPING->STOPPED
+        state<class STOPPING> + event<EventStopped> = state<class STOPPED>, 
+        state<class STOPPING> + event<EventSuccessed> = state<class STOPPED>,    //   STOPPING->STOPPED
 
-        state<class PAUSING> + sml::on_entry<_> / action_pause,                 // 10 PAUSING
-        state<class PAUSING> + event<EventStopped> = state<class PAUSED>,       //   PAUSING->PAUSED
+        state<class PAUSING> + sml::on_entry<_> / action_pause,  
+        // TODO                这个地方应该是success
+        state<class PAUSING> + event<EventStopped> = state<class PAUSED>, 
+        state<class PAUSING> + event<EventPauseFailed> = state<class RUNNING>,
+        state<class PAUSING> + event<EventSuccessed> = state<class PAUSED>,     // 10 PAUSING->RESUMING 
+             //   PAUSING->PAUSED
 
         state<class RESUMING> + sml::on_entry<_> / action_resume,               // 11 RESUMING
-        state<class RESUMING> + event<EventRunning> = state<class RUNNING>,     //    RESUMING->RUNNING
+        state<class RESUMING> + event<EventRunning> = state<class RUNNING>,
+        state<class RESUMING> + event<EventSuccessed> = state<class RUNNING>,   //    RESUMING->RUNNING
 
         state<class RESETTING> + sml::on_entry<_> / action_reset,               // 12 RESETTING
         state<class RESETTING> + event<EventDisabled> = state<class IDLE>,      //    RESETTING->IDLE
@@ -196,8 +207,9 @@ void Robot::on_fsm_enable() {
   log_ptr_->info("机器人正在上使能中");
 
   // IsEnabled();
+  setEnabled();
 
-  if (randomBool()) {
+  if (IsEnabled()) {
     log_ptr_->info("机器人上使能成功，准备进入STOPPED状态");
     impl_->process_event(EventEnabled{});
   } else {
@@ -212,8 +224,8 @@ void Robot::on_fsm_disable() {
   // IsDisabled();
 
 
-
-  if (randomBool()) {
+  setDisabled();
+  if (IsDisabled()) {
     log_ptr_->info("机器人下使能成功，准备进入IDLE状态");
     impl_->process_event(EventDisabled{});
   } else {
@@ -241,43 +253,104 @@ void Robot::on_fsm_start() {
     return;
   }
   impl_->process_event(EventRunning{});
-  control_thread_ = std::thread(&Robot::controlLoop, this);
+  
 
   
 }
 void Robot::on_fsm_run() {
   log_ptr_->info("Robot is running.");
 
+  if (control_thread_.joinable()) {
+    if (control_thread_active_.load()) {
+      // 控制线程仍在 RUNNING/PAUSING/PAUSED/RESUMING/STOPPING 中维持循环。
+      return;
+    }
+    control_thread_.join();
+  }
+
+  control_thread_active_.store(true);
+  control_thread_ = std::thread(&Robot::controlLoop, this);
+
   
 }
 
 void Robot::on_fsm_stop() {
-  if (control_thread_.joinable()) control_thread_.join();
-  impl_->process_event(EventStopped{});
+  
+  // if (control_thread_.joinable()) control_thread_.join();
+  // impl_->process_event(EventStopped{});
+  if(executor)
+  {
+    Result rc = executor->Stop();
+    if(rc == Result::NoError)
+    {
+      log_ptr_->info("机器人停止成功，准备进入Stopped状态");
+      
+    }
+    else
+    {
+      log_ptr_->error("机器人停止失败，退回ERROR状态");
+      impl_->process_event(EventErrorOccurred{});
+    }
+  }
+  else
+  {
+    log_ptr_->error("executor is nullptr");
+    impl_->process_event(EventErrorOccurred{});
+  }
 }
 
 void Robot::controlLoop() {
-  // ToDo: 这里的while (IsRunning()) 改成while (IsControlActive())，只要处于需要控制周期的状态，就持续循环
-  // bool Robot::IsControlActive() const {
-//   return IsRunning()
-//       || IsPausing()
-//       || IsPaused()
-//       || IsResuming()
-//       || IsStopping();
-// }然后while (IsRunning()) 改成while (IsControlActive())，只要处于需要控制周期的状态，就持续循环 
-  while (IsRunning()) {
-    
+
+  while (IsControlActive()) {
     RunCycle();
-    
+    waitControlCycle();
   }
+
+  control_thread_active_.store(false);
 }
 void Robot::on_fsm_pause() {
+
+  
   // PAUSING 进入：确认暂停并转入 PAUSED。
-  impl_->process_event(EventStopped{});
+  if(executor)
+  {
+    Result rc = executor->Pause();
+    if(rc == Result::NoError)
+    {
+      log_ptr_->info("机器人暂停成功，准备进入PAUSED状态");
+      
+    }
+    else
+    {
+      log_ptr_->error("机器人暂停失败，退回RUNNING状态");
+      impl_->process_event(EventPauseFailed{});
+    }
+  }
+  else
+  {
+    log_ptr_->error("executor is nullptr");
+    impl_->process_event(EventErrorOccurred{});
+  }
+
+  
+  // impl_->process_event(EventStopped{});
 }
 void Robot::on_fsm_resume() {
   // CONTINUING 进入：确认继续并转回 RUNNING。
-  impl_->process_event(EventRunning{});
+  if(executor)
+  {
+    Result rc = executor->Resume();
+    if(rc == Result::NoError)
+      {log_ptr_->info("机器人继续成功，准备进入RUNNING状态");
+      impl_->process_event(EventRunning{});
+      }
+  }
+  else
+  {
+    log_ptr_->error("executor is nullptr");
+    impl_->process_event(EventErrorOccurred{});
+  }
+  // impl_->process_event(EventRunning{});
 }
 void Robot::on_fsm_reset() {
   // log_ptr_->info("Robot is initializing...");
@@ -285,8 +358,8 @@ void Robot::on_fsm_reset() {
 
 
   // IsEnabled(); //TODO：要根据当前是否使能来确定状态
-
-  if (randomBool()) {
+  setEnabled();
+  if (IsEnabled()) {
     log_ptr_->info("机器人已经使能，准备进入STOPPED状态");
     impl_->process_event(EventEnabled{});  // 模拟初始化成功事件
   } else {
@@ -305,9 +378,25 @@ void Robot::on_fsm_servo() {
 Robot::Robot() : impl_(std::make_unique<Impl>(*this)) {
   log_ptr_ = Logger::getInstance("Robot");
 
-  hardware = std::make_unique<Hardware>("./config/hardware.yaml", 0);
+  hardware = std::make_unique<Hardware>("hardware_talon_config.yaml", 0);
+  model= std::make_unique<Model>("robot.urdf", "base_link", "link_7");
+  controller = std::make_unique<PositionController>();
+  
 
-  executor = std::make_unique<Executor>();
+  Result rc = controller->SetHardware(hardware.get());
+  if (rc != Result::NoError) {
+    throw std::runtime_error("PositionController SetHardware failed");
+  }
+
+  rc = controller->SetModel(model.get());
+  if (rc != Result::NoError) {
+    throw std::runtime_error("PositionController SetModel failed");
+  }
+
+  executor = std::make_unique<Executor>(
+    motion.get(),
+    controller.get(),
+    hardware.get());
 
   // motion = std::make_unique<MoveJoint>();
   // controller = std::make_unique<PositionController>(); //TODO: 默认加载位置控制器
@@ -319,6 +408,10 @@ Robot::Robot() : impl_(std::make_unique<Impl>(*this)) {
 }
 
 Robot::~Robot() {
+  if (control_thread_.joinable()) {
+    control_thread_.join();
+  }
+
   // Delete logger pointer
   if (log_ptr_) {
     log_ptr_->flush();
@@ -390,14 +483,29 @@ bool Robot::IsEnabled() const { return true; }
 bool Robot::IsDisabled() const { return true; }
 
 bool Robot::IsRunning() const {
-  return impl_->is(sml::state<class RUNNING>) || impl_->is(sml::state<class STOPPING>) || impl_->is(sml::state<class PAUSING>) || impl_->is(sml::state<class RESUMING>);
+  return impl_->is(sml::state<class RUNNING>) ;
 }
 
-void Robot::waitControlCycle() {}
+bool Robot::IsControlActive() const {
+  return impl_->is(sml::state<class RUNNING>)
+      || impl_->is(sml::state<class PAUSING>)
+      || impl_->is(sml::state<class PAUSED>)
+      || impl_->is(sml::state<class RESUMING>)
+      || impl_->is(sml::state<class STOPPING>);
+}
 
-void Robot::setEnabled() {}
+void Robot::waitControlCycle() {
+  hardware->WaitForSignal();
+ 
+}
 
-void Robot::setDisabled() {}
+void Robot::setEnabled() {
+  hardware->SetEnabled();
+}
+
+void Robot::setDisabled() {
+  hardware->SetDisabled();
+}
 
 /////// Motion Command /////////////
 
@@ -430,7 +538,16 @@ void Robot::RunCycle() {
     Result r = motion->Update();
 
     if (r == Result::PlanFinished) {
-        impl_->process_event(EventStopped{});   // RUNNING → STOPPED
+        if (impl_->is(sml::state<class PAUSED>)) {
+            if (executor) {
+                r = executor->Update();
+                if (static_cast<int>(r) < 0) {
+                    impl_->process_event(EventErrorOccurred{});
+                }
+            }
+            return;
+        }
+        impl_->process_event(EventSuccessed{});   // 
         return;
     }
     if (static_cast<int>(r) < 0) {
@@ -439,7 +556,15 @@ void Robot::RunCycle() {
     }
 
     // ② 参考 → 指令 → 硬件
-    if (executor) executor->Update();
+    if (executor) 
+    {
+      r=executor->Update();
+      if (static_cast<int>(r) < 0) {
+      impl_->process_event(EventErrorOccurred{});
+      return;
+}
+    }
+
 }
 
 // ============================================================================
@@ -605,56 +730,86 @@ Result Robot::MoveC(const Frame& pose_start, const Frame& pose_via,
     return Result::NoError;
 }
 
-// ============================================================================
-// MoveJog：连续点动 + 活性保持
-//
-// 语义分派（与 motion_fsm_executor_design.md 场景 8/9/10/11 对齐）：
-//   1) 当前 motion 已经是活跃 MoveJog  → 视为“喂饭”，转发 FeedJog()
-//   2) 当前存在其他 motion 且正在跑    → 冲突拒绝
-//   3) 其它情况                        → 新建 MoveJog，装入 executor，触发 FSM
-// ============================================================================
-Result Robot::MoveJogging(const JogVec& direction, double speed,
-                          double timeout, double dir_threshold) {
-
-    // ── 分支 1：已有活跃 MoveJog → 旁路喂饭 ──
-    if (auto* jog = dynamic_cast<MoveJog*>(motion.get())) {
-        const Result rc = jog->FeedJog(direction, speed);
-        if (rc == Result::NoError) return rc;
-    }
-
-    // ── 分支 2：其他 motion 正在运行 → 拒绝 ──
-    if (motion && IsRunning()) return Result::ConflictTaskRunning;
-
-    // ── 分支 3：全新启动 ──
-    data_ready_callback_ = [this, direction, speed, timeout, dir_threshold]() -> Result {
-        auto new_jog = std::make_unique<MoveJog>(
-            /*dt=*/0.001, timeout, model.get(), dir_threshold);
-
-        const int n = getJointNum();
-        JntArray q_current(static_cast<unsigned int>(n));
-        for (int i = 0; i < n; ++i) q_current(i) = getJointPosition(i);
-        new_jog->setInitialPosition(q_current);
-        Result rc = new_jog->Reset();
-        if (rc != Result::NoError) return rc;
-        
-        rc = new_jog->FeedJog(direction, speed);
-        if (rc != Result::NoError) return rc;
-
-        
-
-        motion = std::move(new_jog);
-        if (executor) { executor->SwitchMotion(motion.get()); return Result::NoError; }
-        log_ptr_->error("executor is nullptr");
-        return Result::Fatal;
-    };
-
-    if (!impl_->process_event(EventStartReq{})) {
-        if (impl_->is(sml::state<class IDLE>))  return Result::NotEnabled;
-        if (impl_->is(sml::state<class ERROR_STATE>)) return Result::Fatal;
-        return Result::ConflictTaskRunning;
-    }
-    return Result::NoError;
+Result Robot::PauseMotion()
+{
+  if(!impl_->process_event(EventPauseReq{}))
+  {
+    log_ptr_->error("当前状态无法执行暂停指令");
+    return Result::Fatal;
+  }
+return Result::NoError;
 }
+
+Result Robot::StopMotion()
+ { if(!impl_->process_event(EventStopReq{}))
+  {
+    log_ptr_->error("当前状态无法执行停止指令");
+    return Result::Fatal;
+  }
+return Result::NoError;
+ }
+
+ Result Robot::ResumeMotion() 
+ { 
+  if(!impl_->process_event(EventResumeReq{}))
+  {
+    log_ptr_->error("当前状态无法执行恢复指令");
+    return Result::Fatal;
+  }
+  return Result(); 
+ }
+
+ // ============================================================================
+ // MoveJog：连续点动 + 活性保持
+ //
+ // 语义分派（与 motion_fsm_executor_design.md 场景 8/9/10/11 对齐）：
+ //   1) 当前 motion 已经是活跃 MoveJog  → 视为“喂饭”，转发 FeedJog()
+ //   2) 当前存在其他 motion 且正在跑    → 冲突拒绝
+ //   3) 其它情况                        → 新建 MoveJog，装入 executor，触发 FSM
+ // ============================================================================
+ Result Robot::MoveJogging(const JogVec& direction, double speed,
+                           double timeout, double dir_threshold) {
+   // ── 分支 1：已有活跃 MoveJog → 旁路喂饭 ──
+   if (auto* jog = dynamic_cast<MoveJog*>(motion.get())) {
+     const Result rc = jog->FeedJog(direction, speed);
+     if (rc == Result::NoError) return rc;
+   }
+
+   // ── 分支 2：其他 motion 正在运行 → 拒绝 ──
+   if (motion && IsRunning()) return Result::ConflictTaskRunning;
+
+   // ── 分支 3：全新启动 ──
+   data_ready_callback_ = [this, direction, speed, timeout,
+                           dir_threshold]() -> Result {
+     auto new_jog = std::make_unique<MoveJog>(
+         /*dt=*/0.001, timeout, model.get(), dir_threshold);
+
+     const int n = getJointNum();
+     JntArray q_current(static_cast<unsigned int>(n));
+     for (int i = 0; i < n; ++i) q_current(i) = getJointPosition(i);
+     new_jog->setInitialPosition(q_current);
+     Result rc = new_jog->Reset();
+     if (rc != Result::NoError) return rc;
+
+     rc = new_jog->FeedJog(direction, speed);
+     if (rc != Result::NoError) return rc;
+
+     motion = std::move(new_jog);
+     if (executor) {
+       executor->SwitchMotion(motion.get());
+       return Result::NoError;
+     }
+     log_ptr_->error("executor is nullptr");
+     return Result::Fatal;
+   };
+
+   if (!impl_->process_event(EventStartReq{})) {
+     if (impl_->is(sml::state<class IDLE>)) return Result::NotEnabled;
+     if (impl_->is(sml::state<class ERROR_STATE>)) return Result::Fatal;
+     return Result::ConflictTaskRunning;
+   }
+   return Result::NoError;
+ }
 
 // ============================================================================
 // MoveNullJogging — 零空间点动（伪逆投影法）

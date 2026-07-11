@@ -23,6 +23,7 @@
 #include <thread>
 #include <vector>
 #include <functional>
+#include <atomic>
 
 #include "types.hpp"
 #include "result.hpp"
@@ -73,6 +74,9 @@ class Robot {
   //！ \brief 获取机器人当前是否正在运动
   [[nodiscard]] bool IsRunning() const;
 
+  /// @brief 是否处于需要控制循环的状态（RUNNING/PAUSING/PAUSED/RESUMING/STOPPING）
+  [[nodiscard]] bool IsControlActive() const;
+
   /// @brief 控制循环主函数，每周期调用 (1000Hz)
   void RunCycle();
 
@@ -104,7 +108,9 @@ class Robot {
                const Frame& pose_goal,
                double v_limit = 1.0, double a_limit = 2.0, double j_limit = 10.0);
 
-
+  Result PauseMotion();
+  Result StopMotion();  
+  Result ResumeMotion();
 
 
 
@@ -142,29 +148,67 @@ class Robot {
 
   // inline void setJointMode(int id, ModeOfOperation mode) { }
 
-  inline int getJointNum() const { }
+  inline int getJointNum() const {
+    return hardware ? static_cast<int>(hardware->GetPosition().rows()) : 0;
+  }
 
-  inline std::string getJointName(int id) {  }
+  inline std::string getJointName(int id) {
+    return hardware ? hardware->getJointName(id) : "";
+  }
 
-  inline int getJointStatus(int id) { }
+  inline int getJointStatus(int id) { return 0; }
 
   ///////////////////用户单位信息///////////////////////
-  inline double getJointPosition(int id) { }
+  inline double getJointPosition(int id) {
+    if (!hardware || id < 0) return 0.0;
+    auto q = hardware->GetPosition();
+    return static_cast<unsigned int>(id) < q.rows() ? q(id) : 0.0;
+  }
 
-  inline double getJointVelocity(int id) { }
+  inline double getJointVelocity(int id) {
+    if (!hardware || id < 0) return 0.0;
+    auto q_dot = hardware->GetVelocity();
+    return static_cast<unsigned int>(id) < q_dot.rows() ? q_dot(id) : 0.0;
+  }
 
-  inline double getJointTorque(int id) { }
+  inline double getJointTorque(int id) {
+    if (!hardware || id < 0) return 0.0;
+    auto tau = hardware->GetTorque();
+    return static_cast<unsigned int>(id) < tau.rows() ? tau(id) : 0.0;
+  }
 
-  inline double getJointLoadTorque(int id) { }
+  inline double getJointLoadTorque(int id) {
+    if (!hardware || id < 0) return 0.0;
+    auto tau_load = hardware->GetLoadTorque();
+    return static_cast<unsigned int>(id) < tau_load.rows() ? tau_load(id) : 0.0;
+  }
   // 获取滤波后的数据
-  inline double getJointTorqueFilter(int id) { }
-  inline double getJointSecondaryPositionInCnt(int id) { }
+  inline double getJointTorqueFilter(int id) { return getJointLoadTorque(id); }
+  inline double getJointSecondaryPositionInCnt(int id) { return 0.0; }
 
-  inline void setJointPosition(int id, double pos) { }
+  inline void setJointPosition(int id, double pos) {
+    if (!hardware || id < 0) return;
+    auto q = hardware->GetPosition();
+    if (static_cast<unsigned int>(id) >= q.rows()) return;
+    q(id) = pos;
+    hardware->SetPosition(q);
+  }
 
-  inline void setJointVelocity(int id, double vel) { }
+  inline void setJointVelocity(int id, double vel) {
+    if (!hardware || id < 0) return;
+    auto q_dot = hardware->GetVelocity();
+    if (static_cast<unsigned int>(id) >= q_dot.rows()) return;
+    q_dot(id) = vel;
+    hardware->SetVelocity(q_dot);
+  }
 
-  inline void setJointTorque(int id, double tor) { }
+  inline void setJointTorque(int id, double tor) {
+    if (!hardware || id < 0) return;
+    auto tau = hardware->GetTorque();
+    if (static_cast<unsigned int>(id) >= tau.rows()) return;
+    tau(id) = tor;
+    hardware->SetTorque(tau);
+  }
 
   inline Frame getFlange() { return Frame();}
 
@@ -190,6 +234,7 @@ class Robot {
 
   void controlLoop();                        // 控制线程函数
   std::thread control_thread_;               // 控制线程句柄
+  std::atomic<bool> control_thread_active_{false};
   std::mutex mtx_;
   std::map<std::string, Frame> tool_frames_;
 

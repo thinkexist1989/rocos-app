@@ -82,6 +82,7 @@ public:
 
     // ========== HardwareInterface ==========
     bool Reset() override { return true; }
+    void WaitForSignal() override {}
 };
 
 /// @brief FakeModel: 实现 ModelInterface，IK 将种子直接作为输出返回（透传），

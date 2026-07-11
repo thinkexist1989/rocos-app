@@ -32,5 +32,7 @@ class HardwareInterface : public DriveInterface,
 
   virtual bool Reset() = 0;
 
+  virtual void WaitForSignal() = 0;
+
 };
 }  // namespace rocos

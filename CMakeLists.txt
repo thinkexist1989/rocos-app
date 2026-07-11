@@ -310,6 +310,13 @@ target_link_libraries(hardware_enable_test
         )
 # 注意：本测试依赖真实 EtherCAT 硬件，仅在连接机械臂时手动运行
 # 使用方法: ./build/bin/hardware_enable_test [ecat_id] [config_path]
+add_executable(robot_movej_integration_test test/robot_movej_integration_test.cc)
+target_link_libraries(robot_movej_integration_test
+        PRIVATE
+        robot
+        )
+# 注意：本测试依赖真实 Robot/Hardware/EtherCAT，仅手动运行，不加入 ctest
+# 使用方法: ./build/bin/robot_movej_integration_test [delta_rad] [joint_index] [timeout_s]
 # ---- 模式切换测试（CSP ↔ CST）--------------------------------------------
 add_executable(mode_switch_test test/mode_switch_test.cc)
 target_link_libraries(mode_switch_test

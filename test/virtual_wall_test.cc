@@ -77,6 +77,7 @@ public:
     void SetAnalogOutput(int, int, double) override {}
 
     bool Reset() override { return true; }
+    void WaitForSignal() override {}
 };
 
 /// @brief FakeFKModel: FK 将前 3 个关节直映射为 XYZ

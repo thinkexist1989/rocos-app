@@ -80,6 +80,7 @@ public:
 
     // HardwareInterface
     bool Reset() override { return true; }
+    void WaitForSignal() override {}
 };
 
 /// @brief FakeModel: IK 透传种子; ID 返回预设重力力矩

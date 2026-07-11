@@ -181,7 +181,7 @@ public:
     bool Reset() override;
 
     /// @brief 等待 EtherCAT 周期同步信号（阻塞直至下一 PDO 交换完成，运动控制用）
-    void WaitForSignal();
+    void WaitForSignal() override;
 
     // ========== DriveInterface 接口实现 ==========
     JntArray GetPosition() override;

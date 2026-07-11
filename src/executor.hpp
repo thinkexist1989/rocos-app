@@ -46,6 +46,27 @@ namespace rocos {
         bool SwitchHardware(HardwareInterface *new_hardware);
 
         bool SwitchMotion(MotionInterface *new_motion);
+        inline Result Stop(){
+            if (motion_)
+            {Result rc =motion_->Stop();
+                return rc;}
+            else
+                return Result::Fatal;
+        }
+        inline Result Resume(){
+            if (motion_)
+            {Result rc =motion_->Resume();
+                return rc;}
+            else
+                return Result::Fatal;
+        }
+        inline Result Pause(){
+            if (motion_)
+            {Result rc =motion_->Pause();
+                return rc;}
+            else
+                return Result::Fatal;
+        }
 
     private:
         //TODO: 之所以保存接口的裸指针，是因为Executor只是拼装作用，不管理指针的生命周期

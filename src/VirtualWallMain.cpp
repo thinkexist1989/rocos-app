@@ -86,6 +86,7 @@ public:
     double GetAnalogInput(int, int) override { return 0; }
     void SetAnalogOutput(int, int, double) override {}
     bool Reset() override { return true; }
+    void WaitForSignal() override {}
 };
 
 /// FK: 前3关节 → TCP(x,y,z) 直接映射

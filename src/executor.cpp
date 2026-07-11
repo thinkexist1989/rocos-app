@@ -64,7 +64,9 @@ Result Executor::Update() {
   if (static_cast<int>(res) < 0) return res;
 
   // ③ 下发硬件
-  controller_->UpdateCmd(q_cmd);
+  res = controller_->UpdateCmd(q_cmd);
+if (static_cast<int>(res) < 0) return res;
+
 
   profiler_->MeasureEnd(kExecutorMeasurement);
   profiler_->MeasureStart(kCycleMeasurement);
@@ -78,6 +80,7 @@ bool Executor::SwitchController(ControllerInterface* new_contorller) {
     controller_->Reset();
 
   controller_ = new_contorller;
+  return true;
 
 }
 
@@ -88,6 +91,7 @@ bool Executor::SwitchHardware(HardwareInterface* new_hardware) {
         hardware_->Reset(); //对之前的hardware指针进行重置
 
   hardware_ = new_hardware;
+  return true;
 }
 
 bool Executor::SwitchMotion(MotionInterface* new_motion) {
@@ -98,6 +102,7 @@ bool Executor::SwitchMotion(MotionInterface* new_motion) {
 
 
   motion_ = new_motion;
+  return true;
 }
 
 }  // namespace rocos
