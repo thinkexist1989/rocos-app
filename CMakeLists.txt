@@ -146,6 +146,8 @@ add_library(robot
         src/move_line.cpp
         src/move_circle.cpp
         src/move_jog.cpp
+        src/move_null_jog.cpp
+        src/move_svd_jog.cpp
 
         src/position_controller.cpp
         src/joint_impedance_controller.cpp

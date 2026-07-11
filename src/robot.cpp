@@ -632,12 +632,13 @@ Result Robot::MoveJogging(const JogVec& direction, double speed,
         JntArray q_current(static_cast<unsigned int>(n));
         for (int i = 0; i < n; ++i) q_current(i) = getJointPosition(i);
         new_jog->setInitialPosition(q_current);
-
-        Result rc = new_jog->FeedJog(direction, speed);
+        Result rc = new_jog->Reset();
+        if (rc != Result::NoError) return rc;
+        
+        rc = new_jog->FeedJog(direction, speed);
         if (rc != Result::NoError) return rc;
 
-        rc = new_jog->Reset();
-        if (rc != Result::NoError) return rc;
+        
 
         motion = std::move(new_jog);
         if (executor) { executor->SwitchMotion(motion.get()); return Result::NoError; }
