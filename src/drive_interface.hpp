@@ -41,6 +41,8 @@ class DriveInterface {
   virtual void SetEnabled() = 0;
   virtual void SetDisabled() = 0;
 
+  virtual JntState GetState() = 0; //TODO: 现在缺Drive状态反馈，只要有一个关节Error，就返回Error，只要有一个Disable就返回Disabled，全部Enabled
+
   /////////////单独设置/获取每个关节/////////////////
   virtual double GetJointPosition(int32_t id) = 0;
   virtual double GetJointVelocity(int32_t id) = 0;
@@ -55,6 +57,8 @@ class DriveInterface {
 
   virtual void SetJointEnabled(int32_t id) = 0;
   virtual void SetJointDisabled(int32_t id) = 0;
+
+  virtual JntState GetJointState(int32_t id) = 0;
 
   virtual std::string getJointName(int32_t id) = 0;
 };

@@ -139,11 +139,11 @@ struct StateMachine {
         state<class STOPPING> + event<EventStopped> = state<class STOPPED>, 
         state<class STOPPING> + event<EventSuccessed> = state<class STOPPED>,    //   STOPPING->STOPPED
 
-        state<class PAUSING> + sml::on_entry<_> / action_pause,  
+        state<class PAUSING> + sml::on_entry<_> / action_pause,                 // 10 PAUSING->RESUMING
         // TODO                这个地方应该是success
         state<class PAUSING> + event<EventStopped> = state<class PAUSED>, 
-        state<class PAUSING> + event<EventPauseFailed> = state<class RUNNING>,
-        state<class PAUSING> + event<EventSuccessed> = state<class PAUSED>,     // 10 PAUSING->RESUMING 
+        state<class PAUSING> + event<EventPauseFailed> = state<class RUNNING>,  //TODO：暂停失败退回RUNNING是否合适？
+        state<class PAUSING> + event<EventSuccessed> = state<class PAUSED>,     //TODO: 为什么需要Successed
              //   PAUSING->PAUSED
 
         state<class RESUMING> + sml::on_entry<_> / action_resume,               // 11 RESUMING
@@ -378,12 +378,13 @@ void Robot::on_fsm_servo() {
 Robot::Robot() : impl_(std::make_unique<Impl>(*this)) {
   log_ptr_ = Logger::getInstance("Robot");
 
-  hardware = std::make_unique<Hardware>("hardware_talon_config.yaml", 0);
-  model= std::make_unique<Model>("robot.urdf", "base_link", "link_7");
-  controller = std::make_unique<PositionController>();
+  hardware = std::make_unique<Hardware>("hardware_talon_config.yaml", 0);   //TODO: 初始化Hardware指针，后续路径需要从配置文件加载
+  model= std::make_unique<Model>("robot.urdf", "base_link", "link_7"); //TODO：初始化Model指针，后续路径需要从配置文件加载
+  controller = std::make_unique<PositionController>();  //TODO： 默认加载位置控制器
   
 
-  Result rc = controller->SetHardware(hardware.get());
+  Result rc = controller->SetHardware(hardware.get());   //TODO：控制器需要传入硬件指针，可以考虑初始化时导入
+
   if (rc != Result::NoError) {
     throw std::runtime_error("PositionController SetHardware failed");
   }

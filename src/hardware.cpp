@@ -450,6 +450,20 @@ void Hardware::SetDisabled() {
     }
 }
 
+JntState Hardware::GetState() {
+    JntState state = JntState::ENABLED;
+    for (const auto& drive : config_.drives) {
+        const JntState joint_state = GetJointState(drive.id);
+        if (joint_state == JntState::ERROR) {
+            return JntState::ERROR;
+        }
+        if (joint_state == JntState::DISABLED) {
+            state = JntState::DISABLED;
+        }
+    }
+    return state;
+}
+
 // ==========================================================================
 // DriveInterface — 单关节操作（使用缓存 PDO 指针，无字符串查找）
 // ==========================================================================
@@ -532,6 +546,31 @@ void Hardware::SetJointMode(int32_t id, int8_t mode) {
     const auto& cache = drive_pdo_cache_[static_cast<size_t>(idx)];
     if (cache.mode_of_operation == nullptr) return;
     *cache.mode_of_operation = mode;
+}
+
+JntState Hardware::GetJointState(int32_t id) {
+    const auto idx = getDriveIdx(id);
+    if (idx < 0) {
+        return JntState::ERROR;
+    }
+
+    const auto& cache = drive_pdo_cache_[static_cast<size_t>(idx)];
+    if (cache.status_word == nullptr) {
+        return JntState::ERROR;
+    }
+
+    Statusword statusword;
+    statusword.setFromRawStatusword(*cache.status_word);
+    switch (statusword.getDriveState()) {
+        case DriveState::OperationEnabled:
+            return JntState::ENABLED;
+        case DriveState::FaultReactionActive:
+        case DriveState::Fault:
+        case DriveState::NA:
+            return JntState::ERROR;
+        default:
+            return JntState::DISABLED;
+    }
 }
 
 // ==========================================================================

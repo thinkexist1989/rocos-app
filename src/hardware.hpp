@@ -194,6 +194,8 @@ public:
     void SetMode(int8_t mode) override;
     void SetEnabled() override;
     void SetDisabled() override;
+    JntState GetState() override;
+
     double GetJointPosition(int32_t id) override;
     double GetJointVelocity(int32_t id) override;
     double GetJointTorque(int32_t id) override;
@@ -205,6 +207,8 @@ public:
     void SetJointEnabled(int32_t id) override;
     void SetJointDisabled(int32_t id) override;
     std::string getJointName(int32_t id) override;
+
+    JntState GetJointState(int32_t id) override;
 
     // ========== FTSensorInterface 接口实现 ==========
     Wrench GetWrench() override;

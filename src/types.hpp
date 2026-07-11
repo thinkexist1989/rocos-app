@@ -33,6 +33,12 @@
 #include <variant>
 
 namespace rocos {
+  enum class JntState : uint8_t {
+    DISABLED,
+    ENABLED,
+    ERROR
+  };
+
 
   using Vector = KDL::Vector;
   using Jacobian = KDL::Jacobian;
