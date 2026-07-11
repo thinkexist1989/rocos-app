@@ -21,6 +21,7 @@
 #include <map>
 #include <string>
 #include <thread>
+#include <functional>
 
 #include "types.hpp"
 #include "result.hpp"
@@ -190,6 +191,8 @@ class Robot {
   std::unique_ptr<Impl> impl_;
 
   Logger::logger_ptr log_ptr_ = nullptr;
+
+  std::function<Result> data_ready_callback_ = nullptr;  // 数据准备好回调函数（由硬件线程调用）
 
   //////////FSM Related function (INTERNAL) ///////////////
  public:

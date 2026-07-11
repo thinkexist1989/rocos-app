@@ -428,8 +428,13 @@ void Robot::RunCycle() {
 
 Result Robot::MoveJ(const JntArray& q_goal,
                     double v_limit, double a_limit, double j_limit) {
-    if (!IsEnabled())   return Result::NotEnabled;
-    if (motion && IsRunning()) return Result::ConflictTaskRunning;
+    // if (!IsEnabled())   return Result::NotEnabled;
+    // if (motion && IsRunning()) return Result::ConflictTaskRunning;
+
+    // data_ready_callback_ = [this]() -> Result {
+    //     if (executor) executor->Update();
+    //     return Result::NoError;
+    // };
 
     const int n = getJointNum();
     JntArray q_start(static_cast<unsigned int>(n));
@@ -448,7 +453,21 @@ Result Robot::MoveJ(const JntArray& q_goal,
     motion = std::move(new_motion);
     if (executor) executor->SwitchMotion(motion.get());
 
-    impl_->process_event(EventStartReq{});   // STOPPED → RUNNING
+    if(impl_->process_event(EventStartReq{})) {   // STOPPED → RUNNING
+    }
+    else {
+      if(impl_->is(sml::state<class IDLE>)) {
+        log_ptr_->error("机器人处于IDLE状态，无法执行MoveJ指令，请先上使能");
+      }
+      else if(impl_->is(sml::state<class ERROR_STATE>)) {
+        log_ptr_->error("机器人处于ERROR_STATE状态，无法执行MoveJ指令，请先复位");
+      }
+      else {
+        log_ptr_->error("机器人当前状态无法执行MoveJ指令");
+      }
+
+    }
+
     return Result::NoError;
 }
 
