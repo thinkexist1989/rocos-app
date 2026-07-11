@@ -21,6 +21,7 @@
 #include <map>
 #include <string>
 #include <thread>
+#include <vector>
 #include <functional>
 
 #include "types.hpp"
@@ -77,6 +78,12 @@ class Robot {
 
   Result MoveJogging(const JogVec& direction, double speed,
                        double timeout = 0.1, double dir_threshold = 0.99);
+
+  Result MoveNullJogging(const JntArray& intent_direction, double speed,
+                           double timeout = 0.1, double dir_threshold = 0.99);
+
+  Result MoveSvdJogging(const std::vector<double>& dim_speeds,
+                          double timeout = 0.1, double dir_threshold = 0.99);
 
   Result MoveJ(const JntArray& q_goal,
                double v_limit = 1.0, double a_limit = 2.0, double j_limit = 10.0);

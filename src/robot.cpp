@@ -28,6 +28,8 @@
 #include "move_line.hpp"
 #include "move_circle.hpp"
 #include "move_jog.hpp"
+#include "move_null_jog.hpp"
+#include "move_svd_jog.hpp"
 
 #include "position_controller.hpp"
 #include "joint_impedance_controller.hpp"
@@ -639,6 +641,99 @@ Result Robot::MoveJogging(const JogVec& direction, double speed,
         if (rc != Result::NoError) return rc;
 
         
+
+        motion = std::move(new_jog);
+        if (executor) { executor->SwitchMotion(motion.get()); return Result::NoError; }
+        log_ptr_->error("executor is nullptr");
+        return Result::Fatal;
+    };
+
+    if (!impl_->process_event(EventStartReq{})) {
+        if (impl_->is(sml::state<class IDLE>))  return Result::NotEnabled;
+        if (impl_->is(sml::state<class ERROR_STATE>)) return Result::Fatal;
+        return Result::ConflictTaskRunning;
+    }
+    return Result::NoError;
+}
+
+// ============================================================================
+// MoveNullJogging — 零空间点动（伪逆投影法）
+// ============================================================================
+
+Result Robot::MoveNullJogging(const JntArray& intent_direction, double speed,
+                          double timeout, double dir_threshold) {
+
+    // ── 分支 1：已有活跃 MoveNullJog → 旁路喂饭 ──
+    if (auto* jog = dynamic_cast<MoveNullJog*>(motion.get())) {
+        const Result rc = jog->FeedNullJog(intent_direction, speed);
+        if (rc == Result::NoError) return rc;
+    }
+
+    // ── 分支 2：其他 motion 正在运行 → 拒绝 ──
+    if (motion && IsRunning()) return Result::ConflictTaskRunning;
+
+    // ── 分支 3：全新启动 ──
+    data_ready_callback_ = [this, intent_direction, speed, timeout, dir_threshold]() -> Result {
+        auto new_jog = std::make_unique<MoveNullJog>(
+            /*dt=*/0.001, timeout, model.get(), dir_threshold);
+
+        const int n = getJointNum();
+        JntArray q_current(static_cast<unsigned int>(n));
+        for (int i = 0; i < n; ++i) q_current(i) = getJointPosition(i);
+        new_jog->setInitialPosition(q_current);
+
+        Result rc = new_jog->Reset();
+        if (rc != Result::NoError) return rc;
+
+        rc = new_jog->FeedNullJog(intent_direction, speed);
+        if (rc != Result::NoError) return rc;
+
+        motion = std::move(new_jog);
+        if (executor) { executor->SwitchMotion(motion.get()); return Result::NoError; }
+        log_ptr_->error("executor is nullptr");
+        return Result::Fatal;
+    };
+
+    if (!impl_->process_event(EventStartReq{})) {
+        if (impl_->is(sml::state<class IDLE>))  return Result::NotEnabled;
+        if (impl_->is(sml::state<class ERROR_STATE>)) return Result::Fatal;
+        return Result::ConflictTaskRunning;
+    }
+    return Result::NoError;
+}
+
+// ============================================================================
+// MoveSvdJogging — 零空间点动（SVD 基向量法）
+// ============================================================================
+// ============================================================================
+
+Result Robot::MoveSvdJogging(const std::vector<double>& dim_speeds,
+                          double timeout, double dir_threshold) {
+
+    // ── 分支 1：已有活跃 MoveSvdJog → 旁路喂饭 ──
+    if (auto* jog = dynamic_cast<MoveSvdJog*>(motion.get())) {
+        const Result rc = jog->FeedSvdJog(dim_speeds);
+        if (rc == Result::NoError) return rc;
+    }
+
+    // ── 分支 2：其他 motion 正在运行 → 拒绝 ──
+    if (motion && IsRunning()) return Result::ConflictTaskRunning;
+
+    // ── 分支 3：全新启动 ──
+    data_ready_callback_ = [this, dim_speeds, timeout, dir_threshold]() -> Result {
+        auto new_jog = std::make_unique<MoveSvdJog>(
+            /*dt=*/0.001, timeout, model.get(), dir_threshold);
+
+        const int n = getJointNum();
+        JntArray q_current(static_cast<unsigned int>(n));
+        for (int i = 0; i < n; ++i) q_current(i) = getJointPosition(i);
+        new_jog->setInitialPosition(q_current);
+
+        Result rc = new_jog->Reset();
+        if (rc != Result::NoError) return rc;
+
+        rc = new_jog->FeedSvdJog(dim_speeds);
+        if (rc != Result::NoError) return rc;
 
         motion = std::move(new_jog);
         if (executor) { executor->SwitchMotion(motion.get()); return Result::NoError; }
