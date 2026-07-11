@@ -62,6 +62,7 @@ struct EventStopped       {}; // 机器人已停止事件
 struct EventEnabled       {}; // 机器人已上使能事件
 struct EventDisabled      {}; // 机器人已下使能事件
 struct EventErrorOccurred {}; // 发生错误
+struct EventStartFailedReq {}; // 启动失败请求
 
 // 指令事件定义
 struct EventEnableReq  {}; // 上使能请求
@@ -123,7 +124,8 @@ struct StateMachine {
 
 
         state<class STARTING> + sml::on_entry<_> / action_start,                // 8 STARTING
-        state<class STARTING> + event<EventAtTarget> = state<class STOPPED>,    //   STARTING->STOPPED
+        state<class STARTING> + event<EventAtTarget> = state<class STOPPED>,
+        state<class STARTING> + event<EventStartFailedReq> = state<class STOPPED>,
         state<class STARTING> + event<EventRunning> = state<class RUNNING>,     //   STARTING->RUNNING
 
         state<class STOPPING> + sml::on_entry<_> / action_stop,                 // 9 STOPPING
@@ -218,12 +220,28 @@ void Robot::on_fsm_disable() {
   }
 }
 void Robot::on_fsm_start() {
-  // STARTING 进入：运动线程已由 MoveJ/MoveL 等在调用线程启动，
+ 
   // 此处确认启动成功并转入 RUNNING。
+  auto rc =data_ready_callback_();
+  if (rc != Result::NoError) {
+    
+    if(rc== Result::PlanFinished)
+      {
+      log_ptr_->info("机器人已在目标位置，无需运动");
+      impl_->process_event(EventAtTarget{});
+      return;
+      }
 
+    log_ptr_->error("机器人启动失败，退回Stopped状态");
+    impl_->process_event(EventStartFailedReq{});
+    
+      
+    return;
+  }
+  impl_->process_event(EventRunning{});
   control_thread_ = std::thread(&Robot::controlLoop, this);
 
-  impl_->process_event(EventRunning{});
+  
 }
 void Robot::on_fsm_run() {
   log_ptr_->info("Robot is running.");
@@ -431,42 +449,47 @@ Result Robot::MoveJ(const JntArray& q_goal,
     // if (!IsEnabled())   return Result::NotEnabled;
     // if (motion && IsRunning()) return Result::ConflictTaskRunning;
 
-    // data_ready_callback_ = [this]() -> Result {
-    //     if (executor) executor->Update();
-    //     return Result::NoError;
-    // };
-
-    const int n = getJointNum();
+    data_ready_callback_= [this, q_goal, v_limit, a_limit, j_limit]() -> Result {
+        const int n = getJointNum();
     JntArray q_start(static_cast<unsigned int>(n));
     for (int i = 0; i < n; ++i) q_start(i) = getJointPosition(i);
 
     auto new_motion = std::make_unique<MoveJoint>(
         q_start, q_goal, v_limit, a_limit, j_limit, /*dt=*/0.001);
 
-    Result rc = new_motion->support();
-    if (rc != Result::NoError) return rc;   // 参数非法，直接退出
-
-    rc = new_motion->Reset();
-    if (rc == Result::PlanFinished) return rc;   // 已在目标，无需运动
+    
+    Result rc = new_motion->Reset();
     if (rc != Result::NoError) return rc;
 
     motion = std::move(new_motion);
-    if (executor) executor->SwitchMotion(motion.get());
-
-    if(impl_->process_event(EventStartReq{})) {   // STOPPED → RUNNING
+    if (executor) 
+    {executor->SwitchMotion(motion.get());
+    return Result::NoError; 
+    }
+    else{
+      log_ptr_->error("executor is nullptr, cannot switch motion");
+      return Result::Fatal;
+    }
+    };
+    if(impl_->process_event(EventStartReq{})) { 
+        // STOPPED → RUNNING
     }
     else {
       if(impl_->is(sml::state<class IDLE>)) {
         log_ptr_->error("机器人处于IDLE状态，无法执行MoveJ指令，请先上使能");
+        return Result::NotEnabled;
       }
       else if(impl_->is(sml::state<class ERROR_STATE>)) {
         log_ptr_->error("机器人处于ERROR_STATE状态，无法执行MoveJ指令，请先复位");
+        return Result::Fatal;
       }
       else {
         log_ptr_->error("机器人当前状态无法执行MoveJ指令");
+        return Result::ConflictTaskRunning;
       }
 
     }
+    
 
     return Result::NoError;
 }
@@ -478,43 +501,39 @@ Result Robot::MoveJ(const JntArray& q_goal,
 Result Robot::MoveL(const Frame& pose_goal,
                     const std::string& tool_name,
                     double v_limit, double a_limit, double j_limit) {
-    if (!IsEnabled())   return Result::NotEnabled;
-    if (motion && IsRunning()) return Result::ConflictTaskRunning;
 
-    // 获取当前法兰位姿
-    const int n = getJointNum();
-    JntArray q_current(static_cast<unsigned int>(n));
-    for (int i = 0; i < n; ++i) q_current(i) = getJointPosition(i);
+    data_ready_callback_ = [this, pose_goal, tool_name, v_limit, a_limit, j_limit]() -> Result {
+        const int n = getJointNum();
+        JntArray q_current(static_cast<unsigned int>(n));
+        for (int i = 0; i < n; ++i) q_current(i) = getJointPosition(i);
 
-    Frame pose_flange;
-    if (model) model->ForwardKinematics(q_current, pose_flange);
+        Frame pose_flange;
+        if (model) model->ForwardKinematics(q_current, pose_flange);
 
-    // 查找工具坐标系，默认单位阵
-    Frame T_tool;
-    if (!tool_name.empty()) {
-        auto it = tool_frames_.find(tool_name);
-        if (it != tool_frames_.end()) T_tool = it->second;
+        Frame T_tool;
+        if (!tool_name.empty()) {
+            auto it = tool_frames_.find(tool_name);
+            if (it != tool_frames_.end()) T_tool = it->second;
+        }
+
+        auto new_motion = std::make_unique<MoveLine>(
+            pose_flange, pose_goal * T_tool.Inverse(),
+            v_limit, a_limit, j_limit, /*dt=*/0.001, model.get());
+
+        Result rc = new_motion->Reset();
+        if (rc != Result::NoError) return rc;
+
+        motion = std::move(new_motion);
+        if (executor) { executor->SwitchMotion(motion.get()); return Result::NoError; }
+        log_ptr_->error("executor is nullptr");
+        return Result::Fatal;
+    };
+
+    if (!impl_->process_event(EventStartReq{})) {
+        if (impl_->is(sml::state<class IDLE>))  return Result::NotEnabled;
+        if (impl_->is(sml::state<class ERROR_STATE>)) return Result::Fatal;
+        return Result::ConflictTaskRunning;
     }
-
-    // 法兰系下的起止位姿
-    const Frame pose_start_flange = pose_flange;
-    const Frame pose_goal_flange  = pose_goal * T_tool.Inverse();
-
-    auto new_motion = std::make_unique<MoveLine>(
-        pose_start_flange, pose_goal_flange,
-        v_limit, a_limit, j_limit, /*dt=*/0.001, model.get());
-
-    Result rc = new_motion->support();
-    if (rc != Result::NoError) return rc;
-
-    rc = new_motion->Reset();
-    if (rc == Result::PlanFinished) return rc;   // 已在目标，无需运动
-    if (rc != Result::NoError) return rc;
-
-    motion = std::move(new_motion);
-    if (executor) executor->SwitchMotion(motion.get());
-
-    impl_->process_event(EventStartReq{});   // STOPPED → RUNNING
     return Result::NoError;
 }
 
@@ -533,24 +552,25 @@ Frame Robot::GetToolFrame(const std::string& name) const {
 
 Result Robot::MoveC(const Frame& pose_start, const Frame& center_frame,
                     double theta, double v_limit, double a_limit, double j_limit) {
-    if (!IsEnabled())   return Result::NotEnabled;
-    if (motion && IsRunning()) return Result::ConflictTaskRunning;
 
-    auto new_motion = std::make_unique<MoveCircle>(
-        pose_start, center_frame, theta, v_limit, a_limit, j_limit, /*dt=*/0.001,
-        model.get());
+    data_ready_callback_ = [this, pose_start, center_frame, theta, v_limit, a_limit, j_limit]() -> Result {
+        auto new_motion = std::make_unique<MoveCircle>(
+            pose_start, center_frame, theta, v_limit, a_limit, j_limit, /*dt=*/0.001, model.get());
 
-    Result rc = new_motion->support();
-    if (rc != Result::NoError) return rc;
+        Result rc = new_motion->Reset();
+        if (rc != Result::NoError) return rc;
 
-    rc = new_motion->Reset();
-    if (rc == Result::PlanFinished) return rc;   // 已在目标，无需运动
-    if (rc != Result::NoError) return rc;
+        motion = std::move(new_motion);
+        if (executor) { executor->SwitchMotion(motion.get()); return Result::NoError; }
+        log_ptr_->error("executor is nullptr");
+        return Result::Fatal;
+    };
 
-    motion = std::move(new_motion);
-    if (executor) executor->SwitchMotion(motion.get());
-
-    impl_->process_event(EventStartReq{});   // STOPPED → RUNNING
+    if (!impl_->process_event(EventStartReq{})) {
+        if (impl_->is(sml::state<class IDLE>))  return Result::NotEnabled;
+        if (impl_->is(sml::state<class ERROR_STATE>)) return Result::Fatal;
+        return Result::ConflictTaskRunning;
+    }
     return Result::NoError;
 }
 
@@ -560,25 +580,26 @@ Result Robot::MoveC(const Frame& pose_start, const Frame& center_frame,
 
 Result Robot::MoveC(const Frame& pose_start, const Frame& pose_via,
                     const Frame& pose_goal,
-                               double v_limit, double a_limit, double j_limit) {
-    if (!IsEnabled())   return Result::NotEnabled;
-    if (motion && IsRunning()) return Result::ConflictTaskRunning;
+                    double v_limit, double a_limit, double j_limit) {
 
-    auto new_motion = std::make_unique<MoveCircle>(
-        pose_start, pose_via, pose_goal, v_limit, a_limit, j_limit, /*dt=*/0.001,
-        model.get());
+    data_ready_callback_ = [this, pose_start, pose_via, pose_goal, v_limit, a_limit, j_limit]() -> Result {
+        auto new_motion = std::make_unique<MoveCircle>(
+            pose_start, pose_via, pose_goal, v_limit, a_limit, j_limit, /*dt=*/0.001, model.get());
 
-    Result rc = new_motion->support();
-    if (rc != Result::NoError) return rc;
+        Result rc = new_motion->Reset();
+        if (rc != Result::NoError) return rc;
 
-    rc = new_motion->Reset();
-    if (rc == Result::PlanFinished) return rc;   // 已在目标，无需运动
-    if (rc != Result::NoError) return rc;
+        motion = std::move(new_motion);
+        if (executor) { executor->SwitchMotion(motion.get()); return Result::NoError; }
+        log_ptr_->error("executor is nullptr");
+        return Result::Fatal;
+    };
 
-    motion = std::move(new_motion);
-    if (executor) executor->SwitchMotion(motion.get());
-
-    impl_->process_event(EventStartReq{});   // STOPPED → RUNNING
+    if (!impl_->process_event(EventStartReq{})) {
+        if (impl_->is(sml::state<class IDLE>))  return Result::NotEnabled;
+        if (impl_->is(sml::state<class ERROR_STATE>)) return Result::Fatal;
+        return Result::ConflictTaskRunning;
+    }
     return Result::NoError;
 }
 
@@ -592,41 +613,43 @@ Result Robot::MoveC(const Frame& pose_start, const Frame& pose_via,
 // ============================================================================
 Result Robot::MoveJogging(const JogVec& direction, double speed,
                           double timeout, double dir_threshold) {
-    if (!IsEnabled()) return Result::NotEnabled;
 
     // ── 分支 1：已有活跃 MoveJog → 旁路喂饭 ──
     if (auto* jog = dynamic_cast<MoveJog*>(motion.get())) {
         const Result rc = jog->FeedJog(direction, speed);
         if (rc == Result::NoError) return rc;
-        // feed 被拒（Decelerating/Stopped/方向突变）→ 落下去走分支 2/3
     }
 
     // ── 分支 2：其他 motion 正在运行 → 拒绝 ──
-    if (motion && IsRunning()) {
-        return Result::ConflictTaskRunning;
-    }
+    if (motion && IsRunning()) return Result::ConflictTaskRunning;
 
     // ── 分支 3：全新启动 ──
-    auto new_jog = std::make_unique<MoveJog>(
-        /*dt=*/0.001, timeout, model.get(), dir_threshold);
+    data_ready_callback_ = [this, direction, speed, timeout, dir_threshold]() -> Result {
+        auto new_jog = std::make_unique<MoveJog>(
+            /*dt=*/0.001, timeout, model.get(), dir_threshold);
 
-    // 获取当前关节位置作为积分起点
-    const int n = getJointNum();
-    JntArray q_current(static_cast<unsigned int>(n));
-    for (int i = 0; i < n; ++i) q_current(i) = getJointPosition(i);
-    new_jog->setInitialPosition(q_current);
+        const int n = getJointNum();
+        JntArray q_current(static_cast<unsigned int>(n));
+        for (int i = 0; i < n; ++i) q_current(i) = getJointPosition(i);
+        new_jog->setInitialPosition(q_current);
 
-    // 喂入初始方向+速度
-    Result rc = new_jog->FeedJog(direction, speed);
-    if (rc != Result::NoError) return rc;
+        Result rc = new_jog->FeedJog(direction, speed);
+        if (rc != Result::NoError) return rc;
 
-    rc = new_jog->Reset();
-    if (rc != Result::NoError) return rc;
+        rc = new_jog->Reset();
+        if (rc != Result::NoError) return rc;
 
-    motion = std::move(new_jog);
-    if (executor) executor->SwitchMotion(motion.get());
+        motion = std::move(new_jog);
+        if (executor) { executor->SwitchMotion(motion.get()); return Result::NoError; }
+        log_ptr_->error("executor is nullptr");
+        return Result::Fatal;
+    };
 
-    impl_->process_event(EventStartReq{});   // STOPPED → RUNNING
+    if (!impl_->process_event(EventStartReq{})) {
+        if (impl_->is(sml::state<class IDLE>))  return Result::NotEnabled;
+        if (impl_->is(sml::state<class ERROR_STATE>)) return Result::Fatal;
+        return Result::ConflictTaskRunning;
+    }
     return Result::NoError;
 }
 

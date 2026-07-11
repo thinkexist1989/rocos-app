@@ -192,7 +192,7 @@ class Robot {
 
   Logger::logger_ptr log_ptr_ = nullptr;
 
-  std::function<Result> data_ready_callback_ = nullptr;  // 数据准备好回调函数（由硬件线程调用）
+  std::function<Result()> data_ready_callback_ = nullptr;
 
   //////////FSM Related function (INTERNAL) ///////////////
  public:
