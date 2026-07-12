@@ -280,23 +280,12 @@ namespace rocos {
 
             return;
         }
-        impl_->process_event(EventRunning{});
-    }
 
-    void Robot::on_fsm_run() {
-        log_ptr_->info("Robot is running.");
 
         if (control_thread_.joinable()) {
-            // if (control_thread_active_.load()) {
-            //   // 控制线程仍在 RUNNING/PAUSING/PAUSED/RESUMING/STOPPING 中维持循环。
-            //   return;
-            // }
+            log_ptr_->info("控制线程已存在，等待其退出");
             control_thread_.join();
         }
-
-        // control_thread_active_.store(true);
-        // control_thread_ = std::thread(&Robot::controlLoop, this);
-
         //TODO: 简化为匿名函数，周期循环调用
         control_thread_ = std::thread([this]() {
             while (IsControlActive()) {
@@ -304,6 +293,24 @@ namespace rocos {
                 waitControlCycle();
             }
         });
+
+
+        impl_->process_event(EventRunning{});
+    }
+
+    void Robot::on_fsm_run() {
+        log_ptr_->info("Robot is running.");
+
+        // if (control_thread_.joinable()) {
+        //     // if (control_thread_active_.load()) {
+        //     //   // 控制线程仍在 RUNNING/PAUSING/PAUSED/RESUMING/STOPPING 中维持循环。
+        //     //   return;
+        //     // }
+        //     control_thread_.join();
+        // }
+
+        // control_thread_active_.store(true);
+        // control_thread_ = std::thread(&Robot::controlLoop, this);
     }
 
     void Robot::on_fsm_stop() {
