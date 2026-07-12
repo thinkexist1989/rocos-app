@@ -78,7 +78,7 @@ MoveNullJog::~MoveNullJog() = default;
 // 参数校验
 // ============================================================================
 
-Result MoveNullJog::support() const {
+Result MoveNullJog::ValidateParameters() const {
     if (!model_) return Result::Fatal;
     if (!std::isfinite(dt_) || dt_ <= 0.0) return Result::ParameterNanOrInf;
     if (!std::isfinite(timeout_) || timeout_ <= 0.0) return Result::ParameterNanOrInf;

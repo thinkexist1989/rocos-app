@@ -232,11 +232,12 @@ class Robot {
 
  private:
 
-  void controlLoop();                        // 控制线程函数
+  // void controlLoop();                        // 控制线程函数
   std::thread control_thread_;               // 控制线程句柄
-  std::atomic<bool> control_thread_active_{false};
+  // std::atomic<bool> control_thread_active_{false};
   std::mutex mtx_;
-  std::map<std::string, Frame> tool_frames_;
+  std::map<std::string, Frame> tool_frames_;   // 保存定义的多个工具坐标系
+  std::map<std::string, Frame> object_frames_; // 保存定义的多个工件坐标系
 
   //// 机器人状态机封装
   struct Impl;

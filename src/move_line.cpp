@@ -70,7 +70,7 @@ MoveLine::~MoveLine() = default;
 // 参数校验
 // ============================================================================
 
-Result MoveLine::support() const {
+Result MoveLine::ValidateParameters() const {
     // 1. dt 合法性
     if (!std::isfinite(dt_) || dt_ <= 0.0) {
         return Result::ParameterNanOrInf;
@@ -158,7 +158,7 @@ Frame MoveLine::interpolatePose(double s) const {
 // ============================================================================
 
 Result MoveLine::Reset() {
-    const Result validation = support();
+    const Result validation = ValidateParameters();
     if (validation != Result::NoError) {
         return validation;
     }

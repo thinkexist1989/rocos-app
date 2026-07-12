@@ -98,7 +98,7 @@ MoveJog::~MoveJog() = default;
 // 参数校验
 // ============================================================================
 
-Result MoveJog::support() const {
+Result MoveJog::ValidateParameters() const {
     if (!std::isfinite(dt_) || dt_ <= 0.0) return Result::ParameterNanOrInf;
     if (!std::isfinite(timeout_) || timeout_ <= 0.0) return Result::ParameterNanOrInf;
     return Result::NoError;

@@ -57,7 +57,7 @@ MoveJoint::~MoveJoint() = default;
 // 参数校验
 // ============================================================================
 
-Result MoveJoint::support() const {
+Result MoveJoint::ValidateParameters() const {
     const auto n = q_start_.rows();
 
     // 1. 维度检查
@@ -130,7 +130,7 @@ bool MoveJoint::computeNormalizedLimits() {
 
 Result MoveJoint::Reset() {
     // 1. 纯参数校验（维度、有限性、正值性）
-    const Result validation = support();
+    const Result validation = ValidateParameters();
     if (validation != Result::NoError) {
         return validation;
     }

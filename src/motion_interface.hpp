@@ -36,10 +36,10 @@ class MotionInterface {
   /// @return NoError=成功启动, PlanFinished=已到位无需运动, <0=错误
   virtual Result Reset() = 0;
 
-  virtual bool supportsPause() const = 0;
-  virtual bool supportsResume() const = 0;
-  virtual bool supportsStop() const = 0;
-  virtual Result support() const = 0;
+  virtual bool CanPause() const = 0;
+  virtual bool CanResume() const = 0;
+  virtual bool CanStop() const = 0;
+  virtual Result ValidateParameters() const = 0;
 
   virtual Result Pause() = 0;
   virtual Result Resume() = 0;

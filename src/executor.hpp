@@ -46,27 +46,52 @@ namespace rocos {
         bool SwitchHardware(HardwareInterface *new_hardware);
 
         bool SwitchMotion(MotionInterface *new_motion);
-        inline Result Stop(){
-            if (motion_)
-            {Result rc =motion_->Stop();
-                return rc;}
-            else
+
+        inline Result Stop() {
+            if (motion_) {
+                Result rc = motion_->Stop();
+                return rc;
+            } else
                 return Result::Fatal;
         }
-        inline Result Resume(){
-            if (motion_)
-            {Result rc =motion_->Resume();
-                return rc;}
-            else
+
+        inline Result Resume() {
+            if (motion_) {
+                Result rc = motion_->Resume();
+                return rc;
+            } else
                 return Result::Fatal;
         }
-        inline Result Pause(){
-            if (motion_)
-            {Result rc =motion_->Pause();
-                return rc;}
-            else
+
+        inline Result Pause() {
+            if (motion_) {
+                Result rc = motion_->Pause();
+                return rc;
+            } else
                 return Result::Fatal;
         }
+
+        inline bool CanPause() const {
+            if (motion_) {
+                return motion_->CanPause();
+            }
+            return false;
+        }
+
+        inline bool CanResume() const {
+            if (motion_) {
+                return motion_->CanResume();
+            }
+            return false;
+        }
+
+        inline bool CanStop() const {
+            if (motion_) {
+                return motion_->CanStop();
+            }
+            return false;
+        }
+
 
     private:
         //TODO: 之所以保存接口的裸指针，是因为Executor只是拼装作用，不管理指针的生命周期
@@ -79,7 +104,7 @@ namespace rocos {
         const int kControllerMeasurement = 1;
         const int kExecutorMeasurement = 3;
         const int kCycleMeasurement = 4;
-        std::unique_ptr<PerformanceProfiler> profiler_ {nullptr};
+        std::unique_ptr<PerformanceProfiler> profiler_{nullptr};
 
         // std::mutex mtx_;
     };

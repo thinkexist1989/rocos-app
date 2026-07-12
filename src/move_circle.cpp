@@ -177,7 +177,7 @@ bool MoveCircle::solveThreePoints(const Frame& start,
 // 参数校验
 // ============================================================================
 
-Result MoveCircle::support() const {
+Result MoveCircle::ValidateParameters() const {
     if (!std::isfinite(dt_) || dt_ <= 0.0) {
         return Result::ParameterNanOrInf;
     }
@@ -250,7 +250,7 @@ Frame MoveCircle::interpolateCircular(double s) const {
 // ============================================================================
 
 Result MoveCircle::Reset() {
-    const Result validation = support();
+    const Result validation = ValidateParameters();
     if (validation != Result::NoError) return validation;
 
     if (!computeNormalizedLimits()) return Result::PlanError;

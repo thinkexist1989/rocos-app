@@ -46,7 +46,7 @@ MoveSvdJog::~MoveSvdJog() = default;
 // 参数校验
 // ============================================================================
 
-Result MoveSvdJog::support() const {
+Result MoveSvdJog::ValidateParameters() const {
     if (!model_) return Result::Fatal;
     if (!std::isfinite(dt_) || dt_ <= 0.0) return Result::ParameterNanOrInf;
     if (!std::isfinite(timeout_) || timeout_ <= 0.0) return Result::ParameterNanOrInf;

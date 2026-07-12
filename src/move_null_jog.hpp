@@ -46,14 +46,14 @@ public:
     ~MoveNullJog() override;
 
     // ─── MotionInterface ───
-    Result support() const override;
+    Result ValidateParameters() const override;
     Result Reset() override;
     Result Update() override;
     Result GenerateRef(Reference& ref_out) override;
 
-    bool supportsPause()  const override { return false; }
-    bool supportsResume() const override { return false; }
-    bool supportsStop()   const override { return true; }
+    bool CanPause()  const override { return false; }
+    bool CanResume() const override { return false; }
+    bool CanStop()   const override { return true; }
 
     Result Pause() override;
     Result Resume() override;

@@ -70,7 +70,7 @@ public:
 
     /// @brief 纯参数校验：维度匹配、有限性、正值性（不涉及 delta 计算）
     /// @return NoError 通过，<0=错误码
-    Result support() const override;
+    Result ValidateParameters() const override;
 
     /// @brief 校验参数并初始化规划（合并 support + Reset）
     /// @return NoError=成功启动, PlanFinished=已到位无需运动, <0=错误码
@@ -83,9 +83,9 @@ public:
     /// @return NoError=仍在运行, PlanFinished=完成, <0=错误
     Result Update() override;
 
-    bool supportsPause()  const override { return true; }
-    bool supportsResume() const override { return true; }
-    bool supportsStop()   const override { return true; }
+    bool CanPause()  const override { return true; }
+    bool CanResume() const override { return true; }
+    bool CanStop()   const override { return true; }
 
     Result Pause() override;
     Result Resume() override;

@@ -134,6 +134,7 @@ namespace rocos {
         DumpLogFailed = -3003,
         ResetDhFailed = -3004,
         IllegalParameter = -3006,
+        FunctionNotSupported = 3007,
     };
 
 

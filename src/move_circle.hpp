@@ -70,14 +70,14 @@ public:
 
     // ─── MotionInterface 接口 ───
 
-    [[nodiscard]] Result support() const override;
+    [[nodiscard]] Result ValidateParameters() const override;
     Result Reset() override;
     Result GenerateRef(Reference& ref_out) override;
     Result Update() override;
 
-    bool supportsPause()  const override { return true; }
-    bool supportsResume() const override { return true; }
-    bool supportsStop()   const override { return true; }
+    bool CanPause()  const override { return true; }
+    bool CanResume() const override { return true; }
+    bool CanStop()   const override { return true; }
 
     Result Pause() override;
     Result Resume() override;
