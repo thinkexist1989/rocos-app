@@ -49,6 +49,12 @@ namespace {
 
 class DemoHardware : public rocos::HardwareInterface {
 public:
+    rocos::JntState GetState() override { return rocos::JntState::ENABLED; }
+
+    rocos::JntState GetJointState(int32_t id) override { return rocos::JntState::ENABLED; }
+
+    ~DemoHardware() override {}
+
     rocos::JntArray position_;
 
     explicit DemoHardware(double x, double y, double z) {

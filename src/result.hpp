@@ -135,6 +135,13 @@ namespace rocos {
         ResetDhFailed = -3004,
         IllegalParameter = -3006,
         FunctionNotSupported = 3007,
+
+        // Lua 脚本错误
+        LuaStateConflict = -6001,
+        LuaExecutionError = -6002,
+        LuaInvalidBreakpoint = -6003,
+        LuaFileError = -6004,
+        LuaStopped = -6005,
     };
 
 
@@ -273,6 +280,12 @@ namespace rocos {
             RESULT_CASE(DumpLogFailed);
             RESULT_CASE(ResetDhFailed);
             RESULT_CASE(IllegalParameter);
+            RESULT_CASE(FunctionNotSupported);
+            RESULT_CASE(LuaStateConflict);
+            RESULT_CASE(LuaExecutionError);
+            RESULT_CASE(LuaInvalidBreakpoint);
+            RESULT_CASE(LuaFileError);
+            RESULT_CASE(LuaStopped);
             default: return "Unknown(" + std::to_string(static_cast<int>(r)) + ")";
         }
 #undef RESULT_CASE

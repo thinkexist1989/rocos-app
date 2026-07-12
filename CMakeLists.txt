@@ -72,6 +72,8 @@ add_subdirectory(3rdparty/plog)
 add_subdirectory(3rdparty/gflags)
 add_subdirectory(3rdparty/spdlog)
 add_subdirectory(3rdparty/sml)
+add_subdirectory(3rdparty/lua)
+add_subdirectory(3rdparty/sol2)
 
 
 ###########
@@ -139,6 +141,7 @@ add_library(robot
         SHARED
         src/hardware.cpp
         src/executor.cpp
+        src/lua_script_engine.cpp
         src/robot.cpp
         src/model.cpp
 
@@ -173,6 +176,7 @@ target_link_libraries(robot
         $<BUILD_INTERFACE:ruckig::ruckig>
         $<BUILD_INTERFACE:trac_ik>
         sml::sml
+        sol2::sol2
         orocos-kdl
         )
 add_library(rocos::robot ALIAS robot)
@@ -216,6 +220,7 @@ configure_file(include/ver.h.in ver.h) # Version Definition
 
 # Copy config files to bin/
 file(COPY ${CONFIG_FILE} DESTINATION ${CMAKE_BINARY_DIR}/bin)
+file(COPY config/scripts DESTINATION ${CMAKE_BINARY_DIR}/bin)
 
 #############
 ## Install ##
@@ -414,3 +419,12 @@ target_link_libraries(virtual_wall_test
 add_test(NAME virtual_wall_test COMMAND virtual_wall_test)
 set_tests_properties(virtual_wall_test PROPERTIES
         WORKING_DIRECTORY ${CMAKE_SOURCE_DIR})
+
+add_executable(lua_script_engine_test test/lua_script_engine_test.cc)
+target_link_libraries(lua_script_engine_test
+        PRIVATE
+        robot
+        )
+add_test(NAME lua_script_engine_test COMMAND lua_script_engine_test)
+set_tests_properties(lua_script_engine_test PROPERTIES
+        WORKING_DIRECTORY ${CMAKE_SOURCE_DIR}/config)

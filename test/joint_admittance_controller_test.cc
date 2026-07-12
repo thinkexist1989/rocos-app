@@ -41,6 +41,12 @@ public:
     int8_t last_set_mode_{-1};
     int set_mode_count_{0};
 
+    rocos::JntState GetState() override { return rocos::JntState::ENABLED; }
+
+    rocos::JntState GetJointState(int32_t id) override { return rocos::JntState::ENABLED; }
+
+    ~FakeHardware() override {}
+
     // DriveInterface — batch
     rocos::JntArray GetPosition() override { return fake_position_; }
     rocos::JntArray GetVelocity() override { return fake_velocity_; }

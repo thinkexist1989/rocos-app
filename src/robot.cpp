@@ -173,12 +173,14 @@ namespace {
                 state<class PAUSING> + sml::on_entry<_> / action_pause, // 10 PAUSING->RESUMING
                 // TODO                这个地方应该是success
                 state<class PAUSING> + event<EventStopped> = state<class PAUSED>,
+                state<class PAUSING> + event<EventStopReq> = state<class STOPPING>,
                 state<class PAUSING> + event<EventPauseFailed> = state<class RUNNING>, //TODO：暂停失败退回RUNNING是否合适？
                 state<class PAUSING> + event<EventSuccessed> = state<class PAUSED>, //TODO: 为什么需要Successed
                 //   PAUSING->PAUSED
 
                 state<class RESUMING> + sml::on_entry<_> / action_resume, // 11 RESUMING
                 state<class RESUMING> + event<EventRunning> = state<class RUNNING>,
+                state<class RESUMING> + event<EventStopReq> = state<class STOPPING>,
                 state<class RESUMING> + event<EventSuccessed> = state<class RUNNING>, //    RESUMING->RUNNING
 
                 state<class RESETTING> + sml::on_entry<_> / action_reset, // 12 RESETTING

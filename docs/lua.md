@@ -157,13 +157,13 @@ end
 | `POST` | `/api/script/breakpoint/remove` | body: `{filename, line}` |
 | `POST` | `/api/script/breakpoint/clear` | 清空断点 |
 
-扩展业务码文档，使用 `6xxx` 表示脚本模块：
+扩展业务码文档，使用 `-6xxx` 表示脚本模块：
 
-- `6001` script state conflict
-- `6002` Lua syntax/runtime error
-- `6003` invalid breakpoint
-- `6004` script path outside allowed root / file unavailable
-- `6005` script stopped
+- `-6001` script state conflict
+- `-6002` Lua syntax/runtime error
+- `-6003` invalid breakpoint
+- `-6004` script path outside allowed root / file unavailable
+- `-6005` script stopped
 
 通用 JSON/字段错误继续使用 `1xxx`，Robot/motion 错误继续映射现有 `2xxx/3xxx`，不把 HTTP status 当业务码。
 
@@ -177,7 +177,7 @@ end
 - `src/robot_http_server.hpp/.cpp`：注入 engine、注册 routes、JSON/status 映射。
 - `src/rocosAppMain.cpp`：在 Robot 后构造 engine，再注入 HTTP server；确保销毁顺序为 server -> engine -> Robot。
 - `config/scripts/example.lua`：最小顺序运动/条件控制示例。
-- `docs/http_api_design.md`、`docs/http_api_return_codes.md`：脚本 API、request/response、状态和 `6xxx` 业务码。
+- `docs/http_api_design.md`、`docs/http_api_return_codes.md`：脚本 API、request/response、状态和 `-6xxx` 业务码。
 - `test/lua_script_engine_test.cc`：doctest 单元测试。
 - `test/lua_script_http_test.cc`：HTTP handler/controller integration test；若现有 server 不便注入 client，则先覆盖序列化与 engine 调用边界，不引入新测试框架。
 
@@ -213,3 +213,27 @@ end
 - 当前运动完成信息主要来自 Robot FSM，而非独立 command result future。首版按现有公开状态实现等待；若实施时确认 FSM 无法区分“正常完成”和“外部停止”，只新增最小 completion snapshot/condition variable 到 `Robot`，不引入第二套 executor。
 - breakpoint 只对当前 loaded chunk 的规范化 filename 生效；首版 Sandbox 禁止 `require/dofile/loadfile`，因此不处理多文件 call stack。
 - Lua VM 不提供 realtime guarantee；Lua 只负责 orchestration，所有实时轨迹与硬件写入仍由现有 Robot/Executor/control thread 完成。
+
+## 当前 C++ 使用方式
+
+脚本引擎不依赖 HTTP，由调用方显式保证 `Robot` 生命周期长于
+`LuaScriptEngine`：
+
+```cpp
+#include <rocos_app/lua_script_engine.h>
+
+#include "robot.hpp"
+
+rocos::Robot robot;
+rocos::LuaScriptEngine engine(robot, "scripts");
+
+const rocos::Result load_result = engine.LoadFile("example.lua");
+if (load_result == rocos::Result::NoError) {
+    const rocos::Result run_result = engine.Run();
+}
+```
+
+`Run()` 异步启动脚本 worker。调用方通过 `GetStatus()` 查询
+`RUNNING/PAUSING/PAUSED/COMPLETED/FAILED/STOPPED`，退出前可调用 `Stop()`；析构函数也会停止并
+join worker。`LoadFile()` 只接受 scripts root 内的相对路径，并拒绝 `..` 或
+symlink 指向根目录之外的文件。

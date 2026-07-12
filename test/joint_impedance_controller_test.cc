@@ -35,6 +35,12 @@ namespace {
 
 class FakeHardware : public rocos::HardwareInterface {
 public:
+    rocos::JntState GetState() override { return rocos::JntState::ENABLED; }
+
+    rocos::JntState GetJointState(int32_t id) override { return rocos::JntState::ENABLED; }
+
+    ~FakeHardware() override {}
+
     rocos::JntArray fake_position_;
     rocos::JntArray fake_velocity_;
     rocos::JntArray last_set_torque_;
