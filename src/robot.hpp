@@ -44,6 +44,16 @@ namespace rocos {
 class Robot {
 
  public:
+  struct JointInfo {
+    int id{-1};
+    std::string name;
+    double cnt_per_unit{1.0};
+    double torque_per_unit{1.0};
+    double ratio{1.0};
+    std::string unit_name{"rad"};
+    int32_t zero_offset{0};
+  };
+
   explicit Robot();
 
   ~Robot();
@@ -77,6 +87,23 @@ class Robot {
   /// @brief 是否处于需要控制循环的状态（RUNNING/PAUSING/PAUSED/RESUMING/STOPPING）
   [[nodiscard]] bool IsControlActive() const;
 
+  [[nodiscard]] std::vector<JointInfo> GetJointInfo() const;
+
+  // TODO(HTTP API): 下面这些接口目前还没有收口到 Robot 层，HTTP 不应该长期直接解析文件或访问底层指针。
+  // - GetRobotModelInfo(): 对应 GET /api/robot/model，返回 URDF model name、links、joint origin、
+  //   joint axis、visual origin、mesh path 等前端建模数据。
+  // - GetRobotModelMesh(path): 对应 GET /api/robot/model/mesh，由 Robot 根据当前 URDF 路径解析并读取 mesh。
+  // - GetUrdfPath()/GetModelBaseLink()/GetModelTipLink(): 暴露当前 Robot 实际加载的模型配置，
+  //   避免 HTTP 使用硬编码 robot.urdf/base_link/link_7。
+  // - GetRobotStateSnapshot(): 对应 GET /api/robot/state，把 state、joint_states、flange/tool/object、
+  //   hardware state 一次性封装，HTTP 只负责 JSON 序列化。
+  // - GetMotionStatus()/GetCurrentTaskInfo(): 对应 GET /api/move/status，封装当前任务状态而不是 HTTP 自己拼。
+  //
+  // TODO(legacy API): 旧 HTTP 里还有 workmode / calibration 相关接口，后续如果恢复，需要先在 Robot 层补：
+  // - SetWorkMode()/GetWorkMode()
+  // - StartTcpCalibration()/AddTcpCalibrationPoint()/ComputeTcpCalibration()
+  // - StartPayloadCalibration()/AddPayloadCalibrationPoint()/ComputePayloadCalibration()
+
   /// @brief 控制循环主函数，每周期调用 (1000Hz)
   void RunCycle();
 
@@ -95,6 +122,13 @@ class Robot {
   Result MoveL(const Frame& pose_goal,
                const std::string& tool_name = "",
                double v_limit = 1.0, double a_limit = 2.0, double j_limit = 10.0);
+
+  Result MoveJ_IK(const Frame& pose_goal,
+                  double v_limit = 1.0, double a_limit = 2.0, double j_limit = 10.0);
+
+  Result MoveL_FK(const JntArray& q_goal,
+                  const std::string& tool_name = "",
+                  double v_limit = 1.0, double a_limit = 2.0, double j_limit = 10.0);
 
   void SetToolFrame(const std::string& name, const Frame& T_tool);
   Frame GetToolFrame(const std::string& name) const;
@@ -210,7 +244,16 @@ class Robot {
     hardware->SetTorque(tau);
   }
 
-  inline Frame getFlange() { return Frame();}
+  inline Frame getFlange() {
+    Frame flange;
+    if (!model || !hardware) return flange;
+
+    auto q = hardware->GetPosition();
+    if (model->ForwardKinematics(q, flange) != Result::NoError) {
+      return Frame();
+    }
+    return flange;
+  }
 
   Frame getTool() { return Frame(); }
 

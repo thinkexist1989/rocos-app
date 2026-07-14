@@ -266,15 +266,22 @@ JntArray MoveJog::computeJointVelocity() {
         if (model_) {
             model_->GetJacobian(q_integral_, jacobian_);
 
-            // damped least-squares pinv: q_dot = Jᵀ (J Jᵀ + λ²I)⁻¹ v
+            // SVD pinv: q_dot = J⁺ v
             const auto& J = jacobian_.data;
-            const double lambda = 0.01;
-            Eigen::MatrixXd JJt = J * J.transpose();
-            JJt.diagonal().array() += lambda * lambda;
             Eigen::VectorXd v(6);
             for (int i = 0; i < 3; ++i) { v(i) = cart_vel.vel(i); v(i+3) = cart_vel.rot(i); }
-            // JJt 是对称正定矩阵，LLT 比 inverse 更快且数值更稳
-            Eigen::VectorXd qd = J.transpose() * JJt.llt().solve(v);
+
+            Eigen::JacobiSVD<Eigen::MatrixXd> svd(
+                J, Eigen::ComputeThinU | Eigen::ComputeThinV);
+            const double tol = 1e-6;
+            const Eigen::VectorXd singular = svd.singularValues();
+            Eigen::VectorXd inv_singular(singular.size());
+            for (int i = 0; i < singular.size(); ++i) {
+                inv_singular(i) = singular(i) > tol ? 1.0 / singular(i) : 0.0;
+            }
+
+            Eigen::VectorXd qd =
+                svd.matrixV() * inv_singular.asDiagonal() * svd.matrixU().transpose() * v;
             for (unsigned int i = 0; i < q_dot.rows(); ++i) q_dot(i) = qd(static_cast<int>(i));
         }
     }

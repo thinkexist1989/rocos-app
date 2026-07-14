@@ -1,63 +1,57 @@
-// Robot MoveJ integration example.
+// Robot HTTP integration example.
 //
 // Run from the project root after the hardware/EtherCAT runtime is ready:
 //   ./build/bin/robot_movej_integration_test
 
 #include <chrono>
+#include <csignal>
 #include <iostream>
 #include <thread>
 
 #include "src/robot.hpp"
+#include "src/robot_http_server.hpp"
+
+namespace {
+
+volatile std::sig_atomic_t is_running = 1;
+rocos::Robot* robot_ptr = nullptr;
+
+void signalHandler(int signo) {
+    if (signo == SIGINT) {
+        std::cout << "\033[1;31m"
+                  << "[!!SIGNAL!!] INTERRUPT by CTRL-C"
+                  << "\033[0m" << std::endl;
+        is_running = 0;
+    }
+}
+
+}  // namespace
 
 int main() {
+    if (std::signal(SIGINT, signalHandler) == SIG_ERR) {
+        std::cout << "\033[1;31m"
+                  << "Can not catch SIGINT"
+                  << "\033[0m" << std::endl;
+    }
+
     rocos::Robot robot;
+    robot_ptr = &robot;
 
-    std::cout << "Initial state: " << robot.GetStateString() << std::endl;
-    if (robot.GetStateString() == "IDLE") {
-        auto rc = robot.SetEnabled();
-        std::cout << "SetEnabled result: " << static_cast<int>(rc)
-                  << ", state: " << robot.GetStateString() << std::endl;
+    rocos::RobotHttpServer http_server(&robot);
+    http_server.runAsync("0.0.0.0", 12345);
+
+    std::cout << "\033[1;32m"
+              << "[HTTP Server] Running on 0.0.0.0:12345"
+              << "\033[0m" << std::endl;
+
+    while (is_running) {
+        std::this_thread::sleep_for(std::chrono::seconds(1));
     }
 
-    const int joint_num = robot.getJointNum();
-    rocos::JntArray q_goal(static_cast<unsigned int>(joint_num));
-    for (int i = 0; i < joint_num; ++i) {
-        q_goal(i) = robot.getJointPosition(i);
+    http_server.stop();
+    if (robot_ptr != nullptr) {
+        robot_ptr->SetDisabled();
     }
 
-    if (joint_num > 0) {
-        q_goal(1) += 1;
-    }
-
-    auto rc = robot.MoveJ(q_goal, 0.05, 0.5, 2.0);
-    std::cout << "MoveJ result: " << static_cast<int>(rc)
-              << ", state: " << robot.GetStateString() << std::endl;
-
-    const auto start_time = std::chrono::steady_clock::now();
-    bool pause_sent = false;
-    bool resume_sent = false;
-
-    while (robot.IsControlActive()) {
-        const auto elapsed = std::chrono::steady_clock::now() - start_time;
-
-        if (!pause_sent && elapsed >= std::chrono::seconds(4)) {
-            rc = robot.PauseMotion();
-            std::cout << "PauseMotion result: " << static_cast<int>(rc)
-                      << ", state: " << robot.GetStateString() << std::endl;
-            pause_sent = true;
-        }
-
-        if (pause_sent && !resume_sent &&
-            elapsed >= std::chrono::milliseconds(7500)) {
-            rc = robot.ResumeMotion();
-            std::cout << "ResumeMotion result: " << static_cast<int>(rc)
-                      << ", state: " << robot.GetStateString() << std::endl;
-            resume_sent = true;
-        }
-
-        std::this_thread::sleep_for(std::chrono::milliseconds(20));
-    }
-
-    std::cout << "Final state: " << robot.GetStateString() << std::endl;
     return 0;
 }

@@ -143,6 +143,7 @@ add_library(robot
         src/executor.cpp
         src/lua_script_engine.cpp
         src/robot.cpp
+        src/robot_http_server.cpp
         src/model.cpp
 
         src/move_joint.cpp
@@ -322,6 +323,20 @@ target_link_libraries(robot_movej_integration_test
         )
 # 注意：本测试依赖真实 Robot/Hardware/EtherCAT，仅手动运行，不加入 ctest
 # 使用方法: ./build/bin/robot_movej_integration_test [delta_rad] [joint_index] [timeout_s]
+add_executable(robot_cartesian_jog_linearity_demo test/robot_cartesian_jog_linearity_demo.cc)
+target_link_libraries(robot_cartesian_jog_linearity_demo
+        PRIVATE
+        robot
+        )
+# 使用rocos-mujoco仿真时，启动仿真器后再运行本程序
+# ./build/bin/robot_cartesian_jog_linearity_demo
+add_executable(move_jog_planner_linearity_test test/move_jog_planner_linearity_test.cc)
+target_link_libraries(move_jog_planner_linearity_test
+        PRIVATE
+        robot
+        )
+# 离线测试 MoveJog + Model，不连接硬件，不加入 ctest
+# ./build/bin/move_jog_planner_linearity_test
 # ---- 模式切换测试（CSP ↔ CST）--------------------------------------------
 add_executable(mode_switch_test test/mode_switch_test.cc)
 target_link_libraries(mode_switch_test

@@ -4,6 +4,7 @@
 #include <spdlog/spdlog.h>
 
 #include <chrono>
+#include <cmath>
 #include <ctime>
 #include <fstream>
 #include <kdl_parser/kdl_parser.hpp>
@@ -12,6 +13,80 @@
 #include "robot.hpp"
 
 namespace rocos {
+
+namespace {
+
+int resultCode(Result result) {
+    return static_cast<int>(result);
+}
+
+bool resultSucceeded(Result result) {
+    return result == Result::NoError || result == Result::PlanFinished;
+}
+
+double jsonNumberOr(const nlohmann::json& body,
+                    const char* primary_key,
+                    const char* fallback_key,
+                    double default_value) {
+    if (body.contains(primary_key)) {
+        return body[primary_key].get<double>();
+    }
+    if (fallback_key != nullptr && body.contains(fallback_key)) {
+        return body[fallback_key].get<double>();
+    }
+    return default_value;
+}
+
+bool isFinite(double value) {
+    return std::isfinite(value);
+}
+
+bool directionSign(const std::string& direction, double& sign) {
+    if (direction == "POSITIVE") {
+        sign = 1.0;
+        return true;
+    }
+    if (direction == "NEGATIVE") {
+        sign = -1.0;
+        return true;
+    }
+    if (direction == "NONE") {
+        sign = 0.0;
+        return true;
+    }
+    return false;
+}
+
+bool parseCartesianJogFlag(const std::string& flag, double sign, Twist& twist) {
+    const auto separator = flag.rfind('_');
+    if (separator == std::string::npos) return false;
+
+    const std::string frame = flag.substr(0, separator);
+    const std::string axis = flag.substr(separator + 1);
+    if (frame != "TOOL" && frame != "FLANGE" && frame != "OBJECT" && frame != "BASE") {
+        return false;
+    }
+
+    if (axis == "X") {
+        twist.vel.x(sign);
+    } else if (axis == "Y") {
+        twist.vel.y(sign);
+    } else if (axis == "Z") {
+        twist.vel.z(sign);
+    } else if (axis == "ROLL") {
+        twist.rot.x(sign);
+    } else if (axis == "PITCH") {
+        twist.rot.y(sign);
+    } else if (axis == "YAW") {
+        twist.rot.z(sign);
+    } else {
+        return false;
+    }
+
+    return true;
+}
+
+}  // namespace
 
 // ============================================================================
 // Construction / Destruction
@@ -213,7 +288,7 @@ KDL::Frame RobotHttpServer::jsonToFrame(const nlohmann::json& pos,
 }
 
 std::string RobotHttpServer::getUrdfPath() {
-    // return robot_->urdf_file_path_;
+    return "robot.urdf";
 }
 
 nlohmann::json RobotHttpServer::frameToJson(const KDL::Frame& frame) {
@@ -308,7 +383,11 @@ void RobotHttpServer::handleGetRobotState(const httplib::Request& req, httplib::
 
     nlohmann::json data;
 
-    data["robot_state"] = robot_->GetRobotState();
+    data["robot_state"] = robot_->GetStateString();
+    data["is_enabled"] = robot_->IsEnabled();
+    data["is_disabled"] = robot_->IsDisabled();
+    data["is_running"] = robot_->IsRunning();
+    data["control_active"] = robot_->IsControlActive();
     // log_ptr_->info("Robot state: {}", data["robot_state"].get<std::string>());
 
     // Joint states
@@ -325,25 +404,24 @@ void RobotHttpServer::handleGetRobotState(const httplib::Request& req, httplib::
     }
     data["joint_states"] = joint_states;
 
-    // // Flange pose
-    // KDL::Frame flange = robot_->getFlange();
-    // data["flange"] = frameToJson(flange);
-    //
-    // // Tool pose
-    // KDL::Frame tool = robot_->getTool();
-    // data["tool"] = frameToJson(tool);
-    //
-    // // Object pose
-    // KDL::Frame object = robot_->getObject();
-    // data["object"] = frameToJson(object);
+    // Flange pose
+    KDL::Frame flange = robot_->getFlange();
+    data["flange"] = frameToJson(flange);
+
+    // Tool pose
+    KDL::Frame tool = robot_->getTool();
+    data["tool"] = frameToJson(tool);
+
+    // Object pose
+    KDL::Frame object = robot_->getObject();
+    data["object"] = frameToJson(object);
 
     // Hardware state
     nlohmann::json hw;
-    hw["hw_type"] = static_cast<int>(robot_->hardware->getHardwareType());
-    hw["min_cycle_time"] = robot_->hardware->getMinCycleTime();
-    hw["max_cycle_time"] = robot_->hardware->getMaxCycleTime();
-    hw["current_cycle_time"] = robot_->hardware->getCurrCycleTime();
-    hw["slave_num"] = robot_->hardware->getSlaveNumber();
+    hw["joint_num"] = robot_->getJointNum();
+    if (robot_->hardware) {
+        hw["state"] = static_cast<int>(robot_->hardware->GetState());
+    }
     data["hw_state"] = hw;
 
     sendJson(res, true, 0, "ok", data);
@@ -352,29 +430,23 @@ void RobotHttpServer::handleGetRobotState(const httplib::Request& req, httplib::
 void RobotHttpServer::handleGetRobotInfo(const httplib::Request& req, httplib::Response& res) {
     log_ptr_->info("GET /api/robot/info");
 
-    // nlohmann::json joint_infos = nlohmann::json::array();
-    // for (int i = 0; i < robot_->getJointNum(); ++i) {
-    //     nlohmann::json ji;
-    //     ji["name"] = robot_->getJointName(i);
-    //     ji["cnt_per_unit"] = robot_->getJointCntPerUnit(i);
-    //     ji["torque_per_unit"] = robot_->getJointTorquePerUnit(i);
-    //     ji["ratio"] = robot_->getJointRatio(i);
-    //     ji["unit_name"] = robot_->getJointUserUnitName(i);
-    //     ji["zero_offset"] = robot_->getJointPosZeroOffset(i);
-    //     joint_infos.push_back(ji);
-    //     log_ptr_->info("Joint {}: cnt_per_unit={}, torque_per_unit={}, ratio={}, unit_name={}, zero_offset={}",
-    //                  ji["name"].get<std::string>(),
-    //                  ji["cnt_per_unit"].get<double>(),
-    //                  ji["torque_per_unit"].get<double>(),
-    //                  ji["ratio"].get<double>(),
-    //                  ji["unit_name"].get<std::string>(),
-    //                  ji["zero_offset"].get<int32_t>());
-    // }
-    //
-    // nlohmann::json data;
-    // data["joint_infos"] = joint_infos;
-    //
-    // sendJson(res, true, 0, "ok", data);
+    nlohmann::json joint_infos = nlohmann::json::array();
+    for (const auto& info : robot_->GetJointInfo()) {
+        nlohmann::json ji;
+        ji["id"] = info.id;
+        ji["name"] = info.name;
+        ji["cnt_per_unit"] = info.cnt_per_unit;
+        ji["torque_per_unit"] = info.torque_per_unit;
+        ji["ratio"] = info.ratio;
+        ji["unit_name"] = info.unit_name;
+        ji["zero_offset"] = info.zero_offset;
+        joint_infos.push_back(ji);
+    }
+
+    nlohmann::json data;
+    data["joint_infos"] = joint_infos;
+
+    sendJson(res, true, 0, "ok", data);
 }
 
 void RobotHttpServer::handleGetRobotModel(const httplib::Request& req, httplib::Response& res) {
@@ -385,19 +457,19 @@ void RobotHttpServer::handleGetRobotModel(const httplib::Request& req, httplib::
     //     sendJson(res, false, 1001, "Could not parse robot model");
     //     return;
     // }
-    //
+    
     // nlohmann::json data;
     // data["name"] = robot_model->getName();
-    //
+    
     // std::vector<urdf::LinkSharedPtr> links;
     // robot_model->getLinks(links);
-    //
+    
     // nlohmann::json links_arr = nlohmann::json::array();
     // for (size_t i = 0; i < links.size(); ++i) {
     //     nlohmann::json link;
     //     link["name"] = links[i]->name;
     //     link["order"] = static_cast<int>(i);
-    //
+    
     //     if (links[i]->parent_joint) {
     //         // Joint type mapping
     //         std::string type_str;
@@ -409,14 +481,14 @@ void RobotHttpServer::handleGetRobotModel(const httplib::Request& req, httplib::
     //             default:                      type_str = "unknown";    break;
     //         }
     //         link["type"] = type_str;
-    //
+    
     //         // Joint origin translation
     //         link["translate"] = {
     //             {"x", links[i]->parent_joint->parent_to_joint_origin_transform.position.x},
     //             {"y", links[i]->parent_joint->parent_to_joint_origin_transform.position.y},
     //             {"z", links[i]->parent_joint->parent_to_joint_origin_transform.position.z}
     //         };
-    //
+    
     //         // Joint origin rotation (RPY)
     //         double roll, pitch, yaw;
     //         links[i]->parent_joint->parent_to_joint_origin_transform.rotation.getRPY(roll, pitch, yaw);
@@ -425,7 +497,7 @@ void RobotHttpServer::handleGetRobotModel(const httplib::Request& req, httplib::
     //             {"y", pitch},
     //             {"z", yaw}
     //         };
-    //
+    
     //         // Joint axis
     //         link["axis"] = {
     //             {"x", links[i]->parent_joint->axis.x},
@@ -433,14 +505,14 @@ void RobotHttpServer::handleGetRobotModel(const httplib::Request& req, httplib::
     //             {"z", links[i]->parent_joint->axis.z}
     //         };
     //     }
-    //
+    
     //     if (links[i]->visual) {
     //         link["translateLink"] = {
     //             {"x", links[i]->visual->origin.position.x},
     //             {"y", links[i]->visual->origin.position.y},
     //             {"z", links[i]->visual->origin.position.z}
     //         };
-    //
+    
     //         double roll_l, pitch_l, yaw_l;
     //         links[i]->visual->origin.rotation.getRPY(roll_l, pitch_l, yaw_l);
     //         link["rotateLink"] = {
@@ -448,7 +520,7 @@ void RobotHttpServer::handleGetRobotModel(const httplib::Request& req, httplib::
     //             {"y", pitch_l},
     //             {"z", yaw_l}
     //         };
-    //
+    
     //         auto mesh_geo = std::dynamic_pointer_cast<urdf::Mesh>(links[i]->visual->geometry);
     //         if (mesh_geo) {
     //             std::string mesh_file = mesh_geo->filename;
@@ -460,12 +532,12 @@ void RobotHttpServer::handleGetRobotModel(const httplib::Request& req, httplib::
     //             link["mesh"] = mesh_file;
     //         }
     //     }
-    //
+    
     //     links_arr.push_back(link);
     // }
-    //
+    
     // data["links"] = links_arr;
-    //
+    
     // sendJson(res, true, 0, "ok", data);
 }
 
@@ -518,22 +590,33 @@ void RobotHttpServer::handleGetLinkMesh(const httplib::Request& req, httplib::Re
 
 void RobotHttpServer::handleEnable(const httplib::Request& req, httplib::Response& res) {
     log_ptr_->info("POST /api/robot/enable");
-    // robot_->SetEnabled();
-    // sendJson(res, true, 0, "Robot enabled");
+    const Result result = robot_->SetEnabled();
+    nlohmann::json data;
+    data["robot_state"] = robot_->GetStateString();
+    data["enabled"] = robot_->IsEnabled();
+    sendJson(res, resultSucceeded(result), resultCode(result),
+             resultSucceeded(result) ? "Robot enabled" : "Robot enable failed",
+             data);
 }
 
 void RobotHttpServer::handleDisable(const httplib::Request& req, httplib::Response& res) {
     log_ptr_->info("POST /api/robot/disable");
-    // robot_->SetDisabled();
-    // sendJson(res, true, 0, "Robot disabled");
+    const Result result = robot_->SetDisabled();
+    nlohmann::json data;
+    data["robot_state"] = robot_->GetStateString();
+    data["enabled"] = robot_->IsEnabled();
+    sendJson(res, resultSucceeded(result), resultCode(result),
+             resultSucceeded(result) ? "Robot disabled" : "Robot disable failed",
+             data);
 }
 
 void RobotHttpServer::handleIsEnabled(const httplib::Request& req, httplib::Response& res) {
     log_ptr_->info("GET /api/robot/enabled");
-    // bool enabled = robot_->IsEnabled();
-    // nlohmann::json data;
-    // data["enabled"] = enabled;
-    // sendJson(res, true, 0, "ok", data);
+    nlohmann::json data;
+    data["enabled"] = robot_->IsEnabled();
+    data["disabled"] = robot_->IsDisabled();
+    data["robot_state"] = robot_->GetStateString();
+    sendJson(res, true, 0, "ok", data);
 }
 
 void RobotHttpServer::handleSetWorkMode(const httplib::Request& req, httplib::Response& res) {
@@ -578,272 +661,209 @@ void RobotHttpServer::handleSetWorkMode(const httplib::Request& req, httplib::Re
 void RobotHttpServer::handleMoveJ(const httplib::Request& req, httplib::Response& res) {
     log_ptr_->info("POST /api/move/joint");
 
-    // nlohmann::json body = nlohmann::json::parse(req.body, nullptr, false);
-    // if (body.is_discarded() || !body.contains("joints")) {
-    //     sendJson(res, false, 1001, "Invalid JSON or missing 'joints' array");
-    //     return;
-    // }
-    //
-    // int jnt_num = robot_->getJointNum();
-    // auto joints_arr = body["joints"];
-    // if (static_cast<int>(joints_arr.size()) != jnt_num) {
-    //     sendJson(res, false, 1003, "Joint count mismatch: expected " + std::to_string(jnt_num));
-    //     return;
-    // }
-    //
-    // KDL::JntArray q(jnt_num);
-    // for (int i = 0; i < jnt_num; ++i) {
-    //     q(i) = joints_arr[i].get<double>();
-    // }
-    //
-    // double speed = body.value("speed", 1.05);
-    // double acceleration = body.value("acceleration", 1.4);
-    // double time = body.value("time", 0.0);
-    // double radius = body.value("radius", 0.0);
-    // bool asynchronous = body.value("asynchronous", false);
-    //
-    // if (asynchronous) {
-    //     std::string taskId = generateTaskId();
-    //     registerTask(taskId, "MoveJ");
-    //
-    //     submitTask([this, q, speed, acceleration, time, radius, taskId]() {
-    //         int result = robot_->MoveJ(q, speed, acceleration, time, radius, false);
-    //         if (result == 0) {
-    //             updateTaskStatus(taskId, "COMPLETED", result, "ok");
-    //         } else {
-    //             updateTaskStatus(taskId, "FAILED", result, "MoveJ failed");
-    //         }
-    //     });
-    //
-    //     nlohmann::json data;
-    //     data["task_id"] = taskId;
-    //     sendJson(res, true, 0, "MoveJ started", data);
-    // } else {
-    //     std::atomic<bool> done{false};
-    //     std::atomic<int> result{-1};
-    //     submitTask([&]() {
-    //         result = robot_->MoveJ(q, speed, acceleration, time, radius, false);
-    //         done = true;
-    //     });
-    //     // Wait for completion with timeout (30s)
-    //     auto deadline = std::chrono::steady_clock::now() + std::chrono::seconds(30);
-    //     while (!done && std::chrono::steady_clock::now() < deadline) {
-    //         std::this_thread::sleep_for(std::chrono::milliseconds(10));
-    //     }
-    //     if (!done) {
-    //         sendJson(res, false, 5002, "Motion timed out after 30s");
-    //     } else if (result == 0) {
-    //         sendJson(res, true, 0, "MoveJ completed");
-    //     } else {
-    //         sendJson(res, false, 2004, "MoveJ failed with code " + std::to_string(result));
-    //     }
-    // }
+    nlohmann::json body = nlohmann::json::parse(req.body, nullptr, false);
+    if (body.is_discarded() || !body.contains("joints") ||
+        !body["joints"].is_array()) {
+        sendJson(res, false, 1001, "Invalid JSON or missing 'joints' array");
+        return;
+    }
+
+    const int joint_count = robot_->getJointNum();
+    const auto& joints = body["joints"];
+    if (static_cast<int>(joints.size()) != joint_count) {
+        sendJson(res, false, 1003,
+                 "Joint count mismatch: expected " + std::to_string(joint_count));
+        return;
+    }
+
+    JntArray q_goal(static_cast<unsigned int>(joint_count));
+    for (int i = 0; i < joint_count; ++i) {
+        if (!joints[i].is_number()) {
+            sendJson(res, false, 1001, "Joint values must be numbers");
+            return;
+        }
+        const double value = joints[i].get<double>();
+        if (!isFinite(value)) {
+            sendJson(res, false, 1001, "Joint values must be finite");
+            return;
+        }
+        q_goal(static_cast<unsigned int>(i)) = value;
+    }
+
+    const double velocity = jsonNumberOr(body, "velocity", "speed", 1.0);
+    const double acceleration = jsonNumberOr(body, "acceleration", nullptr, 2.0);
+    const double jerk = jsonNumberOr(body, "jerk", nullptr, 10.0);
+    if (!isFinite(velocity) || !isFinite(acceleration) || !isFinite(jerk) ||
+        velocity <= 0.0 || acceleration <= 0.0 || jerk <= 0.0) {
+        sendJson(res, false, 1001, "velocity, acceleration and jerk must be positive finite numbers");
+        return;
+    }
+
+    const Result result = robot_->MoveJ(q_goal, velocity, acceleration, jerk);
+    nlohmann::json data;
+    data["robot_state"] = robot_->GetStateString();
+    data["control_active"] = robot_->IsControlActive();
+    sendJson(res, resultSucceeded(result), resultCode(result),
+             resultSucceeded(result) ? "MoveJ accepted" : "MoveJ failed",
+             data);
 }
 
 void RobotHttpServer::handleMoveJ_IK(const httplib::Request& req, httplib::Response& res) {
     log_ptr_->info("POST /api/move/joint_ik");
 
-    // nlohmann::json body = nlohmann::json::parse(req.body, nullptr, false);
-    // if (body.is_discarded() || !body.contains("pose")) {
-    //     sendJson(res, false, 1001, "Invalid JSON or missing 'pose' object");
-    //     return;
-    // }
-    //
-    // nlohmann::json pose_json = body["pose"];
-    // KDL::Frame pose;
-    // if (pose_json.contains("position") && pose_json.contains("orientation")) {
-    //     pose = jsonToFrame(pose_json["position"], pose_json["orientation"]);
-    // } else {
-    //     pose = jsonToFrame(pose_json);
-    // }
-    //
-    // double speed = body.value("speed", 1.05);
-    // double acceleration = body.value("acceleration", 1.4);
-    // double time = body.value("time", 0.0);
-    // double radius = body.value("radius", 0.0);
-    // bool asynchronous = body.value("asynchronous", false);
-    //
-    // // Get current joint positions as initial guess for IK
-    // int jnt_num = robot_->getJointNum();
-    // KDL::JntArray q_init(jnt_num);
-    // for (int i = 0; i < jnt_num; ++i) {
-    //     q_init(i) = robot_->getJointPosition(i);
-    // }
-    //
-    // // Perform IK
-    // KDL::JntArray q_target(jnt_num);
-    // int ik_result = robot_->CartToJnt(q_init, pose, q_target);
-    //
-    // if (ik_result < 0) {
-    //     sendJson(res, false, 2001, "Inverse kinematics: no solution found for target pose");
-    //     return;
-    // }
-    //
-    // if (asynchronous) {
-    //     std::string taskId = generateTaskId();
-    //     registerTask(taskId, "MoveJ_IK");
-    //
-    //     submitTask([this, q_target, speed, acceleration, time, radius, taskId]() {
-    //         int result = robot_->MoveJ(q_target, speed, acceleration, time, radius, false);
-    //         if (result == 0) {
-    //             updateTaskStatus(taskId, "COMPLETED", result, "ok");
-    //         } else {
-    //             updateTaskStatus(taskId, "FAILED", result, "MoveJ_IK failed");
-    //         }
-    //     });
-    //
-    //     nlohmann::json data;
-    //     data["task_id"] = taskId;
-    //     sendJson(res, true, 0, "MoveJ_IK started", data);
-    // } else {
-    //     int result = robot_->MoveJ(q_target, speed, acceleration, time, radius, false);
-    //     if (result == 0) {
-    //         sendJson(res, true, 0, "MoveJ_IK completed");
-    //     } else {
-    //         sendJson(res, false, 2004, "MoveJ_IK failed with code " + std::to_string(result));
-    //     }
-    // }
+    nlohmann::json body = nlohmann::json::parse(req.body, nullptr, false);
+    if (body.is_discarded() || !body.contains("pose") ||
+        !body["pose"].is_object()) {
+        sendJson(res, false, 1001, "Invalid JSON or missing 'pose' object");
+        return;
+    }
+    const auto& pose_json = body["pose"];
+    Frame pose;
+    if (pose_json.contains("position") && pose_json.contains("orientation")) {
+        pose = jsonToFrame(pose_json["position"], pose_json["orientation"]);
+    } else {
+        pose = jsonToFrame(pose_json);
+    }
+
+    const double velocity = jsonNumberOr(body, "velocity", "speed", 1.0);
+    const double acceleration = jsonNumberOr(body, "acceleration", nullptr, 2.0);
+    const double jerk = jsonNumberOr(body, "jerk", nullptr, 10.0);
+    if (!isFinite(velocity) || !isFinite(acceleration) || !isFinite(jerk) ||
+        velocity <= 0.0 || acceleration <= 0.0 || jerk <= 0.0) {
+        sendJson(res, false, 1001, "velocity, acceleration and jerk must be positive finite numbers");
+        return;
+    }
+
+    const Result result = robot_->MoveJ_IK(pose, velocity, acceleration, jerk);
+    nlohmann::json data;
+    data["robot_state"] = robot_->GetStateString();
+    data["control_active"] = robot_->IsControlActive();
+    sendJson(res, resultSucceeded(result), resultCode(result),
+             resultSucceeded(result) ? "MoveJ_IK accepted" : "MoveJ_IK failed",
+             data);
 }
 
 void RobotHttpServer::handleMoveL(const httplib::Request& req, httplib::Response& res) {
     log_ptr_->info("POST /api/move/linear");
 
-    // nlohmann::json body = nlohmann::json::parse(req.body, nullptr, false);
-    // if (body.is_discarded() || !body.contains("pose")) {
-    //     sendJson(res, false, 1001, "Invalid JSON or missing 'pose' object");
-    //     return;
-    // }
-    //
-    // nlohmann::json pose_json = body["pose"];
-    // KDL::Frame pose;
-    // if (pose_json.contains("position") && pose_json.contains("orientation")) {
-    //     pose = jsonToFrame(pose_json["position"], pose_json["orientation"]);
-    // } else {
-    //     pose = jsonToFrame(pose_json);
-    // }
-    //
-    // double speed = body.value("speed", 1.05);
-    // double acceleration = body.value("acceleration", 1.4);
-    // double time = body.value("time", 0.0);
-    // double radius = body.value("radius", 0.0);
-    // bool asynchronous = body.value("asynchronous", false);
-    //
-    // if (asynchronous) {
-    //     std::string taskId = generateTaskId();
-    //     registerTask(taskId, "MoveL");
-    //
-    //     submitTask([this, pose, speed, acceleration, time, radius, taskId]() {
-    //         int result = robot_->MoveL(pose, speed, acceleration, time, radius, false);
-    //         if (result == 0) {
-    //             updateTaskStatus(taskId, "COMPLETED", result, "ok");
-    //         } else {
-    //             updateTaskStatus(taskId, "FAILED", result, "MoveL failed");
-    //         }
-    //     });
-    //
-    //     nlohmann::json data;
-    //     data["task_id"] = taskId;
-    //     sendJson(res, true, 0, "MoveL started", data);
-    // } else {
-    //     int result = robot_->MoveL(pose, speed, acceleration, time, radius, false);
-    //     if (result == 0) {
-    //         sendJson(res, true, 0, "MoveL completed");
-    //     } else {
-    //         sendJson(res, false, 2004, "MoveL failed with code " + std::to_string(result));
-    //     }
-    // }
+    nlohmann::json body = nlohmann::json::parse(req.body, nullptr, false);
+    if (body.is_discarded() || !body.contains("pose") ||
+        !body["pose"].is_object()) {
+        sendJson(res, false, 1001, "Invalid JSON or missing 'pose' object");
+        return;
+    }
+
+    const auto& pose_json = body["pose"];
+    Frame pose;
+    if (pose_json.contains("position") && pose_json.contains("orientation")) {
+        pose = jsonToFrame(pose_json["position"], pose_json["orientation"]);
+    } else {
+        pose = jsonToFrame(pose_json);
+    }
+
+    const std::string tool_name = body.value("tool_name", std::string{});
+    const double velocity = jsonNumberOr(body, "velocity", "speed", 1.0);
+    const double acceleration = jsonNumberOr(body, "acceleration", nullptr, 2.0);
+    const double jerk = jsonNumberOr(body, "jerk", nullptr, 10.0);
+    if (!isFinite(velocity) || !isFinite(acceleration) || !isFinite(jerk) ||
+        velocity <= 0.0 || acceleration <= 0.0 || jerk <= 0.0) {
+        sendJson(res, false, 1001, "velocity, acceleration and jerk must be positive finite numbers");
+        return;
+    }
+
+    const Result result = robot_->MoveL(pose, tool_name, velocity, acceleration, jerk);
+    nlohmann::json data;
+    data["robot_state"] = robot_->GetStateString();
+    data["control_active"] = robot_->IsControlActive();
+    sendJson(res, resultSucceeded(result), resultCode(result),
+             resultSucceeded(result) ? "MoveL accepted" : "MoveL failed",
+             data);
 }
 
 void RobotHttpServer::handleMoveL_FK(const httplib::Request& req, httplib::Response& res) {
     log_ptr_->info("POST /api/move/linear_fk");
 
-    // nlohmann::json body = nlohmann::json::parse(req.body, nullptr, false);
-    // if (body.is_discarded() || !body.contains("joints")) {
-    //     sendJson(res, false, 1001, "Invalid JSON or missing 'joints' array");
-    //     return;
-    // }
-    //
-    // int jnt_num = robot_->getJointNum();
-    // auto joints_arr = body["joints"];
-    // if (static_cast<int>(joints_arr.size()) != jnt_num) {
-    //     sendJson(res, false, 1003, "Joint count mismatch: expected " + std::to_string(jnt_num));
-    //     return;
-    // }
-    //
-    // KDL::JntArray q(jnt_num);
-    // for (int i = 0; i < jnt_num; ++i) {
-    //     q(i) = joints_arr[i].get<double>();
-    // }
-    //
-    // double speed = body.value("speed", 1.05);
-    // double acceleration = body.value("acceleration", 1.4);
-    // double time = body.value("time", 0.0);
-    // double radius = body.value("radius", 0.0);
-    // bool asynchronous = body.value("asynchronous", false);
-    //
-    // if (asynchronous) {
-    //     std::string taskId = generateTaskId();
-    //     registerTask(taskId, "MoveL_FK");
-    //
-    //     submitTask([this, q, speed, acceleration, time, radius, taskId]() {
-    //         int result = robot_->MoveL_FK(q, speed, acceleration, time, radius, false);
-    //         if (result == 0) {
-    //             updateTaskStatus(taskId, "COMPLETED", result, "ok");
-    //         } else {
-    //             updateTaskStatus(taskId, "FAILED", result, "MoveL_FK failed");
-    //         }
-    //     });
-    //
-    //     nlohmann::json data;
-    //     data["task_id"] = taskId;
-    //     sendJson(res, true, 0, "MoveL_FK started", data);
-    // } else {
-    //     int result = robot_->MoveL_FK(q, speed, acceleration, time, radius, false);
-    //     if (result == 0) {
-    //         sendJson(res, true, 0, "MoveL_FK completed");
-    //     } else {
-    //         sendJson(res, false, 2004, "MoveL_FK failed with code " + std::to_string(result));
-    //     }
-    // }
+    nlohmann::json body = nlohmann::json::parse(req.body, nullptr, false);
+    if (body.is_discarded() || !body.contains("joints") ||
+        !body["joints"].is_array()) {
+        sendJson(res, false, 1001, "Invalid JSON or missing 'joints' array");
+        return;
+    }
+    const int joint_count = robot_->getJointNum();
+    const auto& joints = body["joints"];
+    if (static_cast<int>(joints.size()) != joint_count) {
+        sendJson(res, false, 1003,
+                 "Joint count mismatch: expected " + std::to_string(joint_count));
+        return;
+    }
+
+    JntArray q_goal(static_cast<unsigned int>(joint_count));
+    for (int i = 0; i < joint_count; ++i) {
+        if (!joints[i].is_number()) {
+            sendJson(res, false, 1001, "Joint values must be numbers");
+            return;
+        }
+        const double value = joints[i].get<double>();
+        if (!isFinite(value)) {
+            sendJson(res, false, 1001, "Joint values must be finite");
+            return;
+        }
+        q_goal(static_cast<unsigned int>(i)) = value;
+    }
+
+    const double velocity = jsonNumberOr(body, "velocity", "speed", 1.0);
+    const double acceleration = jsonNumberOr(body, "acceleration", nullptr, 2.0);
+    const double jerk = jsonNumberOr(body, "jerk", nullptr, 10.0);
+    if (!isFinite(velocity) || !isFinite(acceleration) || !isFinite(jerk) ||
+        velocity <= 0.0 || acceleration <= 0.0 || jerk <= 0.0) {
+        sendJson(res, false, 1001, "velocity, acceleration and jerk must be positive finite numbers");
+        return;
+    }
+
+    const std::string tool_name = body.value("tool_name", std::string{});
+    const Result result = robot_->MoveL_FK(q_goal, tool_name, velocity, acceleration, jerk);
+    nlohmann::json data;
+    data["robot_state"] = robot_->GetStateString();
+    data["control_active"] = robot_->IsControlActive();
+    sendJson(res, resultSucceeded(result), resultCode(result),
+             resultSucceeded(result) ? "MoveL_FK accepted" : "MoveL_FK failed",
+             data);
 }
 
 void RobotHttpServer::handleStop(const httplib::Request& req, httplib::Response& res) {
     log_ptr_->info("POST /api/move/stop");
 
-    // // const int result = robot_->StopMotion();
-    // const int result = 0;
-    //
-    // if (result == 0) {
-    //     sendJson(res, true, 0, "Motion stopped");
-    // } else {
-    //     sendJson(res, false, result, "Motion stop failed with code " + std::to_string(result));
-    // }
+    const Result result = robot_->StopMotion();
+    nlohmann::json data;
+    data["robot_state"] = robot_->GetStateString();
+    data["control_active"] = robot_->IsControlActive();
+    sendJson(res, resultSucceeded(result), resultCode(result),
+             resultSucceeded(result) ? "Motion stop requested" : "Motion stop failed",
+             data);
 }
 
 void RobotHttpServer::handlePause(const httplib::Request& req, httplib::Response& res) {
     log_ptr_->info("POST /api/move/pause");
 
-    // // const int result = robot_->PauseMotion();
-    // const int result = 0;
-    //
-    // if (result == 0) {
-    //     sendJson(res, true, 0, "Motion paused");
-    // } else {
-    //     sendJson(res, false, result, "Motion pause failed with code " + std::to_string(result));
-    // }
+    const Result result = robot_->PauseMotion();
+    nlohmann::json data;
+    data["robot_state"] = robot_->GetStateString();
+    data["control_active"] = robot_->IsControlActive();
+    sendJson(res, resultSucceeded(result), resultCode(result),
+             resultSucceeded(result) ? "Motion pause requested" : "Motion pause failed",
+             data);
 }
 
 void RobotHttpServer::handleResume(const httplib::Request& req, httplib::Response& res) {
   log_ptr_->info("POST /api/move/resume");
 
-  // // const int result = robot_->ResumeMotion();
-  // const int result = 0;
-  //
-  // if (result == 0) {
-  //       sendJson(res, true, 0, "Motion resumed");
-  //   } else {
-  //       sendJson(res, false, result, "Motion resume failed with code " + std::to_string(result));
-  //   }
+    const Result result = robot_->ResumeMotion();
+    nlohmann::json data;
+    data["robot_state"] = robot_->GetStateString();
+    data["control_active"] = robot_->IsControlActive();
+    sendJson(res, resultSucceeded(result), resultCode(result),
+             resultSucceeded(result) ? "Motion resume requested" : "Motion resume failed",
+             data);
 }
 
 // ============================================================================
@@ -854,20 +874,15 @@ void RobotHttpServer::handleMoveStatus(const httplib::Request& req, httplib::Res
     std::string task_id = req.get_param_value("task_id");
     log_ptr_->info("GET /api/move/status task_id={}", task_id);
 
-    // if (task_id.empty()) {
-    //     sendJson(res, false, 1001, "Missing 'task_id' query parameter");
-    //     return;
-    // }
-    //
-    // nlohmann::json info = getTaskInfo(task_id);
-    // if (info.is_null()) {
-    //     // Task not found
-    //     nlohmann::json data;
-    //     data["task_id"] = task_id;
-    //     sendJson(res, false, 5001, "Task not found", data);
-    // } else {
-    //     sendJson(res, true, 0, "ok", info);
-    // }
+    nlohmann::json data;
+    data["robot_state"] = robot_->GetStateString();
+    data["is_running"] = robot_->IsRunning();
+    data["control_active"] = robot_->IsControlActive();
+    if (!task_id.empty()) {
+        data["task_id"] = task_id;
+        data["task"] = getTaskInfo(task_id);
+    }
+    sendJson(res, true, 0, "ok", data);
 }
 
 
@@ -878,26 +893,99 @@ void RobotHttpServer::handleMoveStatus(const httplib::Request& req, httplib::Res
 void RobotHttpServer::handleDragStart(const httplib::Request& req, httplib::Response& res) {
     log_ptr_->info("POST /api/drag/start");
 
-    // nlohmann::json body = nlohmann::json::parse(req.body, nullptr, false);
-    // if (body.is_discarded() || !body.contains("flag") || !body.contains("direction")) {
-    //     sendJson(res, false, 1001, "Invalid JSON or missing 'flag'/'direction' fields");
-    //     return;
-    // }
-    //
-    // std::string flag_str = body["flag"].get<std::string>();
-    // std::string dir_str = body["direction"].get<std::string>();
-    // double max_speed = body.value("max_speed", 1.0);
-    // double max_acceleration = body.value("max_acceleration", 1.0);
-    //
-    // // Map flag string to enum
-    //
-    // sendJson(res, true, 0, "Dragging started");
+    nlohmann::json body = nlohmann::json::parse(req.body, nullptr, false);
+    if (body.is_discarded() || !body.contains("flag") || !body["flag"].is_string() ||
+        !body.contains("direction") || !body["direction"].is_string()) {
+        sendJson(res, false, 1001, "Invalid JSON or missing 'flag'/'direction' fields");
+        return;
+    }
+
+    const std::string flag = body["flag"].get<std::string>();
+    const std::string direction = body["direction"].get<std::string>();
+    const double speed = jsonNumberOr(body, "max_speed", "speed", 1.0);
+    const double timeout = jsonNumberOr(body, "timeout", nullptr, 0.1);
+    const double dir_threshold = jsonNumberOr(body, "dir_threshold", nullptr, 0.99);
+    if (!isFinite(speed) || !isFinite(timeout) || !isFinite(dir_threshold) ||
+        speed <= 0.0 || timeout <= 0.0 || dir_threshold < -1.0 || dir_threshold > 1.0) {
+        sendJson(res, false, 1001, "Invalid jogging speed, timeout or direction threshold");
+        return;
+    }
+
+    double sign = 0.0;
+    if (!directionSign(direction, sign)) {
+        sendJson(res, false, 1001, "Invalid jogging direction");
+        return;
+    }
+
+    Result result = Result::IllegalParameter;
+    if (sign == 0.0) {
+        result = robot_->StopMotion();
+    } else if (flag.size() == 2 && flag[0] == 'J' && flag[1] >= '0' && flag[1] <= '9') {
+        const int joint_index = flag[1] - '0';
+        const int joint_count = robot_->getJointNum();
+        if (joint_index >= joint_count) {
+            sendJson(res, false, 1003,
+                     "Joint index out of range: expected 0.." + std::to_string(joint_count - 1));
+            return;
+        }
+        JntArray joint_direction(static_cast<unsigned int>(joint_count));
+        joint_direction(static_cast<unsigned int>(joint_index)) = sign;
+        result = robot_->MoveJogging(joint_direction, speed, timeout, dir_threshold);
+    } else if (flag == "NULLSPACE") {
+        const auto vector_json = body.contains("joints") ? body["joints"] : body.value("direction_vector", nlohmann::json::array());
+        if (!vector_json.is_array()) {
+            sendJson(res, false, 1001, "NULLSPACE jogging requires 'joints' or 'direction_vector' array");
+            return;
+        }
+
+        const int joint_count = robot_->getJointNum();
+        if (static_cast<int>(vector_json.size()) != joint_count) {
+            sendJson(res, false, 1003,
+                     "Joint count mismatch: expected " + std::to_string(joint_count));
+            return;
+        }
+
+        JntArray intent_direction(static_cast<unsigned int>(joint_count));
+        for (int i = 0; i < joint_count; ++i) {
+            if (!vector_json[i].is_number()) {
+                sendJson(res, false, 1001, "NULLSPACE direction values must be numbers");
+                return;
+            }
+            const double value = vector_json[i].get<double>();
+            if (!isFinite(value)) {
+                sendJson(res, false, 1001, "NULLSPACE direction values must be finite");
+                return;
+            }
+            intent_direction(static_cast<unsigned int>(i)) = sign * value;
+        }
+        result = robot_->MoveNullJogging(intent_direction, speed, timeout, dir_threshold);
+    } else {
+        Twist twist;
+        if (!parseCartesianJogFlag(flag, sign, twist)) {
+            sendJson(res, false, 1001, "Invalid jogging flag");
+            return;
+        }
+        result = robot_->MoveJogging(twist, speed, timeout, dir_threshold);
+    }
+
+    nlohmann::json data;
+    data["robot_state"] = robot_->GetStateString();
+    data["control_active"] = robot_->IsControlActive();
+    sendJson(res, resultSucceeded(result), resultCode(result),
+             resultSucceeded(result) ? "Dragging started" : "Dragging start failed",
+             data);
 }
 
 void RobotHttpServer::handleDragStop(const httplib::Request& req, httplib::Response& res) {
     log_ptr_->info("POST /api/drag/stop");
 
-    // sendJson(res, true, 0, "Dragging stopped");
+    const Result result = robot_->StopMotion();
+    nlohmann::json data;
+    data["robot_state"] = robot_->GetStateString();
+    data["control_active"] = robot_->IsControlActive();
+    sendJson(res, resultSucceeded(result), resultCode(result),
+             resultSucceeded(result) ? "Dragging stopped" : "Dragging stop failed",
+             data);
 }
 
 // ============================================================================

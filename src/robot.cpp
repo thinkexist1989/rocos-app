@@ -507,6 +507,27 @@ namespace rocos {
                || impl_->is(sml::state<class STOPPING>);
     }
 
+    std::vector<Robot::JointInfo> Robot::GetJointInfo() const {
+        std::vector<JointInfo> joint_infos;
+        const auto *hw = dynamic_cast<const Hardware *>(hardware.get());
+        if (hw == nullptr) return joint_infos;
+
+        const auto &drives = hw->getConfig().drives;
+        joint_infos.reserve(drives.size());
+        for (const auto &drive : drives) {
+            JointInfo info;
+            info.id = drive.id;
+            info.name = drive.joint_name;
+            info.cnt_per_unit = drive.transform.cnt_per_unit;
+            info.torque_per_unit = drive.transform.torque_per_unit;
+            info.ratio = drive.transform.ratio;
+            info.unit_name = drive.transform.user_unit_name;
+            info.zero_offset = drive.transform.offset_pos_cnt;
+            joint_infos.push_back(std::move(info));
+        }
+        return joint_infos;
+    }
+
     void Robot::waitControlCycle() {
         hardware->WaitForSignal();
     }
@@ -661,6 +682,39 @@ namespace rocos {
             return Result::ConflictTaskRunning;
         }
         return Result::NoError;
+    }
+
+    Result Robot::MoveJ_IK(const Frame &pose_goal,
+                           double v_limit, double a_limit, double j_limit) {
+        if (!model) {
+            log_ptr_->error("机器人模型未初始化，无法执行MoveJ_IK指令");
+            return Result::ResourceUnavailable;
+        }
+
+        const int n = getJointNum();
+        JntArray q_current(static_cast<unsigned int>(n));
+        for (int i = 0; i < n; ++i) q_current(i) = getJointPosition(i);
+
+        JntArray q_goal(static_cast<unsigned int>(n));
+        Result rc = model->InverseKinematics(q_current, pose_goal, q_goal);
+        if (rc != Result::NoError) return rc;
+
+        return MoveJ(q_goal, v_limit, a_limit, j_limit);
+    }
+
+    Result Robot::MoveL_FK(const JntArray &q_goal,
+                           const std::string &tool_name,
+                           double v_limit, double a_limit, double j_limit) {
+        if (!model) {
+            log_ptr_->error("机器人模型未初始化，无法执行MoveL_FK指令");
+            return Result::ResourceUnavailable;
+        }
+
+        Frame pose_goal;
+        Result rc = model->ForwardKinematics(q_goal, pose_goal);
+        if (rc != Result::NoError) return rc;
+
+        return MoveL(pose_goal, tool_name, v_limit, a_limit, j_limit);
     }
 
     void Robot::SetToolFrame(const std::string &name, const Frame &T_tool) {
