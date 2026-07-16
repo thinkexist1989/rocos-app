@@ -1,6 +1,6 @@
 #define DOCTEST_CONFIG_IMPLEMENT_WITH_MAIN
 
-#include <rocos_app/lua_script_engine.h>
+#include "../src/lua_script_engine.hpp"
 
 #include <chrono>
 #include <filesystem>
@@ -33,7 +33,7 @@ TEST_CASE("LuaScriptEngine LoadFile 执行安全脚本") {
     rocos::Robot robot_;
     rocos::LuaScriptEngine engine_(robot_, "scripts");
 
-    REQUIRE(engine_.LoadFile("engine_test.lua") == rocos::Result::NoError);
+    REQUIRE(engine_.LoadFile("example.lua") == rocos::Result::NoError);
     REQUIRE(engine_.Run() == rocos::Result::NoError);
     REQUIRE(waitForState(
         engine_, rocos::LuaScriptEngine::State::Completed));

@@ -172,7 +172,7 @@ end
 - `3rdparty/lua/`：固定 Lua 5.4 release source，提供 CMake target `lua::lua`。
 - `3rdparty/sol2/`：固定 sol2 release source，使用其 header target。
 - `CMakeLists.txt`：加入两项依赖、新 engine source、include/link 设置、测试 target，并复制 `config/scripts/*.lua` 到 runtime config。
-- `include/rocos_app/lua_script_engine.h`：稳定公开接口、状态与快照类型。
+- `src/lua_script_engine.hpp`：稳定公开接口、状态与快照类型。
 - `src/lua_script_engine.cpp`：PImpl、Sandbox、bindings、worker、hook、blocking motion 和错误转换。
 - `src/robot_http_server.hpp/.cpp`：注入 engine、注册 routes、JSON/status 映射。
 - `src/rocosAppMain.cpp`：在 Robot 后构造 engine，再注入 HTTP server；确保销毁顺序为 server -> engine -> Robot。
@@ -220,7 +220,7 @@ end
 `LuaScriptEngine`：
 
 ```cpp
-#include <rocos_app/lua_script_engine.h>
+#include "lua_script_engine.hpp"
 
 #include "robot.hpp"
 

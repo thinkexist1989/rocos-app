@@ -443,3 +443,12 @@ target_link_libraries(lua_script_engine_test
 add_test(NAME lua_script_engine_test COMMAND lua_script_engine_test)
 set_tests_properties(lua_script_engine_test PROPERTIES
         WORKING_DIRECTORY ${CMAKE_SOURCE_DIR}/config)
+
+# ============================================================================
+# Examples —— 独立例程可执行文件
+# ============================================================================
+add_executable(lua_runner examples/lua_runner.cpp)
+target_link_libraries(lua_runner
+        PRIVATE
+        robot
+        )
