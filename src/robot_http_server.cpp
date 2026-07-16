@@ -6,6 +6,7 @@
 #include <chrono>
 #include <cmath>
 #include <ctime>
+#include <filesystem>
 #include <fstream>
 #include <kdl_parser/kdl_parser.hpp>
 #include <sstream>
@@ -185,8 +186,8 @@ void RobotHttpServer::registerRoutes() {
     // Robot state
     server_->Get("/api/robot/state", [this](auto& req, auto& res) { handleGetRobotState(req, res); });
     server_->Get("/api/robot/info", [this](auto& req, auto& res) { handleGetRobotInfo(req, res); });
-    server_->Get("/api/robot/model", [this](auto& req, auto& res) { handleGetRobotModel(req, res); });
-    server_->Get("/api/robot/model/mesh", [this](auto& req, auto& res) { handleGetLinkMesh(req, res); });
+    server_->Get("/api/robot/urdf", [this](auto& req, auto& res) { handleGetRobotModel(req, res); });
+    server_->Get("/api/robot/urdf/mesh", [this](auto& req, auto& res) { handleGetLinkMesh(req, res); });
     server_->Get("/api/robot/enabled", [this](auto& req, auto& res) { handleIsEnabled(req, res); });
     server_->Post("/api/robot/enable", [this](auto& req, auto& res) { handleEnable(req, res); });
     server_->Post("/api/robot/disable", [this](auto& req, auto& res) { handleDisable(req, res); });
@@ -450,138 +451,112 @@ void RobotHttpServer::handleGetRobotInfo(const httplib::Request& req, httplib::R
 }
 
 void RobotHttpServer::handleGetRobotModel(const httplib::Request& req, httplib::Response& res) {
-    log_ptr_->info("GET /api/robot/model");
+    log_ptr_->info("GET /api/robot/urdf");
 
-    // urdf::ModelInterfaceSharedPtr robot_model = urdf::parseURDFFile(getUrdfPath());
-    // if (!robot_model) {
-    //     sendJson(res, false, 1001, "Could not parse robot model");
-    //     return;
-    // }
-    
-    // nlohmann::json data;
-    // data["name"] = robot_model->getName();
-    
-    // std::vector<urdf::LinkSharedPtr> links;
-    // robot_model->getLinks(links);
-    
-    // nlohmann::json links_arr = nlohmann::json::array();
-    // for (size_t i = 0; i < links.size(); ++i) {
-    //     nlohmann::json link;
-    //     link["name"] = links[i]->name;
-    //     link["order"] = static_cast<int>(i);
-    
-    //     if (links[i]->parent_joint) {
-    //         // Joint type mapping
-    //         std::string type_str;
-    //         switch (links[i]->parent_joint->type) {
-    //             case urdf::Joint::FIXED:      type_str = "fixed";      break;
-    //             case urdf::Joint::REVOLUTE:   type_str = "revolute";   break;
-    //             case urdf::Joint::PRISMATIC:  type_str = "prismatic";  break;
-    //             case urdf::Joint::CONTINUOUS: type_str = "continuous"; break;
-    //             default:                      type_str = "unknown";    break;
-    //         }
-    //         link["type"] = type_str;
-    
-    //         // Joint origin translation
-    //         link["translate"] = {
-    //             {"x", links[i]->parent_joint->parent_to_joint_origin_transform.position.x},
-    //             {"y", links[i]->parent_joint->parent_to_joint_origin_transform.position.y},
-    //             {"z", links[i]->parent_joint->parent_to_joint_origin_transform.position.z}
-    //         };
-    
-    //         // Joint origin rotation (RPY)
-    //         double roll, pitch, yaw;
-    //         links[i]->parent_joint->parent_to_joint_origin_transform.rotation.getRPY(roll, pitch, yaw);
-    //         link["rotate"] = {
-    //             {"x", roll},
-    //             {"y", pitch},
-    //             {"z", yaw}
-    //         };
-    
-    //         // Joint axis
-    //         link["axis"] = {
-    //             {"x", links[i]->parent_joint->axis.x},
-    //             {"y", links[i]->parent_joint->axis.y},
-    //             {"z", links[i]->parent_joint->axis.z}
-    //         };
-    //     }
-    
-    //     if (links[i]->visual) {
-    //         link["translateLink"] = {
-    //             {"x", links[i]->visual->origin.position.x},
-    //             {"y", links[i]->visual->origin.position.y},
-    //             {"z", links[i]->visual->origin.position.z}
-    //         };
-    
-    //         double roll_l, pitch_l, yaw_l;
-    //         links[i]->visual->origin.rotation.getRPY(roll_l, pitch_l, yaw_l);
-    //         link["rotateLink"] = {
-    //             {"x", roll_l},
-    //             {"y", pitch_l},
-    //             {"z", yaw_l}
-    //         };
-    
-    //         auto mesh_geo = std::dynamic_pointer_cast<urdf::Mesh>(links[i]->visual->geometry);
-    //         if (mesh_geo) {
-    //             std::string mesh_file = mesh_geo->filename;
-    //             // Extract filename from path (e.g., "/foo/bar/link1.stl" -> "link1.stl")
-    //             std::string::size_type pos = mesh_file.find_last_of("/\\");
-    //             if (pos != std::string::npos) {
-    //                 mesh_file = mesh_file.substr(pos + 1);
-    //             }
-    //             link["mesh"] = mesh_file;
-    //         }
-    //     }
-    
-    //     links_arr.push_back(link);
-    // }
-    
-    // data["links"] = links_arr;
-    
-    // sendJson(res, true, 0, "ok", data);
+    const std::string urdf_path = getUrdfPath();
+    std::ifstream file(urdf_path);
+    if (!file.is_open()) {
+        log_ptr_->error("Failed to open URDF file: {}", urdf_path);
+        sendJson(res, false, 1001, "URDF file not found: " + urdf_path);
+        return;
+    }
+
+    std::string content((std::istreambuf_iterator<char>(file)),
+                         std::istreambuf_iterator<char>());
+
+    setCorsHeaders(res);
+    res.set_content(content, "text/xml");
 }
 
 void RobotHttpServer::handleGetLinkMesh(const httplib::Request& req, httplib::Response& res) {
-    // Query parameter: ?path=relative/path/to/mesh.stl
-    std::string path = req.get_param_value("path");
-    log_ptr_->info("GET /api/robot/model/mesh path={}", path);
+    namespace fs = std::filesystem;
 
-    // if (path.empty()) {
-    //     sendJson(res, false, 1001, "Missing 'path' query parameter");
-    //     return;
-    // }
-    //
-    // std::string urdf_path = getUrdfPath();
-    // // Extract parent directory from urdf path
-    // std::string::size_type pos = urdf_path.find_last_of("/\\");
-    // std::string urdf_dir = (pos != std::string::npos) ? urdf_path.substr(0, pos) : ".";
-    // std::string file_path = urdf_dir + "/" + path;
-    //
-    // std::ifstream file(file_path, std::ios::binary);
-    // if (!file.is_open()) {
-    //     log_ptr_->error("Failed to open mesh file: {}", file_path);
-    //     sendJson(res, false, 1001, "Mesh file not found");
-    //     return;
-    // }
-    //
-    // file.seekg(0, std::ios::end);
-    // std::streampos file_size = file.tellg();
-    // file.seekg(0, std::ios::beg);
-    //
-    // std::vector<char> buffer(file_size);
-    // file.read(buffer.data(), file_size);
-    //
-    // // Extract filename from path
-    // std::string filename = path;
-    // pos = filename.find_last_of("/\\");
-    // if (pos != std::string::npos) {
-    //     filename = filename.substr(pos + 1);
-    // }
-    //
-    // setCorsHeaders(res);
-    // res.set_header("Content-Type", "application/octet-stream");
-    // res.set_header("Content-Disposition", "attachment; filename=\"" + filename + "\"");
-    // res.set_content(std::string(buffer.data(), buffer.size()), "application/octet-stream");
+    std::string path = req.get_param_value("path");
+    log_ptr_->info("GET /api/robot/urdf/mesh path={}", path);
+
+    if (path.empty()) {
+        sendJson(res, false, 1001, "Missing 'path' query parameter");
+        return;
+    }
+
+    // 解析 package:// ROS 路径格式：package://pkg_name/relative/path.stl
+    // 剥离 scheme + package 名，保留相对路径部分（如 meshes/link1.stl）
+    std::string rel_path = path;
+    if (path.rfind("package://", 0) == 0) {
+        const auto after_pkg = path.find('/', 10); // 跳过 "package://"
+        if (after_pkg == std::string::npos) {
+            sendJson(res, false, 1001, "Invalid package:// path: " + path);
+            return;
+        }
+        rel_path = path.substr(after_pkg + 1); // e.g., "meshes/link1.stl"
+    }
+
+    // 禁止路径穿越攻击
+    if (rel_path.find("..") != std::string::npos) {
+        sendJson(res, false, 1001, "Path traversal not allowed");
+        return;
+    }
+
+    // 提取文件名，用于回退搜索
+    const auto sep = rel_path.find_last_of("/\\");
+    const std::string filename = (sep != std::string::npos)
+        ? rel_path.substr(sep + 1)
+        : rel_path;
+
+    // 候选搜索根目录：当前目录、上级目录、上上级目录
+    const std::vector<fs::path> search_bases = {".", "..", "../.." };
+
+    std::string found_path;
+
+    // 1. 先尝试 base/rel_path 精确匹配
+    for (const auto& base : search_bases) {
+        fs::path candidate = base / rel_path;
+        std::error_code ec;
+        if (fs::is_regular_file(candidate, ec)) {
+            found_path = candidate.string();
+            break;
+        }
+    }
+
+    // 2. 精确匹配失败时，按文件名在各目录树中递归搜索
+    if (found_path.empty()) {
+        for (const auto& base : search_bases) {
+            std::error_code ec;
+            if (!fs::is_directory(base, ec)) continue;
+            for (const auto& entry :
+                 fs::recursive_directory_iterator(base,
+                     fs::directory_options::skip_permission_denied, ec)) {
+                if (entry.is_regular_file() &&
+                    entry.path().filename().string() == filename) {
+                    found_path = entry.path().string();
+                    break;
+                }
+            }
+            if (!found_path.empty()) break;
+        }
+    }
+
+    if (found_path.empty()) {
+        log_ptr_->error("Mesh file not found: {}", path);
+        sendJson(res, false, 1001, "Mesh file not found: " + filename);
+        return;
+    }
+
+    std::ifstream file(found_path, std::ios::binary);
+    if (!file.is_open()) {
+        log_ptr_->error("Failed to open mesh file: {}", found_path);
+        sendJson(res, false, 1001, "Failed to open mesh file");
+        return;
+    }
+
+    std::ostringstream ss;
+    ss << file.rdbuf();
+    const std::string content = ss.str();
+
+    log_ptr_->info("Serving mesh: {}", found_path);
+    setCorsHeaders(res);
+    res.set_header("Content-Disposition", "attachment; filename=\"" + filename + "\"");
+    res.set_content(content, "application/octet-stream");
 }
 
 // ============================================================================

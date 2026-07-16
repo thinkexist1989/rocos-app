@@ -10,11 +10,6 @@
 #include "robot.hpp"
 #include "robot_http_server.hpp"
 
-DEFINE_string(urdf, "robot.urdf", "Urdf file path");
-DEFINE_string(base, "base_link", "Base link name");
-DEFINE_string(tip, "link_7", "Tip link name");
-DEFINE_bool(sim, true, "Sim or not");
-DEFINE_int32(id, 0, "hardware id, only work for real hardware");
 DEFINE_string(http_host, "0.0.0.0", "HTTP server listen host");
 DEFINE_int32(http_port, 8080, "HTTP server listen port");
 
@@ -48,30 +43,24 @@ int main(int argc, char *argv[]) {
     using namespace rocos;
 
     gflags::ParseCommandLineFlags(&argc, &argv, true);
-    //**-------------------------------**//
 
-    // //**-------------启动admittance_joint-----------**//
-    // // 初始化类
-    // HardwareInterface* hw;
-    // if (FLAGS_sim)
-    //     hw = new HardwareSim(20);  // 仿真
-    // else
-    //     hw = new Hardware(FLAGS_urdf, FLAGS_id); // 真实机械臂
-    //
-    // Robot executor{};
-    //
-    // robot_ptr = &executor;
-    //
-    // rocos::RobotHttpServer httpServer(&executor);
-    //
-    // //------------------------wait----------------------------------
-    // httpServer.runAsync(FLAGS_http_host, FLAGS_http_port);
-    // // Keep main thread alive
-    // std::cout << "\033[1;32m" << "[HTTP Server] Running on "
-    //       << FLAGS_http_host << ":" << FLAGS_http_port << "\033[0m" << std::endl;
-    // while (isRuning) {
-    //     std::this_thread::sleep_for(std::chrono::seconds(1));
-    // }
+    // 初始化机器人（内部自动加载硬件与运动学模型）
+    Robot robot;
+    robot_ptr = &robot;
+
+    // 启动 HTTP REST API 服务器（非阻塞）
+    RobotHttpServer httpServer(&robot);
+    httpServer.runAsync(FLAGS_http_host, FLAGS_http_port);
+
+    std::cout << "\033[1;32m"
+              << "[HTTP Server] Running on "
+              << FLAGS_http_host << ":" << FLAGS_http_port
+              << "\033[0m" << std::endl;
+
+    // 主线程保活，等待 SIGINT
+    while (isRuning) {
+        std::this_thread::sleep_for(std::chrono::seconds(1));
+    }
 
     return 0;
 }
