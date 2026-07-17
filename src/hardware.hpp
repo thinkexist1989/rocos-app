@@ -183,6 +183,9 @@ public:
     /// @brief 等待 EtherCAT 周期同步信号（阻塞直至下一 PDO 交换完成，运动控制用）
     void WaitForSignal() override;
 
+    /// @brief 从共享内存读取控制周期 [us]（mujoco/主站写入的 EcatBus::dt）
+    uint32_t GetDt() const override;
+
     // ========== DriveInterface 接口实现 ==========
     JntArray GetPosition() override;
     JntArray GetVelocity() override;

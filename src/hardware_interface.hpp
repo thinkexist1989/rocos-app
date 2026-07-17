@@ -18,6 +18,8 @@
 // email: luoyang@sia.cn
 #pragma once
 
+#include <cstdint>
+
 #include "drive_interface.hpp"
 #include "ft_sensor_interface.hpp"
 #include "io_inteface.hpp"
@@ -33,6 +35,10 @@ class HardwareInterface : public DriveInterface,
   virtual bool Reset() = 0;
 
   virtual void WaitForSignal() = 0;
+
+  /// @brief Control cycle period from shared memory, unit: microseconds.
+  ///        1 kHz -> 1000. Master (mujoco/ecm) writes EcatBus::dt; app reads it.
+  virtual uint32_t GetDt() const { return 0; }
 
 };
 }  // namespace rocos

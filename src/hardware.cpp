@@ -290,6 +290,14 @@ void Hardware::WaitForSignal() {
     ec_ptr_->waitForSignal(8);
 }
 
+uint32_t Hardware::GetDt() const {
+    // mujoco 写 ecatBus->dt → 共享内存 → app Hardware::GetDt()
+    if (ec_ptr_ == nullptr || ec_ptr_->ecatBus == nullptr) {
+        return 0;
+    }
+    return ec_ptr_->getDt();
+}
+
 bool Hardware::Reset() {
 
   return true;

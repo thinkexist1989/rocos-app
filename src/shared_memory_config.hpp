@@ -14,6 +14,7 @@
 #include <algorithm>
 #include <cerrno>
 #include <cstddef>
+#include <cstdint>
 #include <cstdlib>
 #include <cstring>
 #include <fcntl.h>
@@ -100,6 +101,10 @@ struct EcatBus {
     double max_cycle_time{0.0};
     double avg_cycle_time{0.0};
     double current_cycle_time{0.0};
+
+    /// Control cycle period written by the master (mujoco / real ECM), unit: microseconds.
+    /// Example: 1 kHz -> dt = 1000.
+    uint32_t dt{0};
 
     bool   resetCycleTime{false};
 
@@ -423,6 +428,8 @@ public:
     double getBusMaxCycleTime()     const { return ecatBus->max_cycle_time;     }
     double getBusAvgCycleTime()     const { return ecatBus->avg_cycle_time;     }
     double getBusCurrentCycleTime() const { return ecatBus->current_cycle_time; }
+    /// @brief Control cycle period [us] from shared memory (master writes, app reads)
+    uint32_t getDt()                const { return ecatBus->dt;                 }
     bool   isAuthorized()           const { return ecatBus->is_authorized;      }
     long   getTimestamp()           const { return ecatBus->timestamp;          }
     int    getSlaveNum()            const { return ecatBus->slave_num;          }
