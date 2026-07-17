@@ -7,6 +7,8 @@
 #include <yaml-cpp/yaml.h>
 
 #include <chrono>
+#include <set>
+#include <sstream>
 #include <stdexcept>
 #include <thread>
 
@@ -47,6 +49,15 @@ static int yamlGetInt(const YAML::Node& node,
         return node[key].as<int>();
     }
     return default_val;
+}
+
+static std::string formatDriveIdList(const std::vector<int32_t>& ids) {
+    std::ostringstream oss;
+    for (size_t i = 0; i < ids.size(); ++i) {
+        if (i > 0) oss << ", ";
+        oss << ids[i];
+    }
+    return oss.str();
 }
 
 // ==========================================================================
@@ -391,52 +402,52 @@ double Hardware::torqueToUnit(const Drive& drive, int16_t raw_torque) const {
 // ==========================================================================
 
 JntArray Hardware::GetPosition() {
-    JntArray q(config_.drives.size());
-    for (size_t i = 0; i < config_.drives.size(); ++i) {
-        q(i) = GetJointPosition(config_.drives[i].id);
+    JntArray q(ModelJointCount());
+    for (size_t i = 0; i < ModelJointCount(); ++i) {
+        q(i) = GetJointPosition(DriveIdByModelIndex(i));
     }
     return q;
 }
 
 JntArray Hardware::GetVelocity() {
-    JntArray q_dot(config_.drives.size());
-    for (size_t i = 0; i < config_.drives.size(); ++i) {
-        q_dot(i) = GetJointVelocity(config_.drives[i].id);
+    JntArray q_dot(ModelJointCount());
+    for (size_t i = 0; i < ModelJointCount(); ++i) {
+        q_dot(i) = GetJointVelocity(DriveIdByModelIndex(i));
     }
     return q_dot;
 }
 
 JntArray Hardware::GetTorque() {
-    JntArray tau(config_.drives.size());
-    for (size_t i = 0; i < config_.drives.size(); ++i) {
-        tau(i) = GetJointTorque(config_.drives[i].id);
+    JntArray tau(ModelJointCount());
+    for (size_t i = 0; i < ModelJointCount(); ++i) {
+        tau(i) = GetJointTorque(DriveIdByModelIndex(i));
     }
     return tau;
 }
 
 JntArray Hardware::GetLoadTorque() {
-    JntArray lt(config_.drives.size());
-    for (size_t i = 0; i < config_.drives.size(); ++i) {
-        lt(i) = GetJointLoadTorque(config_.drives[i].id);
+    JntArray lt(ModelJointCount());
+    for (size_t i = 0; i < ModelJointCount(); ++i) {
+        lt(i) = GetJointLoadTorque(DriveIdByModelIndex(i));
     }
     return lt;
 }
 
 void Hardware::SetPosition(const JntArray& q) {
-    for (size_t i = 0; i < config_.drives.size() && i < q.rows(); ++i) {
-        SetJointPosition(config_.drives[i].id, q(i));
+    for (size_t i = 0; i < ModelJointCount() && i < q.rows(); ++i) {
+        SetJointPosition(DriveIdByModelIndex(i), q(i));
     }
 }
 
 void Hardware::SetVelocity(const JntArray& q_dot) {
-    for (size_t i = 0; i < config_.drives.size() && i < q_dot.rows(); ++i) {
-        SetJointVelocity(config_.drives[i].id, q_dot(i));
+    for (size_t i = 0; i < ModelJointCount() && i < q_dot.rows(); ++i) {
+        SetJointVelocity(DriveIdByModelIndex(i), q_dot(i));
     }
 }
 
 void Hardware::SetTorque(const JntArray& tau) {
-    for (size_t i = 0; i < config_.drives.size() && i < tau.rows(); ++i) {
-        SetJointTorque(config_.drives[i].id, tau(i));
+    for (size_t i = 0; i < ModelJointCount() && i < tau.rows(); ++i) {
+        SetJointTorque(DriveIdByModelIndex(i), tau(i));
     }
 }
 
@@ -765,10 +776,76 @@ void Hardware::SetJointDisabled(int32_t id) {
     setDriverState(static_cast<size_t>(idx), DriveState::SwitchOnDisabled);
 }
 
-std::string Hardware::getJointName(int32_t id) {
-    auto idx = getDriveIdx(id);
+std::string Hardware::getJointName(int32_t model_index) {
+    if (model_index < 0 || static_cast<size_t>(model_index) >= ModelJointCount()) {
+        return "";
+    }
+    const int32_t drive_id = DriveIdByModelIndex(static_cast<size_t>(model_index));
+    auto idx = getDriveIdx(drive_id);
     if (idx < 0) return "";
     return config_.drives[static_cast<size_t>(idx)].joint_name;
+}
+
+// ==========================================================================
+// Joint binding 接口实现
+// ==========================================================================
+
+Result Hardware::SetJointBinding(const std::vector<int32_t>& model_index_to_drive_id) {
+    auto log_ptr = Logger::getInstance("Hardware");
+    if (model_index_to_drive_id.empty()) {
+        log_ptr->error("SetJointBinding failed: mapping table is empty");
+        return Result::IllegalParameter;
+    }
+    if (model_index_to_drive_id.size() > config_.drives.size()) {
+        log_ptr->error("SetJointBinding failed: model joint count ({}) > hardware drive count ({})",
+                       model_index_to_drive_id.size(), config_.drives.size());
+        return Result::IllegalParameter;
+    }
+
+    // 检查每个 drive id 都存在且不重复
+    std::set<int32_t> seen;
+    for (size_t model_index = 0; model_index < model_index_to_drive_id.size(); ++model_index) {
+        const int32_t drive_id = model_index_to_drive_id[model_index];
+        auto idx = getDriveIdx(drive_id);
+        if (idx < 0) {
+            log_ptr->error("SetJointBinding failed: model index {} references unknown drive id {}",
+                           model_index, drive_id);
+            return Result::IllegalParameter;
+        }
+        if (!seen.insert(drive_id).second) {
+            log_ptr->error("SetJointBinding failed: duplicated drive id {} at model index {}",
+                           drive_id, model_index);
+            return Result::IllegalParameter;
+        }
+    }
+
+    model_index_to_drive_id_ = model_index_to_drive_id;
+    log_ptr->info("SetJointBinding success: model_index_to_drive_id=[{}]",
+                  formatDriveIdList(model_index_to_drive_id_));
+    return Result::NoError;
+}
+
+void Hardware::ClearJointBinding() {
+    model_index_to_drive_id_.clear();
+    auto log_ptr = Logger::getInstance("Hardware");
+    log_ptr->info("Joint binding cleared; hardware will use default drive order");
+}
+
+std::vector<int32_t> Hardware::GetJointBinding() const {
+    return model_index_to_drive_id_;
+}
+
+int Hardware::GetDriveNum() const {
+    return static_cast<int>(config_.drives.size());
+}
+
+std::vector<int32_t> Hardware::GetDriveIds() const {
+    std::vector<int32_t> ids;
+    ids.reserve(config_.drives.size());
+    for (const auto& drive : config_.drives) {
+        ids.push_back(drive.id);
+    }
+    return ids;
 }
 
 // ==========================================================================

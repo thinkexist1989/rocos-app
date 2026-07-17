@@ -36,6 +36,7 @@
 #include "hardware_interface.hpp"
 
 #include "executor.hpp"
+#include "joint_binding.hpp"
 
 #include <random>
 
@@ -44,6 +45,13 @@ namespace rocos {
 class Robot {
 
  public:
+  enum class JogFrame {
+    BASE,
+    FLANGE,
+    TOOL,
+    OBJECT
+  };
+
   struct JointInfo {
     int id{-1};
     std::string name;
@@ -133,7 +141,7 @@ class Robot {
   // - GetUrdfPath()/GetModelBaseLink()/GetModelTipLink(): 暴露当前 Robot 实际加载的模型配置，
   //   避免 HTTP 使用硬编码 robot.urdf/base_link/link_7。
   // ✓ GetRobotStateSnapshot(): 对应 GET /api/robot/state，已实现。
-  // - GetMotionStatus()/GetCurrentTaskInfo(): 对应 GET /api/move/status，封装当前任务状态而不是 HTTP 自己拼。
+  // - GetMotionStatus()/GetCurrentTaskInfo(): 对应 GET /api/robot/move_status，封装当前任务状态而不是 HTTP 自己拼。
   //
   // TODO(legacy API): 旧 HTTP 里还有 workmode / calibration 相关接口，后续如果恢复，需要先在 Robot 层补：
   // - SetWorkMode()/GetWorkMode()
@@ -145,6 +153,12 @@ class Robot {
 
   Result MoveJogging(const JogVec& direction, double speed,
                        double timeout = 0.1, double dir_threshold = 0.99);
+
+  Result MoveJogging(const Twist& direction,
+                     JogFrame frame,
+                     double speed,
+                     double timeout = 0.1,
+                     double dir_threshold = 0.99);
 
   Result MoveNullJogging(const JntArray& intent_direction, double speed,
                            double timeout = 0.1, double dir_threshold = 0.99);
@@ -247,7 +261,7 @@ class Robot {
   // inline void setJointMode(int id, ModeOfOperation mode) { }
 
   inline int getJointNum() const {
-    return hardware ? static_cast<int>(hardware->GetPosition().rows()) : 0;
+    return model ? model->GetJointNum() : 0;
   }
 
   inline std::string getJointName(int id) const {
@@ -345,6 +359,10 @@ class Robot {
   std::map<std::string, Frame> object_frames_;
   std::string active_tool_frame_name_;
   std::string active_object_frame_name_;
+
+  //// Joint binding
+  std::unique_ptr<JointBinding> joint_binding_;
+  std::string joint_binding_path_{"joint_binding.yaml"};
 
   //// 机器人状态机封装
   struct Impl;

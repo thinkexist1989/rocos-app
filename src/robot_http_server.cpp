@@ -76,33 +76,82 @@ bool directionSign(const std::string& direction, double& sign) {
     return false;
 }
 
-bool parseCartesianJogFlag(const std::string& flag, double sign, Twist& twist) {
-    const auto separator = flag.rfind('_');
-    if (separator == std::string::npos) return false;
+bool parseJogFrame(const std::string& frame, Robot::JogFrame& jog_frame) {
+    if (frame == "BASE") {
+        jog_frame = Robot::JogFrame::BASE;
+        return true;
+    }
+    if (frame == "FLANGE") {
+        jog_frame = Robot::JogFrame::FLANGE;
+        return true;
+    }
+    if (frame == "TOOL") {
+        jog_frame = Robot::JogFrame::TOOL;
+        return true;
+    }
+    if (frame == "OBJECT") {
+        jog_frame = Robot::JogFrame::OBJECT;
+        return true;
+    }
+    return false;
+}
 
-    const std::string frame = flag.substr(0, separator);
-    const std::string axis = flag.substr(separator + 1);
-    if (frame != "TOOL" && frame != "FLANGE" && frame != "OBJECT" && frame != "BASE") {
-        return false;
+
+bool parseFrameJson(const nlohmann::json& j, KDL::Frame& frame) {
+    if (!j.is_object()) return false;
+
+    if (j.contains("position") && j.contains("orientation") &&
+        j["position"].is_object() && j["orientation"].is_object()) {
+        const auto& pos = j["position"];
+        const auto& rot = j["orientation"];
+        const double x = pos.value("x", 0.0);
+        const double y = pos.value("y", 0.0);
+        const double z = pos.value("z", 0.0);
+        const double qx = rot.value("x", 0.0);
+        const double qy = rot.value("y", 0.0);
+        const double qz = rot.value("z", 0.0);
+        const double qw = rot.value("w", 1.0);
+        if (!isFinite(x) || !isFinite(y) || !isFinite(z) ||
+            !isFinite(qx) || !isFinite(qy) || !isFinite(qz) || !isFinite(qw)) {
+            return false;
+        }
+        frame = KDL::Frame(KDL::Rotation::Quaternion(qx, qy, qz, qw),
+                           KDL::Vector(x, y, z));
+        return true;
     }
 
-    if (axis == "X") {
-        twist.vel.x(sign);
-    } else if (axis == "Y") {
-        twist.vel.y(sign);
-    } else if (axis == "Z") {
-        twist.vel.z(sign);
-    } else if (axis == "ROLL") {
-        twist.rot.x(sign);
-    } else if (axis == "PITCH") {
-        twist.rot.y(sign);
-    } else if (axis == "YAW") {
-        twist.rot.z(sign);
-    } else {
+    const double x = j.value("x", 0.0);
+    const double y = j.value("y", 0.0);
+    const double z = j.value("z", 0.0);
+    const double qx = j.value("qx", 0.0);
+    const double qy = j.value("qy", 0.0);
+    const double qz = j.value("qz", 0.0);
+    const double qw = j.value("qw", 1.0);
+    if (!isFinite(x) || !isFinite(y) || !isFinite(z) ||
+        !isFinite(qx) || !isFinite(qy) || !isFinite(qz) || !isFinite(qw)) {
         return false;
     }
-
+    frame = KDL::Frame(KDL::Rotation::Quaternion(qx, qy, qz, qw),
+                       KDL::Vector(x, y, z));
     return true;
+}
+
+bool parseNamedFrameBody(const nlohmann::json& body,
+                         std::string& name,
+                         KDL::Frame& frame) {
+    if (body.is_discarded() || !body.contains("name") || !body["name"].is_string()) {
+        return false;
+    }
+    const nlohmann::json* frame_json = nullptr;
+    if (body.contains("frame")) {
+        frame_json = &body["frame"];
+    } else if (body.contains("pose")) {
+        frame_json = &body["pose"];
+    }
+    if (frame_json == nullptr) return false;
+
+    name = body["name"].get<std::string>();
+    return parseFrameJson(*frame_json, frame);
 }
 
 }  // namespace
@@ -211,20 +260,54 @@ void RobotHttpServer::registerRoutes() {
     server_->Post("/api/robot/disable", [this](auto& req, auto& res) { handleDisable(req, res); });
     server_->Post("/api/robot/workmode", [this](auto& req, auto& res) { handleSetWorkMode(req, res); });
 
-    // Motion control
+    // Robot motion control
+    server_->Post("/api/robot/movej", [this](auto& req, auto& res) { handleMoveJ(req, res); });
+    server_->Post("/api/robot/movej_ik", [this](auto& req, auto& res) { handleMoveJ_IK(req, res); });
+    server_->Post("/api/robot/movel", [this](auto& req, auto& res) { handleMoveL(req, res); });
+    server_->Post("/api/robot/movel_fk", [this](auto& req, auto& res) { handleMoveL_FK(req, res); });
+    server_->Post("/api/robot/movec", [this](auto& req, auto& res) { handleMoveC(req, res); });
+    server_->Post("/api/robot/pause", [this](auto& req, auto& res) { handlePause(req, res); });
+    server_->Post("/api/robot/resume", [this](auto& req, auto& res) { handleResume(req, res); });
+    server_->Post("/api/robot/stop", [this](auto& req, auto& res) { handleStop(req, res); });
+    server_->Post("/api/robot/wait_move", [this](auto& req, auto& res) { handleWaitMove(req, res); });
+    server_->Get("/api/robot/move_status", [this](auto& req, auto& res) { handleMoveStatus(req, res); });
+
+    // Robot jogging — 全部向量传递
+    server_->Post("/api/robot/jog/joint", [this](auto& req, auto& res) { handleJogJoint(req, res); });
+    server_->Post("/api/robot/jog/cartesian", [this](auto& req, auto& res) { handleJogCartesian(req, res); });
+    server_->Post("/api/robot/jog/nullspace", [this](auto& req, auto& res) { handleJogNullspace(req, res); });
+    server_->Post("/api/robot/jog/svd", [this](auto& req, auto& res) { handleJogSvd(req, res); });
+    server_->Post("/api/robot/jog/stop", [this](auto& req, auto& res) { handleJogStop(req, res); });
+
+    // Legacy jogging aliases — 上位机仍在使用 flag 格式
+    server_->Post("/api/drag/start", [this](auto& req, auto& res) { handleJogCompat(req, res); });
+    server_->Post("/api/drag/stop", [this](auto& req, auto& res) { handleJogStop(req, res); });
+    server_->Post("/api/robot/jog", [this](auto& req, auto& res) { handleJogCompat(req, res); });
+
+    // Legacy motion aliases kept for existing clients during API migration.
     server_->Post("/api/move/joint", [this](auto& req, auto& res) { handleMoveJ(req, res); });
     server_->Post("/api/move/joint_ik", [this](auto& req, auto& res) { handleMoveJ_IK(req, res); });
     server_->Post("/api/move/linear", [this](auto& req, auto& res) { handleMoveL(req, res); });
     server_->Post("/api/move/linear_fk", [this](auto& req, auto& res) { handleMoveL_FK(req, res); });
-
+    server_->Post("/api/move/circle", [this](auto& req, auto& res) { handleMoveC(req, res); });
     server_->Post("/api/move/pause", [this](auto& req, auto& res) { handlePause(req, res); });
     server_->Post("/api/move/resume", [this](auto& req, auto& res) { handleResume(req, res); });
     server_->Post("/api/move/stop", [this](auto& req, auto& res) { handleStop(req, res); });
     server_->Get("/api/move/status", [this](auto& req, auto& res) { handleMoveStatus(req, res); });
 
-    // Dragging
-    server_->Post("/api/drag/start", [this](auto& req, auto& res) { handleDragStart(req, res); });
-    server_->Post("/api/drag/stop", [this](auto& req, auto& res) { handleDragStop(req, res); });
+    // Frame management
+    server_->Get("/api/robot/tool_frames", [this](auto& req, auto& res) { handleGetToolFrameNames(req, res); });
+    server_->Get("/api/robot/object_frames", [this](auto& req, auto& res) { handleGetObjectFrameNames(req, res); });
+    server_->Get("/api/robot/tool_frame", [this](auto& req, auto& res) { handleGetToolFrame(req, res); });
+    server_->Get("/api/robot/object_frame", [this](auto& req, auto& res) { handleGetObjectFrame(req, res); });
+    server_->Post("/api/robot/tool_frame", [this](auto& req, auto& res) { handleSetToolFrame(req, res); });
+    server_->Post("/api/robot/object_frame", [this](auto& req, auto& res) { handleSetObjectFrame(req, res); });
+    server_->Delete("/api/robot/tool_frame", [this](auto& req, auto& res) { handleRemoveToolFrame(req, res); });
+    server_->Delete("/api/robot/object_frame", [this](auto& req, auto& res) { handleRemoveObjectFrame(req, res); });
+    server_->Post("/api/robot/active_tool_frame", [this](auto& req, auto& res) { handleSetActiveToolFrame(req, res); });
+    server_->Post("/api/robot/active_object_frame", [this](auto& req, auto& res) { handleSetActiveObjectFrame(req, res); });
+    server_->Post("/api/robot/frames/load", [this](auto& req, auto& res) { handleLoadFrames(req, res); });
+    server_->Post("/api/robot/frames/save", [this](auto& req, auto& res) { handleSaveFrames(req, res); });
 
     // Calibration
     server_->Post("/api/calibration/pose", [this](auto& req, auto& res) { handleSetPoseFrame(req, res); });
@@ -246,10 +329,10 @@ void RobotHttpServer::registerRoutes() {
     server_->Post("/api/script/breakpoint/clear", [this](auto& req, auto& res) { handleScriptBreakpointClear(req, res); });
 
     
-    // 修改后：去掉 ".*",
-    server_->set_post_routing_handler([](const httplib::Request&, httplib::Response& res) {
-    if (res.body.empty() && res.status == 0) {
-        res.status = 404;
+	    // 修改后：去掉 ".*",
+	    server_->set_post_routing_handler([](const httplib::Request&, httplib::Response& res) {
+	    if (res.body.empty() && (res.status == 0 || res.status == 404)) {
+	        res.status = 404;
         // 按照设计文档，业务错误码使用 4 位编码；这里统一返回通用参数错误码 1001
         res.set_content(R"({"success":false,"code":1001,"message":"endpoint not found","data":null})", "application/json");
     }
@@ -262,7 +345,7 @@ void RobotHttpServer::registerRoutes() {
 
 void RobotHttpServer::setCorsHeaders(httplib::Response& res) {
     res.set_header("Access-Control-Allow-Origin", "*");
-    res.set_header("Access-Control-Allow-Methods", "GET, POST, OPTIONS");
+    res.set_header("Access-Control-Allow-Methods", "GET, POST, DELETE, OPTIONS");
     res.set_header("Access-Control-Allow-Headers", "Content-Type");
 }
 
@@ -688,7 +771,7 @@ void RobotHttpServer::handleSetWorkMode(const httplib::Request& req, httplib::Re
 // ============================================================================
 
 void RobotHttpServer::handleMoveJ(const httplib::Request& req, httplib::Response& res) {
-    log_ptr_->info("POST /api/move/joint");
+    log_ptr_->info("POST /api/robot/movej");
 
     nlohmann::json body = nlohmann::json::parse(req.body, nullptr, false);
     if (body.is_discarded() || !body.contains("joints") ||
@@ -738,7 +821,7 @@ void RobotHttpServer::handleMoveJ(const httplib::Request& req, httplib::Response
 }
 
 void RobotHttpServer::handleMoveJ_IK(const httplib::Request& req, httplib::Response& res) {
-    log_ptr_->info("POST /api/move/joint_ik");
+    log_ptr_->info("POST /api/robot/movej_ik");
 
     nlohmann::json body = nlohmann::json::parse(req.body, nullptr, false);
     if (body.is_discarded() || !body.contains("pose") ||
@@ -773,7 +856,7 @@ void RobotHttpServer::handleMoveJ_IK(const httplib::Request& req, httplib::Respo
 }
 
 void RobotHttpServer::handleMoveL(const httplib::Request& req, httplib::Response& res) {
-    log_ptr_->info("POST /api/move/linear");
+    log_ptr_->info("POST /api/robot/movel");
 
     nlohmann::json body = nlohmann::json::parse(req.body, nullptr, false);
     if (body.is_discarded() || !body.contains("pose") ||
@@ -810,7 +893,7 @@ void RobotHttpServer::handleMoveL(const httplib::Request& req, httplib::Response
 }
 
 void RobotHttpServer::handleMoveL_FK(const httplib::Request& req, httplib::Response& res) {
-    log_ptr_->info("POST /api/move/linear_fk");
+    log_ptr_->info("POST /api/robot/movel_fk");
 
     nlohmann::json body = nlohmann::json::parse(req.body, nullptr, false);
     if (body.is_discarded() || !body.contains("joints") ||
@@ -859,8 +942,68 @@ void RobotHttpServer::handleMoveL_FK(const httplib::Request& req, httplib::Respo
              data);
 }
 
+void RobotHttpServer::handleMoveC(const httplib::Request& req, httplib::Response& res) {
+    log_ptr_->info("POST /api/robot/movec");
+
+    nlohmann::json body = nlohmann::json::parse(req.body, nullptr, false);
+    if (body.is_discarded()) {
+        sendJson(res, false, 1001, "Invalid JSON body");
+        return;
+    }
+
+    Frame pose_start = robot_->getFlange();
+    if (body.contains("pose_start") && !parseFrameJson(body["pose_start"], pose_start)) {
+        sendJson(res, false, 1001, "Invalid 'pose_start' frame");
+        return;
+    }
+
+    const double velocity = jsonNumberOr(body, "velocity", "speed", 1.0);
+    const double acceleration = jsonNumberOr(body, "acceleration", nullptr, 2.0);
+    const double jerk = jsonNumberOr(body, "jerk", nullptr, 10.0);
+    if (!isFinite(velocity) || !isFinite(acceleration) || !isFinite(jerk) ||
+        velocity <= 0.0 || acceleration <= 0.0 || jerk <= 0.0) {
+        sendJson(res, false, 1001, "velocity, acceleration and jerk must be positive finite numbers");
+        return;
+    }
+
+    Result result = Result::IllegalParameter;
+    if (body.contains("center_frame") && body.contains("theta")) {
+        Frame center_frame;
+        if (!parseFrameJson(body["center_frame"], center_frame) || !body["theta"].is_number()) {
+            sendJson(res, false, 1001, "Invalid 'center_frame' or 'theta'");
+            return;
+        }
+        const double theta = body["theta"].get<double>();
+        if (!isFinite(theta)) {
+            sendJson(res, false, 1001, "theta must be finite");
+            return;
+        }
+        result = robot_->MoveC(pose_start, center_frame, theta, velocity, acceleration, jerk);
+    } else if (body.contains("pose_via") && (body.contains("pose_goal") || body.contains("pose_to"))) {
+        Frame pose_via;
+        Frame pose_goal;
+        const auto& goal_json = body.contains("pose_goal") ? body["pose_goal"] : body["pose_to"];
+        if (!parseFrameJson(body["pose_via"], pose_via) || !parseFrameJson(goal_json, pose_goal)) {
+            sendJson(res, false, 1001, "Invalid 'pose_via' or 'pose_goal' frame");
+            return;
+        }
+        result = robot_->MoveC(pose_start, pose_via, pose_goal, velocity, acceleration, jerk);
+    } else {
+        sendJson(res, false, 1001,
+                 "MoveC requires either 'center_frame' + 'theta' or 'pose_via' + 'pose_goal'");
+        return;
+    }
+
+    nlohmann::json data;
+    data["robot_state"] = robot_->GetStateString();
+    data["control_active"] = robot_->IsControlActive();
+    sendJson(res, resultSucceeded(result), resultCode(result),
+             resultSucceeded(result) ? "MoveC accepted" : "MoveC failed",
+             data);
+}
+
 void RobotHttpServer::handleStop(const httplib::Request& req, httplib::Response& res) {
-    log_ptr_->info("POST /api/move/stop");
+    log_ptr_->info("POST /api/robot/stop");
 
     const Result result = robot_->StopMotion();
     nlohmann::json data;
@@ -872,7 +1015,7 @@ void RobotHttpServer::handleStop(const httplib::Request& req, httplib::Response&
 }
 
 void RobotHttpServer::handlePause(const httplib::Request& req, httplib::Response& res) {
-    log_ptr_->info("POST /api/move/pause");
+    log_ptr_->info("POST /api/robot/pause");
 
     const Result result = robot_->PauseMotion();
     nlohmann::json data;
@@ -884,7 +1027,7 @@ void RobotHttpServer::handlePause(const httplib::Request& req, httplib::Response
 }
 
 void RobotHttpServer::handleResume(const httplib::Request& req, httplib::Response& res) {
-  log_ptr_->info("POST /api/move/resume");
+  log_ptr_->info("POST /api/robot/resume");
 
     const Result result = robot_->ResumeMotion();
     nlohmann::json data;
@@ -895,13 +1038,26 @@ void RobotHttpServer::handleResume(const httplib::Request& req, httplib::Respons
              data);
 }
 
+void RobotHttpServer::handleWaitMove(const httplib::Request& req, httplib::Response& res) {
+    log_ptr_->info("POST /api/robot/wait_move");
+
+    const Result result = robot_->WaitMove();
+    nlohmann::json data;
+    data["robot_state"] = robot_->GetStateString();
+    data["control_active"] = robot_->IsControlActive();
+    data["motion_busy"] = robot_->IsMotionBusy();
+    sendJson(res, resultSucceeded(result), resultCode(result),
+             resultSucceeded(result) ? "Motion finished" : "WaitMove failed",
+             data);
+}
+
 // ============================================================================
 // Async Task Query
 // ============================================================================
 
 void RobotHttpServer::handleMoveStatus(const httplib::Request& req, httplib::Response& res) {
     std::string task_id = req.get_param_value("task_id");
-    log_ptr_->info("GET /api/move/status task_id={}", task_id);
+    log_ptr_->info("GET /api/robot/move_status task_id={}", task_id);
 
     nlohmann::json data;
     data["robot_state"] = robot_->GetStateString();
@@ -1057,11 +1213,11 @@ void RobotHttpServer::handleScriptBreakpointClear(const httplib::Request&,
 
 
 // ============================================================================
-// Dragging Handlers
+// Jogging Compatibility Handler — 旧 flag 格式转换
 // ============================================================================
 
-void RobotHttpServer::handleDragStart(const httplib::Request& req, httplib::Response& res) {
-    log_ptr_->info("POST /api/drag/start");
+void RobotHttpServer::handleJogCompat(const httplib::Request& req, httplib::Response& res) {
+    log_ptr_->info("POST /api/robot/jog (compat flag mode)");
 
     nlohmann::json body = nlohmann::json::parse(req.body, nullptr, false);
     if (body.is_discarded() || !body.contains("flag") || !body["flag"].is_string() ||
@@ -1075,24 +1231,21 @@ void RobotHttpServer::handleDragStart(const httplib::Request& req, httplib::Resp
     const double speed = jsonNumberOr(body, "max_speed", "speed", 1.0);
     const double timeout = jsonNumberOr(body, "timeout", nullptr, 0.1);
     const double dir_threshold = jsonNumberOr(body, "dir_threshold", nullptr, 0.99);
-    if (!isFinite(speed) || !isFinite(timeout) || !isFinite(dir_threshold) ||
-        speed <= 0.0 || timeout <= 0.0 || dir_threshold < -1.0 || dir_threshold > 1.0) {
-        sendJson(res, false, 1001, "Invalid jogging speed, timeout or direction threshold");
-        return;
-    }
 
     double sign = 0.0;
     if (!directionSign(direction, sign)) {
-        sendJson(res, false, 1001, "Invalid jogging direction");
+        sendJson(res, false, 1001, "Invalid direction");
         return;
     }
 
     Result result = Result::IllegalParameter;
-    if (sign == 0.0) {
+    const int joint_count = robot_->getJointNum();
+
+    if (sign == 0.0 || flag == "NONE") {
         result = robot_->StopMotion();
     } else if (flag.size() == 2 && flag[0] == 'J' && flag[1] >= '0' && flag[1] <= '9') {
+        // 关节点动 flag → 向量
         const int joint_index = flag[1] - '0';
-        const int joint_count = robot_->getJointNum();
         if (joint_index >= joint_count) {
             sendJson(res, false, 1003,
                      "Joint index out of range: expected 0.." + std::to_string(joint_count - 1));
@@ -1102,39 +1255,49 @@ void RobotHttpServer::handleDragStart(const httplib::Request& req, httplib::Resp
         joint_direction(static_cast<unsigned int>(joint_index)) = sign;
         result = robot_->MoveJogging(joint_direction, speed, timeout, dir_threshold);
     } else if (flag == "NULLSPACE") {
-        const auto vector_json = body.contains("joints") ? body["joints"] : body.value("direction_vector", nlohmann::json::array());
-        if (!vector_json.is_array()) {
-            sendJson(res, false, 1001, "NULLSPACE jogging requires 'joints' or 'direction_vector' array");
+        // 零空间点动 flag → 向量
+        const auto vector_json = body.contains("joints") ? body["joints"]
+            : body.value("direction_vector", nlohmann::json::array());
+        if (!vector_json.is_array() || static_cast<int>(vector_json.size()) != joint_count) {
+            sendJson(res, false, 1001,
+                     "NULLSPACE requires 'joints' array with " + std::to_string(joint_count) + " elements");
             return;
         }
-
-        const int joint_count = robot_->getJointNum();
-        if (static_cast<int>(vector_json.size()) != joint_count) {
-            sendJson(res, false, 1003,
-                     "Joint count mismatch: expected " + std::to_string(joint_count));
-            return;
-        }
-
         JntArray intent_direction(static_cast<unsigned int>(joint_count));
         for (int i = 0; i < joint_count; ++i) {
-            if (!vector_json[i].is_number()) {
-                sendJson(res, false, 1001, "NULLSPACE direction values must be numbers");
+            if (!vector_json[i].is_number() || !isFinite(vector_json[i].get<double>())) {
+                sendJson(res, false, 1001, "Invalid NULLSPACE direction values");
                 return;
             }
-            const double value = vector_json[i].get<double>();
-            if (!isFinite(value)) {
-                sendJson(res, false, 1001, "NULLSPACE direction values must be finite");
-                return;
-            }
-            intent_direction(static_cast<unsigned int>(i)) = sign * value;
+            intent_direction(static_cast<unsigned int>(i)) = sign * vector_json[i].get<double>();
         }
         result = robot_->MoveNullJogging(intent_direction, speed, timeout, dir_threshold);
     } else {
-        Twist twist;
-        if (!parseCartesianJogFlag(flag, sign, twist)) {
-            sendJson(res, false, 1001, "Invalid jogging flag");
+        // 笛卡尔点动 flag → Twist
+        const auto separator = flag.rfind('_');
+        if (separator == std::string::npos) {
+            sendJson(res, false, 1001, "Invalid jogging flag: " + flag);
             return;
         }
+        const std::string frame = flag.substr(0, separator);
+        const std::string axis = flag.substr(separator + 1);
+        if (frame != "TOOL" && frame != "FLANGE" && frame != "OBJECT" && frame != "BASE") {
+            sendJson(res, false, 1001, "Invalid frame in flag: " + flag);
+            return;
+        }
+
+        Twist twist;
+        if (axis == "X") twist.vel.x(sign);
+        else if (axis == "Y") twist.vel.y(sign);
+        else if (axis == "Z") twist.vel.z(sign);
+        else if (axis == "ROLL") twist.rot.x(sign);
+        else if (axis == "PITCH") twist.rot.y(sign);
+        else if (axis == "YAW") twist.rot.z(sign);
+        else {
+            sendJson(res, false, 1001, "Invalid axis in flag: " + flag);
+            return;
+        }
+
         result = robot_->MoveJogging(twist, speed, timeout, dir_threshold);
     }
 
@@ -1146,15 +1309,489 @@ void RobotHttpServer::handleDragStart(const httplib::Request& req, httplib::Resp
              data);
 }
 
-void RobotHttpServer::handleDragStop(const httplib::Request& req, httplib::Response& res) {
-    log_ptr_->info("POST /api/drag/stop");
+// ============================================================================
+// Jogging Handlers
+// ============================================================================
+
+void RobotHttpServer::handleJogJoint(const httplib::Request& req, httplib::Response& res) {
+    log_ptr_->info("POST /api/robot/jog/joint");
+
+    nlohmann::json body = nlohmann::json::parse(req.body, nullptr, false);
+    if (body.is_discarded() || !body.contains("joints") || !body["joints"].is_array()) {
+        sendJson(res, false, 1001, "Invalid JSON or missing 'joints' array");
+        return;
+    }
+
+    const int joint_count = robot_->getJointNum();
+    const auto& joints_json = body["joints"];
+    if (static_cast<int>(joints_json.size()) != joint_count) {
+        sendJson(res, false, 1003,
+                 "Joint count mismatch: expected " + std::to_string(joint_count));
+        return;
+    }
+
+    JntArray joint_direction(static_cast<unsigned int>(joint_count));
+    for (int i = 0; i < joint_count; ++i) {
+        if (!joints_json[i].is_number()) {
+            sendJson(res, false, 1001, "Joint direction values must be numbers");
+            return;
+        }
+        const double value = joints_json[i].get<double>();
+        if (!isFinite(value)) {
+            sendJson(res, false, 1001, "Joint direction values must be finite");
+            return;
+        }
+        joint_direction(static_cast<unsigned int>(i)) = value;
+    }
+
+    double sign = 1.0;
+    if (body.contains("direction") && body["direction"].is_string()) {
+        if (!directionSign(body["direction"].get<std::string>(), sign) || sign == 0.0) {
+            sendJson(res, false, 1001, "Invalid direction");
+            return;
+        }
+    }
+    if (sign != 1.0) {
+        for (unsigned int i = 0; i < joint_direction.rows(); ++i) {
+            joint_direction(i) *= sign;
+        }
+    }
+
+    const double speed = jsonNumberOr(body, "speed", nullptr, 1.0);
+    const double timeout = jsonNumberOr(body, "timeout", nullptr, 0.1);
+    const double dir_threshold = jsonNumberOr(body, "dir_threshold", nullptr, 0.99);
+    if (!isFinite(speed) || !isFinite(timeout) || !isFinite(dir_threshold) ||
+        speed <= 0.0 || timeout <= 0.0 || dir_threshold < -1.0 || dir_threshold > 1.0) {
+        sendJson(res, false, 1001, "Invalid speed, timeout or direction threshold");
+        return;
+    }
+
+    const Result result = robot_->MoveJogging(joint_direction, speed, timeout, dir_threshold);
+    nlohmann::json data;
+    data["robot_state"] = robot_->GetStateString();
+    data["control_active"] = robot_->IsControlActive();
+    sendJson(res, resultSucceeded(result), resultCode(result),
+             resultSucceeded(result) ? "Joint jogging started" : "Joint jogging failed",
+             data);
+}
+
+void RobotHttpServer::handleJogCartesian(const httplib::Request& req, httplib::Response& res) {
+    log_ptr_->info("POST /api/robot/jog/cartesian");
+
+    nlohmann::json body = nlohmann::json::parse(req.body, nullptr, false);
+    if (body.is_discarded() || !body.contains("twist") || !body["twist"].is_array()) {
+        sendJson(res, false, 1001, "Invalid JSON or missing 'twist' array");
+        return;
+    }
+
+    const auto& twist_json = body["twist"];
+    if (twist_json.size() != 6) {
+        sendJson(res, false, 1001, "Twist must have exactly 6 elements");
+        return;
+    }
+
+    Twist twist;
+    for (size_t i = 0; i < 6; ++i) {
+        if (!twist_json[i].is_number()) {
+            sendJson(res, false, 1001, "Twist values must be numbers");
+            return;
+        }
+        const double value = twist_json[i].get<double>();
+        if (!isFinite(value)) {
+            sendJson(res, false, 1001, "Twist values must be finite");
+            return;
+        }
+        if (i == 0) twist.vel.x(value);
+        else if (i == 1) twist.vel.y(value);
+        else if (i == 2) twist.vel.z(value);
+        else if (i == 3) twist.rot.x(value);
+        else if (i == 4) twist.rot.y(value);
+        else twist.rot.z(value);
+    }
+
+    double sign = 1.0;
+    if (body.contains("direction") && body["direction"].is_string()) {
+        if (!directionSign(body["direction"].get<std::string>(), sign) || sign == 0.0) {
+            sendJson(res, false, 1001, "Invalid direction");
+            return;
+        }
+    }
+	    if (sign != 1.0) {
+	        twist.vel = twist.vel * sign;
+	        twist.rot = twist.rot * sign;
+	    }
+
+        Robot::JogFrame jog_frame = Robot::JogFrame::BASE;
+        if (body.contains("frame")) {
+            if (!body["frame"].is_string() ||
+                !parseJogFrame(body["frame"].get<std::string>(), jog_frame)) {
+                sendJson(res, false, 1001, "Invalid jog frame: expected BASE, FLANGE, TOOL or OBJECT");
+                return;
+            }
+        }
+
+    const double speed = jsonNumberOr(body, "speed", nullptr, 1.0);
+    const double timeout = jsonNumberOr(body, "timeout", nullptr, 0.1);
+    const double dir_threshold = jsonNumberOr(body, "dir_threshold", nullptr, 0.99);
+    if (!isFinite(speed) || !isFinite(timeout) || !isFinite(dir_threshold) ||
+        speed <= 0.0 || timeout <= 0.0 || dir_threshold < -1.0 || dir_threshold > 1.0) {
+	        sendJson(res, false, 1001, "Invalid speed, timeout or direction threshold");
+	        return;
+    }
+
+    const Result result = robot_->MoveJogging(twist, jog_frame, speed, timeout, dir_threshold);
+    nlohmann::json data;
+    data["robot_state"] = robot_->GetStateString();
+    data["control_active"] = robot_->IsControlActive();
+    sendJson(res, resultSucceeded(result), resultCode(result),
+             resultSucceeded(result) ? "Cartesian jogging started" : "Cartesian jogging failed",
+             data);
+}
+
+void RobotHttpServer::handleJogNullspace(const httplib::Request& req, httplib::Response& res) {
+    log_ptr_->info("POST /api/robot/jog/nullspace");
+
+    nlohmann::json body = nlohmann::json::parse(req.body, nullptr, false);
+    if (body.is_discarded()) {
+        sendJson(res, false, 1001, "Invalid JSON body");
+        return;
+    }
+    const auto vector_json = body.contains("joints") ? body["joints"] : body.value("direction_vector", nlohmann::json::array());
+    if (!vector_json.is_array()) {
+        sendJson(res, false, 1001, "NULLSPACE jogging requires 'joints' array");
+        return;
+    }
+
+    double sign = 1.0;
+    if (body.contains("direction")) {
+        if (!body["direction"].is_string() ||
+            !directionSign(body["direction"].get<std::string>(), sign) || sign == 0.0) {
+            sendJson(res, false, 1001, "Invalid direction");
+            return;
+        }
+    }
+
+    const double speed = jsonNumberOr(body, "max_speed", "speed", 1.0);
+    const double timeout = jsonNumberOr(body, "timeout", nullptr, 0.1);
+    const double dir_threshold = jsonNumberOr(body, "dir_threshold", nullptr, 0.99);
+    if (!isFinite(speed) || !isFinite(timeout) || !isFinite(dir_threshold) ||
+        speed <= 0.0 || timeout <= 0.0 || dir_threshold < -1.0 || dir_threshold > 1.0) {
+        sendJson(res, false, 1001, "Invalid speed, timeout or direction threshold");
+        return;
+    }
+
+    const int joint_count = robot_->getJointNum();
+    if (static_cast<int>(vector_json.size()) != joint_count) {
+        sendJson(res, false, 1003,
+                 "Joint count mismatch: expected " + std::to_string(joint_count));
+        return;
+    }
+
+    JntArray intent_direction(static_cast<unsigned int>(joint_count));
+    for (int i = 0; i < joint_count; ++i) {
+        if (!vector_json[i].is_number()) {
+            sendJson(res, false, 1001, "NULLSPACE direction values must be numbers");
+            return;
+        }
+        const double value = vector_json[i].get<double>();
+        if (!isFinite(value)) {
+            sendJson(res, false, 1001, "NULLSPACE direction values must be finite");
+            return;
+        }
+        intent_direction(static_cast<unsigned int>(i)) = sign * value;
+    }
+
+    const Result result = robot_->MoveNullJogging(intent_direction, speed, timeout, dir_threshold);
+    nlohmann::json data;
+    data["robot_state"] = robot_->GetStateString();
+    data["control_active"] = robot_->IsControlActive();
+    sendJson(res, resultSucceeded(result), resultCode(result),
+             resultSucceeded(result) ? "Nullspace jogging started" : "Nullspace jogging failed",
+             data);
+}
+
+void RobotHttpServer::handleJogSvd(const httplib::Request& req, httplib::Response& res) {
+    log_ptr_->info("POST /api/robot/jog/svd");
+
+    nlohmann::json body = nlohmann::json::parse(req.body, nullptr, false);
+    if (body.is_discarded()) {
+        sendJson(res, false, 1001, "Invalid JSON body");
+        return;
+    }
+    const auto speeds_json = body.contains("dim_speeds") ? body["dim_speeds"] : body.value("speeds", nlohmann::json::array());
+    if (!speeds_json.is_array() || speeds_json.empty()) {
+        sendJson(res, false, 1001, "SVD jogging requires 'dim_speeds' array");
+        return;
+    }
+
+    std::vector<double> dim_speeds;
+    dim_speeds.reserve(speeds_json.size());
+    for (const auto& value_json : speeds_json) {
+        if (!value_json.is_number()) {
+            sendJson(res, false, 1001, "SVD jogging speeds must be numbers");
+            return;
+        }
+        const double value = value_json.get<double>();
+        if (!isFinite(value)) {
+            sendJson(res, false, 1001, "SVD jogging speeds must be finite");
+            return;
+        }
+        dim_speeds.push_back(value);
+    }
+
+    const double timeout = jsonNumberOr(body, "timeout", nullptr, 0.1);
+    const double dir_threshold = jsonNumberOr(body, "dir_threshold", nullptr, 0.99);
+    if (!isFinite(timeout) || !isFinite(dir_threshold) ||
+        timeout <= 0.0 || dir_threshold < -1.0 || dir_threshold > 1.0) {
+        sendJson(res, false, 1001, "Invalid timeout or direction threshold");
+        return;
+    }
+
+    const Result result = robot_->MoveSvdJogging(dim_speeds, timeout, dir_threshold);
+    nlohmann::json data;
+    data["robot_state"] = robot_->GetStateString();
+    data["control_active"] = robot_->IsControlActive();
+    sendJson(res, resultSucceeded(result), resultCode(result),
+             resultSucceeded(result) ? "SVD jogging started" : "SVD jogging failed",
+             data);
+}
+
+void RobotHttpServer::handleJogStop(const httplib::Request& req, httplib::Response& res) {
+    log_ptr_->info("POST /api/robot/jog/stop");
+
+    if (!robot_->IsMotionBusy()) {
+        nlohmann::json data;
+        data["robot_state"] = robot_->GetStateString();
+        data["control_active"] = robot_->IsControlActive();
+        sendJson(res, true, 0, "Jogging already stopped", data);
+        return;
+    }
 
     const Result result = robot_->StopMotion();
     nlohmann::json data;
     data["robot_state"] = robot_->GetStateString();
     data["control_active"] = robot_->IsControlActive();
     sendJson(res, resultSucceeded(result), resultCode(result),
-             resultSucceeded(result) ? "Dragging stopped" : "Dragging stop failed",
+             resultSucceeded(result) ? "Jogging stopped" : "Jogging stop failed",
+             data);
+}
+
+
+
+// ============================================================================
+// Frame Management Handlers
+// ============================================================================
+
+void RobotHttpServer::handleGetToolFrameNames(const httplib::Request& req, httplib::Response& res) {
+    log_ptr_->info("GET /api/robot/tool_frames");
+
+    nlohmann::json data;
+    data["names"] = robot_->GetToolFrameNames();
+    data["active"] = robot_->GetActiveToolFrameName();
+    sendJson(res, true, 0, "ok", data);
+}
+
+void RobotHttpServer::handleGetObjectFrameNames(const httplib::Request& req, httplib::Response& res) {
+    log_ptr_->info("GET /api/robot/object_frames");
+
+    nlohmann::json data;
+    data["names"] = robot_->GetObjectFrameNames();
+    data["active"] = robot_->GetActiveObjectFrameName();
+    sendJson(res, true, 0, "ok", data);
+}
+
+void RobotHttpServer::handleGetToolFrame(const httplib::Request& req, httplib::Response& res) {
+    const std::string name = req.get_param_value("name");
+    log_ptr_->info("GET /api/robot/tool_frame name={}", name);
+    if (name.empty()) {
+        sendJson(res, false, 1001, "Missing 'name' query parameter");
+        return;
+    }
+
+    Frame frame;
+    const Result result = robot_->GetToolFrame(name, frame);
+    nlohmann::json data;
+    data["name"] = name;
+    if (resultSucceeded(result)) data["frame"] = frameToJson(frame);
+    sendJson(res, resultSucceeded(result), resultCode(result),
+             resultSucceeded(result) ? "ok" : "Tool frame not found",
+             data);
+}
+
+void RobotHttpServer::handleGetObjectFrame(const httplib::Request& req, httplib::Response& res) {
+    const std::string name = req.get_param_value("name");
+    log_ptr_->info("GET /api/robot/object_frame name={}", name);
+    if (name.empty()) {
+        sendJson(res, false, 1001, "Missing 'name' query parameter");
+        return;
+    }
+
+    Frame frame;
+    const Result result = robot_->GetObjectFrame(name, frame);
+    nlohmann::json data;
+    data["name"] = name;
+    if (resultSucceeded(result)) data["frame"] = frameToJson(frame);
+    sendJson(res, resultSucceeded(result), resultCode(result),
+             resultSucceeded(result) ? "ok" : "Object frame not found",
+             data);
+}
+
+void RobotHttpServer::handleSetPoseFrame(const httplib::Request& req, httplib::Response& res) {
+    log_ptr_->info("POST /api/calibration/pose");
+    sendJson(res, false, 1004, "Pose frame calibration endpoint is not implemented");
+}
+
+void RobotHttpServer::handleSetToolFrame(const httplib::Request& req, httplib::Response& res) {
+    log_ptr_->info("POST /api/robot/tool_frame");
+
+    nlohmann::json body = nlohmann::json::parse(req.body, nullptr, false);
+    std::string name;
+    Frame frame;
+    if (!parseNamedFrameBody(body, name, frame)) {
+        sendJson(res, false, 1001, "Invalid JSON or missing 'name' and 'frame' fields");
+        return;
+    }
+
+    const Result result = robot_->SetToolFrame(name, frame);
+    nlohmann::json data;
+    data["name"] = name;
+    data["frame"] = frameToJson(frame);
+    sendJson(res, resultSucceeded(result), resultCode(result),
+             resultSucceeded(result) ? "Tool frame set" : "Tool frame set failed",
+             data);
+}
+
+void RobotHttpServer::handleSetObjectFrame(const httplib::Request& req, httplib::Response& res) {
+    log_ptr_->info("POST /api/robot/object_frame");
+
+    nlohmann::json body = nlohmann::json::parse(req.body, nullptr, false);
+    std::string name;
+    Frame frame;
+    if (!parseNamedFrameBody(body, name, frame)) {
+        sendJson(res, false, 1001, "Invalid JSON or missing 'name' and 'frame' fields");
+        return;
+    }
+
+    const Result result = robot_->SetObjectFrame(name, frame);
+    nlohmann::json data;
+    data["name"] = name;
+    data["frame"] = frameToJson(frame);
+    sendJson(res, resultSucceeded(result), resultCode(result),
+             resultSucceeded(result) ? "Object frame set" : "Object frame set failed",
+             data);
+}
+
+void RobotHttpServer::handleRemoveToolFrame(const httplib::Request& req, httplib::Response& res) {
+    const std::string name = req.get_param_value("name");
+    log_ptr_->info("DELETE /api/robot/tool_frame name={}", name);
+    if (name.empty()) {
+        sendJson(res, false, 1001, "Missing 'name' query parameter");
+        return;
+    }
+
+    const Result result = robot_->RemoveToolFrame(name);
+    nlohmann::json data;
+    data["name"] = name;
+    data["active"] = robot_->GetActiveToolFrameName();
+    sendJson(res, resultSucceeded(result), resultCode(result),
+             resultSucceeded(result) ? "Tool frame removed" : "Tool frame remove failed",
+             data);
+}
+
+void RobotHttpServer::handleRemoveObjectFrame(const httplib::Request& req, httplib::Response& res) {
+    const std::string name = req.get_param_value("name");
+    log_ptr_->info("DELETE /api/robot/object_frame name={}", name);
+    if (name.empty()) {
+        sendJson(res, false, 1001, "Missing 'name' query parameter");
+        return;
+    }
+
+    const Result result = robot_->RemoveObjectFrame(name);
+    nlohmann::json data;
+    data["name"] = name;
+    data["active"] = robot_->GetActiveObjectFrameName();
+    sendJson(res, resultSucceeded(result), resultCode(result),
+             resultSucceeded(result) ? "Object frame removed" : "Object frame remove failed",
+             data);
+}
+
+void RobotHttpServer::handleSetActiveToolFrame(const httplib::Request& req, httplib::Response& res) {
+    log_ptr_->info("POST /api/robot/active_tool_frame");
+
+    nlohmann::json body = nlohmann::json::parse(req.body, nullptr, false);
+    if (body.is_discarded() || !body.contains("name") || !body["name"].is_string()) {
+        sendJson(res, false, 1001, "Invalid JSON or missing 'name' field");
+        return;
+    }
+
+    const std::string name = body["name"].get<std::string>();
+    const Result result = robot_->SetActiveToolFrame(name);
+    nlohmann::json data;
+    data["active"] = robot_->GetActiveToolFrameName();
+    sendJson(res, resultSucceeded(result), resultCode(result),
+             resultSucceeded(result) ? "Active tool frame set" : "Active tool frame set failed",
+             data);
+}
+
+void RobotHttpServer::handleSetActiveObjectFrame(const httplib::Request& req, httplib::Response& res) {
+    log_ptr_->info("POST /api/robot/active_object_frame");
+
+    nlohmann::json body = nlohmann::json::parse(req.body, nullptr, false);
+    if (body.is_discarded() || !body.contains("name") || !body["name"].is_string()) {
+        sendJson(res, false, 1001, "Invalid JSON or missing 'name' field");
+        return;
+    }
+
+    const std::string name = body["name"].get<std::string>();
+    const Result result = robot_->SetActiveObjectFrame(name);
+    nlohmann::json data;
+    data["active"] = robot_->GetActiveObjectFrameName();
+    sendJson(res, resultSucceeded(result), resultCode(result),
+             resultSucceeded(result) ? "Active object frame set" : "Active object frame set failed",
+             data);
+}
+
+void RobotHttpServer::handleLoadFrames(const httplib::Request& req, httplib::Response& res) {
+    log_ptr_->info("POST /api/robot/frames/load");
+
+    nlohmann::json body = nlohmann::json::parse(req.body, nullptr, false);
+    if (body.is_discarded() || !body.contains("path") || !body["path"].is_string()) {
+        sendJson(res, false, 1001, "Invalid JSON or missing 'path' field");
+        return;
+    }
+
+    const std::string path = body["path"].get<std::string>();
+    const Result result = robot_->LoadFrames(path);
+    nlohmann::json data;
+    data["path"] = path;
+    data["tool_frames"] = robot_->GetToolFrameNames();
+    data["object_frames"] = robot_->GetObjectFrameNames();
+    data["active_tool_frame"] = robot_->GetActiveToolFrameName();
+    data["active_object_frame"] = robot_->GetActiveObjectFrameName();
+    sendJson(res, resultSucceeded(result), resultCode(result),
+             resultSucceeded(result) ? "Frames loaded" : "Frames load failed",
+             data);
+}
+
+void RobotHttpServer::handleSaveFrames(const httplib::Request& req, httplib::Response& res) {
+    log_ptr_->info("POST /api/robot/frames/save");
+
+    nlohmann::json body = nlohmann::json::parse(req.body, nullptr, false);
+    if (body.is_discarded() || !body.contains("path") || !body["path"].is_string()) {
+        sendJson(res, false, 1001, "Invalid JSON or missing 'path' field");
+        return;
+    }
+
+    const std::string path = body["path"].get<std::string>();
+    const Result result = robot_->SaveFrames(path);
+    nlohmann::json data;
+    data["path"] = path;
+    data["tool_frames"] = robot_->GetToolFrameNames();
+    data["object_frames"] = robot_->GetObjectFrameNames();
+    data["active_tool_frame"] = robot_->GetActiveToolFrameName();
+    data["active_object_frame"] = robot_->GetActiveObjectFrameName();
+    sendJson(res, resultSucceeded(result), resultCode(result),
+             resultSucceeded(result) ? "Frames saved" : "Frames save failed",
              data);
 }
 
@@ -1162,110 +1799,14 @@ void RobotHttpServer::handleDragStop(const httplib::Request& req, httplib::Respo
 // Calibration Handlers
 // ============================================================================
 
-void RobotHttpServer::handleSetPoseFrame(const httplib::Request& req, httplib::Response& res) {
-    log_ptr_->info("POST /api/calibration/pose");
-
-    // nlohmann::json body = nlohmann::json::parse(req.body, nullptr, false);
-    // if (body.is_discarded() || !body.contains("id") || !body.contains("pose")) {
-    //     sendJson(res, false, 1001, "Invalid JSON or missing 'id'/'pose' fields");
-    //     return;
-    // }
-    //
-    // int id = body["id"].get<int>();
-    // nlohmann::json pose_json = body["pose"];
-    //
-    // KDL::Frame pose;
-    // if (pose_json.contains("position") && pose_json.contains("orientation")) {
-    //     pose = jsonToFrame(pose_json["position"], pose_json["orientation"]);
-    // } else {
-    //     pose = jsonToFrame(pose_json);
-    // }
-    //
-    // robot_->set_pose_frame(id, pose);
-    // sendJson(res, true, 0, "Pose frame " + std::to_string(id) + " set");
-}
-
-void RobotHttpServer::handleSetToolFrame(const httplib::Request& req, httplib::Response& res) {
-    log_ptr_->info("POST /api/calibration/tool");
-
-    // nlohmann::json body = nlohmann::json::parse(req.body, nullptr, false);
-    // if (body.is_discarded() || !body.contains("pose")) {
-    //     sendJson(res, false, 1001, "Invalid JSON or missing 'pose' field");
-    //     return;
-    // }
-    //
-    // nlohmann::json pose_json = body["pose"];
-    // KDL::Frame pose;
-    // if (pose_json.contains("position") && pose_json.contains("orientation")) {
-    //     pose = jsonToFrame(pose_json["position"], pose_json["orientation"]);
-    // } else {
-    //     pose = jsonToFrame(pose_json);
-    // }
-    //
-    // robot_->set_tool_frame(pose);
-    // sendJson(res, true, 0, "Tool frame set");
-}
-
-void RobotHttpServer::handleSetObjectFrame(const httplib::Request& req, httplib::Response& res) {
-    log_ptr_->info("POST /api/calibration/object");
-
-    // nlohmann::json body = nlohmann::json::parse(req.body, nullptr, false);
-    // if (body.is_discarded() || !body.contains("pose")) {
-    //     sendJson(res, false, 1001, "Invalid JSON or missing 'pose' field");
-    //     return;
-    // }
-    //
-    // nlohmann::json pose_json = body["pose"];
-    // KDL::Frame pose;
-    // if (pose_json.contains("position") && pose_json.contains("orientation")) {
-    //     pose = jsonToFrame(pose_json["position"], pose_json["orientation"]);
-    // } else {
-    //     pose = jsonToFrame(pose_json);
-    // }
-    //
-    // robot_->set_object_frame(pose);
-    // sendJson(res, true, 0, "Object frame set");
-}
-
 void RobotHttpServer::handleCalibrationRun(const httplib::Request& req, httplib::Response& res) {
     log_ptr_->info("POST /api/calibration/run");
-
-    // nlohmann::json body = nlohmann::json::parse(req.body, nullptr, false);
-    // if (body.is_discarded() || !body.contains("frame")) {
-    //     sendJson(res, false, 1001, "Invalid JSON or missing 'frame' field");
-    //     return;
-    // }
-    //
-    // std::string frame = body["frame"].get<std::string>();
-    // if (frame != "tool" && frame != "object") {
-    //     sendJson(res, false, 4004, "Invalid frame type: must be 'tool' or 'object'");
-    //     return;
-    // }
-    //
-    // robot_->tool_calibration(frame);
-    //
-    // bool error_state = robot_->getErrorStateOfCal();
-    // if (error_state) {
-    //     sendJson(res, false, 4002, "Calibration failed");
-    // } else {
-    //     KDL::Frame result = robot_->getPose_out();
-    //     nlohmann::json data;
-    //     data["result"] = frameToJson(result);
-    //     sendJson(res, true, 0, "Calibration completed", data);
-    // }
+    sendJson(res, false, 1004, "Calibration run endpoint is not implemented");
 }
 
 void RobotHttpServer::handleCalibrationResult(const httplib::Request& req, httplib::Response& res) {
     log_ptr_->info("GET /api/calibration/result");
-
-    // bool error_state = robot_->getErrorStateOfCal();
-    // KDL::Frame result = robot_->getPose_out();
-    //
-    // nlohmann::json data;
-    // data["error_state"] = error_state;
-    // data["pose"] = frameToJson(result);
-    //
-    // sendJson(res, true, 0, "ok", data);
+    sendJson(res, false, 1004, "Calibration result endpoint is not implemented");
 }
 
-} // namespace rocos
+}  // namespace rocos

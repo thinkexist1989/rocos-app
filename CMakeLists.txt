@@ -90,7 +90,7 @@ link_directories(
 
 file(GLOB_RECURSE SRCS src/*.cpp)
 file(GLOB_RECURSE HDRS include/*.h include/*.hpp)
-file(GLOB_RECURSE CONFIG_FILE config/*.urdf config/*.yaml )
+file(GLOB_RECURSE CONFIG_FILE CONFIGURE_DEPENDS config/*.urdf config/*.yaml)
 
 set(DEP_LIBS
         dl
@@ -144,6 +144,7 @@ add_library(robot
         src/lua_script_engine.cpp
         src/robot.cpp
         src/robot_http_server.cpp
+        src/joint_binding.cpp
         src/model.cpp
 
         src/move_joint.cpp

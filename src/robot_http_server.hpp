@@ -72,22 +72,40 @@ private:
     void handleMoveJ_IK(const httplib::Request& req, httplib::Response& res);
     void handleMoveL(const httplib::Request& req, httplib::Response& res);
     void handleMoveL_FK(const httplib::Request& req, httplib::Response& res);
+    void handleMoveC(const httplib::Request& req, httplib::Response& res);
 
     void handlePause(const httplib::Request& req, httplib::Response& res);
     void handleResume(const httplib::Request& req, httplib::Response& res);
     void handleStop(const httplib::Request& req, httplib::Response& res);
+    void handleWaitMove(const httplib::Request& req, httplib::Response& res);
 
-    // ---- Dragging ----
-    void handleDragStart(const httplib::Request& req, httplib::Response& res);
-    void handleDragStop(const httplib::Request& req, httplib::Response& res);
+    // ---- Jogging ----
+    void handleJogJoint(const httplib::Request& req, httplib::Response& res);
+    void handleJogCartesian(const httplib::Request& req, httplib::Response& res);
+    void handleJogNullspace(const httplib::Request& req, httplib::Response& res);
+    void handleJogSvd(const httplib::Request& req, httplib::Response& res);
+    void handleJogStop(const httplib::Request& req, httplib::Response& res);
+    void handleJogCompat(const httplib::Request& req, httplib::Response& res);  // 旧 flag 兼容
 
     // ---- Async Task Query ----
     void handleMoveStatus(const httplib::Request& req, httplib::Response& res);
 
-    // ---- Calibration ----
+    // ---- Frame Management ----
+    void handleGetToolFrameNames(const httplib::Request& req, httplib::Response& res);
+    void handleGetObjectFrameNames(const httplib::Request& req, httplib::Response& res);
+    void handleGetToolFrame(const httplib::Request& req, httplib::Response& res);
+    void handleGetObjectFrame(const httplib::Request& req, httplib::Response& res);
     void handleSetPoseFrame(const httplib::Request& req, httplib::Response& res);
     void handleSetToolFrame(const httplib::Request& req, httplib::Response& res);
     void handleSetObjectFrame(const httplib::Request& req, httplib::Response& res);
+    void handleRemoveToolFrame(const httplib::Request& req, httplib::Response& res);
+    void handleRemoveObjectFrame(const httplib::Request& req, httplib::Response& res);
+    void handleSetActiveToolFrame(const httplib::Request& req, httplib::Response& res);
+    void handleSetActiveObjectFrame(const httplib::Request& req, httplib::Response& res);
+    void handleLoadFrames(const httplib::Request& req, httplib::Response& res);
+    void handleSaveFrames(const httplib::Request& req, httplib::Response& res);
+
+    // ---- Calibration ----
     void handleCalibrationRun(const httplib::Request& req, httplib::Response& res);
     void handleCalibrationResult(const httplib::Request& req, httplib::Response& res);
 

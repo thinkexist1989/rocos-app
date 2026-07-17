@@ -159,7 +159,30 @@ bool Model::ParseUrdf(const std::string& urdf_string,
     ++joint_index;
   }
 
+  // 刷新可动关节名称列表，顺序与 KDL JntArray 一致
+  joint_names_.clear();
+  for (unsigned int i = 0; i < chain_.getNrOfSegments(); ++i) {
+    const auto& kdl_joint = chain_.getSegment(i).getJoint();
+    if (kdl_joint.getType() != KDL::Joint::None) {
+      joint_names_.push_back(kdl_joint.getName());
+    }
+  }
+
+  if (joint_names_.size() != chain_.getNrOfJoints()) {
+    log_ptr_->error("joint_names_ count ({}) != chain joints ({})",
+                    joint_names_.size(), chain_.getNrOfJoints());
+    return false;
+  }
+
   return true;
+}
+
+int Model::GetJointNum() const {
+  return chain_.getNrOfJoints();
+}
+
+std::vector<std::string> Model::GetJointNames() const {
+  return joint_names_;
 }
 
 }  // namespace rocos

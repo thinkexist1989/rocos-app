@@ -199,6 +199,13 @@ public:
     void SetDisabled() override;
     JntState GetState() override;
 
+    // ========== Joint binding 接口 ==========
+    Result SetJointBinding(const std::vector<int32_t>& model_index_to_drive_id) override;
+    void ClearJointBinding() override;
+    std::vector<int32_t> GetJointBinding() const override;
+    int GetDriveNum() const override;
+    std::vector<int32_t> GetDriveIds() const override;
+
     double GetJointPosition(int32_t id) override;
     double GetJointVelocity(int32_t id) override;
     double GetJointTorque(int32_t id) override;
@@ -338,6 +345,24 @@ private:
     /// @brief 状态机后台工作线程（对应 old_drive DriveGuard::workingThread）
     void smWorkingThread();
 
+    /// @brief 是否存在有效的轴绑定映射表
+    bool HasJointBinding() const {
+      return !model_index_to_drive_id_.empty();
+    }
+
+    /// @brief 返回建模层的关节数量（有绑定则以绑定表长度为准，否则以硬件驱动数）
+    size_t ModelJointCount() const {
+      return HasJointBinding() ? model_index_to_drive_id_.size() : config_.drives.size();
+    }
+
+    /// @brief 按 model index 查询对应的真实 drive id
+    int32_t DriveIdByModelIndex(size_t model_index) const {
+      if (HasJointBinding()) {
+        return model_index_to_drive_id_[model_index];
+      }
+      return config_.drives[model_index].id;
+    }
+
     /// @brief O(1) 查找：从站 ID → config_.drives 中的索引，未找到返回 -1
     int32_t getDriveIdx(int32_t id) const {
         if (id < 0 || static_cast<size_t>(id) >= drive_id_to_index_.size()) return -1;
@@ -358,6 +383,8 @@ private:
 
     HardwareConfig config_;           // 硬件配置
     EcatConfig* ec_ptr_{nullptr};     // EtherCAT 配置单例指针（非拥有）
+
+    std::vector<int32_t> model_index_to_drive_id_;  // model index → real drive id 映射表
 
     // O(1) ID → 索引查找表（vector 预分配 + -1 哨兵，参考 PerformanceProfiler::channel_to_index_）
     std::vector<int32_t> drive_id_to_index_;

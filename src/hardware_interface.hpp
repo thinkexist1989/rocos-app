@@ -19,10 +19,12 @@
 #pragma once
 
 #include <cstdint>
+#include <vector>
 
 #include "drive_interface.hpp"
 #include "ft_sensor_interface.hpp"
 #include "io_inteface.hpp"
+#include "result.hpp"
 
 namespace rocos {
 
@@ -39,6 +41,29 @@ class HardwareInterface : public DriveInterface,
   /// @brief Control cycle period from shared memory, unit: microseconds.
   ///        1 kHz -> 1000. Master (mujoco/ecm) writes EcatBus::dt; app reads it.
   virtual uint32_t GetDt() const { return 0; }
+
+  /// @brief 设置 model index → drive id 映射表（建模层到硬件层的轴绑定）
+  virtual Result SetJointBinding(const std::vector<int32_t>& /*model_index_to_drive_id*/) {
+    return Result::FunctionNotSupported;
+  }
+
+  /// @brief 清除当前的轴绑定映射表
+  virtual void ClearJointBinding() {}
+
+  /// @brief 获取当前的 model index → drive id 映射表
+  virtual std::vector<int32_t> GetJointBinding() const {
+    return {};
+  }
+
+  /// @brief 获取真实的硬件伺服驱动器数量（不含绑定映射）
+  virtual int GetDriveNum() const {
+    return 0;
+  }
+
+  /// @brief 获取所有硬件伺服驱动器的 id 列表
+  virtual std::vector<int32_t> GetDriveIds() const {
+    return {};
+  }
 
 };
 }  // namespace rocos

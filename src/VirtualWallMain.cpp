@@ -135,6 +135,9 @@ public:
                                   rocos::JntArray&) override {
         return rocos::Result::NoError;
     }
+
+    int GetJointNum() const override { return 7; }
+    std::vector<std::string> GetJointNames() const override { return {}; }
 };
 
 /// 透传控制器：GenerateCmd 直接将 Reference 转为 JntArray

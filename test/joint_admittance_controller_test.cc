@@ -21,7 +21,9 @@
 
 #include <cmath>
 #include <limits>
+#include <string>
 #include <variant>
+#include <vector>
 
 #include <test/doctest.h>
 
@@ -132,6 +134,9 @@ public:
                                   rocos::JntArray&) override {
         return rocos::Result::NoError;
     }
+
+    int GetJointNum() const override { return 7; }
+    std::vector<std::string> GetJointNames() const override { return {}; }
 };
 
 rocos::JntArray makeJntArray(unsigned int n, double start = 1.0) {

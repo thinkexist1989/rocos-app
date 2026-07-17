@@ -1,28 +1,28 @@
 openapi: 3.0.1
 info:
-  title: ROCOS  API
-  description: 替代 gRPC 的 HTTP/JSON 机器人控制器接口，支持多语言、跨平台低门槛集成。
-  version: 1.0.0
+  title: ROCOS API
+  description: 机器人控制器 HTTP/JSON 接口，替代 gRPC，支持多语言跨平台集成。
+  version: 2.0.0
 tags:
   - name: 机器人状态与信息
   - name: 基础控制
   - name: 空间运动控制 (Motion)
-  - name: 单轴/多轴控制
-  - name: 拖拽示教
-  - name: 标定与坐标系
+  - name: 点动控制 (Jogging)
+  - name: 坐标系管理 (Frame)
+  - name: 标定
   - name: Lua 脚本
 paths:
+  # ==========================================================================
+  # 机器人状态与信息
+  # ==========================================================================
   /api/robot/state:
     get:
-      summary: 获取机器人完整状态
-      deprecated: false
-      description: 包含关节状态、笛卡尔位姿（法兰、工具、工件）及硬件总线状态
-      tags:
-        - 机器人状态与信息
-      parameters: []
+      summary: 获取机器人完整状态快照
+      description: 包含 FSM 状态、关节数据、笛卡尔位姿（法兰、激活工具系、激活工件系）及硬件总线摘要
+      tags: [机器人状态与信息]
       responses:
         '200':
-          description: 成功获取机器人状态
+          description: 成功
           content:
             application/json:
               schema:
@@ -32,16 +32,12 @@ paths:
                     properties:
                       data:
                         $ref: '#/components/schemas/RobotStateData'
-          headers: {}
-      security: []
+
   /api/robot/info:
     get:
-      summary: 获取机器人信息
-      deprecated: false
-      description: 获取关节传动比、脉冲数、零点偏移等参数
-      tags:
-        - 机器人状态与信息
-      parameters: []
+      summary: 获取机器人参数信息
+      description: 返回各关节的传动比、编码器脉冲数、零点偏移等配置参数
+      tags: [机器人状态与信息]
       responses:
         '200':
           description: 成功
@@ -54,37 +50,27 @@ paths:
                     properties:
                       data:
                         $ref: '#/components/schemas/RobotInfoData'
-          headers: {}
-      security: []
+
   /api/robot/urdf:
     get:
-      summary: 获取机器人 URDF 模型结构
-      deprecated: false
-      description: ''
-      tags:
-        - 机器人状态与信息
-      parameters: []
+      summary: 获取机器人 URDF 模型 XML
+      tags: [机器人状态与信息]
       responses:
         '200':
-          description: 成功
+          description: 返回 URDF XML 文本
           content:
             text/xml:
               schema:
-                allOf:
-                  - $ref: '#/components/schemas/StandardResponse'
-          headers: {}
-      security: []
+                type: string
+
   /api/robot/urdf/mesh:
     get:
       summary: 获取连杆 3D Mesh 文件 (STL)
-      deprecated: false
-      description: ''
-      tags:
-        - 机器人状态与信息
+      tags: [机器人状态与信息]
       parameters:
         - name: path
           in: query
-          description: 'STL文件的相对路径，例如: link1.stl'
+          description: STL 文件相对路径，支持 package:// 格式
           required: true
           schema:
             type: string
@@ -96,16 +82,11 @@ paths:
               schema:
                 type: string
                 format: binary
-          headers: {}
-      security: []
+
   /api/robot/enabled:
     get:
       summary: 查询使能状态
-      deprecated: false
-      description: ''
-      tags:
-        - 基础控制
-      parameters: []
+      tags: [机器人状态与信息]
       responses:
         '200':
           description: 成功
@@ -118,16 +99,14 @@ paths:
                     properties:
                       data:
                         $ref: '#/components/schemas/RobotEnabledData'
-          headers: {}
-      security: []
+
+  # ==========================================================================
+  # 基础控制
+  # ==========================================================================
   /api/robot/enable:
     post:
       summary: 全局使能机器人
-      deprecated: false
-      description: ''
-      tags:
-        - 基础控制
-      parameters: []
+      tags: [基础控制]
       responses:
         '200':
           description: 使能成功
@@ -135,40 +114,30 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/StandardResponse'
-          headers: {}
-      security: []
+
   /api/robot/disable:
     post:
-      summary: 全局下电/关闭使能
-      deprecated: false
-      description: ''
-      tags:
-        - 基础控制
-      parameters: []
+      summary: 全局下电 / 关闭使能
+      tags: [基础控制]
       responses:
         '200':
-          description: 禁用成功
+          description: 下电成功
           content:
             application/json:
               schema:
                 $ref: '#/components/schemas/StandardResponse'
-          headers: {}
-      security: []
+
   /api/robot/workmode:
     post:
       summary: 设置工作模式
-      deprecated: false
-      description: ''
-      tags:
-        - 基础控制
-      parameters: []
+      tags: [基础控制]
       requestBody:
+        required: true
         content:
           application/json:
             schema:
               type: object
-              required:
-                - mode
+              required: [mode]
               properties:
                 mode:
                   type: string
@@ -178,366 +147,261 @@ paths:
                     - jnt_admit_teach
                     - jnt_imp
                     - cart_imp
-        required: true
       responses:
         '200':
           description: 模式切换成功
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/StandardResponse'
-          headers: {}
-      security: []
-  /api/move/joint:
+
+  # ==========================================================================
+  # 空间运动控制 (Motion)
+  # ==========================================================================
+  /api/robot/movej:
     post:
       summary: 关节空间运动 (MoveJ)
-      deprecated: false
-      description: ''
-      tags:
-        - 空间运动控制 (Motion)
-      parameters: []
+      tags: [空间运动控制 (Motion)]
       requestBody:
+        required: true
         content:
           application/json:
             schema:
               type: object
-              required:
-                - joints
+              required: [joints]
               properties:
                 joints:
                   type: array
+                  description: 目标关节角度 [rad]，长度必须等于机器人关节数
                   items:
                     type: number
-                  description: 目标关节角度（弧度）数组
-                speed:
+                velocity:
                   type: number
-                  default: 1.05
+                  default: 1.0
+                  description: 速度限制
                 acceleration:
                   type: number
-                  default: 1.4
-                time:
+                  default: 2.0
+                jerk:
                   type: number
-                  default: 0
-                radius:
-                  type: number
-                  default: 0
-                asynchronous:
-                  type: boolean
-                  default: false
-        required: true
+                  default: 10.0
       responses:
         '200':
-          description: 运动请求已受理 (返回 data 视 asynchronous 参数而定)
+          description: 运动请求已受理
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/MoveResponse'
-          headers: {}
-      security: []
-  /api/move/joint_ik:
+                $ref: '#/components/schemas/MotionResponse'
+
+  /api/robot/movej_ik:
     post:
       summary: 笛卡尔位姿逆解运动 (MoveJ_IK)
-      deprecated: false
-      description: ''
-      tags:
-        - 空间运动控制 (Motion)
-      parameters: []
+      tags: [空间运动控制 (Motion)]
       requestBody:
+        required: true
         content:
           application/json:
             schema:
               type: object
-              required:
-                - pose
+              required: [pose]
               properties:
                 pose:
                   $ref: '#/components/schemas/Pose'
-                speed:
+                velocity:
                   type: number
-                  default: 1.05
+                  default: 1.0
                 acceleration:
                   type: number
-                  default: 1.4
-                time:
+                  default: 2.0
+                jerk:
                   type: number
-                  default: 0
-                radius:
-                  type: number
-                  default: 0
-                asynchronous:
-                  type: boolean
-                  default: false
-        required: true
+                  default: 10.0
       responses:
         '200':
           description: 成功
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/MoveResponse'
-          headers: {}
-      security: []
-  /api/move/linear:
+                $ref: '#/components/schemas/MotionResponse'
+
+  /api/robot/movel:
     post:
       summary: 笛卡尔直线运动 (MoveL)
-      deprecated: false
-      description: ''
-      tags:
-        - 空间运动控制 (Motion)
-      parameters: []
+      tags: [空间运动控制 (Motion)]
       requestBody:
+        required: true
         content:
           application/json:
             schema:
               type: object
-              required:
-                - pose
+              required: [pose]
               properties:
                 pose:
                   $ref: '#/components/schemas/Pose'
-                speed:
+                tool_name:
+                  type: string
+                  description: 可选，指定使用的工具坐标系名称
+                velocity:
                   type: number
-                  default: 1.05
+                  default: 1.0
                 acceleration:
                   type: number
-                  default: 1.4
-                time:
+                  default: 2.0
+                jerk:
                   type: number
-                  default: 0
-                radius:
-                  type: number
-                  default: 0
-                asynchronous:
-                  type: boolean
-                  default: false
-        required: true
+                  default: 10.0
       responses:
         '200':
           description: 成功
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/MoveResponse'
-          headers: {}
-      security: []
-  /api/move/linear_fk:
+                $ref: '#/components/schemas/MotionResponse'
+
+  /api/robot/movel_fk:
     post:
       summary: 关节空间直线运动 (MoveL_FK)
-      deprecated: false
-      description: ''
-      tags:
-        - 空间运动控制 (Motion)
-      parameters: []
+      tags: [空间运动控制 (Motion)]
       requestBody:
+        required: true
         content:
           application/json:
             schema:
               type: object
-              required:
-                - joints
+              required: [joints]
               properties:
                 joints:
                   type: array
+                  description: 目标关节角度 [rad]
                   items:
                     type: number
-                speed:
+                tool_name:
+                  type: string
+                  description: 可选，指定使用的工具坐标系名称
+                velocity:
                   type: number
-                  default: 1.05
+                  default: 1.0
                 acceleration:
                   type: number
-                  default: 1.4
-                time:
+                  default: 2.0
+                jerk:
                   type: number
-                  default: 0
-                radius:
-                  type: number
-                  default: 0
-                asynchronous:
-                  type: boolean
-                  default: false
-        required: true
+                  default: 10.0
       responses:
         '200':
           description: 成功
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/MoveResponse'
-          headers: {}
-      security: []
-  /api/move/circle:
+                $ref: '#/components/schemas/MotionResponse'
+
+  /api/robot/movec:
     post:
       summary: 笛卡尔圆弧运动 (MoveC)
-      deprecated: false
-      description: ''
-      tags:
-        - 空间运动控制 (Motion)
-      parameters: []
+      description: >
+        支持两种模式：圆心+角度 (center_frame + theta) 或三点圆弧 (pose_via + pose_goal)。
+        pose_start 可选，默认当前法兰位姿。
+      tags: [空间运动控制 (Motion)]
       requestBody:
+        required: true
         content:
           application/json:
             schema:
               type: object
-              required:
-                - pose_via
-                - pose_to
               properties:
+                pose_start:
+                  $ref: '#/components/schemas/Pose'
+                  description: 圆弧起点，默认当前法兰位姿
+                center_frame:
+                  $ref: '#/components/schemas/Pose'
+                  description: 圆心位姿（与 theta 配合）
+                theta:
+                  type: number
+                  description: 圆弧角度 [rad]（与 center_frame 配合）
                 pose_via:
                   $ref: '#/components/schemas/Pose'
+                  description: 圆弧经过点（与 pose_goal 配合）
+                pose_goal:
+                  $ref: '#/components/schemas/Pose'
+                  description: 圆弧终点（与 pose_via 配合）
                 pose_to:
                   $ref: '#/components/schemas/Pose'
-                speed:
+                  description: pose_goal 的别名
+                velocity:
                   type: number
-                  default: 0.25
+                  default: 1.0
                 acceleration:
                   type: number
-                  default: 1.2
-                time:
+                  default: 2.0
+                jerk:
                   type: number
-                  default: 0
-                radius:
-                  type: number
-                  default: 0
-                mode:
-                  type: string
-                  enum:
-                    - UNCONSTRAINED
-                    - FIXED
-                  default: UNCONSTRAINED
-                asynchronous:
-                  type: boolean
-                  default: false
-        required: true
+                  default: 10.0
       responses:
         '200':
           description: 成功
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/MoveResponse'
-          headers: {}
-      security: []
-  /api/move/path:
+                $ref: '#/components/schemas/MotionResponse'
+
+  /api/robot/pause:
     post:
-      summary: 路径点运动 (MoveP)
-      deprecated: false
-      description: ''
-      tags:
-        - 空间运动控制 (Motion)
-      parameters: []
-      requestBody:
-        content:
-          application/json:
-            schema:
-              type: object
-              required:
-                - pose
-              properties:
-                pose:
-                  $ref: '#/components/schemas/Pose'
-                speed:
-                  type: number
-                  default: 1.05
-                acceleration:
-                  type: number
-                  default: 1.4
-                time:
-                  type: number
-                  default: 0
-                radius:
-                  type: number
-                  default: 0
-                asynchronous:
-                  type: boolean
-                  default: false
-        required: true
+      summary: 暂停运动
+      tags: [空间运动控制 (Motion)]
       responses:
         '200':
-          description: 成功
+          description: 暂停请求结果
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/MoveResponse'
-          headers: {}
-      security: []
-  /api/move/pathway:
+                $ref: '#/components/schemas/MotionResponse'
+
+  /api/robot/resume:
     post:
-      summary: 多路点路径运动 (MovePath)
-      deprecated: false
-      description: >-
-        Not Implemented in the current server implementation. See server docs
-        and implementation for details.
-      tags:
-        - 空间运动控制 (Motion)
-      parameters: []
-      requestBody:
-        content:
-          application/json:
-            schema:
-              type: object
-              required:
-                - waypoints
-              properties:
-                waypoints:
-                  type: array
-                  items:
-                    type: object
-                    properties: {}
-                asynchronous:
-                  type: boolean
-                  default: false
-        required: true
+      summary: 继续运动
+      tags: [空间运动控制 (Motion)]
       responses:
         '200':
-          description: 成功
+          description: 继续请求结果
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/MoveResponse'
-          headers: {}
-        '501':
-          description: Not Implemented in server implementation
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/StandardResponse'
-          headers: {}
-      security: []
-      x-not-implemented: true
-  /api/move/stop:
+                $ref: '#/components/schemas/MotionResponse'
+
+  /api/robot/stop:
     post:
       summary: 停止运动
-      deprecated: false
-      description: ''
-      tags:
-        - 空间运动控制 (Motion)
-      parameters: []
+      tags: [空间运动控制 (Motion)]
       responses:
         '200':
-          description: 成功停止
+          description: 停止请求结果
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/StandardResponse'
-          headers: {}
-      security: []
-  /api/move/status:
+                $ref: '#/components/schemas/MotionResponse'
+
+  /api/robot/wait_move:
+    post:
+      summary: 等待当前运动结束（阻塞）
+      description: 先延时 20ms，再轮询 FSM 直到运动完成或进入 ERROR_STATE
+      tags: [空间运动控制 (Motion)]
+      responses:
+        '200':
+          description: 运动结束或出错
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MotionResponse'
+
+  /api/robot/move_status:
     get:
-      summary: 查询异步任务状态
-      deprecated: false
-      description: 供上层任务编排系统进行状态追踪和错误恢复
-      tags:
-        - 空间运动控制 (Motion)
+      summary: 查询运动/任务状态
+      tags: [空间运动控制 (Motion)]
       parameters:
         - name: task_id
           in: query
-          description: ''
-          required: true
+          required: false
           schema:
             type: string
       responses:
         '200':
-          description: 返回任务详情状态
+          description: 返回机器人状态与任务信息
           content:
             application/json:
               schema:
@@ -546,371 +410,565 @@ paths:
                   - type: object
                     properties:
                       data:
-                        $ref: '#/components/schemas/TaskStatusData'
-          headers: {}
-      security: []
-  /api/axis/single/enable:
+                        $ref: '#/components/schemas/MoveStatusData'
+
+  # ==========================================================================
+  # 点动控制 (Jogging) — 全部使用向量传递
+  # ==========================================================================
+  /api/robot/jog/joint:
     post:
-      summary: 单轴使能
-      deprecated: false
-      description: ''
-      tags:
-        - 单轴/多轴控制
-      parameters: []
+      summary: 关节点动
+      description: 传入与关节数等长的方向向量，每个元素为该关节的速度方向
+      tags: [点动控制 (Jogging)]
       requestBody:
-        content:
-          application/json:
-            schema:
-              type: object
-              required:
-                - id
-              properties:
-                id:
-                  type: integer
-                  description: 关节序号(从0开始)
         required: true
-      responses:
-        '200':
-          description: 成功
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/StandardResponse'
-          headers: {}
-      security: []
-  /api/axis/single/disable:
-    post:
-      summary: 单轴禁用
-      deprecated: false
-      description: ''
-      tags:
-        - 单轴/多轴控制
-      parameters: []
-      requestBody:
         content:
           application/json:
             schema:
               type: object
-              required:
-                - id
+              required: [joints]
               properties:
-                id:
-                  type: integer
-        required: true
-      responses:
-        '200':
-          description: 成功
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/StandardResponse'
-          headers: {}
-      security: []
-  /api/axis/single/move:
-    post:
-      summary: 单轴运动
-      deprecated: false
-      description: ''
-      tags:
-        - 单轴/多轴控制
-      parameters: []
-      requestBody:
-        content:
-          application/json:
-            schema:
-              type: object
-              required:
-                - id
-                - pos
-              properties:
-                id:
-                  type: integer
-                pos:
-                  type: number
-                  description: 目标位置
-                max_vel:
-                  type: number
-                  default: -1
-                max_acc:
-                  type: number
-                  default: -1
-                max_jerk:
-                  type: number
-                  default: -1
-                least_time:
-                  type: number
-                  default: -1
-                raw_data:
-                  type: boolean
-                  default: false
-        required: true
-      responses:
-        '200':
-          description: 成功
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/StandardResponse'
-          headers: {}
-      security: []
-  /api/axis/single/stop:
-    post:
-      summary: 单轴停止
-      deprecated: false
-      description: ''
-      tags:
-        - 单轴/多轴控制
-      parameters: []
-      requestBody:
-        content:
-          application/json:
-            schema:
-              type: object
-              required:
-                - id
-              properties:
-                id:
-                  type: integer
-        required: true
-      responses:
-        '200':
-          description: 成功
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/StandardResponse'
-          headers: {}
-      security: []
-  /api/axis/multi/enable:
-    post:
-      summary: 多轴统一使能
-      deprecated: false
-      description: ''
-      tags:
-        - 单轴/多轴控制
-      parameters: []
-      responses:
-        '200':
-          description: 成功
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/StandardResponse'
-          headers: {}
-      security: []
-  /api/axis/multi/disable:
-    post:
-      summary: 多轴统一下电
-      deprecated: false
-      description: ''
-      tags:
-        - 单轴/多轴控制
-      parameters: []
-      responses:
-        '200':
-          description: 成功
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/StandardResponse'
-          headers: {}
-      security: []
-  /api/axis/multi/move:
-    post:
-      summary: 多轴底层控制运动
-      deprecated: false
-      description: ''
-      tags:
-        - 单轴/多轴控制
-      parameters: []
-      requestBody:
-        content:
-          application/json:
-            schema:
-              type: object
-              required:
-                - target_pos
-                - max_vel
-                - max_acc
-                - max_jerk
-              properties:
-                target_pos:
+                joints:
                   type: array
+                  description: 关节方向向量，长度等于机器人关节数
                   items:
                     type: number
-                max_vel:
-                  type: array
-                  items:
-                    type: number
-                max_acc:
-                  type: array
-                  items:
-                    type: number
-                max_jerk:
-                  type: array
-                  items:
-                    type: number
-                least_time:
-                  type: number
-                  default: -1
-        required: true
-      responses:
-        '200':
-          description: 成功
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/StandardResponse'
-          headers: {}
-      security: []
-  /api/axis/multi/stop:
-    post:
-      summary: 多轴统一停止
-      deprecated: false
-      description: ''
-      tags:
-        - 单轴/多轴控制
-      parameters: []
-      responses:
-        '200':
-          description: 成功
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/StandardResponse'
-          headers: {}
-      security: []
-  /api/axis/multi/sync:
-    post:
-      summary: 设置多轴同步模式
-      deprecated: false
-      description: ''
-      tags:
-        - 单轴/多轴控制
-      parameters: []
-      requestBody:
-        content:
-          application/json:
-            schema:
-              type: object
-              required:
-                - sync
-              properties:
-                sync:
-                  type: string
-                  enum:
-                    - none
-                    - time
-                    - phase
-        required: true
-      responses:
-        '200':
-          description: 成功
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/StandardResponse'
-          headers: {}
-      security: []
-  /api/drag/start:
-    post:
-      summary: 启动拖拽示教
-      deprecated: false
-      description: ''
-      tags:
-        - 拖拽示教
-      parameters: []
-      requestBody:
-        content:
-          application/json:
-            schema:
-              type: object
-              required:
-                - flag
-                - direction
-              properties:
-                flag:
-                  type: string
-                  enum:
-                    - J0
-                    - J1
-                    - J2
-                    - J3
-                    - J4
-                    - J5
-                    - J6
-                    - TOOL_X
-                    - TOOL_Y
-                    - TOOL_Z
-                    - TOOL_ROLL
-                    - TOOL_PITCH
-                    - TOOL_YAW
-                    - FLANGE_X
-                    - FLANGE_Y
-                    - FLANGE_Z
-                    - FLANGE_ROLL
-                    - FLANGE_PITCH
-                    - FLANGE_YAW
-                    - OBJECT_X
-                    - OBJECT_Y
-                    - OBJECT_Z
-                    - OBJECT_ROLL
-                    - OBJECT_PITCH
-                    - OBJECT_YAW
-                    - BASE_X
-                    - BASE_Y
-                    - BASE_Z
-                    - BASE_ROLL
-                    - BASE_PITCH
-                    - BASE_YAW
-                    - NULLSPACE
                 direction:
                   type: string
-                  enum:
-                    - POSITIVE
-                    - NEGATIVE
-                    - NONE
-                max_speed:
+                  enum: [POSITIVE, NEGATIVE]
+                  default: POSITIVE
+                  description: 向量整体缩放符号（乘到每个元素上）
+                speed:
                   type: number
-                  default: 1
-                max_acceleration:
+                  default: 1.0
+                timeout:
                   type: number
-                  default: 2
-        required: true
+                  default: 0.1
+                dir_threshold:
+                  type: number
+                  default: 0.99
       responses:
         '200':
-          description: 成功
+          description: 点动请求结果
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/StandardResponse'
-          headers: {}
-      security: []
-  /api/drag/stop:
+                $ref: '#/components/schemas/MotionResponse'
+
+  /api/robot/jog/cartesian:
     post:
-      summary: 停止拖拽示教
-      deprecated: false
-      description: ''
-      tags:
-        - 拖拽示教
-      parameters: []
+      summary: 笛卡尔点动
+      description: >
+        传入 6 维 twist 向量 [vx, vy, vz, wx, wy, wz]，前 3 个为线速度，后 3 个为角速度。
+        可通过 frame 参数指定参考坐标系；Robot 层会将 FLANGE/TOOL/OBJECT 下的 twist 旋转到 BASE 后执行。
+      tags: [点动控制 (Jogging)]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [twist]
+              properties:
+                twist:
+                  type: array
+                  description: 6 维 twist [vx, vy, vz, wx, wy, wz]
+                  minItems: 6
+                  maxItems: 6
+                  items:
+                    type: number
+                frame:
+                  type: string
+                  enum: [BASE, FLANGE, TOOL, OBJECT]
+                  default: BASE
+                  description: >
+                    点动参考坐标系。BASE 表示 twist 已经在基坐标系表达；
+                    FLANGE 表示 twist 在当前法兰坐标系表达；
+                    TOOL 表示 twist 在当前激活工具坐标系表达；
+                    OBJECT 表示 twist 在当前激活工件坐标系表达。
+                direction:
+                  type: string
+                  enum: [POSITIVE, NEGATIVE]
+                  default: POSITIVE
+                speed:
+                  type: number
+                  default: 1.0
+                timeout:
+                  type: number
+                  default: 0.1
+                dir_threshold:
+                  type: number
+                  default: 0.99
+      responses:
+        '200':
+          description: 点动请求结果
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MotionResponse'
+
+  /api/robot/jog/nullspace:
+    post:
+      summary: 零空间点动
+      description: 传入与关节数等长的方向向量，在不影响末端位姿的零空间内运动
+      tags: [点动控制 (Jogging)]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [joints]
+              properties:
+                joints:
+                  type: array
+                  description: 关节方向向量，长度等于机器人关节数
+                  items:
+                    type: number
+                direction:
+                  type: string
+                  enum: [POSITIVE, NEGATIVE]
+                  default: POSITIVE
+                speed:
+                  type: number
+                  default: 1.0
+                timeout:
+                  type: number
+                  default: 0.1
+                dir_threshold:
+                  type: number
+                  default: 0.99
+      responses:
+        '200':
+          description: 点动请求结果
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MotionResponse'
+
+  /api/robot/jog/svd:
+    post:
+      summary: SVD 维度速度点动
+      description: 传入各维度的速度标量数组
+      tags: [点动控制 (Jogging)]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [dim_speeds]
+              properties:
+                dim_speeds:
+                  type: array
+                  description: 各维度速度标量
+                  items:
+                    type: number
+                timeout:
+                  type: number
+                  default: 0.1
+                dir_threshold:
+                  type: number
+                  default: 0.99
+      responses:
+        '200':
+          description: 点动请求结果
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MotionResponse'
+
+  /api/robot/jog/stop:
+    post:
+      summary: 停止点动
+      tags: [点动控制 (Jogging)]
+      responses:
+        '200':
+          description: 停止成功
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MotionResponse'
+
+  # ==========================================================================
+  # 坐标系管理 (Frame)
+  # ==========================================================================
+  /api/robot/tool_frames:
+    get:
+      summary: 获取所有工具坐标系名称列表
+      tags: [坐标系管理 (Frame)]
       responses:
         '200':
           description: 成功
           content:
             application/json:
               schema:
+                allOf:
+                  - $ref: '#/components/schemas/StandardResponse'
+                  - type: object
+                    properties:
+                      data:
+                        $ref: '#/components/schemas/FrameNameList'
+
+  /api/robot/object_frames:
+    get:
+      summary: 获取所有工件坐标系名称列表
+      tags: [坐标系管理 (Frame)]
+      responses:
+        '200':
+          description: 成功
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/StandardResponse'
+                  - type: object
+                    properties:
+                      data:
+                        $ref: '#/components/schemas/FrameNameList'
+
+  /api/robot/tool_frame:
+    get:
+      summary: 查询指定工具坐标系
+      tags: [坐标系管理 (Frame)]
+      parameters:
+        - name: name
+          in: query
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: 成功或未找到
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/StandardResponse'
+                  - type: object
+                    properties:
+                      data:
+                        $ref: '#/components/schemas/NamedFrame'
+    post:
+      summary: 设置/新增工具坐标系
+      tags: [坐标系管理 (Frame)]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [name, frame]
+              properties:
+                name:
+                  type: string
+                  description: 坐标系名称（字母/数字/下划线/短横/点号，≤64 字符）
+                frame:
+                  $ref: '#/components/schemas/Pose'
+                pose:
+                  $ref: '#/components/schemas/Pose'
+                  description: frame 的别名
+      responses:
+        '200':
+          description: 操作结果
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/StandardResponse'
+                  - type: object
+                    properties:
+                      data:
+                        $ref: '#/components/schemas/NamedFrame'
+    delete:
+      summary: 删除指定工具坐标系
+      tags: [坐标系管理 (Frame)]
+      parameters:
+        - name: name
+          in: query
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: 操作结果
+          content:
+            application/json:
+              schema:
                 $ref: '#/components/schemas/StandardResponse'
-          headers: {}
-      security: []
+
+  /api/robot/object_frame:
+    get:
+      summary: 查询指定工件坐标系
+      tags: [坐标系管理 (Frame)]
+      parameters:
+        - name: name
+          in: query
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: 成功或未找到
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/StandardResponse'
+                  - type: object
+                    properties:
+                      data:
+                        $ref: '#/components/schemas/NamedFrame'
+    post:
+      summary: 设置/新增工件坐标系
+      tags: [坐标系管理 (Frame)]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [name, frame]
+              properties:
+                name:
+                  type: string
+                frame:
+                  $ref: '#/components/schemas/Pose'
+                pose:
+                  $ref: '#/components/schemas/Pose'
+      responses:
+        '200':
+          description: 操作结果
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/StandardResponse'
+                  - type: object
+                    properties:
+                      data:
+                        $ref: '#/components/schemas/NamedFrame'
+    delete:
+      summary: 删除指定工件坐标系
+      tags: [坐标系管理 (Frame)]
+      parameters:
+        - name: name
+          in: query
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: 操作结果
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/StandardResponse'
+
+  /api/robot/active_tool_frame:
+    post:
+      summary: 激活指定工具坐标系
+      tags: [坐标系管理 (Frame)]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [name]
+              properties:
+                name:
+                  type: string
+      responses:
+        '200':
+          description: 操作结果
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/StandardResponse'
+
+  /api/robot/active_object_frame:
+    post:
+      summary: 激活指定工件坐标系
+      tags: [坐标系管理 (Frame)]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [name]
+              properties:
+                name:
+                  type: string
+      responses:
+        '200':
+          description: 操作结果
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/StandardResponse'
+
+  /api/robot/frames/load:
+    post:
+      summary: 从 YAML 文件加载坐标系
+      tags: [坐标系管理 (Frame)]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [path]
+              properties:
+                path:
+                  type: string
+                  description: YAML 文件路径
+      responses:
+        '200':
+          description: 加载结果
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/StandardResponse'
+                  - type: object
+                    properties:
+                      data:
+                        $ref: '#/components/schemas/FramesSnapshot'
+
+  /api/robot/frames/save:
+    post:
+      summary: 保存坐标系到 YAML 文件
+      tags: [坐标系管理 (Frame)]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [path]
+              properties:
+                path:
+                  type: string
+      responses:
+        '200':
+          description: 保存结果
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/StandardResponse'
+                  - type: object
+                    properties:
+                      data:
+                        $ref: '#/components/schemas/FramesSnapshot'
+
+  # ==========================================================================
+  # 标定
+  # ==========================================================================
+  /api/calibration/pose:
+    post:
+      summary: 设置标定点位
+      deprecated: true
+      description: 当前未实现，返回 code=1004
+      tags: [标定]
+      responses:
+        '200':
+          description: 未实现
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/StandardResponse'
+
+  /api/calibration/tool:
+    post:
+      summary: 设置工具坐标系（等同 POST /api/robot/tool_frame）
+      tags: [标定]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [name, frame]
+              properties:
+                name:
+                  type: string
+                frame:
+                  $ref: '#/components/schemas/Pose'
+                pose:
+                  $ref: '#/components/schemas/Pose'
+      responses:
+        '200':
+          description: 操作结果
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/StandardResponse'
+
+  /api/calibration/object:
+    post:
+      summary: 设置工件坐标系（等同 POST /api/robot/object_frame）
+      tags: [标定]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [name, frame]
+              properties:
+                name:
+                  type: string
+                frame:
+                  $ref: '#/components/schemas/Pose'
+                pose:
+                  $ref: '#/components/schemas/Pose'
+      responses:
+        '200':
+          description: 操作结果
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/StandardResponse'
+
+  /api/calibration/run:
+    post:
+      summary: 执行标定计算
+      deprecated: true
+      description: 当前未实现，返回 code=1004
+      tags: [标定]
+      responses:
+        '200':
+          description: 未实现
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/StandardResponse'
+
+  /api/calibration/result:
+    get:
+      summary: 获取标定结果
+      deprecated: true
+      description: 当前未实现，返回 code=1004
+      tags: [标定]
+      responses:
+        '200':
+          description: 未实现
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/StandardResponse'
+
+  # ==========================================================================
+  # Lua 脚本
+  # ==========================================================================
   /api/script/upload:
     post:
       summary: 上传并编译 Lua 脚本
-      deprecated: false
-      description: 脚本仅加载到内存，不写入服务器文件系统；成功后进入 LOADED 状态。
-      tags:
-        - Lua 脚本
-      parameters: []
+      description: 脚本仅加载到内存，不写入文件系统；成功后进入 LOADED 状态
+      tags: [Lua 脚本]
       requestBody:
         required: true
         content:
@@ -919,20 +977,17 @@ paths:
               $ref: '#/components/schemas/ScriptUploadRequest'
       responses:
         '200':
-          description: 上传成功或返回脚本编译/状态错误
+          description: 上传结果
           content:
             application/json:
               schema:
                 $ref: '#/components/schemas/ScriptResponse'
-      security: []
+
   /api/script/run:
     post:
       summary: 异步执行已加载的 Lua 脚本
-      deprecated: false
-      description: 立即返回；通过脚本状态接口查询执行进度与结果。
-      tags:
-        - Lua 脚本
-      parameters: []
+      description: 立即返回；通过 status 接口查询进度
+      tags: [Lua 脚本]
       responses:
         '200':
           description: 执行请求结果
@@ -940,79 +995,60 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/ScriptResponse'
-      security: []
+
   /api/script/pause:
     post:
       summary: 暂停 Lua 脚本
-      deprecated: false
-      description: 脚本正在执行运动时，同时请求暂停机器人运动。
-      tags:
-        - Lua 脚本
-      parameters: []
+      tags: [Lua 脚本]
       responses:
         '200':
-          description: 暂停请求结果
+          description: 暂停结果
           content:
             application/json:
               schema:
                 $ref: '#/components/schemas/ScriptResponse'
-      security: []
+
   /api/script/resume:
     post:
       summary: 继续 Lua 脚本
-      deprecated: false
-      description: 脚本包含暂停中的运动时，同时继续机器人运动。
-      tags:
-        - Lua 脚本
-      parameters: []
+      tags: [Lua 脚本]
       responses:
         '200':
-          description: 继续请求结果
+          description: 继续结果
           content:
             application/json:
               schema:
                 $ref: '#/components/schemas/ScriptResponse'
-      security: []
+
   /api/script/stop:
     post:
       summary: 停止 Lua 脚本
-      deprecated: false
-      description: 安全停止脚本及其活动机器人运动。
-      tags:
-        - Lua 脚本
-      parameters: []
+      tags: [Lua 脚本]
       responses:
         '200':
-          description: 停止请求结果
+          description: 停止结果
           content:
             application/json:
               schema:
                 $ref: '#/components/schemas/ScriptResponse'
-      security: []
+
   /api/script/step:
     post:
       summary: 单步执行 Lua 脚本
-      deprecated: false
-      description: 执行至下一个有效 Lua source line 后暂停。
-      tags:
-        - Lua 脚本
-      parameters: []
+      description: 执行至下一个有效行后暂停
+      tags: [Lua 脚本]
       responses:
         '200':
-          description: 单步请求结果
+          description: 单步结果
           content:
             application/json:
               schema:
                 $ref: '#/components/schemas/ScriptResponse'
-      security: []
+
   /api/script/status:
     get:
       summary: 获取 Lua 脚本状态
-      deprecated: false
-      description: 返回当前脚本、source location、运行错误、运动状态和断点列表。
-      tags:
-        - Lua 脚本
-      parameters: []
+      tags: [Lua 脚本]
       responses:
         '200':
           description: 当前脚本状态
@@ -1020,15 +1056,11 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/ScriptResponse'
-      security: []
+
   /api/script/breakpoint/add:
     post:
-      summary: 添加 Lua 脚本断点
-      deprecated: false
-      description: ''
-      tags:
-        - Lua 脚本
-      parameters: []
+      summary: 添加断点
+      tags: [Lua 脚本]
       requestBody:
         required: true
         content:
@@ -1042,15 +1074,11 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/ScriptResponse'
-      security: []
+
   /api/script/breakpoint/remove:
     post:
-      summary: 删除 Lua 脚本断点
-      deprecated: false
-      description: ''
-      tags:
-        - Lua 脚本
-      parameters: []
+      summary: 删除断点
+      tags: [Lua 脚本]
       requestBody:
         required: true
         content:
@@ -1064,15 +1092,11 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/ScriptResponse'
-      security: []
+
   /api/script/breakpoint/clear:
     post:
-      summary: 清空 Lua 脚本断点
-      deprecated: false
-      description: ''
-      tags:
-        - Lua 脚本
-      parameters: []
+      summary: 清空所有断点
+      tags: [Lua 脚本]
       responses:
         '200':
           description: 清空结果
@@ -1080,244 +1104,93 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/ScriptResponse'
-      security: []
-  /api/calibration/pose:
-    post:
-      summary: 设置标定点位 (Set Pose Frame)
-      deprecated: false
-      description: ''
-      tags:
-        - 标定与坐标系
-      parameters: []
-      requestBody:
-        content:
-          application/json:
-            schema:
-              type: object
-              required:
-                - id
-                - pose
-              properties:
-                id:
-                  type: integer
-                  description: 点位序号
-                pose:
-                  $ref: '#/components/schemas/Pose'
-        required: true
-      responses:
-        '200':
-          description: 成功
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/StandardResponse'
-          headers: {}
-      security: []
-  /api/calibration/tool:
-    post:
-      summary: 手动设置工具坐标系
-      deprecated: false
-      description: ''
-      tags:
-        - 标定与坐标系
-      parameters: []
-      requestBody:
-        content:
-          application/json:
-            schema:
-              type: object
-              required:
-                - pose
-              properties:
-                pose:
-                  $ref: '#/components/schemas/Pose'
-        required: true
-      responses:
-        '200':
-          description: 成功
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/StandardResponse'
-          headers: {}
-      security: []
-  /api/calibration/object:
-    post:
-      summary: 手动设置工件坐标系
-      deprecated: false
-      description: ''
-      tags:
-        - 标定与坐标系
-      parameters: []
-      requestBody:
-        content:
-          application/json:
-            schema:
-              type: object
-              required:
-                - pose
-              properties:
-                pose:
-                  $ref: '#/components/schemas/Pose'
-        required: true
-      responses:
-        '200':
-          description: 成功
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/StandardResponse'
-          headers: {}
-      security: []
-  /api/calibration/run:
-    post:
-      summary: 执行标定计算
-      deprecated: false
-      description: ''
-      tags:
-        - 标定与坐标系
-      parameters: []
-      requestBody:
-        content:
-          application/json:
-            schema:
-              type: object
-              required:
-                - frame
-              properties:
-                frame:
-                  type: string
-                  enum:
-                    - tool
-                    - object
-        required: true
-      responses:
-        '200':
-          description: 标定成功或失败 (详见错误码 4001-4004)
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/StandardResponse'
-          headers: {}
-      security: []
-  /api/calibration/result:
-    get:
-      summary: 获取标定结果
-      deprecated: false
-      description: ''
-      tags:
-        - 标定与坐标系
-      parameters: []
-      responses:
-        '200':
-          description: 成功
-          content:
-            application/json:
-              schema:
-                allOf:
-                  - $ref: '#/components/schemas/StandardResponse'
-                  - type: object
-                    properties:
-                      data:
-                        $ref: '#/components/schemas/CalibrationResultData'
-          headers: {}
-      security: []
+
+# ============================================================================
+# Components / Schemas
+# ============================================================================
 components:
   schemas:
     StandardResponse:
       type: object
-      required:
-        - success
-        - code
-        - message
+      required: [success, code, message]
       properties:
         success:
           type: boolean
-          description: 请求是否成功
         code:
           type: integer
-          description: >-
-            业务状态码。0: 成功, 1xxx: 参数错误, 2xxx: 运动规划错误, 3xxx: 状态错误, 4xxx: 标定错误, 5xxx:
-            异步任务错误, -6xxx: Lua 脚本错误
+          description: >
+            业务状态码。0: 成功, 1xxx: 参数错误, 2xxx: 运动/规划错误,
+            3xxx: 状态错误, 4xxx: 标定错误, 5xxx: 异步任务错误, -6xxx: Lua 错误
         message:
           type: string
-          description: 状态描述信息
         data:
           type: object
-          description: 具体业务数据
-          properties: {}
           nullable: true
+
     Pose:
       type: object
       properties:
         position:
           type: object
           properties:
-            x:
-              type: number
-              default: 0
-            'y':
-              type: number
-              default: 0
-            z:
-              type: number
-              default: 0
+            x: { type: number, default: 0 }
+            'y': { type: number, default: 0 }
+            z: { type: number, default: 0 }
         orientation:
           type: object
           properties:
-            x:
-              type: number
-              default: 0
-            'y':
-              type: number
-              default: 0
-            z:
-              type: number
-              default: 0
-            w:
-              type: number
-              default: 1
-    NullableVector3:
+            x: { type: number, default: 0 }
+            'y': { type: number, default: 0 }
+            z: { type: number, default: 0 }
+            w: { type: number, default: 1 }
+
+    RobotStateData:
       type: object
       properties:
-        x:
-          type: number
-          default: 0
-          nullable: true
-        'y':
-          type: number
-          default: 0
-          nullable: true
-        z:
-          type: number
-          default: 0
-          nullable: true
-    CalibrationResultPose:
+        robot_state:
+          type: string
+          enum:
+            [IDLE, ENABLING, DISABLING, STARTING, STOPPING, PAUSING, RESUMING,
+             RESETTING, RUNNING, PAUSED, STOPPED, SERVOING, ERROR_STATE]
+        is_enabled:     { type: boolean }
+        is_running:     { type: boolean }
+        control_active: { type: boolean }
+        motion_busy:    { type: boolean }
+        timestamp:      { type: number, description: "快照时刻 (epoch seconds)" }
+        joint_states:
+          type: array
+          items:
+            $ref: '#/components/schemas/JointState'
+        flange:
+          $ref: '#/components/schemas/Pose'
+        active_tool_frame_name:
+          type: string
+        active_tool_frame:
+          $ref: '#/components/schemas/Pose'
+        active_object_frame_name:
+          type: string
+        active_object_frame:
+          $ref: '#/components/schemas/Pose'
+        hw_state:
+          $ref: '#/components/schemas/HardwareState'
+
+    JointState:
       type: object
       properties:
-        position:
-          $ref: '#/components/schemas/NullableVector3'
-        orientation:
-          type: object
-          properties:
-            x:
-              type: number
-              default: 0
-            'y':
-              type: number
-              default: 0
-            z:
-              type: number
-              default: 0
-            w:
-              type: number
-              default: 1
-    RobotEnabledData:
+        id:          { type: integer }
+        name:        { type: string }
+        position:    { type: number }
+        velocity:    { type: number }
+        torque:      { type: number }
+        load_torque: { type: number }
+        status:      { type: integer, description: "0: disabled, 1: fault, 2: enabled" }
+
+    HardwareState:
       type: object
       properties:
-        enabled:
-          type: boolean
-          example: true
+        joint_num: { type: integer }
+        state:     { type: integer, description: "0: DISABLED, 1: ENABLED, 2: ERROR" }
+
     RobotInfoData:
       type: object
       properties:
@@ -1326,196 +1199,122 @@ components:
           items:
             type: object
             properties:
-              name:
-                type: string
-                example: Slave_1000[ SIM ]
-              cnt_per_unit:
-                type: number
-                example: 156455.678
-              torque_per_unit:
-                type: number
-                example: 1
-              ratio:
-                type: number
-                example: 1
-              unit_name:
-                type: string
-                example: rad
-              zero_offset:
-                type: integer
-                example: 0
-    RobotStateData:
+              id:              { type: integer }
+              name:            { type: string }
+              cnt_per_unit:    { type: number }
+              torque_per_unit: { type: number }
+              ratio:           { type: number }
+              unit_name:       { type: string }
+              zero_offset:     { type: integer }
+
+    RobotEnabledData:
       type: object
       properties:
-        joint_states:
+        enabled:     { type: boolean }
+        disabled:    { type: boolean }
+        robot_state: { type: string }
+
+    MotionResponse:
+      allOf:
+        - $ref: '#/components/schemas/StandardResponse'
+        - type: object
+          properties:
+            data:
+              type: object
+              properties:
+                robot_state:    { type: string }
+                control_active: { type: boolean }
+                motion_busy:    { type: boolean, description: "WaitMove 专用" }
+
+    MoveStatusData:
+      type: object
+      properties:
+        robot_state:    { type: string }
+        is_running:     { type: boolean }
+        control_active: { type: boolean }
+        task_id:        { type: string }
+        task:
+          type: object
+          nullable: true
+
+    FrameNameList:
+      type: object
+      properties:
+        names:
           type: array
           items:
-            type: object
-            properties:
-              name:
-                type: string
-                example: Slave_1000[ SIM ]
-              position:
-                type: number
-                example: 0
-              velocity:
-                type: number
-                example: 0
-              torque:
-                type: number
-                example: 0
-              load_torque:
-                type: number
-                example: 0
-              status:
-                type: integer
-                description: '0: disabled, 1: fault, 2: enabled'
-                example: 2
-        flange:
-          $ref: '#/components/schemas/Pose'
-        tool:
-          $ref: '#/components/schemas/Pose'
-        object:
-          $ref: '#/components/schemas/Pose'
-        hw_state:
-          type: object
-          properties:
-            hw_type:
-              type: integer
-              description: '1: simulation, 2: EtherCAT'
-              example: 1
-            current_cycle_time:
-              type: number
-              example: 1006.8407922546279
-            min_cycle_time:
-              type: number
-              example: 990.153963721232
-            max_cycle_time:
-              type: number
-              example: 1009.6510057264206
-            slave_num:
-              type: integer
-              example: 20
-    CalibrationResultData:
+            type: string
+        active:
+          type: string
+          description: 当前激活的坐标系名称
+
+    NamedFrame:
       type: object
       properties:
-        error_state:
-          type: boolean
-          example: false
-        pose:
-          $ref: '#/components/schemas/CalibrationResultPose'
-    TaskStatusData:
+        name:
+          type: string
+        frame:
+          $ref: '#/components/schemas/Pose'
+
+    FramesSnapshot:
       type: object
       properties:
-        task_id:
+        path:
           type: string
-          example: a1b2c3d4-e5f6-7890-abcd-ef1234567890
-        type:
+        tool_frames:
+          type: array
+          items:
+            type: string
+        object_frames:
+          type: array
+          items:
+            type: string
+        active_tool_frame:
           type: string
-          example: MoveJ
-        status:
+        active_object_frame:
           type: string
-          enum:
-            - RUNNING
-            - COMPLETED
-            - FAILED
-            - STOPPED
-          example: COMPLETED
-        result:
-          type: integer
-          example: 0
-        message:
-          type: string
-          example: ok
-        create_time:
-          type: string
-          format: date-time
-          example: '2025-06-03T14:30:00Z'
-        finish_time:
-          type: string
-          format: date-time
-          example: '2025-06-03T14:30:02Z'
+
     ScriptUploadRequest:
       type: object
-      required:
-        - filename
-        - source
+      required: [filename, source]
       properties:
         filename:
           type: string
-          description: 用于错误定位和断点匹配的逻辑文件名
-          example: pick_and_place.lua
         source:
           type: string
-          description: UTF-8 Lua source code
-          example: "robot.Sleep(100)\n"
+          description: UTF-8 Lua 源码
+
     ScriptBreakpointRequest:
       type: object
-      required:
-        - filename
-        - line
+      required: [filename, line]
       properties:
-        filename:
-          type: string
-          example: pick_and_place.lua
-        line:
-          type: integer
-          minimum: 1
-          example: 12
+        filename: { type: string }
+        line:     { type: integer, minimum: 1 }
+
     ScriptBreakpoint:
       type: object
-      required:
-        - filename
-        - line
+      required: [filename, line]
       properties:
-        filename:
-          type: string
-        line:
-          type: integer
-          minimum: 1
+        filename: { type: string }
+        line:     { type: integer, minimum: 1 }
+
     ScriptStatusData:
       type: object
-      required:
-        - state
-        - script_id
-        - filename
-        - line
-        - error
-        - motion_active
-        - breakpoints
+      required: [state, script_id, filename, line, error, motion_active, breakpoints]
       properties:
         state:
           type: string
-          enum:
-            - EMPTY
-            - LOADED
-            - RUNNING
-            - PAUSING
-            - PAUSED
-            - STOPPING
-            - COMPLETED
-            - FAILED
-            - STOPPED
-        script_id:
-          type: string
-          example: script_1
-        filename:
-          type: string
-          example: pick_and_place.lua
-        line:
-          type: integer
-          minimum: 0
-          example: 12
-        error:
-          type: string
-          example: ''
-        motion_active:
-          type: boolean
-          example: false
+          enum: [EMPTY, LOADED, RUNNING, PAUSING, PAUSED, STOPPING, COMPLETED, FAILED, STOPPED]
+        script_id:     { type: string }
+        filename:      { type: string }
+        line:          { type: integer, minimum: 0 }
+        error:         { type: string }
+        motion_active: { type: boolean }
         breakpoints:
           type: array
           items:
             $ref: '#/components/schemas/ScriptBreakpoint'
+
     ScriptResponse:
       allOf:
         - $ref: '#/components/schemas/StandardResponse'
@@ -1523,37 +1322,7 @@ components:
           properties:
             data:
               $ref: '#/components/schemas/ScriptStatusData'
-    MoveResponse:
-      allOf:
-        - $ref: '#/components/schemas/StandardResponse'
-        - type: object
-          properties:
-            data:
-              oneOf:
-                - type: object
-                  description: 异步执行时 (asynchronous=true) 返回的数据
-                  required:
-                    - task_id
-                  properties:
-                    task_id:
-                      type: string
-                      example: task_1
-                    status:
-                      type: string
-                      example: RUNNING
-                    message:
-                      type: string
-                      example: task created
-                - type: object
-                  description: 同步执行时 (asynchronous=false) 返回的数据
-                  properties:
-                    result:
-                      type: integer
-                      example: 0
-                    message:
-                      type: string
-                      example: ok
-              type: 'null'
+
   responses: {}
   securitySchemes: {}
 servers: []

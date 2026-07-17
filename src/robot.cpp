@@ -26,6 +26,7 @@
 #include <chrono>
 #include <cctype>
 #include <fstream>
+#include <sstream>
 
 #include "hardware.hpp"
 
@@ -133,6 +134,24 @@ namespace {
         return names;
     }
 
+    std::string joinNames(const std::vector<std::string> &names) {
+        std::ostringstream oss;
+        for (size_t i = 0; i < names.size(); ++i) {
+            if (i > 0) oss << ", ";
+            oss << names[i];
+        }
+        return oss.str();
+    }
+
+    std::string joinDriveIds(const std::vector<int32_t> &ids) {
+        std::ostringstream oss;
+        for (size_t i = 0; i < ids.size(); ++i) {
+            if (i > 0) oss << ", ";
+            oss << ids[i];
+        }
+        return oss.str();
+    }
+
     YAML::Node frameToYaml(const rocos::Frame &frame) {
         YAML::Node node;
         node["position"].push_back(frame.p.x());
@@ -179,6 +198,10 @@ namespace {
             node[frame.first] = frameToYaml(frame.second);
         }
         return node;
+    }
+
+    rocos::Twist rotateTwist(const rocos::Twist &twist, const KDL::Rotation &rotation) {
+        return rocos::Twist(rotation * twist.vel, rotation * twist.rot);
     }
 
     bool yamlToFrameMap(const YAML::Node &node, std::map<std::string, rocos::Frame> &frames) {
@@ -478,8 +501,76 @@ namespace rocos {
 
         hardware = std::make_unique<Hardware>("hardware_talon_config.yaml", 0); //TODO: 初始化Hardware指针，后续路径需要从配置文件加载
         model = std::make_unique<Model>("robot.urdf", "base_link", "link_7"); //TODO：初始化Model指针，后续路径需要从配置文件加载
-        controller = std::make_unique<PositionController>(); //TODO： 默认加载位置控制器
 
+        // --- JointBinding 初始化：在 controller 创建之前完成轴绑定 ---
+        {
+            const auto model_joint_names = model->GetJointNames();
+            const auto hardware_drive_ids = hardware->GetDriveIds();
+
+            log_ptr_->info("JointBinding 开始初始化: model joints={} [{}], hw drives={} [{}], yaml={}",
+                           model_joint_names.size(), joinNames(model_joint_names),
+                           hardware_drive_ids.size(), joinDriveIds(hardware_drive_ids),
+                           joint_binding_path_);
+
+            joint_binding_ = std::make_unique<JointBinding>();
+            Result rc = joint_binding_->Configure(model_joint_names, hardware_drive_ids);
+            if (rc != Result::NoError) {
+                log_ptr_->error("JointBinding Configure 失败: model joints={}, hw drives={}",
+                                model_joint_names.size(), hardware_drive_ids.size());
+                throw std::runtime_error("JointBinding Configure failed: model joints="
+                    + std::to_string(model_joint_names.size()) + " hw drives="
+                    + std::to_string(hardware_drive_ids.size()));
+            }
+
+            // 检查 joint_binding.yaml 是否存在
+            std::ifstream binding_file(joint_binding_path_);
+            if (binding_file.good()) {
+                log_ptr_->info("发现 JointBinding YAML，使用显式绑定: {}", joint_binding_path_);
+                rc = joint_binding_->LoadFromYaml(joint_binding_path_);
+                if (rc != Result::NoError) {
+                    log_ptr_->error("JointBinding YAML 加载失败: {}", joint_binding_path_);
+                    throw std::runtime_error("JointBinding LoadFromYaml failed: " + joint_binding_path_);
+                }
+            } else {
+                // 无 YAML 时要求 model joint 数量 == hardware drive 数量
+                if (model_joint_names.size() != hardware_drive_ids.size()) {
+                    log_ptr_->error("JointBinding YAML 不存在且数量不匹配: yaml={}, model joints={}, hw drives={}",
+                                    joint_binding_path_, model_joint_names.size(), hardware_drive_ids.size());
+                    throw std::runtime_error(
+                        "joint_binding.yaml missing and joint/drive count mismatch: model="
+                        + std::to_string(model_joint_names.size())
+                        + " hw=" + std::to_string(hardware_drive_ids.size()));
+                }
+                log_ptr_->warn("JointBinding YAML 不存在，使用默认顺序绑定: model joints={}, hw drives={}",
+                               model_joint_names.size(), hardware_drive_ids.size());
+                // 自动生成默认顺序绑定
+                for (size_t i = 0; i < model_joint_names.size(); ++i) {
+                    joint_binding_->Bind(model_joint_names[i], hardware_drive_ids[i]);
+                }
+            }
+
+            rc = joint_binding_->Validate();
+            if (rc != Result::NoError) {
+                log_ptr_->error("JointBinding Validate 失败: yaml={}", joint_binding_path_);
+                throw std::runtime_error("JointBinding Validate failed");
+            }
+
+            const auto model_index_to_drive_id = joint_binding_->GetModelIndexToDriveIds();
+            log_ptr_->info("准备写入 Hardware JointBinding: model_index_to_drive_id=[{}]",
+                           joinDriveIds(model_index_to_drive_id));
+            rc = hardware->SetJointBinding(model_index_to_drive_id);
+            if (rc != Result::NoError) {
+                log_ptr_->error("Hardware SetJointBinding 失败: model_index_to_drive_id=[{}]",
+                                joinDriveIds(model_index_to_drive_id));
+                throw std::runtime_error("Hardware SetJointBinding failed");
+            }
+
+            log_ptr_->info("JointBinding 初始化完成: model joints={}, hw drives={}, binding={}",
+                           model_joint_names.size(), hardware_drive_ids.size(),
+                           joint_binding_path_);
+        }
+
+        controller = std::make_unique<PositionController>(); //TODO： 默认加载位置控制器
 
         Result rc = controller->SetHardware(hardware.get()); //TODO：控制器需要传入硬件指针，可以考虑初始化时导入
 
@@ -990,21 +1081,39 @@ namespace rocos {
     }
 
     Result Robot::LoadFrames(const std::string &path) {
-        if (path.empty()) return Result::IllegalParameter;
+        if (path.empty()) {
+            if (log_ptr_) log_ptr_->error("加载坐标系 YAML 失败: path 为空");
+            return Result::IllegalParameter;
+        }
 
         try {
+            if (log_ptr_) log_ptr_->info("开始加载坐标系 YAML: {}", path);
             YAML::Node root = YAML::LoadFile(path);
             std::map<std::string, Frame> loaded_tools;
             std::map<std::string, Frame> loaded_objects;
-            if (!yamlToFrameMap(root["tools"], loaded_tools)) return Result::IllegalParameter;
-            if (!yamlToFrameMap(root["objects"], loaded_objects)) return Result::IllegalParameter;
+            if (!yamlToFrameMap(root["tools"], loaded_tools)) {
+                if (log_ptr_) log_ptr_->error("加载坐标系 YAML 失败: tools 字段非法, path={}", path);
+                return Result::IllegalParameter;
+            }
+            if (!yamlToFrameMap(root["objects"], loaded_objects)) {
+                if (log_ptr_) log_ptr_->error("加载坐标系 YAML 失败: objects 字段非法, path={}", path);
+                return Result::IllegalParameter;
+            }
 
             std::string active_tool = root["active_tool"].as<std::string>("");
             std::string active_object = root["active_object"].as<std::string>("");
             if (!active_tool.empty() && loaded_tools.find(active_tool) == loaded_tools.end()) {
+                if (log_ptr_) {
+                    log_ptr_->error("加载坐标系 YAML 失败: active_tool='{}' 不存在, path={}",
+                                    active_tool, path);
+                }
                 return Result::IllegalParameter;
             }
             if (!active_object.empty() && loaded_objects.find(active_object) == loaded_objects.end()) {
+                if (log_ptr_) {
+                    log_ptr_->error("加载坐标系 YAML 失败: active_object='{}' 不存在, path={}",
+                                    active_object, path);
+                }
                 return Result::IllegalParameter;
             }
 
@@ -1012,6 +1121,11 @@ namespace rocos {
             object_frames_ = std::move(loaded_objects);
             active_tool_frame_name_ = std::move(active_tool);
             active_object_frame_name_ = std::move(active_object);
+            if (log_ptr_) {
+                log_ptr_->info("坐标系 YAML 加载完成: path={}, tools={}, objects={}, active_tool='{}', active_object='{}'",
+                               path, tool_frames_.size(), object_frames_.size(),
+                               active_tool_frame_name_, active_object_frame_name_);
+            }
             return Result::NoError;
         } catch (const YAML::Exception &e) {
             if (log_ptr_) log_ptr_->error("加载坐标系 YAML 失败: {} => {}", path, e.what());
@@ -1023,7 +1137,10 @@ namespace rocos {
     }
 
     Result Robot::SaveFrames(const std::string &path) const {
-        if (path.empty()) return Result::IllegalParameter;
+        if (path.empty()) {
+            if (log_ptr_) log_ptr_->error("保存坐标系 YAML 失败: path 为空");
+            return Result::IllegalParameter;
+        }
 
         YAML::Node root;
         root["active_tool"] = active_tool_frame_name_;
@@ -1032,9 +1149,20 @@ namespace rocos {
         root["objects"] = frameMapToYaml(object_frames_);
 
         std::ofstream out(path);
-        if (!out.is_open()) return Result::ResourceUnavailable;
+        if (!out.is_open()) {
+            if (log_ptr_) log_ptr_->error("保存坐标系 YAML 失败: 无法打开文件 {}", path);
+            return Result::ResourceUnavailable;
+        }
         out << root;
-        if (!out.good()) return Result::ResourceUnavailable;
+        if (!out.good()) {
+            if (log_ptr_) log_ptr_->error("保存坐标系 YAML 失败: 写入失败 {}", path);
+            return Result::ResourceUnavailable;
+        }
+        if (log_ptr_) {
+            log_ptr_->info("坐标系 YAML 保存完成: path={}, tools={}, objects={}, active_tool='{}', active_object='{}'",
+                           path, tool_frames_.size(), object_frames_.size(),
+                           active_tool_frame_name_, active_object_frame_name_);
+        }
         return Result::NoError;
     }
 
@@ -1147,6 +1275,41 @@ namespace rocos {
     //   2) 当前存在其他 motion 且正在跑    → 冲突拒绝
     //   3) 其它情况                        → 新建 MoveJog，装入 executor，触发 FSM
     // ============================================================================
+    Result Robot::MoveJogging(const Twist &direction,
+                              JogFrame frame,
+                              double speed,
+                              double timeout,
+                              double dir_threshold) {
+        KDL::Rotation R_base_frame = KDL::Rotation::Identity();
+
+        switch (frame) {
+            case JogFrame::BASE:
+                break;
+            case JogFrame::FLANGE:
+                R_base_frame = getFlange().M;
+                break;
+            case JogFrame::TOOL: {
+                Frame T_flange_tool;
+                const Result rc = GetActiveToolFrame(T_flange_tool);
+                if (rc != Result::NoError) return rc;
+                R_base_frame = (getFlange() * T_flange_tool).M;
+                break;
+            }
+            case JogFrame::OBJECT: {
+                Frame T_base_object;
+                const Result rc = GetActiveObjectFrame(T_base_object);
+                if (rc != Result::NoError) return rc;
+                R_base_frame = T_base_object.M;
+                break;
+            }
+        }
+
+        Twist base_direction;
+        base_direction.vel = R_base_frame * direction.vel;
+        base_direction.rot = R_base_frame * direction.rot;
+        return MoveJogging(JogVec{base_direction}, speed, timeout, dir_threshold);
+    }
+
     Result Robot::MoveJogging(const JogVec &direction, double speed,
                               double timeout, double dir_threshold) {
         // ── 分支 1：已有活跃 MoveJog → 旁路喂饭 ──

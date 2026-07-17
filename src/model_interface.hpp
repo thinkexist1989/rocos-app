@@ -18,6 +18,9 @@
 // email: luoyang@sia.cn
 #pragma once
 
+#include <string>
+#include <vector>
+
 #include "types.hpp"
 #include "result.hpp"
 
@@ -38,6 +41,12 @@ class ModelInterface {
 
   /// @brief 计算当前关节角下的 Jacobian 矩阵 (6×n)
   virtual Result GetJacobian(const JntArray& q, Jacobian& J_out) = 0;
+
+  /// @brief 获取 URDF/KDL chain 中可动关节的数量
+  virtual int GetJointNum() const = 0;
+
+  /// @brief 获取 URDF/KDL chain 中可动关节的名称列表，顺序与 KDL joint array 一致
+  virtual std::vector<std::string> GetJointNames() const = 0;
 
 };
 }  // namespace rocos

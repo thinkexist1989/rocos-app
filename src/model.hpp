@@ -45,10 +45,8 @@ class Model : public ModelInterface {
 
   Result GetJacobian(const JntArray& q, Jacobian& J_out) override;
 
-  inline void SetChain(const Chain& chain) { chain_ = chain; }
-
-  bool SetChain(const Tree& tree, const std::string& base_link,
-                const std::string& tip);
+  int GetJointNum() const override;
+  std::vector<std::string> GetJointNames() const override;
 
   void SetGravity(const Vector& gravity);
 
@@ -66,8 +64,15 @@ class Model : public ModelInterface {
   const Chain& GetChain() const noexcept { return chain_; }
 
  private:
+  inline void SetChain(const Chain& chain) { chain_ = chain; }
+
+  bool SetChain(const Tree& tree, const std::string& base_link,
+                const std::string& tip);
+
   Tree tree_;
   Chain chain_;
+
+  std::vector<std::string> joint_names_;  // KDL chain 中可动关节名称，顺序与 JntArray 一致
 
   std::string urdf_file_path_;
   std::string urdf_string_;

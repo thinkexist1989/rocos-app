@@ -140,6 +140,9 @@ public:
                                    rocos::JntArray&) override {
         return rocos::Result::NoError;
     }
+
+    int GetJointNum() const override { return 7; }
+    std::vector<std::string> GetJointNames() const override { return {}; }
 };
 
 class FakeController : public rocos::ControllerInterface {

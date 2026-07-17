@@ -21,7 +21,9 @@
 
 #include <cmath>
 #include <limits>
+#include <string>
 #include <variant>
+#include <vector>
 
 #include <test/doctest.h>
 
@@ -134,6 +136,9 @@ public:
                                   rocos::JntArray&) override {
         return rocos::Result::NoError;
     }
+
+    int GetJointNum() const override { return 7; }
+    std::vector<std::string> GetJointNames() const override { return {}; }
 };
 
 /// @brief 创建一个指定大小的 JntArray 并填充递增的值: [1.0, 2.0, ...]
