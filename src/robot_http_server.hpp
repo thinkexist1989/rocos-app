@@ -36,9 +36,11 @@
 
 namespace rocos {
 
+class LuaScriptEngine;
+
 class RobotHttpServer {
 public:
-    explicit RobotHttpServer(Robot* robot);
+    explicit RobotHttpServer(Robot* robot, LuaScriptEngine* script_engine = nullptr);
     ~RobotHttpServer();
 
     /// Start server (blocking)
@@ -89,10 +91,25 @@ private:
     void handleCalibrationRun(const httplib::Request& req, httplib::Response& res);
     void handleCalibrationResult(const httplib::Request& req, httplib::Response& res);
 
+    // ---- Lua Script ----
+    void handleScriptUpload(const httplib::Request& req, httplib::Response& res);
+    void handleScriptRun(const httplib::Request& req, httplib::Response& res);
+    void handleScriptPause(const httplib::Request& req, httplib::Response& res);
+    void handleScriptResume(const httplib::Request& req, httplib::Response& res);
+    void handleScriptStop(const httplib::Request& req, httplib::Response& res);
+    void handleScriptStep(const httplib::Request& req, httplib::Response& res);
+    void handleScriptStatus(const httplib::Request& req, httplib::Response& res);
+    void handleScriptBreakpointAdd(const httplib::Request& req, httplib::Response& res);
+    void handleScriptBreakpointRemove(const httplib::Request& req, httplib::Response& res);
+    void handleScriptBreakpointClear(const httplib::Request& req, httplib::Response& res);
+
     // ---- Utility ----
     void sendJson(httplib::Response& res, bool success,
                   int businessCode, const std::string& message,
                   const nlohmann::json& data = nlohmann::json());
+    void sendScriptResult(httplib::Response& res, Result result,
+                          const std::string& success_message);
+    nlohmann::json scriptStatusToJson() const;
 
     KDL::Frame jsonToFrame(const nlohmann::json& j);
 
@@ -115,6 +132,7 @@ private:
     void submitTask(std::function<void()> func);
 
     Robot* robot_;
+    LuaScriptEngine* script_engine_;
     std::unique_ptr<httplib::Server> server_;
     std::unique_ptr<std::thread> thread_;
     std::mutex taskMutex_;

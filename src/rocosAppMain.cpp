@@ -7,6 +7,7 @@
 #include <string>
 
 // #include "drive.hpp"
+#include "lua_script_engine.hpp"
 #include "robot.hpp"
 #include "robot_http_server.hpp"
 
@@ -48,8 +49,10 @@ int main(int argc, char *argv[]) {
     Robot robot;
     robot_ptr = &robot;
 
+    LuaScriptEngine script_engine(robot, "scripts");
+
     // 启动 HTTP REST API 服务器（非阻塞）
-    RobotHttpServer httpServer(&robot);
+    RobotHttpServer httpServer(&robot, &script_engine);
     httpServer.runAsync(FLAGS_http_host, FLAGS_http_port);
 
     std::cout << "\033[1;32m"

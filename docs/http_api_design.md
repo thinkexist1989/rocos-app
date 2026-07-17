@@ -222,6 +222,21 @@ int main(int argc, char* argv[]) {
 | `POST` | `/api/calibration/run` | 执行标定 |
 | `GET` | `/api/calibration/result` | 获取标定结果 |
 
+### 4.7 Lua 脚本
+
+| 方法 | 路径 | 说明 |
+|------|------|------|
+| `POST` | `/api/script/upload` | 上传 source 并编译到内存，body 为 `{filename, source}` |
+| `POST` | `/api/script/run` | 异步执行已加载脚本 |
+| `POST` | `/api/script/pause` | 暂停脚本及其活动运动 |
+| `POST` | `/api/script/resume` | 继续脚本及其活动运动 |
+| `POST` | `/api/script/stop` | 停止脚本及其活动运动 |
+| `POST` | `/api/script/step` | 单步执行至下一个 Lua source line |
+| `GET` | `/api/script/status` | 查询脚本状态、当前位置、错误和断点 |
+| `POST` | `/api/script/breakpoint/add` | 添加断点，body 为 `{filename, line}` |
+| `POST` | `/api/script/breakpoint/remove` | 删除断点，body 为 `{filename, line}` |
+| `POST` | `/api/script/breakpoint/clear` | 清空断点 |
+
 ---
 
 ## 5. 请求/响应格式
@@ -250,7 +265,7 @@ int main(int argc, char* argv[]) {
 }
 ```
 
-`code` 字段含义：`0` = 成功，`1xxx` = 参数错误，`2xxx` = 运动规划错误，`3xxx` = 机器人状态错误，`4xxx` = 标定错误，`5xxx` = 异步任务错误。详见第 7 节。
+`code` 字段含义：`0` = 成功，`1xxx` = 参数错误，`2xxx` = 运动规划错误，`3xxx` = 机器人状态错误，`4xxx` = 标定错误，`5xxx` = 异步任务错误，`-6xxx` = Lua 脚本错误。详见第 7 节。
 
 ### 5.2 关键数据类型
 
@@ -558,6 +573,16 @@ int main(int argc, char* argv[]) {
 |------|------|----------------|
 | `5001` | 任务 ID 不存在 | 检查 task_id 是否正确 |
 | `5002` | 异步任务执行超时 | 任务可能卡死，调用 `/api/move/stop` 后重试 |
+
+#### Lua 脚本类（-6xxx）
+
+| code | 说明 | LLM 可恢复建议 |
+|------|------|----------------|
+| `-6001` | 脚本状态冲突 | 查询 `/api/script/status`，等待或停止当前脚本后重试 |
+| `-6002` | Lua 编译或运行错误 | 检查 status 中的 filename、line 和 error |
+| `-6003` | 无效断点 | line 必须大于 0，filename 应与上传脚本一致 |
+| `-6004` | 脚本文件不可用 | 检查 scripts 根目录和相对路径 |
+| `-6005` | 脚本已停止 | 重新上传脚本后再执行 |
 
 ### 7.3 错误响应示例
 

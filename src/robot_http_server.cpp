@@ -11,6 +11,7 @@
 #include <kdl_parser/kdl_parser.hpp>
 #include <sstream>
 
+#include "lua_script_engine.hpp"
 #include "robot.hpp"
 
 namespace rocos {
@@ -23,6 +24,23 @@ int resultCode(Result result) {
 
 bool resultSucceeded(Result result) {
     return result == Result::NoError || result == Result::PlanFinished;
+}
+
+const char* scriptResultMessage(Result result) {
+    switch (result) {
+        case Result::LuaStateConflict:
+            return "script state conflict";
+        case Result::LuaExecutionError:
+            return "Lua script compilation or execution failed";
+        case Result::LuaInvalidBreakpoint:
+            return "invalid script breakpoint";
+        case Result::LuaFileError:
+            return "script file unavailable";
+        case Result::LuaStopped:
+            return "script stopped";
+        default:
+            return "script operation failed";
+    }
 }
 
 double jsonNumberOr(const nlohmann::json& body,
@@ -93,8 +111,8 @@ bool parseCartesianJogFlag(const std::string& flag, double sign, Twist& twist) {
 // Construction / Destruction
 // ============================================================================
 
-RobotHttpServer::RobotHttpServer(Robot* robot)
-    : robot_(robot), server_(new httplib::Server()), taskCounter_(0),
+RobotHttpServer::RobotHttpServer(Robot* robot, LuaScriptEngine* script_engine)
+    : robot_(robot), script_engine_(script_engine), server_(new httplib::Server()), taskCounter_(0),
       poolShutdown_(false), activeWorkers_(0) {
 
     log_ptr_ = Logger::getInstance("HttpServer");
@@ -215,6 +233,18 @@ void RobotHttpServer::registerRoutes() {
     server_->Post("/api/calibration/run", [this](auto& req, auto& res) { handleCalibrationRun(req, res); });
     server_->Get("/api/calibration/result", [this](auto& req, auto& res) { handleCalibrationResult(req, res); });
 
+    // Lua script
+    server_->Post("/api/script/upload", [this](auto& req, auto& res) { handleScriptUpload(req, res); });
+    server_->Post("/api/script/run", [this](auto& req, auto& res) { handleScriptRun(req, res); });
+    server_->Post("/api/script/pause", [this](auto& req, auto& res) { handleScriptPause(req, res); });
+    server_->Post("/api/script/resume", [this](auto& req, auto& res) { handleScriptResume(req, res); });
+    server_->Post("/api/script/stop", [this](auto& req, auto& res) { handleScriptStop(req, res); });
+    server_->Post("/api/script/step", [this](auto& req, auto& res) { handleScriptStep(req, res); });
+    server_->Get("/api/script/status", [this](auto& req, auto& res) { handleScriptStatus(req, res); });
+    server_->Post("/api/script/breakpoint/add", [this](auto& req, auto& res) { handleScriptBreakpointAdd(req, res); });
+    server_->Post("/api/script/breakpoint/remove", [this](auto& req, auto& res) { handleScriptBreakpointRemove(req, res); });
+    server_->Post("/api/script/breakpoint/clear", [this](auto& req, auto& res) { handleScriptBreakpointClear(req, res); });
+
     
     // 修改后：去掉 ".*",
     server_->set_post_routing_handler([](const httplib::Request&, httplib::Response& res) {
@@ -253,6 +283,35 @@ void RobotHttpServer::sendJson(httplib::Response& res, bool success,
     body["data"] = data;
 
     res.set_content(body.dump(), "application/json");
+}
+
+void RobotHttpServer::sendScriptResult(httplib::Response& res, Result result,
+                                       const std::string& success_message) {
+    const bool success = result == Result::NoError;
+    sendJson(res, success, resultCode(result),
+             success ? success_message : scriptResultMessage(result),
+             scriptStatusToJson());
+}
+
+nlohmann::json RobotHttpServer::scriptStatusToJson() const {
+    if (script_engine_ == nullptr) {
+        return nlohmann::json();
+    }
+
+    const LuaScriptEngine::Status status = script_engine_->GetStatus();
+    nlohmann::json breakpoints = nlohmann::json::array();
+    for (const auto& breakpoint : status.breakpoints) {
+        breakpoints.push_back({{"filename", breakpoint.filename},
+                               {"line", breakpoint.line}});
+    }
+
+    return {{"state", LuaScriptEngine::ToString(status.state)},
+            {"script_id", status.script_id},
+            {"filename", status.location.filename},
+            {"line", status.location.line},
+            {"error", status.error},
+            {"motion_active", status.motion_active},
+            {"breakpoints", std::move(breakpoints)}};
 }
 
 // ============================================================================
@@ -858,6 +917,147 @@ void RobotHttpServer::handleMoveStatus(const httplib::Request& req, httplib::Res
         data["task"] = getTaskInfo(task_id);
     }
     sendJson(res, true, 0, "ok", data);
+}
+
+// ============================================================================
+// Lua Script Handlers
+// ============================================================================
+
+void RobotHttpServer::handleScriptUpload(const httplib::Request& req,
+                                         httplib::Response& res) {
+    if (script_engine_ == nullptr) {
+        sendJson(res, false, resultCode(Result::FunctionNotSupported),
+                 "Lua script engine is unavailable");
+        return;
+    }
+
+    const nlohmann::json body = nlohmann::json::parse(req.body, nullptr, false);
+    if (body.is_discarded() || !body.contains("filename") ||
+        !body["filename"].is_string() || !body.contains("source") ||
+        !body["source"].is_string()) {
+        sendJson(res, false, 1001,
+                 "Invalid JSON or missing string 'filename'/'source' fields");
+        return;
+    }
+
+    const Result result = script_engine_->LoadSource(
+        body["source"].get<std::string>(), body["filename"].get<std::string>());
+    sendScriptResult(res, result, "script uploaded");
+}
+
+void RobotHttpServer::handleScriptRun(const httplib::Request&,
+                                      httplib::Response& res) {
+    if (script_engine_ == nullptr) {
+        sendJson(res, false, resultCode(Result::FunctionNotSupported),
+                 "Lua script engine is unavailable");
+        return;
+    }
+    sendScriptResult(res, script_engine_->Run(), "script started");
+}
+
+void RobotHttpServer::handleScriptPause(const httplib::Request&,
+                                        httplib::Response& res) {
+    if (script_engine_ == nullptr) {
+        sendJson(res, false, resultCode(Result::FunctionNotSupported),
+                 "Lua script engine is unavailable");
+        return;
+    }
+    sendScriptResult(res, script_engine_->Pause(), "script pause requested");
+}
+
+void RobotHttpServer::handleScriptResume(const httplib::Request&,
+                                         httplib::Response& res) {
+    if (script_engine_ == nullptr) {
+        sendJson(res, false, resultCode(Result::FunctionNotSupported),
+                 "Lua script engine is unavailable");
+        return;
+    }
+    sendScriptResult(res, script_engine_->Resume(), "script resumed");
+}
+
+void RobotHttpServer::handleScriptStop(const httplib::Request&,
+                                       httplib::Response& res) {
+    if (script_engine_ == nullptr) {
+        sendJson(res, false, resultCode(Result::FunctionNotSupported),
+                 "Lua script engine is unavailable");
+        return;
+    }
+    sendScriptResult(res, script_engine_->Stop(), "script stop requested");
+}
+
+void RobotHttpServer::handleScriptStep(const httplib::Request&,
+                                       httplib::Response& res) {
+    if (script_engine_ == nullptr) {
+        sendJson(res, false, resultCode(Result::FunctionNotSupported),
+                 "Lua script engine is unavailable");
+        return;
+    }
+    sendScriptResult(res, script_engine_->Step(), "script step requested");
+}
+
+void RobotHttpServer::handleScriptStatus(const httplib::Request&,
+                                         httplib::Response& res) {
+    if (script_engine_ == nullptr) {
+        sendJson(res, false, resultCode(Result::FunctionNotSupported),
+                 "Lua script engine is unavailable");
+        return;
+    }
+    sendJson(res, true, 0, "ok", scriptStatusToJson());
+}
+
+void RobotHttpServer::handleScriptBreakpointAdd(const httplib::Request& req,
+                                                httplib::Response& res) {
+    if (script_engine_ == nullptr) {
+        sendJson(res, false, resultCode(Result::FunctionNotSupported),
+                 "Lua script engine is unavailable");
+        return;
+    }
+
+    const nlohmann::json body = nlohmann::json::parse(req.body, nullptr, false);
+    if (body.is_discarded() || !body.contains("filename") ||
+        !body["filename"].is_string() || !body.contains("line") ||
+        !body["line"].is_number_integer()) {
+        sendJson(res, false, 1001,
+                 "Invalid JSON or missing 'filename'/'line' fields");
+        return;
+    }
+
+    const Result result = script_engine_->AddBreakpoint(
+        body["filename"].get<std::string>(), body["line"].get<int>());
+    sendScriptResult(res, result, "breakpoint added");
+}
+
+void RobotHttpServer::handleScriptBreakpointRemove(const httplib::Request& req,
+                                                   httplib::Response& res) {
+    if (script_engine_ == nullptr) {
+        sendJson(res, false, resultCode(Result::FunctionNotSupported),
+                 "Lua script engine is unavailable");
+        return;
+    }
+
+    const nlohmann::json body = nlohmann::json::parse(req.body, nullptr, false);
+    if (body.is_discarded() || !body.contains("filename") ||
+        !body["filename"].is_string() || !body.contains("line") ||
+        !body["line"].is_number_integer()) {
+        sendJson(res, false, 1001,
+                 "Invalid JSON or missing 'filename'/'line' fields");
+        return;
+    }
+
+    const Result result = script_engine_->RemoveBreakpoint(
+        body["filename"].get<std::string>(), body["line"].get<int>());
+    sendScriptResult(res, result, "breakpoint removed");
+}
+
+void RobotHttpServer::handleScriptBreakpointClear(const httplib::Request&,
+                                                  httplib::Response& res) {
+    if (script_engine_ == nullptr) {
+        sendJson(res, false, resultCode(Result::FunctionNotSupported),
+                 "Lua script engine is unavailable");
+        return;
+    }
+    sendScriptResult(res, script_engine_->ClearBreakpoints(),
+                     "breakpoints cleared");
 }
 
 
