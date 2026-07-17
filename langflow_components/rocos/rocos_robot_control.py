@@ -8,7 +8,8 @@ ROCOS 机器人基础控制组件组。
 from langflow.custom import Component
 from langflow.io import Output, StrInput, DropdownInput
 from langflow.schema import Data
-from .rocos_robot_state import _rocos_post
+from .rocos_client import _rocos_post
+
 
 # ---- 工作模式枚举 ----
 
@@ -97,7 +98,7 @@ class DisableRobot(Component):
 
 
 class SetWorkMode(Component):
-    """设置机器人工���模式"""
+    """设置机器人工作模式"""
 
     display_name: str = "设置工作模式"
     description: str = (
@@ -137,9 +138,16 @@ class SetWorkMode(Component):
             self.base_url, "/api/robot/workmode",
             {"mode": self.mode}
         )
-        if result == {} or result.get("success", True):
+        if result.get("success"):
             text = f"✅ 工作模式已切换为: {self.mode}"
-            result = {"success": True, "code": 0, "message": "ok", "data": {"mode": self.mode}}
+        elif result == {}:
+            result = {
+                "success": False,
+                "code": 1004,
+                "message": "workmode endpoint is registered but not implemented",
+                "data": {"mode": self.mode},
+            }
+            text = "❌ 工作模式接口尚未实现，未执行切换"
         else:
             text = f"❌ 切换失败 (code={result.get('code')}): {result.get('message')}"
         self.status = text[:100]

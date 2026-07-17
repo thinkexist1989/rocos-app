@@ -2,7 +2,7 @@
 
 Langflow 自定义组件集，封装了 ROCOS-App 的 HTTP REST API，使 LLM Agent 可以直接通过自然语言控制机器人。
 
-## 组件列表 (28 个 Tool 组件)
+## 组件列表 (35 个 Tool 组件)
 
 | 组件名 | 类别 | 说明 |
 |--------|------|------|
@@ -21,14 +21,21 @@ Langflow 自定义组件集，封装了 ROCOS-App 的 HTTP REST API，使 LLM Ag
 | `MotionStop` | 运动 | 停止运动 |
 | `MotionPause` | 运动 | 暂停运动 |
 | `MotionResume` | 运动 | 继续运动 |
-| `JogStart` | 点动 | 启动拖拽示教 (6D 笛卡尔 + 零空间) |
-| `JogStop` | 点动 | 停止拖拽示教 |
+| `WaitMove` | 运动 | 等待当前运动完成 |
+| `JogStart` | 点动 | 启动点动 (关节/笛卡尔/零空间，新版向量接口) |
+| `JogStop` | 点动 | 停止点动 |
 | `GetToolFrames` | 坐标系 | 获取所有工具坐标系名称 |
+| `GetToolFrame` | 坐标系 | 按名称获取工具坐标系位姿 |
 | `SetToolFrame` | 坐标系 | 设置/新增工具坐标系 (TCP) |
 | `ActivateToolFrame` | 坐标系 | 激活指定工具坐标系 |
+| `RemoveToolFrame` | 坐标系 | 删除指定工具坐标系 |
 | `GetObjectFrames` | 坐标系 | 获取所有工件坐标系名称 |
+| `GetObjectFrame` | 坐标系 | 按名称获取工件坐标系位姿 |
 | `SetObjectFrame` | 坐标系 | 设置/新增工件坐标系 |
 | `ActivateObjectFrame` | 坐标系 | 激活指定工件坐标系 |
+| `RemoveObjectFrame` | 坐标系 | 删除指定工件坐标系 |
+| `LoadFrames` | 坐标系 | 从 YAML 文件加载坐标系 |
+| `SaveFrames` | 坐标系 | 将坐标系保存到 YAML 文件 |
 | `UploadScript` | Lua | 上传并编译 Lua 脚本 |
 | `RunScript` | Lua | 异步执行 Lua 脚本 |
 | `PauseScript` | Lua | 暂停 Lua 脚本 |
@@ -94,7 +101,8 @@ langflow_components/
 ├── rocos/                        # 组件包 (Category)
 │   ├── __init__.py               # 导出所有组件
 │   ├── rocos_config.py           # 配置组件
-│   ├── rocos_robot_state.py      # 状态查询 + 内部 HTTP 工具函数
+│   ├── rocos_client.py           # 内部 HTTP 工具函数
+│   ├── rocos_robot_state.py      # 状态查询
 │   ├── rocos_robot_control.py    # 使能/禁用/工作模式
 │   ├── rocos_motion.py           # MoveJ/MoveL/Stop/Pause/Resume/Status
 │   ├── rocos_jogging.py          # 拖拽示教/点动

@@ -5,8 +5,8 @@ ROCOS Robot Control - Langflow 自定义 Tool 组件包
 支持的 API 类别:
   - 机器人状态查询 (/api/robot/state, /api/robot/info, /api/robot/enabled)
   - 机器人控制 (/api/robot/enable, /api/robot/disable, /api/robot/workmode)
-  - 运动控制   (/api/move/joint, /api/move/linear, /api/move/stop, ...)
-  - 拖拽示教   (/api/drag/start, /api/drag/stop)
+  - 运动控制   (/api/robot/movej, /api/robot/movel, /api/robot/stop, ...)
+  - 点动控制   (/api/robot/jog/joint, /api/robot/jog/cartesian, ...)
   - 坐标系管理 (/api/robot/tool_frame/, /api/robot/object_frame/)
   - Lua 脚本   (/api/script/upload, /api/script/run, /api/script/status, ...)
 
@@ -19,11 +19,12 @@ ROCOS Robot Control - Langflow 自定义 Tool 组件包
 from .rocos_config import RocosConfig
 from .rocos_robot_state import GetRobotState, GetRobotInfo, GetRobotEnabled, GetRobotURDF
 from .rocos_robot_control import EnableRobot, DisableRobot, SetWorkMode
-from .rocos_motion import MoveJ, MoveL, MotionStop, MotionPause, MotionResume, GetMotionStatus
+from .rocos_motion import MoveJ, MoveL, MotionStop, MotionPause, MotionResume, GetMotionStatus, WaitMove
 from .rocos_jogging import JogStart, JogStop
 from .rocos_frames import (
-    GetToolFrames, SetToolFrame, ActivateToolFrame,
-    GetObjectFrames, SetObjectFrame, ActivateObjectFrame,
+    GetToolFrames, GetToolFrame, SetToolFrame, ActivateToolFrame, RemoveToolFrame,
+    GetObjectFrames, GetObjectFrame, SetObjectFrame, ActivateObjectFrame, RemoveObjectFrame,
+    LoadFrames, SaveFrames,
 )
 from .rocos_script import UploadScript, RunScript, PauseScript, ResumeScript, StopScript, GetScriptStatus
 
@@ -35,12 +36,13 @@ __all__ = [
     # Control
     "EnableRobot", "DisableRobot", "SetWorkMode",
     # Motion
-    "MoveJ", "MoveL", "MotionStop", "MotionPause", "MotionResume", "GetMotionStatus",
+    "MoveJ", "MoveL", "MotionStop", "MotionPause", "MotionResume", "GetMotionStatus", "WaitMove",
     # Jogging
     "JogStart", "JogStop",
     # Frames
-    "GetToolFrames", "SetToolFrame", "ActivateToolFrame",
-    "GetObjectFrames", "SetObjectFrame", "ActivateObjectFrame",
+    "GetToolFrames", "GetToolFrame", "SetToolFrame", "ActivateToolFrame", "RemoveToolFrame",
+    "GetObjectFrames", "GetObjectFrame", "SetObjectFrame", "ActivateObjectFrame", "RemoveObjectFrame",
+    "LoadFrames", "SaveFrames",
     # Script
     "UploadScript", "RunScript", "PauseScript", "ResumeScript", "StopScript", "GetScriptStatus",
 ]

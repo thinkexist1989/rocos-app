@@ -5,51 +5,10 @@ ROCOS 机器人状态查询组件组。
 每个组件封装一个 GET 请求到 ROCOS HTTP API。
 """
 
-import json
-import urllib.request
-import urllib.error
-from typing import Optional
 from langflow.custom import Component
 from langflow.io import Output, StrInput
 from langflow.schema import Data
-
-
-# ---- 内部辅助函数 ----
-
-def _rocos_get(base_url: str, path: str, params: Optional[dict] = None) -> dict:
-    """向 ROCOS API 发送 GET 请求，返回解析后的 JSON 响应"""
-    url = f"{base_url.rstrip('/')}{path}"
-    if params:
-        query = "&".join(f"{k}={v}" for k, v in params.items() if v is not None)
-        url = f"{url}?{query}"
-    try:
-        req = urllib.request.Request(url, headers={"Accept": "application/json"})
-        with urllib.request.urlopen(req, timeout=10) as resp:
-            body = resp.read().decode("utf-8")
-            return json.loads(body) if body else {}
-    except urllib.error.URLError as e:
-        return {"success": False, "code": -1, "message": f"网络错误: {e}", "data": None}
-    except json.JSONDecodeError as e:
-        return {"success": False, "code": -2, "message": f"JSON 解析错误: {e}", "data": None}
-
-
-def _rocos_post(base_url: str, path: str, body: dict) -> dict:
-    """向 ROCOS API 发送 POST 请求，返回解析后的 JSON 响应"""
-    url = f"{base_url.rstrip('/')}{path}"
-    try:
-        data = json.dumps(body).encode("utf-8")
-        req = urllib.request.Request(
-            url, data=data,
-            headers={"Content-Type": "application/json", "Accept": "application/json"},
-            method="POST"
-        )
-        with urllib.request.urlopen(req, timeout=30) as resp:
-            resp_body = resp.read().decode("utf-8")
-            return json.loads(resp_body) if resp_body else {}
-    except urllib.error.URLError as e:
-        return {"success": False, "code": -1, "message": f"网络错误: {e}", "data": None}
-    except json.JSONDecodeError as e:
-        return {"success": False, "code": -2, "message": f"JSON 解析错误: {e}", "data": None}
+from .rocos_client import _rocos_get, _rocos_post, _rocos_text
 
 
 # ---- 状态查询组件 ----
@@ -211,11 +170,13 @@ class GetRobotURDF(Component):
     ]
 
     def fetch_urdf(self) -> Data:
-        result = _rocos_get(self.base_url, "/api/robot/urdf")
-        # URDF 返回 XML 文本，可能不在标准 JSON 响应结构内
-        if isinstance(result, dict):
-            text = result.get("message", "") or str(result)[:500]
+        result = _rocos_text(self.base_url, "/api/robot/urdf")
+        if isinstance(result, dict) and result.get("success") is False:
+            text = f"❌ {result.get('message', 'URDF 获取失败')}"
+            data = result
         else:
-            text = str(result)[:2000] + "..." if len(str(result)) > 2000 else str(result)
-        self.status = "URDF 获取完成"
-        return Data(text=text[:2000], data={"urdf_preview": text[:2000]})
+            urdf = str(result)
+            text = urdf[:2000] + "..." if len(urdf) > 2000 else urdf
+            data = {"success": True, "code": 0, "message": "ok", "data": {"urdf": urdf}}
+        self.status = text[:100]
+        return Data(text=text, data=data)

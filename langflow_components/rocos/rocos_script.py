@@ -6,10 +6,9 @@ ROCOS Lua 脚本管理组件组。
 """
 
 from langflow.custom import Component
-from langflow.io import Output, StrInput, IntInput
+from langflow.io import Output, StrInput
 from langflow.schema import Data
-from .rocos_robot_state import _rocos_get, _rocos_post
-
+from .rocos_client import _rocos_get, _rocos_post
 
 class UploadScript(Component):
     """上传并编译 Lua 脚本到内存"""

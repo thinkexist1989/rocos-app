@@ -6,10 +6,9 @@ ROCOS 运动控制组件组。
 """
 
 from langflow.custom import Component
-from langflow.io import Output, StrInput, FloatInput, BoolInput
+from langflow.io import Output, StrInput, FloatInput
 from langflow.schema import Data
-from .rocos_robot_state import _rocos_post, _rocos_get
-
+from .rocos_client import _rocos_get, _rocos_post, parse_float_list
 
 class MoveJ(Component):
     """关节空间运动 (MoveJ)"""
@@ -17,7 +16,7 @@ class MoveJ(Component):
     display_name: str = "MoveJ 关节运动"
     description: str = (
         "执行关节空间运动 (MoveJ): 将机器人各关节移动到指定的目标角度。\n"
-        "输入 7 个目标关节角度（弧度），用逗号分隔。使用 Ruckig 轨迹规划器生成平滑轨迹。\n"
+        "输入目标关节角度（弧度），数量需与当前机器人模型关节数一致，用逗号分隔。\n"
         "Use this tool to move the robot in joint space to specified joint angles."
     )
     icon: str = "Move"
@@ -33,7 +32,7 @@ class MoveJ(Component):
         StrInput(
             name="joints",
             display_name="目标关节角度",
-            info="7 个目标关节角度 (弧度)，用逗号分隔，如: 0.1,0.2,0.3,0.4,0.5,0.6,0.7",
+            info="目标关节角度 (弧度)，用逗号分隔，如: 0.1,0.2,0.3,0.4,0.5,0.6,0.7",
             value="0.1,0.2,0.3,0.4,0.5,0.6,0.7",
         ),
         FloatInput(
@@ -48,6 +47,12 @@ class MoveJ(Component):
             info="加速度缩放系数，默认 2.0",
             value=2.0,
         ),
+        FloatInput(
+            name="jerk",
+            display_name="加加速度限制",
+            info="jerk 限制，默认 10.0",
+            value=10.0,
+        ),
     ]
 
     outputs = [
@@ -56,14 +61,15 @@ class MoveJ(Component):
 
     def execute_movej(self) -> Data:
         try:
-            joint_list = [float(x.strip()) for x in self.joints.split(",")]
+            joint_list = parse_float_list(self.joints)
         except ValueError:
             return Data(text="❌ 参数错误: joints 格式不正确，需要逗号分隔的数值", data=None)
 
-        result = _rocos_post(self.base_url, "/api/move/joint", {
+        result = _rocos_post(self.base_url, "/api/robot/movej", {
             "joints": joint_list,
-            "speed": self.speed,
+            "velocity": self.speed,
             "acceleration": self.acceleration,
+            "jerk": self.jerk,
         })
         if result.get("success"):
             text = f"✅ MoveJ 已执行 → 目标: {joint_list[:3]}... 状态: {result.get('data', {}).get('robot_state', 'RUNNING')}"
@@ -131,6 +137,18 @@ class MoveL(Component):
             display_name="加速度限制",
             info="加速度缩放系数", value=2.0,
         ),
+        FloatInput(
+            name="jerk",
+            display_name="加加速度限制",
+            info="jerk 限制", value=10.0,
+        ),
+        StrInput(
+            name="tool_name",
+            display_name="工具坐标系名称",
+            info="可选。指定用于 MoveL 的工具坐标系名称，留空则使用当前激活工具系",
+            value="",
+            required=False,
+        ),
     ]
 
     outputs = [
@@ -155,11 +173,16 @@ class MoveL(Component):
         except ValueError:
             return Data(text="❌ 参数错误: 位姿参数格式不正确", data=None)
 
-        result = _rocos_post(self.base_url, "/api/move/linear", {
+        body = {
             "pose": pose,
-            "speed": self.speed,
+            "velocity": self.speed,
             "acceleration": self.acceleration,
-        })
+            "jerk": self.jerk,
+        }
+        if self.tool_name:
+            body["tool_name"] = self.tool_name.strip()
+
+        result = _rocos_post(self.base_url, "/api/robot/movel", body)
         if result.get("success"):
             pos = pose["position"]
             text = f"✅ MoveL 已执行 → 目标: ({pos['x']:.3f}, {pos['y']:.3f}, {pos['z']:.3f})"
@@ -195,7 +218,7 @@ class MotionStop(Component):
     ]
 
     def stop(self) -> Data:
-        result = _rocos_post(self.base_url, "/api/move/stop", {})
+        result = _rocos_post(self.base_url, "/api/robot/stop", {})
         if result.get("success"):
             text = "✅ 运动已停止"
         else:
@@ -234,7 +257,7 @@ class MotionPause(Component):
     ]
 
     def pause(self) -> Data:
-        result = _rocos_post(self.base_url, "/api/move/pause", {})
+        result = _rocos_post(self.base_url, "/api/robot/pause", {})
         if result.get("success"):
             text = "✅ 运动已暂停"
         else:
@@ -268,7 +291,7 @@ class MotionResume(Component):
     ]
 
     def resume(self) -> Data:
-        result = _rocos_post(self.base_url, "/api/move/resume", {})
+        result = _rocos_post(self.base_url, "/api/robot/resume", {})
         if result.get("success"):
             text = "✅ 运动已继续"
         else:
@@ -311,7 +334,7 @@ class GetMotionStatus(Component):
 
     def fetch_status(self) -> Data:
         task_id = self.task_id.strip() if self.task_id else None
-        result = _rocos_get(self.base_url, "/api/move/status",
+        result = _rocos_get(self.base_url, "/api/robot/move_status",
                             {"task_id": task_id} if task_id else None)
         if result.get("success"):
             data = result.get("data", {})
@@ -324,5 +347,39 @@ class GetMotionStatus(Component):
                 text += f"\n任务 {task_id}: {task if task else '无详情'}"
         else:
             text = f"❌ {result.get('message', '查询失败')}"
+        self.status = text[:100]
+        return Data(text=text, data=result)
+
+
+class WaitMove(Component):
+    """等待当前运动完成"""
+
+    display_name: str = "等待运动完成"
+    description: str = (
+        "等待 ROCOS 当前运动结束。后端会先延时 20ms，然后轮询状态机直到运动完成或错误。"
+        "Use this after a motion command when the next step must wait for robot motion completion."
+    )
+    icon: str = "Timer"
+    name: str = "wait_move"
+
+    inputs = [
+        StrInput(
+            name="base_url",
+            display_name="API 基础地址",
+            info="ROCOS API 的基础 URL",
+            value="http://localhost:8080",
+        ),
+    ]
+
+    outputs = [
+        Output(display_name="Result", name="result", method="wait"),
+    ]
+
+    def wait(self) -> Data:
+        result = _rocos_post(self.base_url, "/api/robot/wait_move", {})
+        if result.get("success"):
+            text = f"✅ 当前运动已完成，状态: {result.get('data', {}).get('robot_state', 'UNKNOWN')}"
+        else:
+            text = f"❌ 等待失败 (code={result.get('code')}): {result.get('message', '')}"
         self.status = text[:100]
         return Data(text=text, data=result)
