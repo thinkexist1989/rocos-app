@@ -80,6 +80,10 @@ class Robot {
 
   /// @brief 是否处于需要控制循环的状态（RUNNING/PAUSING/PAUSED/RESUMING/STOPPING）
   [[nodiscard]] bool IsControlActive() const;
+  /// @brief 是否处于运动相关的忙碌状态（STARTING/RUNNING/PAUSING/PAUSED/RESUMING/STOPPING）
+  [[nodiscard]] bool IsMotionBusy() const;
+  //! \brief 等待当前运动结束，先延时20ms，再轮询状态机直到完成或错误
+  Result WaitMove();
 
   [[nodiscard]] std::vector<JointInfo> GetJointInfo() const;
 

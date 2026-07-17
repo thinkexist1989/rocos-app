@@ -23,6 +23,7 @@
 #include <kdl_parser/kdl_parser.hpp>  // 用于将urdf文件解析为KDL::Tree
 #include <yaml-cpp/yaml.h>
 
+#include <chrono>
 #include <cctype>
 #include <fstream>
 
@@ -533,7 +534,7 @@ namespace rocos {
         } else if (impl_->is(sml::state<class PAUSING>)) {
             return "PAUSING";
         } else if (impl_->is(sml::state<class RESUMING>)) {
-            return "CONTINUING";
+            return "RESUMING";
         } else if (impl_->is(sml::state<class RESETTING>)) {
             return "RESETTING";
         } else if (impl_->is(sml::state<class RUNNING>)) {
@@ -592,6 +593,28 @@ namespace rocos {
                || impl_->is(sml::state<class PAUSED>)
                || impl_->is(sml::state<class RESUMING>)
                || impl_->is(sml::state<class STOPPING>);
+    }
+
+    bool Robot::IsMotionBusy() const {
+        return impl_->is(sml::state<class STARTING>) || IsControlActive();
+    }
+
+    Result Robot::WaitMove() {
+        using namespace std::chrono_literals;
+
+        std::this_thread::sleep_for(20ms);
+        while (true) {
+            if (impl_->is(sml::state<class ERROR_STATE>)) {
+                return Result::Fatal;
+            }
+            if (impl_->is(sml::state<class IDLE>)) {
+                return Result::NotEnabled;
+            }
+            if (!IsMotionBusy()) {
+                return Result::NoError;
+            }
+            std::this_thread::sleep_for(10ms);
+        }
     }
 
     std::vector<Robot::JointInfo> Robot::GetJointInfo() const {
