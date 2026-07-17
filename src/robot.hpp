@@ -54,11 +54,50 @@ class Robot {
     int32_t zero_offset{0};
   };
 
+  /// @brief 机器人状态快照，一次性打包所有可视化页面需要的状态信息
+  struct RobotStateSnapshot {
+    // --- FSM 状态 ---
+    std::string state_string;
+    bool is_enabled{false};
+    bool is_running{false};
+    bool control_active{false};
+    bool motion_busy{false};
+
+    // --- 单轴状态 ---
+    struct JointState {
+      int id{-1};
+      std::string name;
+      double position{0.0};
+      double velocity{0.0};
+      double torque{0.0};
+      double load_torque{0.0};
+      int status{0};
+    };
+    std::vector<JointState> joints;
+
+    // --- 笛卡尔位姿 ---
+    Frame flange;
+    std::string active_tool_frame_name;
+    std::string active_object_frame_name;
+    Frame active_tool_frame;
+    Frame active_object_frame;
+
+    // --- 硬件摘要 ---
+    int joint_num{0};
+    int hardware_state{0};
+
+    // --- 元信息 ---
+    double timestamp{0.0};  // 快照生成时刻 (epoch seconds)
+  };
+
   explicit Robot();
 
   ~Robot();
 
   [[nodiscard]] std::string GetStateString() const;
+
+  /// @brief 获取机器人状态快照，供前端可视化页面一次性拉取全部状态
+  [[nodiscard]] RobotStateSnapshot GetRobotStateSnapshot() const;
 
   // //! \brief 启动机器人运动，使机器人状态机进入 Running 状态
   // Result Start();
@@ -93,8 +132,7 @@ class Robot {
   // - GetRobotModelMesh(path): 对应 GET /api/robot/model/mesh，由 Robot 根据当前 URDF 路径解析并读取 mesh。
   // - GetUrdfPath()/GetModelBaseLink()/GetModelTipLink(): 暴露当前 Robot 实际加载的模型配置，
   //   避免 HTTP 使用硬编码 robot.urdf/base_link/link_7。
-  // - GetRobotStateSnapshot(): 对应 GET /api/robot/state，把 state、joint_states、flange/tool/object、
-  //   hardware state 一次性封装，HTTP 只负责 JSON 序列化。
+  // ✓ GetRobotStateSnapshot(): 对应 GET /api/robot/state，已实现。
   // - GetMotionStatus()/GetCurrentTaskInfo(): 对应 GET /api/move/status，封装当前任务状态而不是 HTTP 自己拼。
   //
   // TODO(legacy API): 旧 HTTP 里还有 workmode / calibration 相关接口，后续如果恢复，需要先在 Robot 层补：
@@ -212,32 +250,32 @@ class Robot {
     return hardware ? static_cast<int>(hardware->GetPosition().rows()) : 0;
   }
 
-  inline std::string getJointName(int id) {
+  inline std::string getJointName(int id) const {
     return hardware ? hardware->getJointName(id) : "";
   }
 
-  inline int getJointStatus(int id) { return 0; }
+  inline int getJointStatus(int id) const { return 0; }
 
   ///////////////////用户单位信息///////////////////////
-  inline double getJointPosition(int id) {
+  inline double getJointPosition(int id) const {
     if (!hardware || id < 0) return 0.0;
     auto q = hardware->GetPosition();
     return static_cast<unsigned int>(id) < q.rows() ? q(id) : 0.0;
   }
 
-  inline double getJointVelocity(int id) {
+  inline double getJointVelocity(int id) const {
     if (!hardware || id < 0) return 0.0;
     auto q_dot = hardware->GetVelocity();
     return static_cast<unsigned int>(id) < q_dot.rows() ? q_dot(id) : 0.0;
   }
 
-  inline double getJointTorque(int id) {
+  inline double getJointTorque(int id) const {
     if (!hardware || id < 0) return 0.0;
     auto tau = hardware->GetTorque();
     return static_cast<unsigned int>(id) < tau.rows() ? tau(id) : 0.0;
   }
 
-  inline double getJointLoadTorque(int id) {
+  inline double getJointLoadTorque(int id) const {
     if (!hardware || id < 0) return 0.0;
     auto tau_load = hardware->GetLoadTorque();
     return static_cast<unsigned int>(id) < tau_load.rows() ? tau_load(id) : 0.0;
@@ -270,7 +308,7 @@ class Robot {
     hardware->SetTorque(tau);
   }
 
-  inline Frame getFlange() {
+  inline Frame getFlange() const {
     Frame flange;
     if (!model || !hardware) return flange;
 

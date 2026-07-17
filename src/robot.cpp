@@ -552,6 +552,53 @@ namespace rocos {
         }
     }
 
+    Robot::RobotStateSnapshot Robot::GetRobotStateSnapshot() const {
+        RobotStateSnapshot snap;
+
+        // 时间戳
+        snap.timestamp = std::chrono::duration<double>(
+            std::chrono::system_clock::now().time_since_epoch()).count();
+
+        // FSM 状态
+        snap.state_string = GetStateString();
+        snap.is_enabled = IsEnabled();
+        snap.is_running = IsRunning();
+        snap.control_active = IsControlActive();
+        snap.motion_busy = IsMotionBusy();
+
+        // 关节状态
+        const int n = getJointNum();
+        snap.joints.reserve(static_cast<size_t>(n));
+        for (int i = 0; i < n; ++i) {
+            RobotStateSnapshot::JointState js;
+            js.id = i;
+            js.name = getJointName(i);
+            js.position = getJointPosition(i);
+            js.velocity = getJointVelocity(i);
+            js.torque = getJointTorque(i);
+            js.load_torque = getJointLoadTorque(i);
+            js.status = getJointStatus(i);
+            snap.joints.push_back(std::move(js));
+        }
+
+        // 法兰末端位姿
+        snap.flange = getFlange();
+
+        // 激活的坐标系
+        snap.active_tool_frame_name = GetActiveToolFrameName();
+        snap.active_object_frame_name = GetActiveObjectFrameName();
+        snap.active_tool_frame = GetActiveToolFrame();
+        snap.active_object_frame = GetActiveObjectFrame();
+
+        // 硬件摘要
+        snap.joint_num = n;
+        if (hardware) {
+            snap.hardware_state = static_cast<int>(hardware->GetState());
+        }
+
+        return snap;
+    }
+
     Result Robot::SetEnabled() {
         log_ptr_->info("收到上使能指令");
         if (!impl_->process_event(EventEnableReq{})) {

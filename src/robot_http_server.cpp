@@ -439,43 +439,44 @@ void RobotHttpServer::cleanExpiredTasks() {
 // ============================================================================
 
 void RobotHttpServer::handleGetRobotState(const httplib::Request& req, httplib::Response& res) {
-    // log_ptr_->info("GET /api/robot/state");
+    auto snap = robot_->GetRobotStateSnapshot();
 
     nlohmann::json data;
+    data["robot_state"] = snap.state_string;
+    data["is_enabled"] = snap.is_enabled;
+    data["is_running"] = snap.is_running;
+    data["control_active"] = snap.control_active;
+    data["motion_busy"] = snap.motion_busy;
+    data["timestamp"] = snap.timestamp;
 
-    data["robot_state"] = robot_->GetStateString();
-    data["is_enabled"] = robot_->IsEnabled();
-    data["is_disabled"] = robot_->IsDisabled();
-    data["is_running"] = robot_->IsRunning();
-    data["control_active"] = robot_->IsControlActive();
-    // log_ptr_->info("Robot state: {}", data["robot_state"].get<std::string>());
-
-    // Joint states
+    // 关节状态
     nlohmann::json joint_states = nlohmann::json::array();
-    for (int i = 0; i < robot_->getJointNum(); ++i) {
-        nlohmann::json js;
-        js["name"] = robot_->getJointName(i);
-        js["status"] = robot_->getJointStatus(i);
-        js["position"] = robot_->getJointPosition(i);
-        js["velocity"] = robot_->getJointVelocity(i);
-        js["torque"] = robot_->getJointTorque(i);
-        js["load_torque"] = robot_->getJointLoadTorque(i);
-        joint_states.push_back(js);
+    for (const auto& js : snap.joints) {
+        nlohmann::json j;
+        j["id"] = js.id;
+        j["name"] = js.name;
+        j["status"] = js.status;
+        j["position"] = js.position;
+        j["velocity"] = js.velocity;
+        j["torque"] = js.torque;
+        j["load_torque"] = js.load_torque;
+        joint_states.push_back(j);
     }
     data["joint_states"] = joint_states;
 
-    // Flange pose
-    KDL::Frame flange = robot_->getFlange();
-    data["flange"] = frameToJson(flange);
+    // 法兰末端位姿
+    data["flange"] = frameToJson(snap.flange);
 
+    // 激活的坐标系
+    data["active_tool_frame_name"] = snap.active_tool_frame_name;
+    data["active_tool_frame"] = frameToJson(snap.active_tool_frame);
+    data["active_object_frame_name"] = snap.active_object_frame_name;
+    data["active_object_frame"] = frameToJson(snap.active_object_frame);
 
-
-    // Hardware state
+    // 硬件摘要
     nlohmann::json hw;
-    hw["joint_num"] = robot_->getJointNum();
-    if (robot_->hardware) {
-        hw["state"] = static_cast<int>(robot_->hardware->GetState());
-    }
+    hw["joint_num"] = snap.joint_num;
+    hw["state"] = snap.hardware_state;
     data["hw_state"] = hw;
 
     sendJson(res, true, 0, "ok", data);
