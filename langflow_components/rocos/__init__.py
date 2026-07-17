@@ -27,6 +27,8 @@ from .rocos_frames import (
     LoadFrames, SaveFrames,
 )
 from .rocos_script import UploadScript, RunScript, PauseScript, ResumeScript, StopScript, GetScriptStatus
+from .rocos_agent import RocosAgentPrompt, RocosErrorRecovery, RocosSafeMoveL
+from .rocos_memory import RocosMemory, RocosReflect, RocosKnowledge
 
 __all__ = [
     # Config
@@ -45,4 +47,8 @@ __all__ = [
     "LoadFrames", "SaveFrames",
     # Script
     "UploadScript", "RunScript", "PauseScript", "ResumeScript", "StopScript", "GetScriptStatus",
+    # Semantic layer (实战迭代)
+    "RocosAgentPrompt", "RocosErrorRecovery", "RocosSafeMoveL",
+    # Memory & Evolution
+    "RocosMemory", "RocosReflect", "RocosKnowledge",
 ]
