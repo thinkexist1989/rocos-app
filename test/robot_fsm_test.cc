@@ -22,9 +22,9 @@
 //     on_fsm_disable() 使用 randomBool()：
 //       true  → EventDisabled      → IDLE
 //       false → EventErrorOccurred → ERROR_STATE
-//   - ERROR_STATE 仅接受 EventResetReq / EventStopReq。当前没有公开
-//     API 触发这两个事件；SetEnabled/SetDisabled 会被拒绝。
-//   - Start/Pause/Resume/Stop 目前是占位实现，不向 FSM 派发事件。
+//   - ERROR_STATE 仅接受 EventResetReq / EventStopReq。
+//     SetEnabled/SetDisabled 会被拒绝，StopMotion 可触发停止请求。
+//   - Start 目前是占位实现，不向 FSM 派发事件。
 //   - IsRunning() 覆盖 RUNNING || STOPPING || PAUSING || RESUMING。
 // 由于 randomBool()，所有涉及状态迁移的用例都需容忍两种结果，
 // 部分用例通过重复构造收敛到目标初始状态。
@@ -128,10 +128,10 @@ TEST_CASE("Robot FSM - STOPPED 下 SetDisabled 进入 IDLE 或 ERROR_STATE") {
     CHECK((next == "IDLE" || next == "ERROR_STATE"));
 }
 
-TEST_CASE("Robot FSM - 初始状态下 IsRunning 为 false") {
+TEST_CASE("Robot FSM - 初始状态下 IsRunning 为 false 且无运动控制请求不启动运行") {
     // IsRunning() 覆盖 RUNNING || STOPPING || PAUSING || RESUMING。
-    // 初始 STOPPED/IDLE 均不在其中；Start/Pause/Resume/Stop 是占位实现，
-    // 不派发 FSM 事件，因此状态不会变化。
+    // 初始 STOPPED/IDLE 均不在其中；Start 是占位实现，无活动 motion 时
+    // PauseMotion/ResumeMotion/StopMotion 不会把机器人带入 RUNNING。
     rocos::Robot robot;
     const auto initial = robot.GetStateString();
     CHECK_FALSE(robot.IsRunning());
@@ -140,24 +140,20 @@ TEST_CASE("Robot FSM - 初始状态下 IsRunning 为 false") {
     CHECK(robot.GetStateString() == initial);
     CHECK_FALSE(robot.IsRunning());
 
-    robot.Pause();
-    CHECK(robot.GetStateString() == initial);
+    (void)robot.PauseMotion();
     CHECK_FALSE(robot.IsRunning());
 
-    robot.Resume();
-    CHECK(robot.GetStateString() == initial);
+    (void)robot.ResumeMotion();
     CHECK_FALSE(robot.IsRunning());
 
-    robot.Stop();
-    CHECK(robot.GetStateString() == initial);
+    (void)robot.StopMotion();
     CHECK_FALSE(robot.IsRunning());
 }
 
-TEST_CASE("Robot FSM - ERROR_STATE 拒绝 SetEnabled/SetDisabled 且 stub 命令不改变状态") {
+TEST_CASE("Robot FSM - ERROR_STATE 拒绝 SetEnabled/SetDisabled 且 Start 不改变状态") {
     // ERROR_STATE 仅接受 EventResetReq / EventStopReq，
-    // 目前公共 API 中没有能触发这两个事件的方法。
     // SetEnabled/SetDisabled 事件会被 FSM 拒绝并返回 JointStateError。
-    // Start/Pause/Resume/Stop 是 stub，也不会改变状态。
+    // Start 是 stub，也不会改变状态。
     auto robot = makeRobotInErrorState();
     REQUIRE(robot != nullptr);
     REQUIRE(robot->GetStateString() == "ERROR_STATE");
@@ -169,15 +165,6 @@ TEST_CASE("Robot FSM - ERROR_STATE 拒绝 SetEnabled/SetDisabled 且 stub 命令
     CHECK(robot->GetStateString() == "ERROR_STATE");
 
     robot->Start();
-    CHECK(robot->GetStateString() == "ERROR_STATE");
-
-    robot->Pause();
-    CHECK(robot->GetStateString() == "ERROR_STATE");
-
-    robot->Resume();
-    CHECK(robot->GetStateString() == "ERROR_STATE");
-
-    robot->Stop();
     CHECK(robot->GetStateString() == "ERROR_STATE");
 
     CHECK_FALSE(robot->IsRunning());

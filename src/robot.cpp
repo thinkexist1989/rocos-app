@@ -21,6 +21,10 @@
 
 #include <boost/sml.hpp>
 #include <kdl_parser/kdl_parser.hpp>  // 用于将urdf文件解析为KDL::Tree
+#include <yaml-cpp/yaml.h>
+
+#include <cctype>
+#include <fstream>
 
 #include "hardware.hpp"
 
@@ -108,6 +112,89 @@ namespace {
     }; // 伺服请求
     struct EventResetReq {
     }; // 恢复请求
+
+    bool isValidFrameNameValue(const std::string &name) {
+        if (name.empty() || name.size() > 64) return false;
+        for (const unsigned char ch : name) {
+            if (!std::isalnum(ch) && ch != '_' && ch != '-' && ch != '.') {
+                return false;
+            }
+        }
+        return true;
+    }
+
+    std::vector<std::string> collectFrameNames(const std::map<std::string, rocos::Frame> &frames) {
+        std::vector<std::string> names;
+        names.reserve(frames.size());
+        for (const auto &frame : frames) {
+            names.push_back(frame.first);
+        }
+        return names;
+    }
+
+    YAML::Node frameToYaml(const rocos::Frame &frame) {
+        YAML::Node node;
+        node["position"].push_back(frame.p.x());
+        node["position"].push_back(frame.p.y());
+        node["position"].push_back(frame.p.z());
+
+        double qx = 0.0;
+        double qy = 0.0;
+        double qz = 0.0;
+        double qw = 1.0;
+        frame.M.GetQuaternion(qx, qy, qz, qw);
+        node["orientation"].push_back(qx);
+        node["orientation"].push_back(qy);
+        node["orientation"].push_back(qz);
+        node["orientation"].push_back(qw);
+        return node;
+    }
+
+    bool yamlToFrame(const YAML::Node &node, rocos::Frame &frame) {
+        const YAML::Node position = node["position"];
+        const YAML::Node orientation = node["orientation"];
+        if (!position || !orientation || !position.IsSequence() || !orientation.IsSequence()) {
+            return false;
+        }
+        if (position.size() != 3 || orientation.size() != 4) {
+            return false;
+        }
+
+        const double x = position[0].as<double>();
+        const double y = position[1].as<double>();
+        const double z = position[2].as<double>();
+        const double qx = orientation[0].as<double>();
+        const double qy = orientation[1].as<double>();
+        const double qz = orientation[2].as<double>();
+        const double qw = orientation[3].as<double>();
+
+        frame = rocos::Frame(KDL::Rotation::Quaternion(qx, qy, qz, qw), KDL::Vector(x, y, z));
+        return true;
+    }
+
+    YAML::Node frameMapToYaml(const std::map<std::string, rocos::Frame> &frames) {
+        YAML::Node node;
+        for (const auto &frame : frames) {
+            node[frame.first] = frameToYaml(frame.second);
+        }
+        return node;
+    }
+
+    bool yamlToFrameMap(const YAML::Node &node, std::map<std::string, rocos::Frame> &frames) {
+        frames.clear();
+        if (!node) return true;
+        if (!node.IsMap()) return false;
+
+        for (const auto &entry : node) {
+            const std::string name = entry.first.as<std::string>();
+            if (!isValidFrameNameValue(name)) return false;
+
+            rocos::Frame frame;
+            if (!yamlToFrame(entry.second, frame)) return false;
+            frames[name] = frame;
+        }
+        return true;
+    }
 
 
     namespace sml = boost::sml;
@@ -542,18 +629,6 @@ namespace rocos {
 
     /////// Motion Command /////////////
 
-    Result Robot::Pause() {
-        return Result::NoError;
-    }
-
-    Result Robot::Resume() {
-        return Result::NoError;
-    }
-
-    Result Robot::Stop() {
-        return Result::NoError;
-    }
-
     Result Robot::Start() {
         return Result::NoError;
     }
@@ -646,6 +721,11 @@ namespace rocos {
     Result Robot::MoveL(const Frame &pose_goal,
                         const std::string &tool_name,
                         double v_limit, double a_limit, double j_limit) {
+        if (!tool_name.empty() && !HasToolFrame(tool_name)) {
+            log_ptr_->error("工具坐标系不存在: {}", tool_name);
+            return Result::ResourceUnavailable;
+        }
+
         data_ready_callback_ = [this, pose_goal, tool_name, v_limit, a_limit, j_limit]() -> Result {
             const int n = getJointNum();
             JntArray q_current(static_cast<unsigned int>(n));
@@ -656,8 +736,8 @@ namespace rocos {
 
             Frame T_tool;
             if (!tool_name.empty()) {
-                auto it = tool_frames_.find(tool_name);
-                if (it != tool_frames_.end()) T_tool = it->second;
+                Result rc = GetToolFrame(tool_name, T_tool);
+                if (rc != Result::NoError) return rc;
             }
 
             auto new_motion = std::make_unique<MoveLine>(
@@ -717,13 +797,175 @@ namespace rocos {
         return MoveL(pose_goal, tool_name, v_limit, a_limit, j_limit);
     }
 
-    void Robot::SetToolFrame(const std::string &name, const Frame &T_tool) {
-        tool_frames_[name] = T_tool;
+    std::vector<std::string> Robot::GetToolFrameNames() const {
+        return collectFrameNames(tool_frames_);
+    }
+
+    std::vector<std::string> Robot::GetObjectFrameNames() const {
+        return collectFrameNames(object_frames_);
+    }
+
+    bool Robot::HasToolFrame(const std::string &name) const {
+        return tool_frames_.find(name) != tool_frames_.end();
+    }
+
+    bool Robot::HasObjectFrame(const std::string &name) const {
+        return object_frames_.find(name) != object_frames_.end();
+    }
+
+    bool Robot::IsValidFrameName(const std::string &name) const {
+        return isValidFrameNameValue(name);
+    }
+
+    Result Robot::GetToolFrame(const std::string &name, Frame &frame) const {
+        auto it = tool_frames_.find(name);
+        if (it == tool_frames_.end()) return Result::ResourceUnavailable;
+        frame = it->second;
+        return Result::NoError;
+    }
+
+    Result Robot::GetObjectFrame(const std::string &name, Frame &frame) const {
+        auto it = object_frames_.find(name);
+        if (it == object_frames_.end()) return Result::ResourceUnavailable;
+        frame = it->second;
+        return Result::NoError;
     }
 
     Frame Robot::GetToolFrame(const std::string &name) const {
         auto it = tool_frames_.find(name);
         return (it != tool_frames_.end()) ? it->second : Frame();
+    }
+
+    Frame Robot::GetObjectFrame(const std::string &name) const {
+        auto it = object_frames_.find(name);
+        return (it != object_frames_.end()) ? it->second : Frame();
+    }
+
+    Result Robot::SetToolFrame(const std::string &name, const Frame &T_tool) {
+        if (!IsValidFrameName(name)) return Result::IllegalParameter;
+        tool_frames_[name] = T_tool;
+        return Result::NoError;
+    }
+
+    Result Robot::SetObjectFrame(const std::string &name, const Frame &T_object) {
+        if (!IsValidFrameName(name)) return Result::IllegalParameter;
+        object_frames_[name] = T_object;
+        return Result::NoError;
+    }
+
+    Result Robot::AddToolFrame(const std::string &name, const Frame &T_tool) {
+        if (!IsValidFrameName(name)) return Result::IllegalParameter;
+        auto inserted = tool_frames_.emplace(name, T_tool);
+        return inserted.second ? Result::NoError : Result::CallingConflictError;
+    }
+
+    Result Robot::AddObjectFrame(const std::string &name, const Frame &T_object) {
+        if (!IsValidFrameName(name)) return Result::IllegalParameter;
+        auto inserted = object_frames_.emplace(name, T_object);
+        return inserted.second ? Result::NoError : Result::CallingConflictError;
+    }
+
+    Result Robot::RemoveToolFrame(const std::string &name) {
+        if (!IsValidFrameName(name)) return Result::IllegalParameter;
+        if (tool_frames_.erase(name) == 0) return Result::ResourceUnavailable;
+        if (active_tool_frame_name_ == name) active_tool_frame_name_.clear();
+        return Result::NoError;
+    }
+
+    Result Robot::RemoveObjectFrame(const std::string &name) {
+        if (!IsValidFrameName(name)) return Result::IllegalParameter;
+        if (object_frames_.erase(name) == 0) return Result::ResourceUnavailable;
+        if (active_object_frame_name_ == name) active_object_frame_name_.clear();
+        return Result::NoError;
+    }
+
+    Result Robot::SetActiveToolFrame(const std::string &name) {
+        if (!IsValidFrameName(name)) return Result::IllegalParameter;
+        if (!HasToolFrame(name)) return Result::ResourceUnavailable;
+        active_tool_frame_name_ = name;
+        return Result::NoError;
+    }
+
+    Result Robot::SetActiveObjectFrame(const std::string &name) {
+        if (!IsValidFrameName(name)) return Result::IllegalParameter;
+        if (!HasObjectFrame(name)) return Result::ResourceUnavailable;
+        active_object_frame_name_ = name;
+        return Result::NoError;
+    }
+
+    std::string Robot::GetActiveToolFrameName() const {
+        return active_tool_frame_name_;
+    }
+
+    std::string Robot::GetActiveObjectFrameName() const {
+        return active_object_frame_name_;
+    }
+
+    Result Robot::GetActiveToolFrame(Frame &frame) const {
+        if (active_tool_frame_name_.empty()) return Result::ResourceUnavailable;
+        return GetToolFrame(active_tool_frame_name_, frame);
+    }
+
+    Result Robot::GetActiveObjectFrame(Frame &frame) const {
+        if (active_object_frame_name_.empty()) return Result::ResourceUnavailable;
+        return GetObjectFrame(active_object_frame_name_, frame);
+    }
+
+    Frame Robot::GetActiveToolFrame() const {
+        return GetToolFrame(active_tool_frame_name_);
+    }
+
+    Frame Robot::GetActiveObjectFrame() const {
+        return GetObjectFrame(active_object_frame_name_);
+    }
+
+    Result Robot::LoadFrames(const std::string &path) {
+        if (path.empty()) return Result::IllegalParameter;
+
+        try {
+            YAML::Node root = YAML::LoadFile(path);
+            std::map<std::string, Frame> loaded_tools;
+            std::map<std::string, Frame> loaded_objects;
+            if (!yamlToFrameMap(root["tools"], loaded_tools)) return Result::IllegalParameter;
+            if (!yamlToFrameMap(root["objects"], loaded_objects)) return Result::IllegalParameter;
+
+            std::string active_tool = root["active_tool"].as<std::string>("");
+            std::string active_object = root["active_object"].as<std::string>("");
+            if (!active_tool.empty() && loaded_tools.find(active_tool) == loaded_tools.end()) {
+                return Result::IllegalParameter;
+            }
+            if (!active_object.empty() && loaded_objects.find(active_object) == loaded_objects.end()) {
+                return Result::IllegalParameter;
+            }
+
+            tool_frames_ = std::move(loaded_tools);
+            object_frames_ = std::move(loaded_objects);
+            active_tool_frame_name_ = std::move(active_tool);
+            active_object_frame_name_ = std::move(active_object);
+            return Result::NoError;
+        } catch (const YAML::Exception &e) {
+            if (log_ptr_) log_ptr_->error("加载坐标系 YAML 失败: {} => {}", path, e.what());
+            return Result::ResourceUnavailable;
+        } catch (const std::exception &e) {
+            if (log_ptr_) log_ptr_->error("加载坐标系文件失败: {} => {}", path, e.what());
+            return Result::ResourceUnavailable;
+        }
+    }
+
+    Result Robot::SaveFrames(const std::string &path) const {
+        if (path.empty()) return Result::IllegalParameter;
+
+        YAML::Node root;
+        root["active_tool"] = active_tool_frame_name_;
+        root["active_object"] = active_object_frame_name_;
+        root["tools"] = frameMapToYaml(tool_frames_);
+        root["objects"] = frameMapToYaml(object_frames_);
+
+        std::ofstream out(path);
+        if (!out.is_open()) return Result::ResourceUnavailable;
+        out << root;
+        if (!out.good()) return Result::ResourceUnavailable;
+        return Result::NoError;
     }
 
     // ============================================================================

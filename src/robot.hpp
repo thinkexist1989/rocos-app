@@ -63,12 +63,6 @@ class Robot {
   // //! \brief 启动机器人运动，使机器人状态机进入 Running 状态
   // Result Start();
 
-  //! \brief 暂停机器人运动，使机器人状态机进入 Pause 状态
-  Result Pause();
-  //! \brief 继续机器人运动，使机器人状态机进入 Running 状态
-  Result Resume();
-  //! \brief 停止机器人运动，使机器人状态机进入 Stopped 状态
-  Result Stop();
   //! \brief 启动机器人运动，使机器人状态机进入 Running 状态
   Result Start();
   //! \brief 机器人上使能请求
@@ -130,8 +124,33 @@ class Robot {
                   const std::string& tool_name = "",
                   double v_limit = 1.0, double a_limit = 2.0, double j_limit = 10.0);
 
-  void SetToolFrame(const std::string& name, const Frame& T_tool);
+  // 命名坐标系管理：上位机通过 name 列表展示可选工具系/工件系，
+  // 再按 name 查询、设置、新增或删除对应的 Frame。
+  std::vector<std::string> GetToolFrameNames() const;
+  std::vector<std::string> GetObjectFrameNames() const;
+  bool HasToolFrame(const std::string& name) const;
+  bool HasObjectFrame(const std::string& name) const;
+  bool IsValidFrameName(const std::string& name) const;
+  Result GetToolFrame(const std::string& name, Frame& frame) const;
+  Result GetObjectFrame(const std::string& name, Frame& frame) const;
   Frame GetToolFrame(const std::string& name) const;
+  Frame GetObjectFrame(const std::string& name) const;
+  Result SetToolFrame(const std::string& name, const Frame& T_tool);
+  Result SetObjectFrame(const std::string& name, const Frame& T_object);
+  Result AddToolFrame(const std::string& name, const Frame& T_tool);
+  Result AddObjectFrame(const std::string& name, const Frame& T_object);
+  Result RemoveToolFrame(const std::string& name);
+  Result RemoveObjectFrame(const std::string& name);
+  Result SetActiveToolFrame(const std::string& name);
+  Result SetActiveObjectFrame(const std::string& name);
+  std::string GetActiveToolFrameName() const;
+  std::string GetActiveObjectFrameName() const;
+  Result GetActiveToolFrame(Frame& frame) const;
+  Result GetActiveObjectFrame(Frame& frame) const;
+  Frame GetActiveToolFrame() const;
+  Frame GetActiveObjectFrame() const;
+  Result LoadFrames(const std::string& path);
+  Result SaveFrames(const std::string& path) const;
 
   // MoveC 圆心+角度
   Result MoveC(const Frame& pose_start, const Frame& center_frame, double theta,
@@ -142,8 +161,11 @@ class Robot {
                const Frame& pose_goal,
                double v_limit = 1.0, double a_limit = 2.0, double j_limit = 10.0);
 
+  //! \brief 暂停机器人运动，使机器人状态机进入 Pause 状态
   Result PauseMotion();
-  Result StopMotion();  
+  //! \brief 停止机器人运动，使机器人状态机进入 Stopped 状态
+  Result StopMotion();
+  //! \brief 继续机器人运动，使机器人状态机进入 Running 状态
   Result ResumeMotion();
 
 
@@ -255,9 +277,6 @@ class Robot {
     return flange;
   }
 
-  Frame getTool() { return Frame(); }
-
-  Frame getObject() { return Frame(); }
 
 
  public:
@@ -279,8 +298,11 @@ class Robot {
   std::thread control_thread_;               // 控制线程句柄
   // std::atomic<bool> control_thread_active_{false};
   std::mutex mtx_;
-  std::map<std::string, Frame> tool_frames_;   // 保存定义的多个工具坐标系
-  std::map<std::string, Frame> object_frames_; // 保存定义的多个工件坐标系
+  // 命名坐标系注册表：key 是上位机展示和选择的坐标系 name，value 是对应位姿。
+  std::map<std::string, Frame> tool_frames_;
+  std::map<std::string, Frame> object_frames_;
+  std::string active_tool_frame_name_;
+  std::string active_object_frame_name_;
 
   //// 机器人状态机封装
   struct Impl;
