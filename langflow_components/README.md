@@ -42,7 +42,7 @@ export DEEPSEEK_API_KEY="sk-xxx"
 langflow run
 
 # 3. 导入 Workflow
-# 基础版: workflows/rocos_basic.json  (Agent + DeepSeek + ROCOS Tools)
+# 基础版: ../langflow_workflows/rocos_basic.json  (Agent + DeepSeek + ROCOS Tools)
 ```
 
 ## 目录结构
@@ -54,8 +54,6 @@ langflow_components/
 ├── start.sh                      # 一键启动
 ├── experiment.py                 # 自主试验脚本（开发工具）
 ├── gen_flow.py                   # Workflow 生成器
-├── workflows/
-│   └── rocos_basic.json          # 基础版 (Agent + DeepSeek + ROCOS Tools)
 └── rocos/
     ├── __init__.py               # 43 组件导出
     ├── rocos_client.py           # 统一 HTTP 客户端

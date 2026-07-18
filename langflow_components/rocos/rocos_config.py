@@ -37,6 +37,7 @@ class RocosConfig(Component):
             display_name="Config",
             name="config",
             method="build_config_data",
+            tool_mode=True,
         ),
     ]
 
