@@ -36,6 +36,11 @@ class HardwareInterface : public DriveInterface,
 
   virtual bool Reset() = 0;
 
+  /// @brief 清除硬件/驱动报警。实现层应清除 Fault/Alarm，但不直接进入运动使能态。
+  virtual Result ClearFault() {
+    return Result::FunctionNotSupported;
+  }
+
   virtual void WaitForSignal() = 0;
 
   /// @brief Control cycle period from shared memory, unit: microseconds.

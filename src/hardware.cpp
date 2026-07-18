@@ -314,6 +314,21 @@ bool Hardware::Reset() {
   return true;
 }
 
+Result Hardware::ClearFault() {
+    for (const auto& drive : config_.drives) {
+        const auto idx = getDriveIdx(drive.id);
+        if (idx < 0) {
+            return Result::JointStateError;
+        }
+
+        if (!setDriverState(static_cast<size_t>(idx), DriveState::SwitchOnDisabled)) {
+            return Result::JointStateError;
+        }
+    }
+
+    return Result::NoError;
+}
+
 // ==========================================================================
 // YAML 加载
 // ==========================================================================

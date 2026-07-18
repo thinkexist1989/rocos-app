@@ -295,7 +295,7 @@ namespace {
                 state<class RESUMING> + event<EventSuccessed> = state<class RUNNING>, //    RESUMING->RUNNING
 
                 state<class RESETTING> + sml::on_entry<_> / action_reset, // 12 RESETTING
-                state<class RESETTING> + event<EventDisabled> = state<class IDLE>, //    RESETTING->IDLE
+                state<class RESETTING> + event<EventDisabled> = state<class ERROR_STATE>, // RESETTING失败必须保持错误态
                 state<class RESETTING> + event<EventEnabled> = state<class STOPPED>, //    RESETTING->STOPPED
 
 
@@ -474,18 +474,51 @@ namespace rocos {
     }
 
     void Robot::on_fsm_reset() {
-        // log_ptr_->info("Robot is initializing...");
-        log_ptr_->info("机器人正在Resetting，执行on_fsm_reset");
+        log_ptr_->info("机器人进入RESETTING，开始清除报警并重新建立使能状态");
 
+        if (control_thread_.joinable() &&
+            control_thread_.get_id() != std::this_thread::get_id()) {
+            log_ptr_->info("ResetFault等待控制线程退出");
+            control_thread_.join();
+        }
 
-        // IsEnabled(); //TODO：要根据当前是否使能来确定状态
+        if (motion) {
+            const Result motion_reset = motion->Reset();
+            if (motion_reset != Result::NoError && motion_reset != Result::PlanFinished) {
+                log_ptr_->warn("ResetFault重置当前motion返回: {}", static_cast<int>(motion_reset));
+            }
+            motion.reset();
+            if (executor) {
+                executor->SwitchMotion(nullptr);
+            }
+        }
+
+        if (controller && !controller->Reset()) {
+            log_ptr_->error("ResetFault重置控制器失败，保持ERROR_STATE");
+            impl_->process_event(EventErrorOccurred{});
+            return;
+        }
+
+        if (hardware) {
+            const Result clear_result = hardware->ClearFault();
+            if (clear_result != Result::NoError &&
+                clear_result != Result::FunctionNotSupported) {
+                log_ptr_->error("ResetFault清除硬件报警失败: {}", static_cast<int>(clear_result));
+                impl_->process_event(EventErrorOccurred{});
+                return;
+            }
+            if (clear_result == Result::FunctionNotSupported) {
+                log_ptr_->warn("当前Hardware未实现ClearFault，继续尝试重新使能");
+            }
+        }
+
         setEnabled();
         if (IsEnabled()) {
-            log_ptr_->info("机器人已经使能，准备进入STOPPED状态");
+            log_ptr_->info("ResetFault成功，机器人已经使能，准备进入STOPPED状态");
             impl_->process_event(EventEnabled{}); // 模拟初始化成功事件
         } else {
-            log_ptr_->info("机器人未使能，准备进入IDLE状态");
-            impl_->process_event(EventDisabled{}); // 模拟初始化失败事件
+            log_ptr_->error("ResetFault后重新使能失败，保持ERROR_STATE");
+            impl_->process_event(EventErrorOccurred{});
         }
     }
 
@@ -708,6 +741,26 @@ namespace rocos {
         }
 
         return Result::NoError;
+    }
+
+    Result Robot::ResetFault() {
+        log_ptr_->info("收到ResetFault清除报警指令，当前状态: {}", GetStateString());
+        if (!impl_->is(sml::state<class ERROR_STATE>)) {
+            log_ptr_->error("当前状态不是ERROR_STATE，拒绝ResetFault: {}", GetStateString());
+            return Result::JointStateError;
+        }
+
+        if (!impl_->process_event(EventResetReq{})) {
+            log_ptr_->error("ResetFault状态机事件被拒绝，当前状态: {}", GetStateString());
+            return Result::JointStateError;
+        }
+
+        if (impl_->is(sml::state<class STOPPED>)) {
+            return Result::NoError;
+        }
+
+        log_ptr_->error("ResetFault未能回到STOPPED，当前状态: {}", GetStateString());
+        return Result::Fatal;
     }
 
 

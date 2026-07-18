@@ -180,6 +180,9 @@ public:
 
     bool Reset() override;
 
+    /// @brief 清除驱动报警，使 Fault 驱动回到可重新使能的安全状态
+    Result ClearFault() override;
+
     /// @brief 等待 EtherCAT 周期同步信号（阻塞直至下一 PDO 交换完成，运动控制用）
     void WaitForSignal() override;
 

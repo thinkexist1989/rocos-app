@@ -116,6 +116,8 @@ class Robot {
   Result SetEnabled();
   //! \brief 机器人下使能请求
   Result SetDisabled();
+  //! \brief 清除报警/错误状态，成功后状态机回到 STOPPED
+  Result ResetFault();
 
 
   //! \brief 获取机器人当前是否上使能状态

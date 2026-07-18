@@ -64,6 +64,7 @@ private:
     // ---- Robot Control ----
     void handleEnable(const httplib::Request& req, httplib::Response& res);
     void handleDisable(const httplib::Request& req, httplib::Response& res);
+    void handleReset(const httplib::Request& req, httplib::Response& res);
     void handleIsEnabled(const httplib::Request& req, httplib::Response& res);
     void handleSetWorkMode(const httplib::Request& req, httplib::Response& res);
 

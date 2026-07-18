@@ -258,6 +258,7 @@ void RobotHttpServer::registerRoutes() {
     server_->Get("/api/robot/enabled", [this](auto& req, auto& res) { handleIsEnabled(req, res); });
     server_->Post("/api/robot/enable", [this](auto& req, auto& res) { handleEnable(req, res); });
     server_->Post("/api/robot/disable", [this](auto& req, auto& res) { handleDisable(req, res); });
+    server_->Post("/api/robot/reset", [this](auto& req, auto& res) { handleReset(req, res); });
     server_->Post("/api/robot/workmode", [this](auto& req, auto& res) { handleSetWorkMode(req, res); });
 
     // Robot motion control
@@ -719,6 +720,17 @@ void RobotHttpServer::handleDisable(const httplib::Request& req, httplib::Respon
     data["enabled"] = robot_->IsEnabled();
     sendJson(res, resultSucceeded(result), resultCode(result),
              resultSucceeded(result) ? "Robot disabled" : "Robot disable failed",
+             data);
+}
+
+void RobotHttpServer::handleReset(const httplib::Request& req, httplib::Response& res) {
+    log_ptr_->info("POST /api/robot/reset");
+    const Result result = robot_->ResetFault();
+    nlohmann::json data;
+    data["robot_state"] = robot_->GetStateString();
+    data["enabled"] = robot_->IsEnabled();
+    sendJson(res, resultSucceeded(result), resultCode(result),
+             resultSucceeded(result) ? "Robot reset to STOPPED" : "Robot reset failed",
              data);
 }
 
