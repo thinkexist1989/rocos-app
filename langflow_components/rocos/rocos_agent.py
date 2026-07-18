@@ -3,53 +3,133 @@ ROCOS 语义层组件 — 将实战中迭代出的控制模式编码为可复用
 
 包含:
   - RocosAgentPrompt: 生成最优的 Agent 系统提示词
-  - RocosErrorRecovery: 自动错误恢复 (ERROR_STATE → disable → enable → STOPPED)
+  - RocosErrorRecovery: 自动错误恢复
   - RocosSafeMoveL: 先读状态再执行 MoveL 的安全模式
+  - ResetRobotFault: 复位机器人 Fault（POST /api/robot/reset）
 """
 
 from langflow.custom import Component
 from langflow.io import Output, StrInput, FloatInput, DropdownInput
 from langflow.schema import Data
 import json
-import urllib.request
 import urllib.error
+import urllib.parse
+import urllib.request
 from typing import Optional
 
 
-# ---- HTTP Helpers ----
+def _error(code: int, message: str) -> dict:
+    return {"success": False, "code": code, "message": message, "data": None}
 
-def _rocos_get(base_url: str, path: str, params: Optional[dict] = None) -> dict:
+
+def _url(base_url: str, path: str, params: Optional[dict] = None) -> str:
     url = f"{base_url.rstrip('/')}{path}"
     if params:
-        query = "&".join(f"{k}={v}" for k, v in params.items() if v is not None)
-        url = f"{url}?{query}"
-    try:
-        req = urllib.request.Request(url, headers={"Accept": "application/json"})
-        with urllib.request.urlopen(req, timeout=10) as resp:
-            body = resp.read().decode("utf-8")
-            return json.loads(body) if body else {}
-    except urllib.error.URLError as e:
-        return {"success": False, "code": -1, "message": f"Network error: {e}", "data": None}
-    except json.JSONDecodeError as e:
-        return {"success": False, "code": -2, "message": f"JSON parse error: {e}", "data": None}
+        query = urllib.parse.urlencode({k: v for k, v in params.items() if v is not None})
+        if query:
+            url = f"{url}?{query}"
+    return url
 
 
-def _rocos_post(base_url: str, path: str, body: dict) -> dict:
-    url = f"{base_url.rstrip('/')}{path}"
+def _decode_json(body: str) -> dict:
+    if not body:
+        return {}
+    return json.loads(body)
+
+
+def _parse_http_error(e: urllib.error.HTTPError) -> dict:
     try:
-        data = json.dumps(body).encode("utf-8")
-        req = urllib.request.Request(
-            url, data=data,
-            headers={"Content-Type": "application/json", "Accept": "application/json"},
-            method="POST"
-        )
-        with urllib.request.urlopen(req, timeout=30) as resp:
-            resp_body = resp.read().decode("utf-8")
-            return json.loads(resp_body) if resp_body else {}
+        body = e.read().decode("utf-8")
+        parsed = _decode_json(body)
+        if isinstance(parsed, dict):
+            parsed.setdefault("success", False)
+            parsed.setdefault("code", e.code)
+            parsed.setdefault("message", e.reason)
+            return parsed
+    except Exception:
+        pass
+    return _error(e.code, f"HTTP {e.code}: {e.reason}")
+
+
+def _rocos_request(
+    base_url: str, path: str, method: str = "GET",
+    body: Optional[dict] = None, params: Optional[dict] = None,
+    expect_json: bool = True, timeout: float = 30.0,
+):
+    url = _url(base_url, path, params)
+    data = json.dumps(body).encode("utf-8") if body is not None else None
+    headers = {"Accept": "application/json" if expect_json else "*/*"}
+    if data is not None:
+        headers["Content-Type"] = "application/json"
+    try:
+        req = urllib.request.Request(url, data=data, headers=headers, method=method)
+        with urllib.request.urlopen(req, timeout=timeout) as resp:
+            text = resp.read().decode("utf-8")
+            return _decode_json(text) if expect_json else text
+    except urllib.error.HTTPError as e:
+        return _parse_http_error(e)
     except urllib.error.URLError as e:
-        return {"success": False, "code": -1, "message": f"Network error: {e}", "data": None}
+        return _error(-1, f"网络错误: {e}")
     except json.JSONDecodeError as e:
-        return {"success": False, "code": -2, "message": f"JSON parse error: {e}", "data": None}
+        return _error(-2, f"JSON 解析错误: {e}")
+
+
+def _rocos_get(base_url: str, path: str, params: Optional[dict] = None) -> dict:
+    return _rocos_request(base_url, path, method="GET", params=params, timeout=10.0)
+
+
+def _rocos_post(base_url: str, path: str, body: Optional[dict] = None) -> dict:
+    return _rocos_request(base_url, path, method="POST", body=body or {})
+
+
+def _rocos_delete(base_url: str, path: str, params: Optional[dict] = None) -> dict:
+    return _rocos_request(base_url, path, method="DELETE", params=params)
+
+
+def _rocos_text(base_url: str, path: str, params: Optional[dict] = None) -> str:
+    return _rocos_request(base_url, path, method="GET", params=params, expect_json=False, timeout=10.0)
+
+
+def parse_float_list(text: str, expected_len: Optional[int] = None) -> list[float]:
+    values = [float(x.strip()) for x in text.split(",") if x.strip()]
+    if expected_len is not None and len(values) != expected_len:
+        raise ValueError(f"expected {expected_len} values, got {len(values)}")
+    return values
+
+# Minimal memory store (自包含，避免 Langflow exec 导入失败)
+DEFAULT_MEMORY_DIR = "/tmp/rocos_memory"
+DEFAULT_MEMORY_FILE = "rocos_memory.json"
+
+def _record_to_memory(memory_dir: str, entry: dict, intent: str = "", action_template: dict = None):
+    """轻量记录: 写入执行记忆 + 语义缓存学习"""
+    import os as _os
+    fpath = _os.path.join(memory_dir, DEFAULT_MEMORY_FILE)
+    _os.makedirs(_os.path.dirname(fpath), exist_ok=True)
+    if _os.path.exists(fpath):
+        with open(fpath) as f:
+            mem = json.load(f)
+    else:
+        mem = {"executions": [], "patterns": [], "semantic_cache": {},
+               "stats": {"total_motions": 0, "errors": 0, "recoveries": 0}}
+    mem["executions"].append(entry)
+    mem["executions"] = mem["executions"][-200:]
+    mem["stats"]["total_motions"] = mem["stats"].get("total_motions", 0) + 1
+    if not entry.get("success", True):
+        mem["stats"]["errors"] = mem["stats"].get("errors", 0) + 1
+    if intent and action_template:
+        sc = mem.setdefault("semantic_cache", {})
+        cache_key = intent.lower().replace(" ", "")
+        template_key = json.dumps(action_template, sort_keys=True)
+        if cache_key in sc and json.dumps(sc[cache_key].get("action", {}), sort_keys=True) == template_key:
+            sc[cache_key]["frequency"] = sc[cache_key].get("frequency", 0) + 1
+            sc[cache_key]["success_count"] = sc[cache_key].get("success_count", 0) + 1
+            sc[cache_key]["last_used"] = entry["timestamp"]
+        else:
+            sc[cache_key] = {"action_name": "safe_executor", "action": action_template,
+                             "frequency": 1, "success_count": 1, "failure_count": 0,
+                             "first_seen": entry["timestamp"], "last_used": entry["timestamp"]}
+    with open(fpath, 'w') as f:
+        json.dump(mem, f, indent=2, ensure_ascii=False)
 
 
 # ---- 1. Agent 系统提示词 ----
@@ -93,7 +173,7 @@ class RocosAgentPrompt(Component):
 1. **先读状态再决策**: 调用 GetRobotState 获取真实的当前位置/姿态/状态
 2. **基于真实坐标计算**: 不要假设机器人在上一次指令的目标位置，用 GetRobotState 返回的实际值
 3. **小幅度执行**: 默认每次位移 ≤5cm，速度 ≤0.3
-4. **错误恢复**: 如果 robot_state 是 ERROR_STATE，先调用 DisableRobot 再 EnableRobot
+4. **错误恢复**: 如果 robot_state 是 ERROR_STATE，调 ResetRobotFault 复位
 
 ## 工作流程:
 ```
@@ -103,8 +183,9 @@ GetRobotState → 检查 STOPPED+enabled → 计算小幅度目标 → MoveJ/Mov
 ## 状态码参考:
 - STOPPED: 就绪，可以运动
 - RUNNING: 运动中，等待完成
-- ERROR_STATE: 需要恢复 (Disable → Enable)
-- code=-2307: Fatal 错误，需要 Disable+Enable 恢复
+- ERROR_STATE: 需要复位 (调 ResetRobotFault 或 POST /api/robot/reset)
+- 规划失败 (IK/限位) → 保持 STOPPED，调整目标重试
+- 执行失败 (Fault) → ERROR_STATE → ResetRobotFault 复位
 
 ## API 参考:
 - MoveJ: /api/robot/movej, 字段 joints(数组), velocity, acceleration, jerk
@@ -124,13 +205,23 @@ GetRobotState → 检查 STOPPED+enabled → 计算小幅度目标 → MoveJ/Mov
 # ---- 2. 错误恢复 ----
 
 class RocosErrorRecovery(Component):
-    """自动从 ERROR_STATE 恢复机器人"""
+    """MoveL 运行失败后的复位流程
+
+    正确流程:
+      MoveL 失败
+        → 读 /api/robot/state
+        → 如果 ERROR_STATE: 调 POST /api/robot/reset → 等待 STOPPED
+        → 如果 STOPPED: 只是规划/参数失败，修改目标即可，不需要 reset
+
+    FSM: ERROR_STATE + EventResetReq → RESETTING → STOPPED
+    """
 
     display_name: str = "ROCOS 错误恢复"
     description: str = (
-        "自动将机器人从 ERROR_STATE 恢复到 STOPPED 就绪状态。"
-        "执行 Disable → Enable 循环。"
-        "Use this tool when robot_state is ERROR_STATE or motion commands return code=-2307."
+        "MoveL 失败后的复位恢复。先读状态机: "
+        "ERROR_STATE → 调 /api/robot/reset 复位; "
+        "STOPPED → 只是规划失败，调整参数重试即可。"
+        "Use this tool after a motion command fails."
     )
     icon: str = "RefreshCw"
     name: str = "rocos_error_recovery"
@@ -148,43 +239,47 @@ class RocosErrorRecovery(Component):
     ]
 
     def recover(self) -> Data:
+        import time
         base = self.base_url.rstrip("/")
 
-        # Step 1: Read state
         state = _rocos_get(base, "/api/robot/state")
         robot_state = state.get("data", {}).get("robot_state", "UNKNOWN")
 
+        # 不是错误 → 不需要恢复
+        if robot_state == "STOPPED":
+            text = (
+                "✅ 机器人处于 STOPPED，无需复位。\n"
+                "上次 MoveL 失败是规划阶段问题（IK/限位/参数），调整目标后直接重试即可。"
+            )
+            self.status = "无需恢复"
+            return Data(text=text, data={"state": "STOPPED", "recovered": True, "was_planning_error": True})
+
         if robot_state != "ERROR_STATE":
-            text = f"机器人当前状态为 {robot_state}，无需恢复"
-            self.status = text
-            return Data(text=text, data={"state": robot_state, "recovered": False})
+            return Data(
+                text=f"机器人状态 {robot_state}，非 ERROR_STATE，无需复位",
+                data={"state": robot_state, "recovered": False},
+            )
 
-        # Step 2: Disable
-        d = _rocos_post(base, "/api/robot/disable", {})
-        if not d.get("success"):
-            text = f"Disable 失败: {d.get('message')}"
-            self.status = text
-            return Data(text=text, data=d)
+        # ERROR_STATE: 调 reset
+        reset = _rocos_post(base, "/api/robot/reset", {})
+        if not reset.get("success"):
+            text = f"❌ Reset 失败 (code={reset.get('code')}): {reset.get('message')}"
+            self.status = "复位失败"
+            return Data(text=text, data={"recovered": False})
 
-        # Step 3: Enable
-        e = _rocos_post(base, "/api/robot/enable", {})
-        if not e.get("success"):
-            text = f"Enable 失败: {e.get('message')}"
-            self.status = text
-            return Data(text=text, data=e)
+        # 等待 RESETTING → STOPPED
+        for _ in range(10):
+            time.sleep(0.5)
+            s = _rocos_get(base, "/api/robot/state")
+            st = s.get("data", {}).get("robot_state", "UNKNOWN")
+            if st == "STOPPED":
+                text = "✅ 复位成功: ERROR_STATE → RESETTING → STOPPED，可以重新下发运动"
+                self.status = "复位成功"
+                return Data(text=text, data={"recovered": True, "state": "STOPPED"})
 
-        # Step 4: Verify
-        import time
-        time.sleep(0.5)
-        final = _rocos_get(base, "/api/robot/state")
-        final_state = final.get("data", {}).get("robot_state", "UNKNOWN")
-
-        text = (
-            f"恢复完成: ERROR_STATE → Disable → Enable → {final_state}\n"
-            f"{'✅ 成功，机器人就绪' if final_state == 'STOPPED' else '⚠️ 请检查'}"
-        )
-        self.status = text[:100]
-        return Data(text=text, data={"recovered": final_state == "STOPPED", "state": final_state})
+        text = "⚠️ 复位未完成，请检查机器人状态"
+        self.status = "复位超时"
+        return Data(text=text, data={"recovered": False})
 
 
 # ---- 3. 安全 MoveL（先读再动） ----
@@ -263,10 +358,12 @@ class RocosSafeMoveL(Component):
             "z": current_pos["z"] + self.delta_z,
         }
 
-        # 安全检查: 位移不超过 5cm
+        # 安全检查: 位移超过 5cm 直接拒绝
         total_delta = (self.delta_x**2 + self.delta_y**2 + self.delta_z**2) ** 0.5
         if total_delta > 0.05:
-            self.status = f"Warning: delta={total_delta:.3f}m > 5cm"
+            text = f"⛔ 安全限制: 单步位移 {total_delta*100:.1f}cm > 5cm，已拒绝。请减小步长。"
+            self.status = text[:100]
+            return Data(text=text, data={"rejected": True, "max_delta": 0.05, "requested": total_delta})
 
         # Step 3: 执行 MoveL
         result = _rocos_post(base, "/api/robot/movel", {
@@ -289,3 +386,259 @@ class RocosSafeMoveL(Component):
 
         self.status = text[:100]
         return Data(text=text, data=result)
+
+
+# ---- 4. 复位 Fault ----
+
+class ResetRobotFault(Component):
+    """复位机器人 Fault — POST /api/robot/reset"""
+
+    display_name: str = "复位机器人"
+    description: str = (
+        "复位机器人 Fault 状态。调用 POST /api/robot/reset。"
+        "FSM: ERROR_STATE + EventResetReq → RESETTING → EventEnabled → STOPPED。"
+        "Use this tool to reset the robot after an execution fault."
+    )
+    icon: str = "RotateCcw"
+    name: str = "reset_robot_fault"
+
+    inputs = [
+        StrInput(name="base_url", display_name="API 基础地址", value="http://localhost:8080"),
+    ]
+
+    outputs = [
+        Output(display_name="Reset Result", name="result", method="reset"),
+    ]
+
+    def reset(self) -> Data:
+        import time
+        base = self.base_url.rstrip("/")
+
+        state = _rocos_get(base, "/api/robot/state")
+        robot_state = state.get("data", {}).get("robot_state", "UNKNOWN")
+
+        if robot_state == "STOPPED":
+            return Data(text="机器人已在 STOPPED，无需复位", data={"reset": False})
+
+        result = _rocos_post(base, "/api/robot/reset", {})
+        if not result.get("success"):
+            return Data(
+                text=f"❌ Reset 失败: {result.get('message')}",
+                data={"reset": False},
+            )
+
+        for _ in range(10):
+            time.sleep(0.5)
+            s = _rocos_get(base, "/api/robot/state")
+            st = s.get("data", {}).get("robot_state", "UNKNOWN")
+            if st == "STOPPED":
+                text = "✅ 复位成功 → STOPPED"
+                self.status = text
+                return Data(text=text, data={"reset": True, "state": "STOPPED"})
+
+        text = "⚠️ 复位等待超时"
+        self.status = text
+        return Data(text=text, data={"reset": False})
+
+
+# ---- 5. 安全执行器（核心） ----
+
+class RocosSafeExecutor(Component):
+    """统一安全执行器: 读状态 → 校验 → 执行 → WaitMove → 自动记录
+
+    接收结构化动作:
+      {"type": "cartesian_delta", "frame": "BASE", "delta": [dx,dy,dz,0,0,0], "speed": 0.1}
+      {"type": "joint", "joints": [0,1.047,...], "speed": 0.4}
+      {"type": "nullspace", "joints_vec": [1,0,-1,0,0,0,0], "speed": 0.3, "timeout": 1.5}
+
+    安全校验:
+      - 机器人必须 STOPPED + enabled
+      - 笛卡尔单步 ≤5cm
+      - 关节单步 ≤0.3rad
+      - 速度 ≤0.5
+    """
+
+    display_name: str = "ROCOS 安全执行器"
+    description: str = (
+        "统一的安全运动执行器。接收结构化动作描述，自动完成: "
+        "1) 读状态 2) 安全检查 3) 执行 4) 等待完成 5) 自动记录记忆 6) 自动学习语义缓存。"
+        "支持 cartesian_delta / joint / nullspace 三种动作类型。"
+        "Use this as the single execution entry point for all robot motions."
+    )
+    icon: str = "ShieldCheck"
+    name: str = "rocos_safe_executor"
+
+    inputs = [
+        StrInput(name="base_url", display_name="API 基础地址", value="http://localhost:8080"),
+        StrInput(
+            name="action_json",
+            display_name="动作 (JSON)",
+            info='{"type":"cartesian_delta","delta":[dx,dy,dz,0,0,0],"speed":0.1} or joint/nullspace',
+            value='{"type":"cartesian_delta","delta":[0,0.03,0,0,0,0],"speed":0.1}',
+        ),
+        StrInput(name="intent", display_name="语义描述 (可选)", info='如"往右一点点", 用于缓存学习', value=""),
+        StrInput(name="memory_dir", display_name="记忆目录", value="/tmp/rocos_memory", advanced=True),
+    ]
+
+    outputs = [
+        Output(display_name="Execution Result", name="result", method="execute"),
+    ]
+
+    def execute(self) -> Data:
+        import time, os, json as _json
+
+        base = self.base_url.rstrip("/")
+        memory_dir = self.memory_dir if self.memory_dir else DEFAULT_MEMORY_DIR
+
+        # ---- Step 0: 解析动作 ----
+        try:
+            action = _json.loads(self.action_json)
+        except _json.JSONDecodeError:
+            return Data(text="❌ 动作 JSON 格式错误", data={"success": False})
+
+        atype = action.get("type", "")
+        if atype not in ("cartesian_delta", "joint", "nullspace"):
+            return Data(text=f"❌ 不支持的动作类型: {atype}，支持 cartesian_delta/joint/nullspace", data={"success": False})
+
+        speed = action.get("speed", 0.15)
+
+        # ---- Step 1: 读状态 ----
+        state = _rocos_get(base, "/api/robot/state")
+        sdata = state.get("data", {})
+        robot_state = sdata.get("robot_state", "UNKNOWN")
+        is_enabled = sdata.get("is_enabled", False)
+        active_tool = sdata.get("active_tool_frame_name", "")
+        active_object = sdata.get("active_object_frame_name", "")
+
+        if robot_state != "STOPPED" or not is_enabled:
+            text = f"❌ 机器人未就绪: state={robot_state}, enabled={is_enabled}"
+            if robot_state == "ERROR_STATE":
+                text += "\n💡 请先调用 ResetRobotFault 复位"
+            self.status = text[:100]
+            return Data(text=text, data={
+                "success": False, "state": robot_state,
+                "active_tool": active_tool, "active_object": active_object,
+            })
+
+        flange = sdata.get("flange", {})
+        before_pos = flange.get("position", {"x": 0, "y": 0, "z": 0})
+        before_ori = flange.get("orientation", {"x": 0, "y": 0, "z": 0, "w": 1})
+        joints_before = [j["position"] for j in sdata.get("joint_states", [])]
+
+        # ---- Step 2: 安全检查 ----
+        if speed > 0.5:
+            return Data(text=f"⛔ 速度 {speed} > 0.5，拒绝执行", data={"success": False, "rejected": True})
+
+        if atype == "cartesian_delta":
+            delta = action.get("delta", [0, 0, 0, 0, 0, 0])
+            if len(delta) < 3:
+                return Data(text="❌ cartesian_delta 需要至少3个元素 [dx,dy,dz]", data={"success": False})
+            total = (delta[0]**2 + delta[1]**2 + delta[2]**2) ** 0.5
+            if total > 0.05:
+                return Data(text=f"⛔ 笛卡尔位移 {total*100:.1f}cm > 5cm，拒绝", data={"success": False, "rejected": True})
+            if total == 0:
+                return Data(text="⛔ 零位移，拒绝", data={"success": False, "rejected": True})
+
+            # 构建 MoveL 目标
+            target_pos = {
+                "x": before_pos["x"] + delta[0],
+                "y": before_pos["y"] + delta[1],
+                "z": before_pos["z"] + delta[2],
+            }
+            result = _rocos_post(base, "/api/robot/movel", {
+                "pose": {"position": target_pos, "orientation": before_ori},
+                "velocity": speed,
+            })
+            api_path = "/api/robot/movel"
+
+        elif atype == "joint":
+            joints_target = action.get("joints", [])
+            if not joints_target or len(joints_target) < 3:
+                return Data(text="❌ joint 类型需要 joints 数组", data={"success": False})
+            # 检查单步
+            max_step = max(abs(joints_target[i] - joints_before[i]) for i in range(min(len(joints_target), len(joints_before))))
+            if max_step > 0.3:
+                return Data(text=f"⛔ 关节单步 {max_step:.2f}rad > 0.3rad，拒绝", data={"success": False, "rejected": True})
+
+            result = _rocos_post(base, "/api/robot/movej", {
+                "joints": joints_target,
+                "velocity": speed, "acceleration": 1.0,
+            })
+            api_path = "/api/robot/movej"
+
+        elif atype == "nullspace":
+            vec = action.get("joints_vec", [])
+            timeout_s = action.get("timeout", 1.5)
+            result = _rocos_post(base, "/api/robot/jog/nullspace", {
+                "joints": vec, "direction": "POSITIVE",
+                "speed": speed, "timeout": timeout_s,
+            })
+            api_path = "/api/robot/jog/nullspace"
+
+        api_ok = result.get("success", False)
+        api_code = result.get("code", 0)
+
+        # ---- Step 3+4: 等待完成 + 读后状态 ----
+        final_state = "UNKNOWN"
+        if api_ok:
+            for _ in range(15):
+                time.sleep(0.4)
+                s2 = _rocos_get(base, "/api/robot/state")
+                final_state = s2.get("data", {}).get("robot_state", "UNKNOWN")
+                if final_state in ("STOPPED", "ERROR_STATE"):
+                    break
+
+        after = _rocos_get(base, "/api/robot/state")
+        adata = after.get("data", {})
+        final_state = adata.get("robot_state", final_state)
+        after_pos = adata.get("flange", {}).get("position", {})
+        success = api_ok and final_state == "STOPPED"
+
+        # ---- Step 5: 自动记录 Memory ----
+        entry = {
+            "timestamp": time.strftime("%Y-%m-%dT%H:%M:%S"),
+            "action": atype,
+            "params": action,
+            "before": {
+                "state": robot_state, "x": round(before_pos["x"], 4),
+                "y": round(before_pos["y"], 4), "z": round(before_pos["z"], 4),
+                "active_tool": active_tool, "active_object": active_object,
+            },
+            "after": {
+                "state": final_state,
+                "x": round(after_pos.get("x", 0), 4),
+                "y": round(after_pos.get("y", 0), 4),
+                "z": round(after_pos.get("z", 0), 4),
+            },
+            "success": success,
+            "error_code": None if success else api_code,
+        }
+        # ---- Step 5+6: 记录记忆 + 缓存学习 ----
+        intent = self.intent.strip()
+        _record_to_memory(memory_dir, entry,
+                          intent if (intent and success) else "",
+                          action if (intent and success) else None)
+
+        # ---- Step 7: 生成结果 ----
+        if success:
+            dx = round(after_pos.get("x", 0) - before_pos["x"], 4)
+            dy = round(after_pos.get("y", 0) - before_pos["y"], 4)
+            dz = round(after_pos.get("z", 0) - before_pos["z"], 4)
+            text = (
+                f"✅ {atype} 执行成功\n"
+                f"位移: Δx={dx:.4f} Δy={dy:.4f} Δz={dz:.4f}\n"
+                f"状态: {robot_state} → {final_state}\n"
+                f"已自动记录记忆" + (f" + 缓存学习 '{intent}'" if intent else "")
+            )
+            freq = 0
+        elif final_state == "ERROR_STATE":
+            text = f"❌ 执行失败 → ERROR_STATE (code={api_code})\n💡 请调用 ResetRobotFault 复位"
+        else:
+            text = f"❌ 执行失败 (code={api_code}): {result.get('message', '')}\n状态: {final_state}"
+
+        self.status = text[:100]
+        return Data(text=text, data={
+            "success": success, "state": final_state, "api_code": api_code,
+            "before_pos": before_pos, "after_pos": after_pos,
+            "memory_recorded": True,
+        })

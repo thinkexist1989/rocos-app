@@ -1,0 +1,7 @@
+__pycache__/
+*.pyc
+*.pyo
+/tmp/rocos_memory/
+/logs/
+*.db
+.DS_Store

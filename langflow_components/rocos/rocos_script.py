@@ -8,7 +8,71 @@ ROCOS Lua 脚本管理组件组。
 from langflow.custom import Component
 from langflow.io import Output, StrInput
 from langflow.schema import Data
-from .rocos_client import _rocos_get, _rocos_post
+import json as _json
+import urllib.error as _urlerror
+import urllib.parse as _urlparse
+import urllib.request as _urlreq
+from typing import Optional as _Optional
+
+
+def _rocos_get(_base, _path, _params: _Optional[dict] = None):
+    _url = f"{_base.rstrip('/')}{_path}"
+    if _params:
+        _q = "&".join(f"{k}={v}" for k, v in _params.items() if v is not None)
+        _url = f"{_url}?{_q}"
+    try:
+        _req = _urlreq.Request(_url, headers={"Accept": "application/json"})
+        with _urlreq.urlopen(_req, timeout=10) as _r:
+            return _json.loads(_r.read().decode("utf-8"))
+    except _urlerror.URLError as _e:
+        return {"success": False, "code": -1, "message": f"网络错误: {_e}", "data": None}
+    except _json.JSONDecodeError as _e:
+        return {"success": False, "code": -2, "message": f"JSON解析错误: {_e}", "data": None}
+
+
+def _rocos_post(_base, _path, _body: dict):
+    _url = f"{_base.rstrip('/')}{_path}"
+    try:
+        _data = _json.dumps(_body).encode("utf-8")
+        _req = _urlreq.Request(_url, data=_data, headers={"Content-Type": "application/json", "Accept": "application/json"}, method="POST")
+        with _urlreq.urlopen(_req, timeout=30) as _r:
+            return _json.loads(_r.read().decode("utf-8"))
+    except _urlerror.URLError as _e:
+        return {"success": False, "code": -1, "message": f"网络错误: {_e}", "data": None}
+    except _json.JSONDecodeError as _e:
+        return {"success": False, "code": -2, "message": f"JSON解析错误: {_e}", "data": None}
+
+
+def _rocos_delete(_base, _path, _params: _Optional[dict] = None):
+    _url = f"{_base.rstrip('/')}{_path}"
+    if _params:
+        _q = "&".join(f"{k}={v}" for k, v in _params.items() if v is not None)
+        _url = f"{_url}?{_q}"
+    try:
+        _req = _urlreq.Request(_url, headers={"Accept": "application/json"}, method="DELETE")
+        with _urlreq.urlopen(_req, timeout=10) as _r:
+            return _json.loads(_r.read().decode("utf-8"))
+    except _urlerror.URLError as _e:
+        return {"success": False, "code": -1, "message": f"网络错误: {_e}", "data": None}
+    except _json.JSONDecodeError as _e:
+        return {"success": False, "code": -2, "message": f"JSON解析错误: {_e}", "data": None}
+
+
+def _rocos_text(_base, _path, _params: _Optional[dict] = None):
+    _url = f"{_base.rstrip('/')}{_path}"
+    if _params:
+        _q = "&".join(f"{k}={v}" for k, v in _params.items() if v is not None)
+        _url = f"{_url}?{_q}"
+    _req = _urlreq.Request(_url, headers={"Accept": "*/*"})
+    with _urlreq.urlopen(_req, timeout=10) as _r:
+        return _r.read().decode("utf-8")
+
+
+def parse_float_list(_text: str, _expected_len: _Optional[int] = None):
+    _vals = [float(x.strip()) for x in _text.split(",") if x.strip()]
+    if _expected_len is not None and len(_vals) != _expected_len:
+        raise ValueError(f"expected {_expected_len} values, got {len(_vals)}")
+    return _vals
 
 class UploadScript(Component):
     """上传并编译 Lua 脚本到内存"""

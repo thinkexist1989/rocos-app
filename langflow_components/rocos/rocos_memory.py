@@ -1,10 +1,11 @@
 """
-ROCOS 自进化记忆系统 — 越用越聪明
+ROCOS 自进化记忆系统 — 越用越聪明，越用越快
 
-三层闭环:
-  1. RocosMemory      — 记录每次动作 (执行记忆)
-  2. RocosReflect     — 分析历史提取模式 (自省)
-  3. RocosKnowledge   — 累积可查询的经验规则 (知识库)
+四层闭环:
+  1. RocosSemanticCache — 语义→指令缓存 (高频指令跳过LLM，响应 8s→0.5s)
+  2. RocosMemory        — 记录每次动作 (执行记忆)
+  3. RocosReflect       — 分析历史提取模式 (自省)
+  4. RocosKnowledge     — 累积可查询的经验规则 (知识库)
 
 存储后端: 本地 JSON 文件 (零外部依赖)
 路径: {memory_dir}/rocos_memory.json  (默认 /tmp/rocos_memory/rocos_memory.json)
@@ -13,13 +14,96 @@ ROCOS 自进化记忆系统 — 越用越聪明
 import json
 import os
 import time
-import urllib.request
-import urllib.error
 from pathlib import Path
 from typing import Optional
 from langflow.custom import Component
 from langflow.io import Output, StrInput, FloatInput
 from langflow.schema import Data
+import json
+import urllib.error
+import urllib.parse
+import urllib.request
+from typing import Optional
+
+
+def _error(code: int, message: str) -> dict:
+    return {"success": False, "code": code, "message": message, "data": None}
+
+
+def _url(base_url: str, path: str, params: Optional[dict] = None) -> str:
+    url = f"{base_url.rstrip('/')}{path}"
+    if params:
+        query = urllib.parse.urlencode({k: v for k, v in params.items() if v is not None})
+        if query:
+            url = f"{url}?{query}"
+    return url
+
+
+def _decode_json(body: str) -> dict:
+    if not body:
+        return {}
+    return json.loads(body)
+
+
+def _parse_http_error(e: urllib.error.HTTPError) -> dict:
+    try:
+        body = e.read().decode("utf-8")
+        parsed = _decode_json(body)
+        if isinstance(parsed, dict):
+            parsed.setdefault("success", False)
+            parsed.setdefault("code", e.code)
+            parsed.setdefault("message", e.reason)
+            return parsed
+    except Exception:
+        pass
+    return _error(e.code, f"HTTP {e.code}: {e.reason}")
+
+
+def _rocos_request(
+    base_url: str, path: str, method: str = "GET",
+    body: Optional[dict] = None, params: Optional[dict] = None,
+    expect_json: bool = True, timeout: float = 30.0,
+):
+    url = _url(base_url, path, params)
+    data = json.dumps(body).encode("utf-8") if body is not None else None
+    headers = {"Accept": "application/json" if expect_json else "*/*"}
+    if data is not None:
+        headers["Content-Type"] = "application/json"
+    try:
+        req = urllib.request.Request(url, data=data, headers=headers, method=method)
+        with urllib.request.urlopen(req, timeout=timeout) as resp:
+            text = resp.read().decode("utf-8")
+            return _decode_json(text) if expect_json else text
+    except urllib.error.HTTPError as e:
+        return _parse_http_error(e)
+    except urllib.error.URLError as e:
+        return _error(-1, f"网络错误: {e}")
+    except json.JSONDecodeError as e:
+        return _error(-2, f"JSON 解析错误: {e}")
+
+
+def _rocos_get(base_url: str, path: str, params: Optional[dict] = None) -> dict:
+    return _rocos_request(base_url, path, method="GET", params=params, timeout=10.0)
+
+
+def _rocos_post(base_url: str, path: str, body: Optional[dict] = None) -> dict:
+    return _rocos_request(base_url, path, method="POST", body=body or {})
+
+
+def _rocos_delete(base_url: str, path: str, params: Optional[dict] = None) -> dict:
+    return _rocos_request(base_url, path, method="DELETE", params=params)
+
+
+def _rocos_text(base_url: str, path: str, params: Optional[dict] = None) -> str:
+    return _rocos_request(base_url, path, method="GET", params=params, expect_json=False, timeout=10.0)
+
+
+def parse_float_list(text: str, expected_len: Optional[int] = None) -> list[float]:
+    values = [float(x.strip()) for x in text.split(",") if x.strip()]
+    if expected_len is not None and len(values) != expected_len:
+        raise ValueError(f"expected {expected_len} values, got {len(values)}")
+    return values
+
 
 DEFAULT_MEMORY_DIR = "/tmp/rocos_memory"
 DEFAULT_MEMORY_FILE = "rocos_memory.json"
@@ -92,6 +176,96 @@ class MemoryStore:
     def get_patterns(self) -> list:
         return self._load().get("patterns", [])
 
+    # ---- 语义缓存 ----
+
+    def cache_query(self, intent: str) -> Optional[dict]:
+        """查询语义缓存: 命中返回 {action_name, action(template), frequency, confidence, cached}, 否则 None"""
+        intent_key = self._normalize_intent(intent)
+        data = self._load()
+        cache = data.setdefault("semantic_cache", {})
+
+        if intent_key in cache:
+            entry = cache[intent_key]
+            freq = entry.get("frequency", 0)
+            if freq >= 3:
+                return {
+                    "action_name": entry.get("action_name", ""),
+                    "action": entry.get("action", {}),
+                    "frequency": freq,
+                    "success_count": entry.get("success_count", 0),
+                    "failure_count": entry.get("failure_count", 0),
+                    "confidence": min(0.99, 0.5 + freq * 0.1),
+                    "cached": True,
+                }
+        return None
+
+    def cache_learn(self, intent: str, action_name: str = "", action_template: Optional[dict] = None):
+        """学习: 记录语义→动作模板的映射，增加频率
+
+        action_template 格式:
+          {"type": "cartesian_delta", "delta": [0, 0.03, 0, 0, 0, 0], "speed": 0.1}
+        """
+        intent_key = self._normalize_intent(intent)
+        data = self._load()
+        cache = data.setdefault("semantic_cache", {})
+
+        template = action_template or {}
+        template_key = json.dumps(template, sort_keys=True)
+
+        if intent_key in cache:
+            existing = cache[intent_key]
+            existing_template = existing.get("action", {})
+            if json.dumps(existing_template, sort_keys=True) == template_key:
+                existing["frequency"] = existing.get("frequency", 0) + 1
+                existing["success_count"] = existing.get("success_count", 0) + 1
+                existing["last_used"] = time.strftime("%Y-%m-%dT%H:%M:%S")
+            else:
+                # 不同模板 → 保留频率更高的
+                if existing.get("frequency", 0) < 2:
+                    existing["action"] = template
+                    existing["action_name"] = action_name
+                    existing["frequency"] = 1
+                    existing["success_count"] = 1
+        else:
+            cache[intent_key] = {
+                "action_name": action_name,
+                "action": template,
+                "frequency": 1,
+                "success_count": 1,
+                "failure_count": 0,
+                "first_seen": time.strftime("%Y-%m-%dT%H:%M:%S"),
+                "last_used": time.strftime("%Y-%m-%dT%H:%M:%S"),
+            }
+
+        self._save(data)
+
+    def cache_stats(self) -> dict:
+        """返回缓存统计"""
+        data = self._load()
+        cache = data.get("semantic_cache", {})
+        hot = sum(1 for v in cache.values() if v.get("frequency", 0) >= 5)
+        total = len(cache)
+        return {"total_intents": total, "hot_intents": hot, "hit_rate": round(hot / max(total, 1), 2)}
+
+    @staticmethod
+    def _normalize_intent(text: str) -> str:
+        """标准化意图字符串: 去空格、统一方向词"""
+        import re
+        t = text.strip().lower()
+        t = re.sub(r'\s+', '', t)
+        # 统一方向语义
+        synonyms = {
+            '向上': '往上', '向上边': '往上', 'up': '往上',
+            '向下': '往下', '向下边': '往下', 'down': '往下',
+            '向左': '往左', 'left': '往左',
+            '向右': '往右', 'right': '往右',
+            '向前': '往前', 'forward': '往前',
+            '向后': '往后', 'back': '往后',
+        }
+        for old, new in synonyms.items():
+            t = t.replace(old, new)
+        return t
+
     def get_knowledge_card(self) -> str:
         """生成一张经验卡片 — 给 Agent 做上下文"""
         data = self._load()
@@ -99,10 +273,13 @@ class MemoryStore:
         patterns = data.get("patterns", [])
         recent = data["executions"][-5:]
 
+        cache = data.get("semantic_cache", {})
+        hot = sum(1 for v in cache.values() if v.get("frequency", 0) >= 5)
         card = "## ROCOS 经验累积\n\n"
         card += f"总动作: {stats.get('total_motions', 0)}  |  "
         card += f"错误: {stats.get('errors', 0)}  |  "
-        card += f"恢复: {stats.get('recoveries', 0)}\n\n"
+        card += f"恢复: {stats.get('recoveries', 0)}\n"
+        card += f"语义缓存: {len(cache)} 个意图, {hot} 个高频命中\n\n"
 
         if patterns:
             card += "### 学到的模式\n"
@@ -116,38 +293,6 @@ class MemoryStore:
                 card += f"- [{ts}] {e.get('action', '?')}: {e.get('summary', '')}\n"
 
         return card
-
-
-# ---- HTTP helpers ----
-
-def _rocos_get(base_url: str, path: str, params: Optional[dict] = None) -> dict:
-    url = f"{base_url.rstrip('/')}{path}"
-    if params:
-        query = "&".join(f"{k}={v}" for k, v in params.items() if v is not None)
-        url = f"{url}?{query}"
-    try:
-        req = urllib.request.Request(url, headers={"Accept": "application/json"})
-        with urllib.request.urlopen(req, timeout=10) as resp:
-            body = resp.read().decode("utf-8")
-            return json.loads(body) if body else {}
-    except Exception as e:
-        return {"success": False, "code": -1, "message": str(e), "data": None}
-
-
-def _rocos_post(base_url: str, path: str, body: dict) -> dict:
-    url = f"{base_url.rstrip('/')}{path}"
-    try:
-        data = json.dumps(body).encode("utf-8")
-        req = urllib.request.Request(
-            url, data=data,
-            headers={"Content-Type": "application/json", "Accept": "application/json"},
-            method="POST"
-        )
-        with urllib.request.urlopen(req, timeout=30) as resp:
-            resp_body = resp.read().decode("utf-8")
-            return json.loads(resp_body) if resp_body else {}
-    except Exception as e:
-        return {"success": False, "code": -1, "message": str(e), "data": None}
 
 
 # ---- 1. 执行记忆 ----
@@ -345,3 +490,135 @@ class RocosKnowledge(Component):
         stats = store.get_stats()
         self.status = f"经验: {stats.get('total_motions', 0)} 次动作, {len(store.get_patterns())} 个模式"
         return Data(text=card, data={"stats": stats, "patterns": store.get_patterns()})
+
+
+# ---- 4. 语义缓存（核心加速层） ----
+
+class RocosSemanticCache(Component):
+    """语义→指令缓存: 高频指令跳过LLM推理，8s→0.5s"""
+
+    display_name: str = "ROCOS 语义缓存"
+    description: str = (
+        "语义指令缓存加速器。工作原理:\n"
+        "1. 查询: 输入自然语言指令 → 检查是否已缓存 → 命中则直接返回 API 调用参数\n"
+        "2. 学习: 每次执行后调用 learn 模式，累积语义→指令映射\n"
+        "频率 ≥3 次才缓存命中，≥10 次标记为高频 (hot)。\n"
+        "Use this as a pre-filter: query first, if not cached then fall through to LLM reasoning."
+    )
+    icon: str = "Zap"
+    name: str = "rocos_semantic_cache"
+
+    inputs = [
+        StrInput(
+            name="mode",
+            display_name="模式",
+            info="query: 查询缓存; learn: 学习新映射; stats: 查看统计",
+            value="query",
+        ),
+        StrInput(
+            name="intent",
+            display_name="语义指令",
+            info="用户的自然语言指令，如 '往右一点点'、'往上'",
+            value="",
+        ),
+        StrInput(
+            name="action",
+            display_name="动作类型 (learn模式)",
+            info="对应的 API 动作: MoveL, MoveJ, JogStart, ...",
+            value="",
+        ),
+        StrInput(
+            name="params_json",
+            display_name="参数 (learn模式, JSON)",
+            info="对应的 API 参数 JSON",
+            value="{}",
+        ),
+        StrInput(
+            name="memory_dir",
+            display_name="存储目录",
+            value=DEFAULT_MEMORY_DIR,
+            advanced=True,
+        ),
+    ]
+
+    outputs = [
+        Output(display_name="Cache Result", name="result", method="process"),
+    ]
+
+    def process(self) -> Data:
+        store = MemoryStore(os.path.join(self.memory_dir, DEFAULT_MEMORY_FILE))
+        mode = self.mode.strip().lower()
+
+        if mode == "query":
+            return self._do_query(store)
+
+        elif mode == "learn":
+            return self._do_learn(store)
+
+        elif mode == "stats":
+            return self._do_stats(store)
+
+        return Data(text=f"未知模式: {mode}，支持 query / learn / stats", data={})
+
+    def _do_query(self, store: MemoryStore) -> Data:
+        intent = self.intent.strip()
+        if not intent:
+            return Data(text="请输入语义指令", data={"cached": False})
+
+        hit = store.cache_query(intent)
+        if hit:
+            freq = hit.get("frequency", 0)
+            action = hit.get("action", {})
+            text = (
+                f"⚡ 缓存命中! (频次={freq}, 成功率={hit.get('success_count',0)}/{freq})\n"
+                f"语义: '{intent}' → {json.dumps(action, ensure_ascii=False)}\n"
+                f"置信度: {hit['confidence']:.0%}\n"
+                f"预计响应: 0.5s (跳过LLM，走SafeExecutor)"
+            )
+            self.status = f"命中: {intent} (×{freq})"
+            return Data(text=text, data=hit)
+
+        text = f"🔍 缓存未命中: '{intent}'\n→ 交给 LLM 推理 (预计 8s)"
+        self.status = f"未命中: {intent}"
+        return Data(text=text, data={"cached": False, "intent": intent})
+
+    def _do_learn(self, store: MemoryStore) -> Data:
+        intent = self.intent.strip()
+        action_name = self.action.strip()
+        if not intent:
+            return Data(text="learn 模式需要 intent", data={})
+
+        try:
+            params = json.loads(self.params_json) if self.params_json else {}
+        except json.JSONDecodeError:
+            params = {"raw": self.params_json}
+
+        store.cache_learn(intent, action_name, params)
+
+        # 查当前频次
+        hit = store.cache_query(intent)
+        freq = hit.get("frequency", 0) if hit else 0
+        hot = "🔥 高频" if freq >= 10 else ("⚡ 缓存就绪" if freq >= 3 else "🌱 学习中")
+        text = f"{hot}: '{intent}' → {json.dumps(params, ensure_ascii=False)} (频次={freq})"
+        self.status = text[:100]
+        return Data(text=text, data={"intent": intent, "action": params, "frequency": freq})
+
+    def _do_stats(self, store: MemoryStore) -> Data:
+        cs = store.cache_stats()
+        data = store._load()
+        cache = data.get("semantic_cache", {})
+
+        lines = [f"语义缓存统计: {cs['total_intents']} 个意图, {cs['hot_intents']} 个高频"]
+        if cache:
+            lines.append("\n意图列表 (按频率排序):")
+            sorted_items = sorted(cache.items(), key=lambda x: x[1].get("frequency", 0), reverse=True)
+            for intent, entry in sorted_items[:15]:
+                freq = entry.get("frequency", 0)
+                success = entry.get("success_count", 0)
+                marker = "🔥" if freq >= 10 else ("⚡" if freq >= 3 else "🌱")
+                action = json.dumps(entry.get("action", {}), ensure_ascii=False)
+                lines.append(f"  {marker} ×{freq:3d}(ok{success}) '{intent}' → {action[:80]}")
+
+        text = "\n".join(lines)
+        self.status = f"缓存: {cs['total_intents']}个意图, {cs['hot_intents']}个高频"
+        return Data(text=text, data=cs)
