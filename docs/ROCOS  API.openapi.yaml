@@ -127,6 +127,33 @@ paths:
               schema:
                 $ref: '#/components/schemas/StandardResponse'
 
+  /api/robot/reset:
+    post:
+      summary: 清除机器人报警并复位到 STOPPED
+      description: >
+        仅用于 ERROR_STATE。接口会触发状态机 ERROR_STATE → RESETTING，
+        清除硬件 Fault/Alarm 后重新使能；成功进入 STOPPED，失败保持 ERROR_STATE。
+        Stop 只负责停止运动，不负责清除报警。
+      tags: [基础控制]
+      responses:
+        '200':
+          description: 复位结果
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/StandardResponse'
+                  - type: object
+                    properties:
+                      data:
+                        type: object
+                        properties:
+                          robot_state:
+                            type: string
+                            enum: [STOPPED, ERROR_STATE]
+                          enabled:
+                            type: boolean
+
   /api/robot/workmode:
     post:
       summary: 设置工作模式
