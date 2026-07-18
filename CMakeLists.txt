@@ -149,6 +149,7 @@ add_library(robot
 
         src/move_joint.cpp
         src/move_line.cpp
+        src/move_line_offline.cpp
         src/move_circle.cpp
         src/move_jog.cpp
         src/move_null_jog.cpp
@@ -407,6 +408,15 @@ target_link_libraries(move_line_test
         )
 add_test(NAME move_line_test COMMAND move_line_test)
 set_tests_properties(move_line_test PROPERTIES
+        WORKING_DIRECTORY ${CMAKE_SOURCE_DIR})
+
+add_executable(move_line_offline_test test/move_line_offline_test.cc)
+target_link_libraries(move_line_offline_test
+        PRIVATE
+        robot
+        )
+add_test(NAME move_line_offline_test COMMAND move_line_offline_test)
+set_tests_properties(move_line_offline_test PROPERTIES
         WORKING_DIRECTORY ${CMAKE_SOURCE_DIR})
 
 add_executable(move_circle_test test/move_circle_test.cc)

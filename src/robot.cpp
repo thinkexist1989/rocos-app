@@ -31,7 +31,8 @@
 #include "hardware.hpp"
 
 #include "move_joint.hpp"
-#include "move_line.hpp"
+#include "move_line.hpp"           // v3.0 保留，原有在线规划版本
+#include "move_line_offline.hpp"   // v3.0 离线规划 + 全轨迹 IK 验证版本
 #include "move_circle.hpp"
 #include "move_jog.hpp"
 #include "move_null_jog.hpp"
@@ -954,11 +955,22 @@ namespace rocos {
                 if (rc != Result::NoError) return rc;
             }
 
-            auto new_motion = std::make_unique<MoveLine>(
+            // v3.0 替换为离线规划版本：Reset 中全轨迹 IK 验证，
+            // 任一点逆解失败直接退回 Stopped，避免在线执行到一半才发现不可达。
+            // 暂停/继续走 Jacobian 积分通道，保证在笛卡尔直线上减速和恢复。
+            auto new_motion = std::make_unique<MoveLineOffline>(
                 pose_flange, pose_goal * T_tool.Inverse(),
-                v_limit, a_limit, j_limit, /*dt=*/0.001, model.get());
+                model.get(),
+                v_limit, a_limit, j_limit, /*dt=*/0.001);
 
+            new_motion->SetInitialJointPosition(q_current);  // IK 暖启动
             Result rc = new_motion->Reset();
+
+            // ---- 原在线版本（保留以备回退） ----
+            // auto new_motion = std::make_unique<MoveLine>(
+            //     pose_flange, pose_goal * T_tool.Inverse(),
+            //     v_limit, a_limit, j_limit, /*dt=*/0.001, model.get());
+            // Result rc = new_motion->Reset();
             if (rc != Result::NoError) return rc;
 
             motion = std::move(new_motion);
