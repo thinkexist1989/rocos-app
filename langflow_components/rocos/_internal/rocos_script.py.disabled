@@ -1,0 +1,59 @@
+"""ROCOS Lua脚本管理 — Tool 模式。6个脚本管理组件"""
+from langflow.custom import Component
+from langflow.io import Output, StrInput
+from langchain_core.tools import Tool
+import json as _json
+import urllib.request as _urlreq
+
+def _post(b,p,d):
+    bd=_json.dumps(d).encode()
+    with _urlreq.urlopen(_urlreq.Request(f"{b.rstrip('/')}{p}",data=bd,headers={"Content-Type":"application/json","Accept":"application/json"},method="POST"),timeout=30) as r:
+        return _json.loads(r.read().decode("utf-8"))
+def _get(b,p):
+    with _urlreq.urlopen(_urlreq.Request(f"{b.rstrip('/')}{p}",headers={"Accept":"application/json"}),timeout=10) as r:
+        return _json.loads(r.read().decode("utf-8"))
+
+BI=[StrInput(name="base_url",value="http://localhost:8080")]
+TO=lambda m: [Output(display_name="Tool",name="component_as_tool",method=m,types=["Tool"],tool_mode=True)]
+
+class UploadScript(Component):
+    display_name="上传Lua脚本"; description="上传Lua源码到控制器内存"; icon="Upload"; name="upload_script"
+    inputs=BI+[StrInput(name="filename",value="task.lua"),StrInput(name="source",value="robot.Sleep(100)")]
+    outputs=TO("to_tool")
+    def to_tool(self)->Tool:
+        b,fn,src=self.base_url,self.filename,self.source
+        def _run(s=""):
+            r=_post(b,"/api/script/upload",{"filename":fn,"source":s if s.strip() else src})
+            d=r.get("data",{}); return f"OK uploaded: id={d.get('script_id')} state={d.get('state')}" if r.get("success") else f"FAIL: {r.get('message')}"
+        return Tool(name="UploadScript",description="上传并编译Lua脚本。参数: filename source",func=_run)
+
+class RunScript(Component):
+    display_name="运行Lua脚本"; description="异步执行已加载的脚本"; icon="Play"; name="run_script"; inputs=BI; outputs=TO("to_tool")
+    def to_tool(self)->Tool:
+        def _run(_s=""): r=_post(self.base_url,"/api/script/run",{}); d=r.get("data",{}); return f"OK running: state={d.get('state')}" if r.get("success") else f"FAIL: {r.get('message')}"
+        return Tool(name="RunScript",description="异步执行已加载的Lua脚本",func=_run)
+
+class PauseScript(Component):
+    display_name="暂停Lua脚本"; icon="Pause"; name="pause_script"; inputs=BI; outputs=TO("to_tool")
+    def to_tool(self)->Tool:
+        def _run(_s=""): r=_post(self.base_url,"/api/script/pause",{}); return "OK paused" if r.get("success") else f"FAIL: {r.get('message')}"
+        return Tool(name="PauseScript",description="暂停正在执行的Lua脚本",func=_run)
+
+class ResumeScript(Component):
+    display_name="继续Lua脚本"; icon="SkipForward"; name="resume_script"; inputs=BI; outputs=TO("to_tool")
+    def to_tool(self)->Tool:
+        def _run(_s=""): r=_post(self.base_url,"/api/script/resume",{}); return "OK resumed" if r.get("success") else f"FAIL: {r.get('message')}"
+        return Tool(name="ResumeScript",description="继续之前暂停的Lua脚本",func=_run)
+
+class StopScript(Component):
+    display_name="停止Lua脚本"; icon="Square"; name="stop_script"; inputs=BI; outputs=TO("to_tool")
+    def to_tool(self)->Tool:
+        def _run(_s=""): r=_post(self.base_url,"/api/script/stop",{}); return "OK stopped" if r.get("success") else f"FAIL: {r.get('message')}"
+        return Tool(name="StopScript",description="停止正在执行的Lua脚本",func=_run)
+
+class GetScriptStatus(Component):
+    display_name="查询脚本状态"; icon="Eye"; name="get_script_status"; inputs=BI; outputs=TO("to_tool")
+    def to_tool(self)->Tool:
+        b=self.base_url
+        def _run(_s=""): r=_get(b,"/api/script/status"); d=r.get("data",{}); return f"id={d.get('script_id')} state={d.get('state')} file={d.get('filename')} line={d.get('line')}" if r.get("success") else f"FAIL: {r.get('message')}"
+        return Tool(name="GetScriptStatus",description="查询当前Lua脚本的执行状态",func=_run)

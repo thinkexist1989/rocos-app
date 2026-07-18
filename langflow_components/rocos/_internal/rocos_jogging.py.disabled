@@ -1,0 +1,75 @@
+"""ROCOS 点动控制 — Tool 模式。JogStart / JogStop"""
+from langflow.custom import Component
+from langflow.io import Output, StrInput, DropdownInput, FloatInput
+from langchain_core.tools import Tool
+import json as _json
+import urllib.request as _urlreq
+
+def _parse_kv_args(s: str):
+    args = {}
+    modes = []
+    for part in s.split():
+        if "=" in part:
+            k, v = part.split("=", 1)
+            args[k.strip().lower()] = v.strip()
+        elif part.strip():
+            modes.append(part.strip().lower())
+    return modes, args
+
+def _parse_vec(text: str):
+    return [float(x.strip()) for x in text.replace("，", ",").split(",") if x.strip()]
+
+def _post(b, p, d):
+    bd = _json.dumps(d).encode()
+    r = _urlreq.Request(f"{b.rstrip('/')}{p}", data=bd, headers={"Content-Type":"application/json","Accept":"application/json"}, method="POST")
+    with _urlreq.urlopen(r, timeout=30) as rr:
+        return _json.loads(rr.read().decode("utf-8"))
+
+JOG_FLAGS = ["J0","J1","J2","J3","J4","J5","J6","TOOL_X","TOOL_Y","TOOL_Z","TOOL_ROLL","TOOL_PITCH","TOOL_YAW","FLANGE_X","FLANGE_Y","FLANGE_Z","FLANGE_ROLL","FLANGE_PITCH","FLANGE_YAW","OBJECT_X","OBJECT_Y","OBJECT_Z","OBJECT_ROLL","OBJECT_PITCH","OBJECT_YAW","BASE_X","BASE_Y","BASE_Z","BASE_ROLL","BASE_PITCH","BASE_YAW","NULLSPACE"]
+DIRS = ["POSITIVE","NEGATIVE","NONE"]
+
+class JogStart(Component):
+    display_name: str = "启动点动"
+    description: str = "启动关节/笛卡尔/零空间点动。输入格式: flag=J0 direction=POSITIVE speed=0.3 或 nullspace_vec=1,0,-1,0,0,0,0"
+    icon: str = "MousePointerClick"; name: str = "jog_start"
+    inputs = [
+        StrInput(name="base_url", value="http://localhost:8080"),
+        DropdownInput(name="flag", display_name="默认方向", options=JOG_FLAGS, value="J0"),
+        DropdownInput(name="direction", options=DIRS, value="POSITIVE"),
+        FloatInput(name="max_speed", value=0.3), FloatInput(name="timeout_s", value=1.0),
+    ]
+    outputs = [Output(display_name="Tool", name="component_as_tool", method="to_tool", types=["Tool"], tool_mode=True)]
+    def to_tool(self) -> Tool:
+        base, flag, dire, spd, to = self.base_url, self.flag, self.direction, self.max_speed, self.timeout_s
+        def _run(s: str = "") -> str:
+            f, d = flag, dire; speed, timeout = spd, to
+            modes, args = _parse_kv_args(s)
+            if "flag" in args: f = args["flag"]
+            if "direction" in args: d = args["direction"]
+            if "speed" in args: speed=float(args["speed"])
+            if "timeout" in args: timeout=float(args["timeout"])
+            if "nullspace" in modes or "nullspace_vec" in args:
+                vec_text = args.get("joints") or args.get("joints_vec") or args.get("nullspace_vec")
+                if not vec_text:
+                    return "参数错误: nullspace 需要 joints=1,0,-1,0,0,0,0"
+                vec = _parse_vec(vec_text)
+                r = _post(base, "/api/robot/jog/nullspace", {"joints": vec, "direction": d, "speed": speed, "timeout": timeout})
+                return f"Jog OK (nullspace {vec})" if r.get("success") else f"Jog FAIL: {r.get('message')}"
+            # 判断走 flag 兼容接口还是新向量接口
+            if f in JOG_FLAGS:
+                r = _post(base, "/api/robot/jog", {"flag": f, "direction": d, "max_speed": speed, "timeout": timeout})
+            else:
+                vec = _parse_vec(f)
+                r = _post(base, "/api/robot/jog/joint", {"joints": vec, "direction": d, "speed": speed, "timeout": timeout})
+            return f"Jog OK ({f} {d})" if r.get("success") else f"Jog FAIL: {r.get('message')}"
+        return Tool(name="JogStart", description=f"启动点动。输入方向/向量和速度。默认{flag}/{dire}/speed={spd}", func=_run)
+
+class JogStop(Component):
+    display_name: str = "停止点动"
+    description: str = "停止所有点动。Use this to stop jogging."
+    icon: str = "MousePointer"; name: str = "jog_stop"
+    inputs = [StrInput(name="base_url", value="http://localhost:8080")]
+    outputs = [Output(display_name="Tool", name="component_as_tool", method="to_tool", types=["Tool"], tool_mode=True)]
+    def to_tool(self) -> Tool:
+        base = self.base_url
+        return Tool(name="JogStop", description="停止所有点动/拖拽运动", func=lambda _s="": "OK" if _post(base,"/api/robot/jog/stop",{}).get("success") else "FAIL")

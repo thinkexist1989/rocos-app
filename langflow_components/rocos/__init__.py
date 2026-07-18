@@ -17,18 +17,50 @@ ROCOS Robot Control - Langflow 自定义 Tool 组件包
 """
 
 from .rocos_config import RocosConfig
-from .rocos_robot_state import GetRobotState, GetRobotInfo, GetRobotEnabled, GetRobotURDF
-from .rocos_robot_control import EnableRobot, DisableRobot, SetWorkMode
-from .rocos_motion import MoveJ, MoveL, MotionStop, MotionPause, MotionResume, GetMotionStatus, WaitMove
-from .rocos_jogging import JogStart, JogStop
-from .rocos_frames import (
-    GetToolFrames, GetToolFrame, SetToolFrame, ActivateToolFrame, RemoveToolFrame,
-    GetObjectFrames, GetObjectFrame, SetObjectFrame, ActivateObjectFrame, RemoveObjectFrame,
-    LoadFrames, SaveFrames,
-)
-from .rocos_script import UploadScript, RunScript, PauseScript, ResumeScript, StopScript, GetScriptStatus
-from .rocos_agent import RocosAgentPrompt, RocosErrorRecovery, RocosSafeMoveL, ResetRobotFault, RocosSafeExecutor
-from .rocos_memory import RocosSemanticCache, RocosMemory, RocosReflect, RocosKnowledge
+from .get_robot_state import GetRobotState
+from .get_robot_info import GetRobotInfo
+from .get_robot_enabled import GetRobotEnabled
+from .get_robot_urdf import GetRobotURDF
+from .enable_robot import EnableRobot
+from .disable_robot import DisableRobot
+from .set_work_mode import SetWorkMode
+from .move_j import MoveJ
+from .move_l import MoveL
+from .motion_stop import MotionStop
+from .motion_pause import MotionPause
+from .motion_resume import MotionResume
+from .get_motion_status import GetMotionStatus
+from .wait_move import WaitMove
+from .jog_start import JogStart
+from .jog_stop import JogStop
+from .get_tool_frames import GetToolFrames
+from .get_tool_frame import GetToolFrame
+from .set_tool_frame import SetToolFrame
+from .activate_tool_frame import ActivateToolFrame
+from .remove_tool_frame import RemoveToolFrame
+from .get_object_frames import GetObjectFrames
+from .get_object_frame import GetObjectFrame
+from .set_object_frame import SetObjectFrame
+from .activate_object_frame import ActivateObjectFrame
+from .remove_object_frame import RemoveObjectFrame
+from .load_frames import LoadFrames
+from .save_frames import SaveFrames
+from .upload_script import UploadScript
+from .run_script import RunScript
+from .pause_script import PauseScript
+from .resume_script import ResumeScript
+from .stop_script import StopScript
+from .get_script_status import GetScriptStatus
+from .rocos_agent_prompt import RocosAgentPrompt
+from .rocos_error_recovery import RocosErrorRecovery
+from .rocos_safe_movel import RocosSafeMoveL
+from .reset_robot_fault import ResetRobotFault
+from .rocos_safe_executor import RocosSafeExecutor
+from .rocos_smart_executor import RocosSmartExecutor
+from .rocos_semantic_cache import RocosSemanticCache
+from .rocos_memory import RocosMemory
+from .rocos_reflect import RocosReflect
+from .rocos_knowledge import RocosKnowledge
 
 __all__ = [
     # Config
@@ -49,6 +81,7 @@ __all__ = [
     "UploadScript", "RunScript", "PauseScript", "ResumeScript", "StopScript", "GetScriptStatus",
     # Semantic layer (实战迭代)
     "RocosAgentPrompt", "RocosErrorRecovery", "RocosSafeMoveL", "ResetRobotFault", "RocosSafeExecutor",
+    "RocosSmartExecutor",
     # Memory & Evolution
     "RocosSemanticCache", "RocosMemory", "RocosReflect", "RocosKnowledge",
 ]

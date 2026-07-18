@@ -1,0 +1,172 @@
+"""
+ROCOS 运动控制 — Tool 模式。
+MoveJ / MoveL / Stop / Pause / Resume / Status / WaitMove
+"""
+
+from langflow.custom import Component
+from langflow.io import Output, StrInput, FloatInput
+from langchain_core.tools import Tool
+import json as _json
+import urllib.error as _urlerror
+import urllib.request as _urlreq
+from typing import Optional as _Optional
+
+
+def _rocos_get(_base, _path, _params=None):
+    _url = f"{_base.rstrip('/')}{_path}"
+    if _params: _url += "?" + "&".join(f"{k}={v}" for k, v in _params.items() if v is not None)
+    try:
+        _req = _urlreq.Request(_url, headers={"Accept": "application/json"})
+        with _urlreq.urlopen(_req, timeout=10) as _r:
+            return _json.loads(_r.read().decode("utf-8"))
+    except Exception as _e:
+        return {"success": False, "code": -1, "message": str(_e)}
+
+
+def _rocos_post(_base, _path, _body: dict):
+    try:
+        _data = _json.dumps(_body).encode("utf-8")
+        _req = _urlreq.Request(f"{_base.rstrip('/')}{_path}", data=_data, headers={"Content-Type":"application/json","Accept":"application/json"}, method="POST")
+        with _urlreq.urlopen(_req, timeout=30) as _r:
+            return _json.loads(_r.read().decode("utf-8"))
+    except Exception as _e:
+        return {"success": False, "code": -1, "message": str(_e)}
+
+
+class MoveJ(Component):
+    display_name: str = "MoveJ 关节运动"
+    description: str = "关节空间运动。LLM调用时输入: joints角度(逗号分隔7个值) speed=速度"
+    icon: str = "Move"; name: str = "move_j"
+    inputs = [
+        StrInput(name="base_url", value="http://localhost:8080"),
+        StrInput(name="joints", display_name="默认关节角度", value="0.1,0.8,0.1,0.3,0.4,0.5,0.6"),
+        FloatInput(name="velocity", value=0.3), FloatInput(name="acceleration", value=1.0),
+    ]
+    outputs = [Output(display_name="Tool", name="component_as_tool", method="to_tool", types=["Tool"], tool_mode=True)]
+
+    def to_tool(self) -> Tool:
+        base, vel, acc = self.base_url, self.velocity, self.acceleration
+        def _run(input_str: str = "") -> str:
+            joints_str = input_str.strip() if input_str.strip() else self.joints  # fallback
+            speed = vel
+            if "speed=" in joints_str:
+                parts = joints_str.split("speed=")
+                joints_str = parts[0].strip()
+                try: speed = float(parts[1].strip().split()[0])
+                except: pass
+            try: joints = [float(x.strip()) for x in joints_str.replace("，",",").split(",") if x.strip()]
+            except: return "参数错误: joints格式应为逗号分隔的数值"
+            r = _rocos_post(base, "/api/robot/movej", {"joints": joints, "velocity": speed, "acceleration": acc})
+            if r.get("success"): return f"MoveJ accepted → {r.get('data',{}).get('robot_state','RUNNING')}"
+            return f"MoveJ FAIL (code={r.get('code')}): {r.get('message')}"
+        return Tool(name="MoveJ", description="关节空间运动。输入7个目标关节角度(逗号分隔,弧度)，可选speed=速度。例: 0,0.9,0,1.5,0,-1,0 speed=0.3", func=_run)
+
+
+class MoveL(Component):
+    display_name: str = "MoveL 直线运动"
+    description: str = "笛卡尔直线运动。LLM调用时输入: x,y,z qx,qy,qz,qw speed=速度"
+    icon: str = "MoveDiagonal"; name: str = "move_l"
+    inputs = [
+        StrInput(name="base_url", value="http://localhost:8080"),
+        FloatInput(name="velocity", value=0.15),
+    ]
+    outputs = [Output(display_name="Tool", name="component_as_tool", method="to_tool", types=["Tool"], tool_mode=True)]
+
+    def to_tool(self) -> Tool:
+        base, vel = self.base_url, self.velocity
+        def _run(input_str: str = "") -> str:
+            s = input_str.strip()
+            speed = vel
+            if "speed=" in s:
+                parts = s.split("speed="); s = parts[0].strip()
+                try: speed = float(parts[1].strip().split()[0])
+                except: pass
+            vals = [float(x.strip()) for x in s.replace("，",",").split(",") if x.strip()]
+            if len(vals) < 3: return "参数错误: 需要 x,y,z 或 x,y,z,qx,qy,qz,qw"
+            pos = {"x": vals[0], "y": vals[1], "z": vals[2]}
+            ori = {"x": vals[3] if len(vals)>3 else 0, "y": vals[4] if len(vals)>4 else 0, "z": vals[5] if len(vals)>5 else 0, "w": vals[6] if len(vals)>6 else 1}
+            r = _rocos_post(base, "/api/robot/movel", {"pose": {"position": pos, "orientation": ori}, "velocity": speed})
+            if r.get("success"): return f"MoveL accepted → {r.get('data',{}).get('robot_state','RUNNING')}"
+            return f"MoveL FAIL (code={r.get('code')}): {r.get('message')}"
+        return Tool(name="MoveL", description="笛卡尔直线运动。输入目标位姿 x,y,z,qx,qy,qz,qw speed=速度。例: -0.8,0,0.3,0,-0.707,0,0.707 speed=0.15", func=_run)
+
+
+class MotionStop(Component):
+    display_name: str = "停止运动"
+    description: str = "立即停止当前运动。Use this to stop."
+    icon: str = "StopCircle"; name: str = "motion_stop"
+    inputs = [StrInput(name="base_url", value="http://localhost:8080")]
+    outputs = [Output(display_name="Tool", name="component_as_tool", method="to_tool", types=["Tool"], tool_mode=True)]
+
+    def to_tool(self) -> Tool:
+        base = self.base_url
+        def _run(_s: str = "") -> str:
+            r = _rocos_post(base, "/api/robot/stop", {})
+            return "OK stopped" if r.get("success") else f"Stop FAIL: {r.get('message')}"
+        return Tool(name="MotionStop", description="立即停止机器人当前运动", func=_run)
+
+
+class MotionPause(Component):
+    display_name: str = "暂停运动"
+    description: str = "暂停当前运动。Use this to pause."
+    icon: str = "PauseCircle"; name: str = "motion_pause"
+    inputs = [StrInput(name="base_url", value="http://localhost:8080")]
+    outputs = [Output(display_name="Tool", name="component_as_tool", method="to_tool", types=["Tool"], tool_mode=True)]
+
+    def to_tool(self) -> Tool:
+        base = self.base_url
+        def _run(_s: str = "") -> str:
+            r = _rocos_post(base, "/api/robot/pause", {})
+            return "OK paused" if r.get("success") else f"Pause FAIL: {r.get('message')}"
+        return Tool(name="MotionPause", description="暂停机器人当前运动", func=_run)
+
+
+class MotionResume(Component):
+    display_name: str = "继续运动"
+    description: str = "继续暂停的运动。Use this to resume."
+    icon: str = "PlayCircle"; name: str = "motion_resume"
+    inputs = [StrInput(name="base_url", value="http://localhost:8080")]
+    outputs = [Output(display_name="Tool", name="component_as_tool", method="to_tool", types=["Tool"], tool_mode=True)]
+
+    def to_tool(self) -> Tool:
+        base = self.base_url
+        def _run(_s: str = "") -> str:
+            r = _rocos_post(base, "/api/robot/resume", {})
+            return "OK resumed" if r.get("success") else f"Resume FAIL: {r.get('message')}"
+        return Tool(name="MotionResume", description="继续之前暂停的运动", func=_run)
+
+
+class GetMotionStatus(Component):
+    display_name: str = "查询运动状态"
+    description: str = "查询运动状态和FSM。Use this to check motion progress."
+    icon: str = "BarChart2"; name: str = "get_motion_status"
+    inputs = [StrInput(name="base_url", value="http://localhost:8080")]
+    outputs = [Output(display_name="Tool", name="component_as_tool", method="to_tool", types=["Tool"], tool_mode=True)]
+
+    def to_tool(self) -> Tool:
+        base = self.base_url
+        def _run(_s: str = "") -> str:
+            r = _rocos_get(base, "/api/robot/move_status")
+            if r.get("success"):
+                d = r.get("data", {})
+                return f"state={d.get('robot_state','?')} running={d.get('is_running',False)} control_active={d.get('control_active',False)}"
+            return f"查询失败: {r.get('message')}"
+        return Tool(name="GetMotionStatus", description="查询机器人运动状态: FSM状态、是否运行中、控制是否活跃", func=_run)
+
+
+class WaitMove(Component):
+    display_name: str = "等待运动完成"
+    description: str = "阻塞等待当前运动完成。Use this after issuing a motion command."
+    icon: str = "Clock"; name: str = "wait_move"
+    inputs = [StrInput(name="base_url", value="http://localhost:8080")]
+    outputs = [Output(display_name="Tool", name="component_as_tool", method="to_tool", types=["Tool"], tool_mode=True)]
+
+    def to_tool(self) -> Tool:
+        base = self.base_url
+        def _run(_s: str = "") -> str:
+            r = _rocos_post(base, "/api/robot/wait_move", {})
+            if r.get("success"):
+                d = r.get("data", {})
+                return f"Motion done: state={d.get('robot_state','?')} busy={d.get('motion_busy',False)}"
+            return f"Wait FAIL: {r.get('message')}"
+        return Tool(name="WaitMove", description="阻塞等待当前运动完成。运动指令后调用此工具确认完成", func=_run)

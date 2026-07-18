@@ -10,7 +10,8 @@ ROCOS 语义层组件 — 将实战中迭代出的控制模式编码为可复用
 
 from langflow.custom import Component
 from langflow.io import Output, StrInput, FloatInput, DropdownInput
-from langflow.schema import Data
+from langflow.schema import Data, Message
+from langchain_core.tools import Tool
 import json
 import urllib.error
 import urllib.parse
@@ -101,7 +102,7 @@ DEFAULT_MEMORY_DIR = "/tmp/rocos_memory"
 DEFAULT_MEMORY_FILE = "rocos_memory.json"
 
 def _record_to_memory(memory_dir: str, entry: dict, intent: str = "", action_template: dict = None):
-    """轻量记录: 写入执行记忆 + 语义缓存学习"""
+    """记录执行记忆 + 同步语义缓存（数据与 MemoryStore.cache_learn 兼容）"""
     import os as _os
     fpath = _os.path.join(memory_dir, DEFAULT_MEMORY_FILE)
     _os.makedirs(_os.path.dirname(fpath), exist_ok=True)
@@ -111,23 +112,53 @@ def _record_to_memory(memory_dir: str, entry: dict, intent: str = "", action_tem
     else:
         mem = {"executions": [], "patterns": [], "semantic_cache": {},
                "stats": {"total_motions": 0, "errors": 0, "recoveries": 0}}
-    mem["executions"].append(entry)
-    mem["executions"] = mem["executions"][-200:]
+
+    # 1. 写执行记录（包含 before/after 状态, error_code）
+    entry.setdefault("timestamp", time.strftime("%Y-%m-%dT%H:%M:%S"))
+    mem.setdefault("executions", []).append(entry)
+    if len(mem["executions"]) > 200:
+        mem["executions"] = mem["executions"][-200:]
+
+    # 2. 更新统计
     mem["stats"]["total_motions"] = mem["stats"].get("total_motions", 0) + 1
     if not entry.get("success", True):
         mem["stats"]["errors"] = mem["stats"].get("errors", 0) + 1
+
+    # 3. 语义缓存学习（与 MemoryStore.cache_learn 相同格式）
     if intent and action_template:
         sc = mem.setdefault("semantic_cache", {})
         cache_key = intent.lower().replace(" ", "")
+        ts = entry.get("timestamp", time.strftime("%Y-%m-%dT%H:%M:%S"))
         template_key = json.dumps(action_template, sort_keys=True)
-        if cache_key in sc and json.dumps(sc[cache_key].get("action", {}), sort_keys=True) == template_key:
-            sc[cache_key]["frequency"] = sc[cache_key].get("frequency", 0) + 1
-            sc[cache_key]["success_count"] = sc[cache_key].get("success_count", 0) + 1
-            sc[cache_key]["last_used"] = entry["timestamp"]
+        success = entry.get("success", True)
+
+        if cache_key in sc and isinstance(sc[cache_key], dict):
+            existing = sc[cache_key]
+            if json.dumps(existing.get("action", {}), sort_keys=True) == template_key:
+                existing["frequency"] = existing.get("frequency", 0) + 1
+                if success:
+                    existing["success_count"] = existing.get("success_count", 0) + 1
+                else:
+                    existing["failure_count"] = existing.get("failure_count", 0) + 1
+                existing["last_used"] = ts
+            else:
+                existing["frequency"] = existing.get("frequency", 0) + 1
+                existing["action"] = action_template
+                if success:
+                    existing["success_count"] = existing.get("success_count", 0) + 1
+                else:
+                    existing["failure_count"] = existing.get("failure_count", 0) + 1
         else:
-            sc[cache_key] = {"action_name": "safe_executor", "action": action_template,
-                             "frequency": 1, "success_count": 1, "failure_count": 0,
-                             "first_seen": entry["timestamp"], "last_used": entry["timestamp"]}
+            sc[cache_key] = {
+                "action_name": "safe_executor",
+                "action": action_template,
+                "frequency": 1,
+                "success_count": 1 if success else 0,
+                "failure_count": 0 if success else 1,
+                "first_seen": ts,
+                "last_used": ts,
+            }
+
     with open(fpath, 'w') as f:
         json.dump(mem, f, indent=2, ensure_ascii=False)
 
@@ -162,10 +193,11 @@ class RocosAgentPrompt(Component):
     ]
 
     outputs = [
-        Output(display_name="System Prompt", name="prompt", method="build_prompt"),
+        Output(display_name="System Prompt", name="prompt", method="build_prompt",
+            tool_mode=True),
     ]
 
-    def build_prompt(self) -> Data:
+    def build_prompt(self) -> Message:
         prompt = f"""你是 ROCOS 机器人控制助手。控制对象: {self.robot_description}。
 
 ## 核心规则 — 每次运动前必须遵守:
@@ -199,7 +231,7 @@ GetRobotState → 检查 STOPPED+enabled → 计算小幅度目标 → MoveJ/Mov
 - 接近目标点时缩小速度和步长
 - Always respond in Chinese (简体中文)."""
         self.status = f"Prompt generated ({len(prompt)} chars)"
-        return Data(text=prompt, data={"system_prompt": prompt})
+        return Message(text=prompt)
 
 
 # ---- 2. 错误恢复 ----
@@ -235,7 +267,8 @@ class RocosErrorRecovery(Component):
     ]
 
     outputs = [
-        Output(display_name="Recovery Result", name="result", method="recover"),
+        Output(display_name="Recovery Result", name="result", method="recover",
+            tool_mode=True),
     ]
 
     def recover(self) -> Data:
@@ -329,7 +362,8 @@ class RocosSafeMoveL(Component):
     ]
 
     outputs = [
-        Output(display_name="Move Result", name="result", method="safe_move"),
+        Output(display_name="Move Result", name="result", method="safe_move",
+            tool_mode=True),
     ]
 
     def safe_move(self) -> Data:
@@ -407,7 +441,8 @@ class ResetRobotFault(Component):
     ]
 
     outputs = [
-        Output(display_name="Reset Result", name="result", method="reset"),
+        Output(display_name="Reset Result", name="result", method="reset",
+            tool_mode=True),
     ]
 
     def reset(self) -> Data:
@@ -481,7 +516,8 @@ class RocosSafeExecutor(Component):
     ]
 
     outputs = [
-        Output(display_name="Execution Result", name="result", method="execute"),
+        Output(display_name="Execution Result", name="result", method="execute",
+            tool_mode=True),
     ]
 
     def execute(self) -> Data:
