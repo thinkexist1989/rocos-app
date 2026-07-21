@@ -604,7 +604,7 @@ namespace rocos {
                            model_joint_names.size(), hardware_drive_ids.size(),
                            joint_binding_path_);
         }
-        auto dt = hardware->GetControlCycleTime();
+        auto dt = hardware->GetDt();
         controller = std::make_unique<PositionController>(); //TODO： 默认加载位置控制器
 
         Result rc = controller->SetHardware(hardware.get()); //TODO：控制器需要传入硬件指针，可以考虑初始化时导入

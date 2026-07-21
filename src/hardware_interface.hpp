@@ -45,7 +45,9 @@ class HardwareInterface : public DriveInterface,
 
   /// @brief Control cycle period from shared memory, unit: microseconds.
   ///        1 kHz -> 1000. Master (mujoco/ecm) writes EcatBus::dt; app reads it.
-  virtual uint32_t GetDt() ;
+  virtual uint32_t GetDt() const {
+    return 1000;
+  };
 
   /// @brief 设置 model index → drive id 映射表（建模层到硬件层的轴绑定）
   virtual Result SetJointBinding(const std::vector<int32_t>& /*model_index_to_drive_id*/) {
