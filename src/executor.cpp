@@ -18,13 +18,6 @@ Executor::Executor(MotionInterface* motion, ControllerInterface* controller,
 
 }
 
-Executor::Executor() {
-
-
-
-
-}
-
 Executor::~Executor() {
   if (motion_)
     motion_->Reset();
@@ -73,20 +66,16 @@ if (static_cast<int>(res) < 0) return res;
   return Result::NoError;
 }
 
-bool Executor::SwitchController(ControllerInterface* new_contorller) {
-  // std::lock_guard<std::mutex> lock(mtx_);
-
+bool Executor::SwitchController(ControllerInterface* new_controller) {
   if (controller_)
     controller_->Reset();
 
-  controller_ = new_contorller;
+  controller_ = new_controller;
   return true;
 
 }
 
 bool Executor::SwitchHardware(HardwareInterface* new_hardware) {
-  // std::lock_guard<std::mutex> lock(mtx_);
-
   if (hardware_)
         hardware_->Reset(); //对之前的hardware指针进行重置
 
@@ -95,13 +84,7 @@ bool Executor::SwitchHardware(HardwareInterface* new_hardware) {
 }
 
 bool Executor::SwitchMotion(MotionInterface* new_motion) {
-  // std::lock_guard<std::mutex> lock(mtx_);
-// TODO：：这个地方reset在 motion_ == nullptr 时解引用空指针，已经修改。但是我在外部已经reset了，还说把reset迁移到这
-  // if (motion_)
-  //   motion_->Reset(); //对之前的motion指针进行重置
-
-
-  motion_ = new_motion;
+  motion_ = new_motion; // 资源释放只需在子类析构处理，这里只需要直接替换
   return true;
 }
 

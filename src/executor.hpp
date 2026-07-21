@@ -32,16 +32,15 @@
 namespace rocos {
     class Executor {
     public:
-        explicit Executor(MotionInterface *motion, ControllerInterface *controller,
-                          HardwareInterface *hardware);
-
-        Executor();
+        explicit Executor(MotionInterface *motion         = nullptr,
+                          ControllerInterface *controller = nullptr,
+                          HardwareInterface *hardware     = nullptr);
 
         virtual ~Executor();
 
         Result Update();
 
-        bool SwitchController(ControllerInterface *new_contorller);
+        bool SwitchController(ControllerInterface *new_controller);
 
         bool SwitchHardware(HardwareInterface *new_hardware);
 

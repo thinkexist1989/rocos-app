@@ -416,21 +416,10 @@ namespace rocos {
     void Robot::on_fsm_run() {
         log_ptr_->info("Robot is running.");
 
-        // if (control_thread_.joinable()) {
-        //     // if (control_thread_active_.load()) {
-        //     //   // 控制线程仍在 RUNNING/PAUSING/PAUSED/RESUMING/STOPPING 中维持循环。
-        //     //   return;
-        //     // }
-        //     control_thread_.join();
-        // }
-
-        // control_thread_active_.store(true);
-        // control_thread_ = std::thread(&Robot::controlLoop, this);
     }
 
     void Robot::on_fsm_stop() {
-        // if (control_thread_.joinable()) control_thread_.join();
-        // impl_->process_event(EventStopped{});
+
         Result rc = executor->Stop();
         if (rc == Result::NoError) {
             log_ptr_->info("机器人停止成功，准备进入Stopped状态");
@@ -438,17 +427,8 @@ namespace rocos {
             log_ptr_->error("机器人停止失败，退回ERROR状态");
             impl_->process_event(EventErrorOccurred{});
         }
-    }
 
-    // void Robot::controlLoop() {
-    //
-    //   while (IsControlActive()) {
-    //     RunCycle();
-    //     waitControlCycle();
-    //   }
-    //
-    //   // control_thread_active_.store(false);
-    // }
+    }
 
     void Robot::on_fsm_pause() {
         // PAUSING 进入：确认暂停并转入 PAUSED。
@@ -461,7 +441,6 @@ namespace rocos {
             impl_->process_event(EventPauseFailed{});
         }
 
-        // impl_->process_event(EventStopped{});
     }
 
     void Robot::on_fsm_resume() {
@@ -472,7 +451,6 @@ namespace rocos {
             impl_->process_event(EventRunning{});
         }
 
-        // impl_->process_event(EventRunning{});
     }
 
     void Robot::on_fsm_reset() {
@@ -871,10 +849,9 @@ namespace rocos {
             return;
         }
 
-      // ③ 运动完成且未处于暂停态，发送EventSuccessed事件
+      // ③ 运动完成且未处于暂停态，说明到达目标位置了，发送EventAtTarget事件，进入STOPPED
       if (r == Result::PlanFinished && !impl_->is(sml::state<class PAUSED>)) {
-        impl_->process_event(EventSuccessed{}); //
-        // return; //TODO： 这里我认为不应该return，应该正常处理一次exector->Update，然后再切状态机
+        impl_->process_event(EventAtTarget{});
       }
     }
 
@@ -899,7 +876,7 @@ namespace rocos {
             Result rc = new_motion->Reset();
             if (rc != Result::NoError) return rc;
 
-            motion = std::move(new_motion);
+            motion = std::move(new_motion); // unique_ptr会自动清理旧对象，只需要在析构中处理资源清理即可
 
             executor->SwitchMotion(motion.get());
             return Result::NoError;
