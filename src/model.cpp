@@ -51,7 +51,15 @@ Result Model::InverseKinematics(const JntArray& q_in, const Frame& p_in,
 Result Model::ForwardDynamics(const JntArray& q, const JntArray& q_dot,
                               const JntArray& torques, const Wrenches& f_ext,
                               JntArray& q_dotdot) {
-  if (fd_solver_->CartToJnt(q, q_dot, torques, f_ext, q_dotdot) < 0) {
+  // KDL 要求 f_ext.size() == ns（段数），空 vector 会导致 E_SIZE_MISMATCH
+  // 调用方传空 vector 表示"无外力"，此处自动补齐为零旋量
+  const Wrenches* f_ext_ptr = &f_ext;
+  Wrenches f_ext_zero;
+  if (f_ext.empty()) {
+    f_ext_zero.resize(chain_.getNrOfSegments(), KDL::Wrench::Zero());
+    f_ext_ptr = &f_ext_zero;
+  }
+  if (fd_solver_->CartToJnt(q, q_dot, torques, *f_ext_ptr, q_dotdot) < 0) {
     log_ptr_->error("Forward dynamics computation failed!");
     return Result::FdCalcFail;
   }
@@ -61,7 +69,15 @@ Result Model::ForwardDynamics(const JntArray& q, const JntArray& q_dot,
 Result Model::InverseDynamics(const JntArray& q, const JntArray& q_dot,
                               const JntArray& q_dotdot, const Wrenches& f_ext,
                               JntArray& torques) {
-  if (id_solver_->CartToJnt(q, q_dot, q_dotdot, f_ext, torques) < 0) {
+  // KDL 要求 f_ext.size() == ns（段数），空 vector 会导致 E_SIZE_MISMATCH
+  // 调用方传空 vector 表示"无外力"，此处自动补齐为零旋量
+  const Wrenches* f_ext_ptr = &f_ext;
+  Wrenches f_ext_zero;
+  if (f_ext.empty()) {
+    f_ext_zero.resize(chain_.getNrOfSegments(), KDL::Wrench::Zero());
+    f_ext_ptr = &f_ext_zero;
+  }
+  if (id_solver_->CartToJnt(q, q_dot, q_dotdot, *f_ext_ptr, torques) < 0) {
     log_ptr_->error("Inverse dynamics computation failed!");
     return Result::IdCalcFail;
   }

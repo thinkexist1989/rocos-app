@@ -67,8 +67,6 @@ if (static_cast<int>(res) < 0) return res;
 }
 
 bool Executor::SwitchController(ControllerInterface* new_controller) {
-  if (controller_)
-    controller_->Reset();
 
   controller_ = new_controller;
   return true;

@@ -47,6 +47,19 @@ VirtualWallGuard::~VirtualWallGuard() {
     }
 }
 
+Result VirtualWallGuard::SetReady() {
+    // 透传给内部控制器；若无 inner_ 则用自身 hardware_ 兜底
+    if (inner_) {
+        return inner_->SetReady();
+    }
+    if (hardware_ != nullptr) {
+        hardware_->WaitForSignal();
+        hardware_->SetPosition(hardware_->GetPosition());
+        hardware_->SetMode(8);
+    }
+    return Result::NoError;
+}
+
 // ============================================================================
 // ControllerInterface 接口 — 全部透传给 inner_
 // ============================================================================

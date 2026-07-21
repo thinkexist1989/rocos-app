@@ -41,6 +41,7 @@
 
 #include "position_controller.hpp"
 #include "joint_impedance_controller.hpp"
+#include "joint_admittance_controller.hpp"
 #include "cartesian_impedance_controller.hpp"
 #include "model.hpp"
 
@@ -743,6 +744,60 @@ namespace rocos {
         return Result::Fatal;
     }
 
+    Result Robot::SetWorkMode(const std::string& mode) {
+        // 仅允许在 IDLE 或 STOPPED 状态下切换控制器
+        if (!impl_->is(sml::state<class IDLE>) && !impl_->is(sml::state<class STOPPED>)) {
+            log_ptr_->error("SetWorkMode 只能在 IDLE 或 STOPPED 状态下调用, 当前状态: {}",
+                            GetStateString());
+            return Result::IllegalParameter;
+        }
+
+
+        controller = nullptr; // 先释放旧 controller，确保切换时不会同时存在两个 controller
+
+        std::unique_ptr<ControllerInterface> new_controller;
+
+        if (mode == "position") {
+            new_controller = std::make_unique<PositionController>();
+        } else if (mode == "jnt_imp") {
+            new_controller = std::make_unique<JointImpedanceController>();
+        } else if (mode == "jnt_admit_teach") {
+            new_controller = std::make_unique<JointAdmittanceController>();
+        } else if (mode == "cart_imp" || mode == "ee_admit_teach") {
+            log_ptr_->error("SetWorkMode: 暂未实现 '{}'", mode);
+            return Result::IllegalParameter;
+        } else {
+            log_ptr_->error("SetWorkMode: 未知模式 '{}'", mode);
+            return Result::IllegalParameter;
+        }
+
+        Result rc = new_controller->SetHardware(hardware.get());
+        if (rc != Result::NoError) {
+            log_ptr_->error("SetWorkMode: SetHardware 失败, mode={}", mode);
+            return rc;
+        }
+
+        rc = new_controller->SetModel(model.get());
+        if (rc != Result::NoError) {
+            log_ptr_->error("SetWorkMode: SetModel 失败, mode={}", mode);
+            return rc;
+        }
+
+        // 调用 SetReady 准备控制器（同步硬件 + 安全初始指令）
+        rc = new_controller->SetReady();
+        if (rc != Result::NoError) {
+            log_ptr_->error("SetWorkMode: SetReady 失败, mode={}", mode);
+            return rc;
+        }
+
+        // 旧 controller 析构时自动执行安全兜底（WaitForSignal → SetPosition=curr → SetMode=CSP）
+        controller = std::move(new_controller);
+        executor->SwitchController(controller.get());
+
+        log_ptr_->info("SetWorkMode: 成功切换到模式 '{}'", mode);
+        return Result::NoError;
+    }
+
 
     bool Robot::IsEnabled() const {
         auto state = hardware->GetState();
@@ -849,9 +904,9 @@ namespace rocos {
             return;
         }
 
-      // ③ 运动完成且未处于暂停态，说明到达目标位置了，发送EventAtTarget事件，进入STOPPED
+      // ③ 运动完成且未处于暂停态，说明到达目标位置了，发送EventSuccessed事件，进入STOPPED（注意EventAtTarget不行，因为STOPPING不支持）
       if (r == Result::PlanFinished && !impl_->is(sml::state<class PAUSED>)) {
-        impl_->process_event(EventAtTarget{});
+        impl_->process_event(EventSuccessed{});
       }
     }
 

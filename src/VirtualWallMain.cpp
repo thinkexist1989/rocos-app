@@ -144,6 +144,7 @@ public:
 class PassThroughCtrl : public rocos::ControllerInterface {
 public:
     bool Reset() override { return true; }
+    rocos::Result SetReady() override { return rocos::Result::NoError; }
     rocos::Result SetHardware(rocos::HardwareInterface*) override { return rocos::Result::NoError; }
     rocos::Result SetModel(rocos::ModelInterface*) override { return rocos::Result::NoError; }
 

@@ -30,6 +30,11 @@ class ControllerInterface {
   virtual ~ControllerInterface() = default;
   virtual bool Reset() = 0;
 
+  /// @brief 控制器就绪：同步硬件并设置安全的初始指令
+  ///  - 位置类控制器：SetPosition(curr) + CSP
+  ///  - 力矩类控制器：SetTorque(重力补偿) + CST
+  virtual Result SetReady() = 0;
+
   virtual Result SetHardware(HardwareInterface* hardware) = 0;
   virtual Result SetModel(ModelInterface* model) = 0;
   virtual Result GenerateCmd(const Reference& ref_in, JntArray& q_cmd) = 0; //TODO: 更新Cmd但是不发送

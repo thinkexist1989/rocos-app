@@ -153,6 +153,7 @@ public:
     int update_count_{0};
 
     bool Reset() override { generate_count_ = 0; update_count_ = 0; return true; }
+    rocos::Result SetReady() override { return rocos::Result::NoError; }
     rocos::Result SetHardware(rocos::HardwareInterface*) override { return rocos::Result::NoError; }
     rocos::Result SetModel(rocos::ModelInterface*) override { return rocos::Result::NoError; }
 

@@ -33,6 +33,18 @@ PositionController::~PositionController() {
     }
 }
 
+Result PositionController::SetReady() {
+    if (hardware_ == nullptr) {
+        return Result::ParameterPointerEqualsNullptr;
+    }
+    // 位置控制器就绪：同步硬件后锁定当前位置为指令，切换到 CSP 模式
+    hardware_->WaitForSignal();
+    hardware_->SetPosition(hardware_->GetPosition());
+    hardware_->SetMode(8);
+    mode_set_ = true;
+    return Result::NoError;
+}
+
 bool PositionController::Reset() {
     mode_set_ = false;
     return true;

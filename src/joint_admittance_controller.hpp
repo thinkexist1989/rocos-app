@@ -32,12 +32,13 @@ namespace rocos {
 ///   5. 以 CSP 模式下发位置指令到硬件
 ///
 /// 注意: 最终下发的始终是关节角度（SetPosition），不是力矩。
-class JointImpedanceController : public ControllerInterface {
+class JointAdmittanceController : public ControllerInterface {
 public:
-    JointImpedanceController() = default;
-    ~JointImpedanceController() override;
+    JointAdmittanceController() = default;
+    ~JointAdmittanceController() override;
 
     bool Reset() override;
+    Result SetReady() override;
     Result SetHardware(HardwareInterface* hardware) override;
     Result SetModel(ModelInterface* model) override;
     Result GenerateCmd(const Reference& ref_in, JntArray& q_cmd) override;

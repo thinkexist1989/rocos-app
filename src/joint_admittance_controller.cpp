@@ -24,7 +24,7 @@
 
 namespace rocos {
 
-JointImpedanceController::~JointImpedanceController() {
+JointAdmittanceController::~JointAdmittanceController() {
     if (hardware_ != nullptr) {
         // 安全兜底：先同步硬件，再将目标位置设为当前位置，切换到 CSP 模式，防止析构时飞车
         hardware_->WaitForSignal();
@@ -33,17 +33,31 @@ JointImpedanceController::~JointImpedanceController() {
     }
 }
 
+Result JointAdmittanceController::SetReady() {
+    if (hardware_ == nullptr) {
+        return Result::ParameterPointerEqualsNullptr;
+    }
+    // 导纳控制器就绪：同步硬件后锁定当前位置为指令，切换到 CSP 模式
+    hardware_->WaitForSignal();
+    hardware_->SetPosition(hardware_->GetPosition());
+    hardware_->SetMode(CSP_MODE);
+    mode_set_ = true;
+    // 重置导纳积分状态，避免上一轮残留
+    adm_initialized_ = false;
+    return Result::NoError;
+}
+
 // ==========================================================================
 // 基础接口
 // ==========================================================================
 
-bool JointImpedanceController::Reset() {
+bool JointAdmittanceController::Reset() {
     mode_set_ = false;
     adm_initialized_ = false;
     return true;
 }
 
-Result JointImpedanceController::SetHardware(HardwareInterface* hardware) {
+Result JointAdmittanceController::SetHardware(HardwareInterface* hardware) {
     if (hardware == nullptr) {
         return Result::ParameterPointerEqualsNullptr;
     }
@@ -51,7 +65,7 @@ Result JointImpedanceController::SetHardware(HardwareInterface* hardware) {
     return Result::NoError;
 }
 
-Result JointImpedanceController::SetModel(ModelInterface* model) {
+Result JointAdmittanceController::SetModel(ModelInterface* model) {
     if (model == nullptr) {
         return Result::ParameterPointerEqualsNullptr;
     }
@@ -63,7 +77,7 @@ Result JointImpedanceController::SetModel(ModelInterface* model) {
 // GenerateCmd — 将 Reference 转为期望关节角 q_des（与 PositionController 一致）
 // ==========================================================================
 
-Result JointImpedanceController::GenerateCmd(const Reference& ref_in,
+Result JointAdmittanceController::GenerateCmd(const Reference& ref_in,
                                               JntArray& q_cmd) {
     // 分支1: 关节空间参考值 — 直接透传
     if (auto* q_ref = std::get_if<JntArray>(&ref_in)) {
@@ -133,7 +147,7 @@ Result JointImpedanceController::GenerateCmd(const Reference& ref_in,
 //   5. 以 CSP 模式下发位置
 // ==========================================================================
 
-Result JointImpedanceController::UpdateCmd(const JntArray& q_des) {
+Result JointAdmittanceController::UpdateCmd(const JntArray& q_des) {
     if (hardware_ == nullptr) {
         return Result::ParameterPointerEqualsNullptr;
     }
@@ -143,20 +157,26 @@ Result JointImpedanceController::UpdateCmd(const JntArray& q_des) {
         return Result::MoveInput;
     }
 
-    // ---- 参数懒初始化 ----
-    if (M_.rows() != n) {
+    // ---- 增益维度校验（已显式设置的增益必须与 q_des 维度一致） ----
+    if ((M_.rows() > 0 && M_.rows() != n) ||
+        (B_.rows() > 0 && B_.rows() != n) ||
+        (tau_offset_.rows() > 0 && tau_offset_.rows() != n)) {
+        return Result::UnmatchedJointsNumber;
+    }
+    // ---- 参数懒初始化（对尚未设置的增益赋默认值） ----
+    if (M_.rows() == 0) {
         M_.resize(n);
         for (unsigned int i = 0; i < n; ++i) {
             M_(i) = kDefaultInertia;
         }
     }
-    if (B_.rows() != n) {
+    if (B_.rows() == 0) {
         B_.resize(n);
         for (unsigned int i = 0; i < n; ++i) {
             B_(i) = kDefaultDamping;
         }
     }
-    if (tau_offset_.rows() != n) {
+    if (tau_offset_.rows() == 0) {
         tau_offset_.resize(n);
         for (unsigned int i = 0; i < n; ++i) {
             tau_offset_(i) = 0.0;
@@ -174,10 +194,6 @@ Result JointImpedanceController::UpdateCmd(const JntArray& q_des) {
         adm_initialized_ = true;
     }
 
-    // ---- 校验维度 ----
-    if (M_.rows() != n || B_.rows() != n || tau_offset_.rows() != n) {
-        return Result::UnmatchedJointsNumber;
-    }
     if (dt_ <= 0.0 || !std::isfinite(dt_)) {
         return Result::IllegalParameter;
     }
@@ -250,7 +266,7 @@ Result JointImpedanceController::UpdateCmd(const JntArray& q_des) {
 // 导纳参数设置
 // ==========================================================================
 
-Result JointImpedanceController::SetInertia(const JntArray& M) {
+Result JointAdmittanceController::SetInertia(const JntArray& M) {
     if (M.rows() == 0) {
         return Result::MoveInput;
     }
@@ -263,7 +279,7 @@ Result JointImpedanceController::SetInertia(const JntArray& M) {
     return Result::NoError;
 }
 
-Result JointImpedanceController::SetDamping(const JntArray& B) {
+Result JointAdmittanceController::SetDamping(const JntArray& B) {
     if (B.rows() == 0) {
         return Result::MoveInput;
     }
@@ -276,7 +292,7 @@ Result JointImpedanceController::SetDamping(const JntArray& B) {
     return Result::NoError;
 }
 
-Result JointImpedanceController::SetTorqueOffset(const JntArray& tau_offset) {
+Result JointAdmittanceController::SetTorqueOffset(const JntArray& tau_offset) {
     if (tau_offset.rows() == 0) {
         return Result::MoveInput;
     }
@@ -289,7 +305,7 @@ Result JointImpedanceController::SetTorqueOffset(const JntArray& tau_offset) {
     return Result::NoError;
 }
 
-Result JointImpedanceController::SetDt(double dt) {
+Result JointAdmittanceController::SetDt(double dt) {
     if (dt <= 0.0 || !std::isfinite(dt)) {
         return Result::IllegalParameter;
     }

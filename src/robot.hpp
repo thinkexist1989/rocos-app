@@ -119,6 +119,11 @@ class Robot {
   //! \brief 清除报警/错误状态，成功后状态机回到 STOPPED
   Result ResetFault();
 
+  /// @brief 切换工作模式（控制器）
+  /// @param mode 模式字符串: "position" | "jnt_imp" | "jnt_admit_teach" | "cart_imp" | "ee_admit_teach"
+  /// @note 仅允许在 IDLE 或 STOPPED 状态下调用
+  Result SetWorkMode(const std::string& mode);
+
 
   //! \brief 获取机器人当前是否上使能状态
   [[nodiscard]] bool IsEnabled() const;

@@ -22,5 +22,15 @@
 
 namespace rocos {
     class CartesianImpedanceController : public ControllerInterface {
+    public:
+        CartesianImpedanceController() = default;
+        ~CartesianImpedanceController() override = default;
+
+        bool Reset() override { return true; }
+        Result SetReady() override { return Result::FunctionNotSupported; }
+        Result SetHardware(HardwareInterface*) override { return Result::FunctionNotSupported; }
+        Result SetModel(ModelInterface*) override { return Result::FunctionNotSupported; }
+        Result GenerateCmd(const Reference&, JntArray&) override { return Result::FunctionNotSupported; }
+        Result UpdateCmd(const JntArray&) override { return Result::FunctionNotSupported; }
     };
 } // rocos

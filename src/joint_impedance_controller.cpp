@@ -33,6 +33,40 @@ JointImpedanceController::~JointImpedanceController() {
     }
 }
 
+Result JointImpedanceController::SetReady() {
+    if (hardware_ == nullptr) {
+        return Result::ParameterPointerEqualsNullptr;
+    }
+
+    hardware_->WaitForSignal();
+
+    // 计算重力补偿力矩 τ_grav = InverseDynamics(q_act, 0, 0, ∅)
+    const JntArray q_act = hardware_->GetPosition();
+    const unsigned int n = q_act.rows();
+    JntArray tau_grav(n);
+    if (model_ != nullptr) {
+        JntArray zero(n);
+        for (unsigned int i = 0; i < n; ++i) {
+            zero(i) = 0.0;
+        }
+        Wrenches f_ext;
+        Result res = model_->InverseDynamics(q_act, zero, zero, f_ext, tau_grav);
+        if (res != Result::NoError) {
+            return res;
+        }
+    } else {
+        for (unsigned int i = 0; i < n; ++i) {
+            tau_grav(i) = 0.0;
+        }
+    }
+
+    // 下发重力补偿力矩作为初始指令，切换到 CST 模式
+    hardware_->SetTorque(tau_grav);
+    hardware_->SetMode(CST_MODE);
+    mode_set_ = true;
+    return Result::NoError;
+}
+
 // ==========================================================================
 // 基础接口
 // ==========================================================================

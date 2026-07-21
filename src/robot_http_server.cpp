@@ -746,36 +746,24 @@ void RobotHttpServer::handleIsEnabled(const httplib::Request& req, httplib::Resp
 void RobotHttpServer::handleSetWorkMode(const httplib::Request& req, httplib::Response& res) {
     log_ptr_->info("POST /api/robot/workmode");
 
-    // nlohmann::json body = nlohmann::json::parse(req.body, nullptr, false);
-    // if (body.is_discarded() || !body.contains("mode")) {
-    //     sendJson(res, false, 1001, "Invalid JSON or missing 'mode' field");
-    //     return;
-    // }
-    //
-    // std::string mode_str = body["mode"].get<std::string>();
-    // Robot::WorkMode mode;
-    //
-    // if (mode_str == "position") {
-    //     mode = Robot::WorkMode::Position;
-    // } else if (mode_str == "ee_admit_teach") {
-    //     mode = Robot::WorkMode::EeAdmitTeach;
-    // } else if (mode_str == "jnt_admit_teach") {
-    //     mode = Robot::WorkMode::JntAdmitTeach;
-    // } else if (mode_str == "jnt_imp") {
-    //     mode = Robot::WorkMode::JntImp;
-    // } else if (mode_str == "cart_imp") {
-    //     mode = Robot::WorkMode::CartImp;
-    // } else {
-    //     sendJson(res, false, 1006, "Unknown work mode: " + mode_str);
-    //     return;
-    // }
-    //
-    // bool ok = robot_->setWorkMode(mode);
-    // if (ok) {
-    //     sendJson(res, true, 0, "Work mode set to " + mode_str);
-    // } else {
-    //     sendJson(res, false, 3002, "Failed to set work mode");
-    // }
+    nlohmann::json body = nlohmann::json::parse(req.body, nullptr, false);
+    if (body.is_discarded() || !body.contains("mode") || !body["mode"].is_string()) {
+        sendJson(res, false, 1001, "Invalid JSON or missing 'mode' field");
+        return;
+    }
+
+    const std::string mode_str = body["mode"].get<std::string>();
+    const Result result = robot_->SetWorkMode(mode_str);
+
+    nlohmann::json data;
+    data["mode"] = mode_str;
+    data["robot_state"] = robot_->GetStateString();
+
+    sendJson(res, resultSucceeded(result), resultCode(result),
+             resultSucceeded(result)
+                 ? "Work mode set to " + mode_str
+                 : "Failed to set work mode",
+             data);
 }
 
 // ============================================================================

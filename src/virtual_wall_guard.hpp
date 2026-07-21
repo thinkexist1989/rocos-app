@@ -55,6 +55,7 @@ public:
 
     // ─── ControllerInterface 接口 ───
     bool Reset() override;
+    Result SetReady() override;
     Result SetHardware(HardwareInterface* hardware) override;
     Result SetModel(ModelInterface* model) override;
     Result GenerateCmd(const Reference& ref_in, JntArray& q_cmd) override;
