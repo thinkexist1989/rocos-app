@@ -151,6 +151,7 @@ add_library(robot
         src/move_line.cpp
         src/move_line_offline.cpp
         src/move_circle.cpp
+        src/move_circle_offline.cpp
         src/move_jog.cpp
         src/move_null_jog.cpp
         src/move_svd_jog.cpp
@@ -339,6 +340,38 @@ target_link_libraries(move_jog_planner_linearity_test
         )
 # 离线测试 MoveJog + Model，不连接硬件，不加入 ctest
 # ./build/bin/move_jog_planner_linearity_test
+
+add_executable(move_svd_jog_planner_test test/move_svd_jog_planner_test.cc)
+target_link_libraries(move_svd_jog_planner_test
+        PRIVATE
+        robot
+        )
+# 离线测试 MoveSvdJog + Model，验证零空间点动末端位姿不变
+# ./build/bin/move_svd_jog_planner_test
+
+add_executable(move_svd_jog_drift_analysis test/move_svd_jog_drift_analysis.cc)
+target_link_libraries(move_svd_jog_drift_analysis
+        PRIVATE
+        robot
+        )
+# 长时间 SVD 零空间点动，采集 FK 数据用于漂移可视化
+# ./build/bin/move_svd_jog_drift_analysis [duration_s] [speed] [csv_out]
+
+add_executable(move_jog_reciprocating_test test/move_jog_reciprocating_test.cc)
+target_link_libraries(move_jog_reciprocating_test
+        PRIVATE
+        robot
+        )
+# MoveJog 规划层往复点动，隔离漂移是规划层还是控制层
+# ./build/bin/move_jog_reciprocating_test [cycles] [phase_s]
+
+add_executable(move_jog_offaxis_drift_test test/move_jog_offaxis_drift_test.cc)
+target_link_libraries(move_jog_offaxis_drift_test
+        PRIVATE
+        robot
+        )
+# 单向笛卡尔点动偏轴漂移分析（BASE_X → 看 Y/Z 怎么偏）
+# ./build/bin/move_jog_offaxis_drift_test [duration_s]
 # ---- 模式切换测试（CSP ↔ CST）--------------------------------------------
 add_executable(mode_switch_test test/mode_switch_test.cc)
 target_link_libraries(mode_switch_test

@@ -39,7 +39,7 @@ namespace rocos {
 /// 关节空间直接积分；笛卡尔通过 Jacobian 伪逆转关节速度再积分。
 ///
 /// 线程：FeedJog=HTTP 线程，Update/GenerateRef=控制线程，mtx_ 保护共享状态。
-class MoveJog : public MotionInterface {
+class MoveJogK : public MotionInterface {
 public:
     enum class State { Active, Decelerating, Stopped };
 

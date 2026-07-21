@@ -2,7 +2,7 @@
 // Created by think on 2026/7/7.
 //
 
-#include "move_jog.hpp"
+#include "move_jog_k.hpp"
 
 #include <Eigen/Dense>
 
@@ -44,7 +44,7 @@ bool vecIsFinite(const JogVec& v) noexcept {
 // 归一化方向
 // ============================================================================
 
-double MoveJog::normalizeDirection(const JogVec& src, JogVec& dst) {
+double MoveJogK::normalizeDirection(const JogVec& src, JogVec& dst) {
     const double norm = vecNorm(src);
     if (norm < kSpeedEpsilon) return 0.0;
 
@@ -65,7 +65,7 @@ double MoveJog::normalizeDirection(const JogVec& src, JogVec& dst) {
     return norm;
 }
 
-double MoveJog::directionCosine(const JogVec& a, const JogVec& b) {
+double MoveJogK::directionCosine(const JogVec& a, const JogVec& b) {
     // 调用方保证 a、b 都是归一化向量（模长=1），cos = dot(a,b)
     if (std::holds_alternative<JntArray>(a)) {
         const auto& qa = std::get<JntArray>(a);
@@ -85,20 +85,20 @@ double MoveJog::directionCosine(const JogVec& a, const JogVec& b) {
 // 构造 / 析构
 // ============================================================================
 
-MoveJog::MoveJog(double dt, double timeout, ModelInterface* model, double dir_threshold)
+MoveJogK::MoveJogK(double dt, double timeout, ModelInterface* model, double dir_threshold)
     : MotionInterface(model)
     , dt_(dt)
     , timeout_(timeout)
     , dir_threshold_(dir_threshold)
     , speed_otg_(dt) {}
 
-MoveJog::~MoveJog() = default;
+MoveJogK::~MoveJogK() = default;
 
 // ============================================================================
 // 参数校验
 // ============================================================================
 
-Result MoveJog::ValidateParameters() const {
+Result MoveJogK::ValidateParameters() const {
     if (!std::isfinite(dt_) || dt_ <= 0.0) return Result::ParameterNanOrInf;
     if (!std::isfinite(timeout_) || timeout_ <= 0.0) return Result::ParameterNanOrInf;
     return Result::NoError;
@@ -108,7 +108,7 @@ Result MoveJog::ValidateParameters() const {
 // 初始化 — 等待第一次 FeedJog 后再启动
 // ============================================================================
 
-Result MoveJog::Reset() {
+Result MoveJogK::Reset() {
     std::lock_guard<std::mutex> lock(mtx_);
 
     // 外部必须先调用 setInitialPosition 设置当前关节角
@@ -144,7 +144,7 @@ Result MoveJog::Reset() {
 // 设置初始关节位置（Reset 之前由 Robot 调用）
 // ============================================================================
 
-void MoveJog::setInitialPosition(const JntArray& q) {
+void MoveJogK::setInitialPosition(const JntArray& q) {
     joint_count_ = static_cast<int>(q.rows());
     q_integral_ = q;
     jacobian_.resize(static_cast<unsigned int>(joint_count_));
@@ -154,7 +154,7 @@ void MoveJog::setInitialPosition(const JntArray& q) {
 // FeedJog — HTTP 线程旁路写入
 // ============================================================================
 
-Result MoveJog::FeedJog(const JogVec& direction, double speed) {
+Result MoveJogK::FeedJog(const JogVec& direction, double speed) {
     if (state_.load() != State::Active) return Result::PlanError;
     if (!std::isfinite(speed)) return Result::ParameterNanOrInf;
     if (!vecIsFinite(direction)) return Result::ParameterNanOrInf;
@@ -194,7 +194,7 @@ Result MoveJog::FeedJog(const JogVec& direction, double speed) {
 // 速度 OTG 配置（控制线程调用）
 // ============================================================================
 
-void MoveJog::reconfigureSpeedOtg(double target_speed) {
+void MoveJogK::reconfigureSpeedOtg(double target_speed) {
     // 只更新目标速度和限制，不动 current_velocity / current_acceleration。
     // 当前状态由 speed_output_.pass_to_input(speed_input_) 在 Update 中负责传递，
     // 这里重置会导致 Ruckig 认为每周期加速度都是 0，Jerk 限制失效。
@@ -209,7 +209,7 @@ void MoveJog::reconfigureSpeedOtg(double target_speed) {
 // Update — 控制线程每周期调用
 // ============================================================================
 
-Result MoveJog::Update() {
+Result MoveJogK::Update() {
     if (state_.load() == State::Stopped) return Result::PlanFinished;
     if (!has_started_.load()) return Result::NoError;
 
@@ -251,7 +251,7 @@ Result MoveJog::Update() {
 // computeJointVelocity — 从速度×方向计算关节速度向量
 // ============================================================================
 
-JntArray MoveJog::computeJointVelocity() {
+JntArray MoveJogK::computeJointVelocity() {
     std::lock_guard<std::mutex> lock(mtx_);
     const double s = speed_otg_current_;
     JntArray q_dot(static_cast<unsigned int>(joint_count_));
@@ -329,7 +329,7 @@ JntArray MoveJog::computeJointVelocity() {
 // GenerateRef — 控制线程每周期调用
 // ============================================================================
 
-Result MoveJog::GenerateRef(Reference& ref_out) {
+Result MoveJogK::GenerateRef(Reference& ref_out) {
     if (!has_started_.load()) {
         ref_out = q_integral_;
         return Result::NoError;
@@ -348,10 +348,10 @@ Result MoveJog::GenerateRef(Reference& ref_out) {
 // Pause / Resume / Stop
 // ============================================================================
 
-Result MoveJog::Pause()  { return Result::PlanError; }
-Result MoveJog::Resume() { return Result::PlanError; }
+Result MoveJogK::Pause()  { return Result::PlanError; }
+Result MoveJogK::Resume() { return Result::PlanError; }
 
-Result MoveJog::Stop() {
+Result MoveJogK::Stop() {
     state_.store(State::Decelerating);
     std::lock_guard<std::mutex> lock(mtx_);
     target_speed_ = 0.0;

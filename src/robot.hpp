@@ -373,7 +373,7 @@ class Robot {
   Logger::logger_ptr log_ptr_ = nullptr;
 
   std::function<Result()> data_ready_callback_ = nullptr;
-
+  double dt_=0.001;
   //////////FSM Related function (INTERNAL) ///////////////
  public:
   void on_fsm_reset();

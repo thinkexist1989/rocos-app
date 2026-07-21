@@ -34,6 +34,7 @@
 #include "move_line.hpp"           // v3.0 保留，原有在线规划版本
 #include "move_line_offline.hpp"   // v3.0 离线规划 + 全轨迹 IK 验证版本
 #include "move_circle.hpp"
+#include "move_circle_offline.hpp"  // v3.0 离线圆弧规划 + 全轨迹 IK 验证版本
 #include "move_jog.hpp"
 #include "move_null_jog.hpp"
 #include "move_svd_jog.hpp"
@@ -582,7 +583,7 @@ namespace rocos {
                     joint_binding_->Bind(model_joint_names[i], hardware_drive_ids[i]);
                 }
             }
-
+            dt_=hardware->GetDt()/1000000.0; // 将微秒转换为秒
             rc = joint_binding_->Validate();
             if (rc != Result::NoError) {
                 log_ptr_->error("JointBinding Validate 失败: yaml={}", joint_binding_path_);
@@ -603,7 +604,7 @@ namespace rocos {
                            model_joint_names.size(), hardware_drive_ids.size(),
                            joint_binding_path_);
         }
-
+        auto dt = hardware->GetControlCycleTime();
         controller = std::make_unique<PositionController>(); //TODO： 默认加载位置控制器
 
         Result rc = controller->SetHardware(hardware.get()); //TODO：控制器需要传入硬件指针，可以考虑初始化时导入
@@ -892,7 +893,7 @@ namespace rocos {
             for (int i = 0; i < n; ++i) q_start(i) = getJointPosition(i);
 
             auto new_motion = std::make_unique<MoveJoint>(
-                q_start, q_goal, v_limit, a_limit, j_limit, /*dt=*/0.001);
+                q_start, q_goal, v_limit, a_limit, j_limit, dt_);
 
 
             Result rc = new_motion->Reset();
@@ -954,7 +955,7 @@ namespace rocos {
             auto new_motion = std::make_unique<MoveLineOffline>(
                 pose_flange, pose_goal * T_tool.Inverse(),
                 model.get(),
-                v_limit, a_limit, j_limit, /*dt=*/0.001);
+                v_limit, a_limit, j_limit, dt_);
 
             new_motion->SetInitialJointPosition(q_current);  // IK 暖启动
             Result rc = new_motion->Reset();
@@ -962,7 +963,7 @@ namespace rocos {
             // ---- 原在线版本（保留以备回退） ----
             // auto new_motion = std::make_unique<MoveLine>(
             //     pose_flange, pose_goal * T_tool.Inverse(),
-            //     v_limit, a_limit, j_limit, /*dt=*/0.001, model.get());
+            //     v_limit, a_limit, j_limit, dt_, model.get());
             // Result rc = new_motion->Reset();
             if (rc != Result::NoError) return rc;
 
@@ -1231,19 +1232,21 @@ namespace rocos {
     Result Robot::MoveC(const Frame &pose_start, const Frame &center_frame,
                         double theta, double v_limit, double a_limit, double j_limit) {
         data_ready_callback_ = [this, pose_start, center_frame, theta, v_limit, a_limit, j_limit]() -> Result {
-            auto new_motion = std::make_unique<MoveCircle>(
-                pose_start, center_frame, theta, v_limit, a_limit, j_limit, /*dt=*/0.001, model.get());
+            auto new_motion = std::make_unique<MoveCircleOffline>(
+                pose_start, center_frame, theta, model.get(),
+                v_limit, a_limit, j_limit, dt_);
+
+            const int n = getJointNum();
+            JntArray q_current(static_cast<unsigned int>(n));
+            for (int i = 0; i < n; ++i) q_current(i) = getJointPosition(i);
+            new_motion->SetInitialJointPosition(q_current);
 
             Result rc = new_motion->Reset();
             if (rc != Result::NoError) return rc;
 
             motion = std::move(new_motion);
-
             executor->SwitchMotion(motion.get());
             return Result::NoError;
-
-            log_ptr_->error("executor is nullptr");
-            return Result::Fatal;
         };
 
         if (!impl_->process_event(EventStartReq{})) {
@@ -1262,19 +1265,21 @@ namespace rocos {
                         const Frame &pose_goal,
                         double v_limit, double a_limit, double j_limit) {
         data_ready_callback_ = [this, pose_start, pose_via, pose_goal, v_limit, a_limit, j_limit]() -> Result {
-            auto new_motion = std::make_unique<MoveCircle>(
-                pose_start, pose_via, pose_goal, v_limit, a_limit, j_limit, /*dt=*/0.001, model.get());
+            auto new_motion = std::make_unique<MoveCircleOffline>(
+                pose_start, pose_via, pose_goal, model.get(),
+                v_limit, a_limit, j_limit, dt_);
+
+            const int n = getJointNum();
+            JntArray q_current(static_cast<unsigned int>(n));
+            for (int i = 0; i < n; ++i) q_current(i) = getJointPosition(i);
+            new_motion->SetInitialJointPosition(q_current);
 
             Result rc = new_motion->Reset();
             if (rc != Result::NoError) return rc;
 
             motion = std::move(new_motion);
-
             executor->SwitchMotion(motion.get());
             return Result::NoError;
-
-            log_ptr_->error("executor is nullptr");
-            return Result::Fatal;
         };
 
         if (!impl_->process_event(EventStartReq{})) {
@@ -1383,7 +1388,7 @@ namespace rocos {
         data_ready_callback_ = [this, direction, speed, timeout,
                     dir_threshold]() -> Result {
                     auto new_jog = std::make_unique<MoveJog>(
-                        /*dt=*/0.001, timeout, model.get(), dir_threshold);
+                        dt_, timeout, model.get(), dir_threshold);
 
                     const int n = getJointNum();
                     JntArray q_current(static_cast<unsigned int>(n));
@@ -1430,7 +1435,7 @@ namespace rocos {
         // ── 分支 3：全新启动 ──
         data_ready_callback_ = [this, intent_direction, speed, timeout, dir_threshold]() -> Result {
             auto new_jog = std::make_unique<MoveNullJog>(
-                /*dt=*/0.001, timeout, model.get(), dir_threshold);
+                dt_, timeout, model.get(), dir_threshold);
 
             const int n = getJointNum();
             JntArray q_current(static_cast<unsigned int>(n));
@@ -1479,7 +1484,7 @@ namespace rocos {
         // ── 分支 3：全新启动 ──
         data_ready_callback_ = [this, dim_speeds, timeout, dir_threshold]() -> Result {
             auto new_jog = std::make_unique<MoveSvdJog>(
-                /*dt=*/0.001, timeout, model.get(), dir_threshold);
+                dt_, timeout, model.get(), dir_threshold);
 
             const int n = getJointNum();
             JntArray q_current(static_cast<unsigned int>(n));
