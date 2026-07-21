@@ -25,7 +25,7 @@ namespace rocos {
 class PositionController : public ControllerInterface {
 public:
     PositionController() = default;
-    ~PositionController() override = default;
+    ~PositionController() override;
 
     bool Reset() override;
     Result SetHardware(HardwareInterface* hardware) override;

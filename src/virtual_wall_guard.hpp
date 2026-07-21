@@ -51,7 +51,7 @@ public:
     VirtualWallGuard(std::unique_ptr<ControllerInterface> inner,
                      ModelInterface* model,
                      HardwareInterface* hardware = nullptr);
-    ~VirtualWallGuard() override = default;
+    ~VirtualWallGuard() override;
 
     // ─── ControllerInterface 接口 ───
     bool Reset() override;

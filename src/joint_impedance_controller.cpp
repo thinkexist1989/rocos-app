@@ -24,6 +24,15 @@
 
 namespace rocos {
 
+JointImpedanceController::~JointImpedanceController() {
+    if (hardware_ != nullptr) {
+        // 安全兜底：先同步硬件，再将目标位置设为当前位置，切换到 CSP 模式，防止析构时飞车
+        hardware_->WaitForSignal();
+        hardware_->SetPosition(hardware_->GetPosition());
+        hardware_->SetMode(8);
+    }
+}
+
 // ==========================================================================
 // 基础接口
 // ==========================================================================

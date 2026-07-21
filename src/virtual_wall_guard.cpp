@@ -38,6 +38,15 @@ VirtualWallGuard::VirtualWallGuard(
     , model_(model)
     , hardware_(hardware) {}
 
+VirtualWallGuard::~VirtualWallGuard() {
+    if (hardware_ != nullptr) {
+        // 安全兜底：先同步硬件，再将目标位置设为当前位置，切换到 CSP 模式，防止析构时飞车
+        hardware_->WaitForSignal();
+        hardware_->SetPosition(hardware_->GetPosition());
+        hardware_->SetMode(8);
+    }
+}
+
 // ============================================================================
 // ControllerInterface 接口 — 全部透传给 inner_
 // ============================================================================

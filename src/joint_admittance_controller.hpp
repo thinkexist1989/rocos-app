@@ -35,7 +35,7 @@ namespace rocos {
 class JointImpedanceController : public ControllerInterface {
 public:
     JointImpedanceController() = default;
-    ~JointImpedanceController() override = default;
+    ~JointImpedanceController() override;
 
     bool Reset() override;
     Result SetHardware(HardwareInterface* hardware) override;
