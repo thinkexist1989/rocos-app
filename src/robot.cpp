@@ -583,7 +583,7 @@ namespace rocos {
                     joint_binding_->Bind(model_joint_names[i], hardware_drive_ids[i]);
                 }
             }
-            dt_=hardware->GetDt()/1000000.0; // 将微秒转换为秒
+            
             rc = joint_binding_->Validate();
             if (rc != Result::NoError) {
                 log_ptr_->error("JointBinding Validate 失败: yaml={}", joint_binding_path_);
@@ -604,7 +604,7 @@ namespace rocos {
                            model_joint_names.size(), hardware_drive_ids.size(),
                            joint_binding_path_);
         }
-        auto dt = hardware->GetDt();
+        dt_=hardware->GetDt()/1000000.0; // 将微秒转换为秒
         controller = std::make_unique<PositionController>(); //TODO： 默认加载位置控制器
 
         Result rc = controller->SetHardware(hardware.get()); //TODO：控制器需要传入硬件指针，可以考虑初始化时导入
