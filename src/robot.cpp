@@ -855,33 +855,26 @@ namespace rocos {
     void Robot::RunCycle() {
         if (!motion) return;
 
-        // ① 推进 motion 状态
-        Result r = motion->Update();
+        // 推进 motion 状态
+        const Result r = motion->Update();
 
-        if (r == Result::PlanFinished) {
-            if (impl_->is(sml::state<class PAUSED>)) {
-                r = executor->Update();
-                if (static_cast<int>(r) < 0) {
-                    impl_->process_event(EventErrorOccurred{});
-                }
-
-                return;
-            }
-            impl_->process_event(EventSuccessed{}); //
-            return;
-        }
+        // ① 错误优先 —— 任何异常立即进入 ERROR_STATE
         if (static_cast<int>(r) < 0) {
+          impl_->process_event(EventErrorOccurred{});
+          return;
+        }
+
+        // ② 正常执行 —— 参考 → 控制 → 硬件
+        if (static_cast<int>(executor->Update()) < 0) {
             impl_->process_event(EventErrorOccurred{});
             return;
         }
 
-        // ② 参考 → 指令 → 硬件
-
-        r = executor->Update();
-        if (static_cast<int>(r) < 0) {
-            impl_->process_event(EventErrorOccurred{});
-            return;
-        }
+      // ③ 运动完成且未处于暂停态，发送EventSuccessed事件
+      if (r == Result::PlanFinished && !impl_->is(sml::state<class PAUSED>)) {
+        impl_->process_event(EventSuccessed{}); //
+        // return; //TODO： 这里我认为不应该return，应该正常处理一次exector->Update，然后再切状态机
+      }
     }
 
     // ============================================================================
