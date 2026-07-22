@@ -21,16 +21,95 @@
 #include "controller_interface.hpp"
 
 namespace rocos {
-    class CartesianImpedanceController : public ControllerInterface {
-    public:
-        CartesianImpedanceController() = default;
-        ~CartesianImpedanceController() override = default;
 
-        bool Reset() override { return true; }
-        Result SetReady() override { return Result::FunctionNotSupported; }
-        Result SetHardware(HardwareInterface*) override { return Result::FunctionNotSupported; }
-        Result SetModel(ModelInterface*) override { return Result::FunctionNotSupported; }
-        Result GenerateCmd(const Reference&, JntArray&) override { return Result::FunctionNotSupported; }
-        Result UpdateCmd(const JntArray&) override { return Result::FunctionNotSupported; }
-    };
-} // rocos
+/// @brief 笛卡尔空间阻抗控制器（工具系下表达阻抗，经 Jacobian 转置映射到关节力矩）
+///
+/// 控制律（每个周期执行）：
+///   1. 获取当前 q, q̇
+///   2. FK → 当前笛卡尔位姿 x_cur
+///   3. J = GetJacobian(q)
+///   4. Δx = diff(x_cur, x_des)              ← 6D 误差 twist（在当前工具系下表达）
+///   5. v_ee_base = J · q̇                     ← 末端速度 twist（基坐标系）
+///   6. v_ee_cur  = Ad(R_cur^T) · v_ee_base   ← 末端速度 twist（工具系）
+///   7. F_cur = K_p·Δx - K_d·v_ee_cur        ← 阻抗力/力矩（工具系）
+///   8. F_base = Ad(R_cur)^T · F_cur          ← 阻抗力/力矩（基坐标系）
+///   9. τ_imp = J^T · F_base                  ← Jacobian 转置映射到关节力矩
+///  10. τ_null = N · (K_p_null·(q_null_des-q) - K_d_null·q̇)  ← 零空间阻抗
+///      N = I - J#·J 是阻尼伪逆零空间投影矩阵
+///  11. τ_raw = τ_imp + τ_null + τ_grav
+///  12. Rate limit: |τ_new - τ_prev| ≤ τ_rate_limit · dt
+///  13. Saturation: clamp(τ_new, -τ_max, +τ_max)
+///  14. SetTorque(τ_cmd)，CST 模式 (mode=10)
+///
+/// 阻抗参数在工具系（末端当前坐标系）下定义，使刚度方向对操作者直观。
+/// 零空间阻抗使冗余关节收敛到期望构型，同时不影响末端位姿。
+class CartesianImpedanceController : public ControllerInterface {
+public:
+    CartesianImpedanceController() = default;
+    ~CartesianImpedanceController() override;
+
+    bool Reset() override;
+    Result SetReady() override;
+    Result SetHardware(HardwareInterface* hardware) override;
+    Result SetModel(ModelInterface* model) override;
+    Result GenerateCmd(const Reference& ref_in, JntArray& q_cmd) override;
+    Result UpdateCmd(const JntArray& q_cmd) override;
+
+    // ---- 笛卡尔阻抗参数 ----
+    /// @brief 设置笛卡尔平动刚度 [N/m]，默认 500
+    Result SetTranslationalStiffness(double K);
+    /// @brief 设置笛卡尔转动刚度 [Nm/rad]，默认 50
+    Result SetRotationalStiffness(double K);
+    /// @brief 设置笛卡尔平动阻尼 [N·s/m]，默认 100
+    Result SetTranslationalDamping(double D);
+    /// @brief 设置笛卡尔转动阻尼 [Nm·s/rad]，默认 10
+    Result SetRotationalDamping(double D);
+
+    // ---- 零空间阻抗参数 ----
+    /// @brief 设置零空间关节刚度 [Nm/rad]，默认 50
+    Result SetNullspaceStiffness(double K);
+    /// @brief 设置零空间关节阻尼 [Nm·s/rad]，默认 10
+    Result SetNullspaceDamping(double D);
+    /// @brief 设置零空间期望关节位置（冗余关节收敛目标，如 elbow 优化姿态）
+    Result SetNullspaceReference(const JntArray& q_nullspace);
+
+    // ---- 力矩安全参数 ----
+    /// @brief 设置力矩变化率限制 [Nm/s]，0 表示不限制，默认 0
+    Result SetTorqueRateLimit(double limit);
+    /// @brief 设置关节力矩饱和上限 [Nm]，0 表示不限制，默认 0
+    Result SetTorqueSaturation(double limit);
+
+private:
+    HardwareInterface* hardware_{nullptr};
+    ModelInterface* model_{nullptr};
+    bool mode_set_{false};
+
+    // 笛卡尔位姿
+    Frame x_des_;              ///< 期望笛卡尔位姿（每周期由 GenerateCmd 更新）
+    bool x_des_valid_{false};  ///< x_des_ 是否已被设置
+
+    // 笛卡尔阻抗增益（工具系）
+    double K_p_lin_{500.0};    ///< 平动刚度 [N/m]
+    double K_p_ang_{50.0};     ///< 转动刚度 [Nm/rad]
+    double K_d_lin_{100.0};    ///< 平动阻尼 [N·s/m]
+    double K_d_ang_{10.0};     ///< 转动阻尼 [Nm·s/rad]
+
+    // 零空间阻抗
+    double K_p_null_{50.0};        ///< 零空间关节刚度 [Nm/rad]
+    double K_d_null_{10.0};        ///< 零空间关节阻尼 [Nm·s/rad]
+    JntArray q_nullspace_des_;     ///< 零空间期望关节位置
+    bool q_nullspace_valid_{false};///< q_nullspace_des_ 是否有效
+    bool q_nullspace_user_set_{false}; ///< 是否由用户显式设置（禁止 GenerateCmd 覆盖）
+
+    // 力矩安全
+    double tau_rate_limit_{0.0};   ///< 力矩变化率限制 [Nm/s]，0=不限制
+    double tau_max_{0.0};          ///< 关节力矩饱和值 [Nm]，0=不限制
+    JntArray tau_prev_;            ///< 上一周期输出的力矩（用于变化率限制）
+    bool tau_prev_valid_{false};   ///< tau_prev_ 是否有效
+    double dt_{0.001};             ///< 控制周期 [s]
+
+    static constexpr int8_t CST_MODE = 10;  // Cyclic Synchronous Torque
+    static constexpr double kNullspaceDampingLambda = 0.01;  // 阻尼伪逆因子
+};
+
+} // namespace rocos

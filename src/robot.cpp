@@ -763,7 +763,9 @@ namespace rocos {
             new_controller = std::make_unique<JointImpedanceController>();
         } else if (mode == "jnt_admit_teach") {
             new_controller = std::make_unique<JointAdmittanceController>();
-        } else if (mode == "cart_imp" || mode == "ee_admit_teach") {
+        } else if (mode == "cart_imp") {
+            new_controller = std::make_unique<CartesianImpedanceController>();
+        } else if (mode == "ee_admit_teach") {
             log_ptr_->error("SetWorkMode: 暂未实现 '{}'", mode);
             return Result::IllegalParameter;
         } else {

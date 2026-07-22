@@ -46,7 +46,7 @@ int main(int argc, char* argv[]) {
 
     const int    kCycleUs = 1000;          // 控制周期 1ms
     const double kCSPMove = 0.174532925;   // +10°
-    const double kCSTTorque = -6.0;         // Nm (力矩模式施加值)
+    const double kCSTTorque = -36.0;         // Nm (力矩模式施加值)
     const double kCSTDuration = 2.0;       // 力矩模式持续时间 [s]
     const double kMaxVel = 0.5;            // rad/s
     const double kAcc = 2.0;               // rad/s²
@@ -138,9 +138,10 @@ int main(int argc, char* argv[]) {
     int64_t steps = static_cast<int64_t>(total_t * 1e6 / kCycleUs);
 
     auto t0 = std::chrono::steady_clock::now();
+    double frac;
     for (int64_t i = 0; i <= steps; ++i) {
         double t = static_cast<double>(i) * kCycleUs * 1e-6;
-        double frac;
+        
         if (t < t_acc)
             frac = 0.5 * kAcc * t * t / kCSPMove;
         else if (t < t_acc + t_cruise)
@@ -148,10 +149,15 @@ int main(int argc, char* argv[]) {
         else
             frac = 1.0 - 0.5 * kAcc * (total_t - t) * (total_t - t) / kCSPMove;
         hw->SetJointPosition(j2id, start_pos + kCSPMove * frac);
+      
         auto next = t0 + std::chrono::microseconds(
             static_cast<int64_t>((i + 1) * kCycleUs));
         std::this_thread::sleep_until(next);
     }
+      std::cout << "send JointPosition(joint_2) = "
+                  << start_pos + kCSPMove * frac << " rad\n";
+        std::cout << "JointPosition(joint_2) = "
+                  << hw->GetJointPosition(j2id) << " rad\n";
     std::this_thread::sleep_for(std::chrono::milliseconds(200));
     double csp_end = hw->GetJointPosition(j2id);
     std::cout << "  CSP 到位: " << csp_end << " rad ("
