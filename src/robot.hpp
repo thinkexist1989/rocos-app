@@ -358,9 +358,12 @@ class Robot {
  private:
 
   // void controlLoop();                        // 控制线程函数
+  void startControlThread();
+  void stopControlThread();
+  void joinControlThreadIfJoinable();
   std::thread control_thread_;               // 控制线程句柄
-  // std::atomic<bool> control_thread_active_{false};
   std::mutex mtx_;
+  JntArray hold_position_;                    // motion 完成后锁定保持位置
   // 命名坐标系注册表：key 是上位机展示和选择的坐标系 name，value 是对应位姿。
   std::map<std::string, Frame> tool_frames_;
   std::map<std::string, Frame> object_frames_;
@@ -378,6 +381,7 @@ class Robot {
   Logger::logger_ptr log_ptr_ = nullptr;
 
   std::function<Result()> data_ready_callback_ = nullptr;
+  bool boot_reset_to_idle_{true};
   double dt_=0.001;
   //////////FSM Related function (INTERNAL) ///////////////
  public:

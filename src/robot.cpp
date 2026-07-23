@@ -298,7 +298,7 @@ namespace {
                 state<class RESUMING> + event<EventSuccessed> = state<class RUNNING>, //    RESUMING->RUNNING
 
                 state<class RESETTING> + sml::on_entry<_> / action_reset, // 12 RESETTING
-                state<class RESETTING> + event<EventDisabled> = state<class ERROR_STATE>, // RESETTING失败必须保持错误态
+                state<class RESETTING> + event<EventDisabled> = state<class IDLE>, // 启动初始化完成后保持下使能空闲态
                 state<class RESETTING> + event<EventEnabled> = state<class STOPPED>, //    RESETTING->STOPPED
 
 
@@ -352,10 +352,12 @@ namespace rocos {
     void Robot::on_fsm_enable() {
         log_ptr_->info("机器人正在上使能中");
 
-        // IsEnabled();
         setEnabled();
 
         if (IsEnabled()) {
+            hold_position_ = hardware->GetPosition();  // 锁当前位置作为保持参考
+            startControlThread();
+
             log_ptr_->info("机器人上使能成功，准备进入STOPPED状态");
             impl_->process_event(EventEnabled{});
         } else {
@@ -366,9 +368,6 @@ namespace rocos {
 
     void Robot::on_fsm_disable() {
         log_ptr_->info("机器人正在下使能中");
-
-        // IsDisabled();
-
 
         setDisabled();
         if (IsDisabled()) {
@@ -398,19 +397,7 @@ namespace rocos {
         }
 
 
-        if (control_thread_.joinable()) {
-            log_ptr_->info("控制线程已存在，等待其退出");
-            control_thread_.join();
-        }
-        //TODO: 简化为匿名函数，周期循环调用
-        control_thread_ = std::thread([this]() {
-            while (IsControlActive()) {
-                RunCycle();
-                waitControlCycle();
-            }
-        });
-
-
+        // 控制线程已在 on_fsm_enable 中创建，此处直接复用
         impl_->process_event(EventRunning{});
     }
 
@@ -421,7 +408,11 @@ namespace rocos {
 
     void Robot::on_fsm_stop() {
 
-        Result rc = executor->Stop();
+        Result rc = Result::Fatal;
+        {
+            std::lock_guard<std::mutex> lock(mtx_);
+            rc = executor->Stop();
+        }
         if (rc == Result::NoError) {
             log_ptr_->info("机器人停止成功，准备进入Stopped状态");
         } else {
@@ -433,7 +424,11 @@ namespace rocos {
 
     void Robot::on_fsm_pause() {
         // PAUSING 进入：确认暂停并转入 PAUSED。
-        Result rc = executor->Pause();
+        Result rc = Result::Fatal;
+        {
+            std::lock_guard<std::mutex> lock(mtx_);
+            rc = executor->Pause();
+        }
         if (rc == Result::NoError) {
             log_ptr_->info("机器人暂停成功，准备进入PAUSED状态");
         } else {
@@ -446,7 +441,11 @@ namespace rocos {
 
     void Robot::on_fsm_resume() {
         // CONTINUING 进入：确认继续并转回 RUNNING。
-        Result rc = executor->Resume();
+        Result rc = Result::Fatal;
+        {
+            std::lock_guard<std::mutex> lock(mtx_);
+            rc = executor->Resume();
+        }
         if (rc == Result::NoError) {
             log_ptr_->info("机器人继续成功，准备进入RUNNING状态");
             impl_->process_event(EventRunning{});
@@ -457,25 +456,39 @@ namespace rocos {
     void Robot::on_fsm_reset() {
         log_ptr_->info("机器人进入RESETTING，开始清除报警并重新建立使能状态");
 
-        if (control_thread_.joinable() &&
-            control_thread_.get_id() != std::this_thread::get_id()) {
-            log_ptr_->info("ResetFault等待控制线程退出");
-            control_thread_.join();
+        if (boot_reset_to_idle_) {
+            boot_reset_to_idle_ = false;
+            setDisabled();
+            if (IsDisabled()) {
+                log_ptr_->info("机器人启动初始化完成，保持IDLE状态");
+                impl_->process_event(EventDisabled{});
+            } else {
+                log_ptr_->error("机器人启动初始化下使能失败，进入ERROR_STATE");
+                impl_->process_event(EventErrorOccurred{});
+            }
+            return;
         }
 
-        if (motion) {
-            const Result motion_reset = motion->Reset();
-            if (motion_reset != Result::NoError && motion_reset != Result::PlanFinished) {
-                log_ptr_->warn("ResetFault重置当前motion返回: {}", static_cast<int>(motion_reset));
+        bool controller_reset_failed = false;
+        {
+            std::lock_guard<std::mutex> lock(mtx_);
+            if (motion) {
+                const Result motion_reset = motion->Reset();
+                if (motion_reset != Result::NoError && motion_reset != Result::PlanFinished) {
+                    log_ptr_->warn("ResetFault重置当前motion返回: {}", static_cast<int>(motion_reset));
+                }
+                motion.reset();
+                if (executor) {
+                    executor->SwitchMotion(nullptr);
+                }
             }
-            motion.reset();
-            if (executor) {
-                executor->SwitchMotion(nullptr);
+
+            if (controller && !controller->Reset()) {
+                log_ptr_->error("ResetFault重置控制器失败，保持ERROR_STATE");
+                controller_reset_failed = true;
             }
         }
-
-        if (controller && !controller->Reset()) {
-            log_ptr_->error("ResetFault重置控制器失败，保持ERROR_STATE");
+        if (controller_reset_failed) {
             impl_->process_event(EventErrorOccurred{});
             return;
         }
@@ -497,6 +510,7 @@ namespace rocos {
         if (IsEnabled()) {
             log_ptr_->info("ResetFault成功，机器人已经使能，准备进入STOPPED状态");
             impl_->process_event(EventEnabled{}); // 模拟初始化成功事件
+            startControlThread();
         } else {
             log_ptr_->error("ResetFault后重新使能失败，保持ERROR_STATE");
             impl_->process_event(EventErrorOccurred{});
@@ -508,6 +522,35 @@ namespace rocos {
     }
 
 #pragma endregion
+
+    void Robot::startControlThread() {
+        if (control_thread_.joinable()) {
+            log_ptr_->warn("控制线程对象仍为joinable，跳过重复启动");
+            return;
+        }
+
+        control_thread_ = std::thread([this]() {
+            while (IsControlActive()) {
+                RunCycle();
+                waitControlCycle();
+            }
+        });
+    }
+
+    void Robot::stopControlThread() {
+        joinControlThreadIfJoinable();
+    }
+
+    void Robot::joinControlThreadIfJoinable() {
+        if (!control_thread_.joinable()) {
+            return;
+        }
+        if (control_thread_.get_id() == std::this_thread::get_id()) {
+            log_ptr_->warn("控制线程尝试join自身，跳过");
+            return;
+        }
+        control_thread_.join();
+    }
 
 
     Robot::Robot() : impl_(std::make_unique<Impl>(*this)) {
@@ -611,9 +654,12 @@ namespace rocos {
     }
 
     Robot::~Robot() {
-        if (control_thread_.joinable()) {
-            control_thread_.join();
+        if (control_thread_.joinable() &&
+            !impl_->is(sml::state<class IDLE>) &&
+            !impl_->is(sml::state<class ERROR_STATE>)) {
+            impl_->process_event(EventErrorOccurred{});
         }
+        joinControlThreadIfJoinable();
 
         // Delete logger pointer
         if (log_ptr_) {
@@ -706,6 +752,11 @@ namespace rocos {
 
     Result Robot::SetEnabled() {
         log_ptr_->info("收到上使能指令");
+        if (impl_->is(sml::state<class IDLE>) ||
+            impl_->is(sml::state<class ERROR_STATE>)) {
+            stopControlThread();
+        }
+
         if (!impl_->process_event(EventEnableReq{})) {
             log_ptr_->error("当前状态无法执行上使能指令");
             return Result::JointStateError;
@@ -721,6 +772,11 @@ namespace rocos {
             return Result::JointStateError;
         }
 
+        if (impl_->is(sml::state<class IDLE>) ||
+            impl_->is(sml::state<class ERROR_STATE>)) {
+            stopControlThread();
+        }
+
         return Result::NoError;
     }
 
@@ -730,6 +786,8 @@ namespace rocos {
             log_ptr_->error("当前状态不是ERROR_STATE，拒绝ResetFault: {}", GetStateString());
             return Result::JointStateError;
         }
+
+        stopControlThread();
 
         if (!impl_->process_event(EventResetReq{})) {
             log_ptr_->error("ResetFault状态机事件被拒绝，当前状态: {}", GetStateString());
@@ -752,8 +810,6 @@ namespace rocos {
             return Result::IllegalParameter;
         }
 
-
-        controller = nullptr; // 先释放旧 controller，确保切换时不会同时存在两个 controller
 
         std::unique_ptr<ControllerInterface> new_controller;
 
@@ -785,16 +841,21 @@ namespace rocos {
             return rc;
         }
 
-        // 调用 SetReady 准备控制器（同步硬件 + 安全初始指令）
-        rc = new_controller->SetReady();
-        if (rc != Result::NoError) {
-            log_ptr_->error("SetWorkMode: SetReady 失败, mode={}", mode);
-            return rc;
-        }
+        {
+            std::lock_guard<std::mutex> lock(mtx_);
 
-        // 旧 controller 析构时自动执行安全兜底（WaitForSignal → SetPosition=curr → SetMode=CSP）
-        controller = std::move(new_controller);
-        executor->SwitchController(controller.get());
+            // 先释放旧 controller（析构安全兜底: SetPosition=curr → SetMode=CSP）
+            // 再 SetReady 新 controller（覆盖为正确的模式: CST / CSP 等）
+            controller.reset();
+            rc = new_controller->SetReady();
+            if (rc != Result::NoError) {
+                log_ptr_->error("SetWorkMode: SetReady 失败, mode={}", mode);
+                return rc;
+            }
+            controller = std::move(new_controller);
+            executor->SwitchController(controller.get());
+            hold_position_ = hardware->GetPosition();  // 切换控制器时更新保持位置
+        }
 
         log_ptr_->info("SetWorkMode: 成功切换到模式 '{}'", mode);
         return Result::NoError;
@@ -816,15 +877,20 @@ namespace rocos {
     }
 
     bool Robot::IsControlActive() const {
-        return impl_->is(sml::state<class RUNNING>)
+        return impl_->is(sml::state<class ENABLING>)
+               || impl_->is(sml::state<class RUNNING>)
                || impl_->is(sml::state<class PAUSING>)
                || impl_->is(sml::state<class PAUSED>)
                || impl_->is(sml::state<class RESUMING>)
-               || impl_->is(sml::state<class STOPPING>);
+               || impl_->is(sml::state<class STOPPING>)
+               || impl_->is(sml::state<class DISABLING>)
+               || impl_->is(sml::state<class STOPPED>)
+               || impl_->is(sml::state<class STARTING>);
     }
 
     bool Robot::IsMotionBusy() const {
-        return impl_->is(sml::state<class STARTING>) || IsControlActive();
+        return impl_->is(sml::state<class STARTING>)
+            || (IsControlActive() && !impl_->is(sml::state<class STOPPED>));
     }
 
     Result Robot::WaitMove() {
@@ -886,30 +952,83 @@ namespace rocos {
 
     // ============================================================================
     // RunCycle：控制循环主函数，1000Hz 调用
+    //
+    // 解耦为两层：
+    //   伺服层 — 始终运行（STOPPED 也跑），控制器持续更新硬件指令
+    //            无 motion 时以当前位置为参考，阻抗/导纳控制器自然退化为阻尼+重力补偿
+    //   运动层 — 仅在有活跃 motion 时推进，完成后清理 motion 并发送 EventSuccessed
     // ============================================================================
 
     void Robot::RunCycle() {
-        if (!motion) return;
+        enum class PendingEvent {
+            None,
+            Error,
+            Success
+        };
 
-        // 推进 motion 状态
-        const Result r = motion->Update();
+        PendingEvent pending_event = PendingEvent::None;
+        const bool paused = impl_->is(sml::state<class PAUSED>);
 
-        // ① 错误优先 —— 任何异常立即进入 ERROR_STATE
-        if (static_cast<int>(r) < 0) {
-          impl_->process_event(EventErrorOccurred{});
-          return;
+        {
+            std::lock_guard<std::mutex> lock(mtx_);
+
+            Result motion_result = Result::NoError;
+            if (motion) {
+                motion_result = motion->Update();
+                if (static_cast<int>(motion_result) < 0) {
+                    pending_event = PendingEvent::Error;
+                }
+            }
+
+            if (pending_event == PendingEvent::None && controller && hardware) {
+                Reference ref;
+                if (motion) {
+                    // 有运动 → 先推进规划器，再下发本周期更新后的参考。
+                    const Result ref_result = motion->GenerateRef(ref);
+                    if (static_cast<int>(ref_result) < 0) {
+                        pending_event = PendingEvent::Error;
+                    }
+                } else {
+                    ref = hold_position_;
+                }
+
+                if (pending_event == PendingEvent::None) {
+                    JntArray q_cmd;
+                    Result cmd_result = controller->GenerateCmd(ref, q_cmd);
+                    if (static_cast<int>(cmd_result) < 0) {
+                        pending_event = PendingEvent::Error;
+                    } else {
+                        cmd_result = controller->UpdateCmd(q_cmd);
+                        if (static_cast<int>(cmd_result) < 0) {
+                            pending_event = PendingEvent::Error;
+                        }
+                    }
+                }
+            }
+
+            // 运动完成且未处于暂停态 → 锁定当前位置 → 清理 motion → 进入 STOPPED
+            // 伺服层继续运行，以锁定位置为参考保持位姿
+            if (pending_event == PendingEvent::None &&
+                motion &&
+                motion_result == Result::PlanFinished &&
+                !paused) {
+                hold_position_ = hardware->GetPosition();  // 锁住，不让阻抗漂移
+                motion.reset();
+                if (executor) {
+                    executor->SwitchMotion(nullptr);
+                }
+                pending_event = PendingEvent::Success;
+            }
         }
 
-        // ② 正常执行 —— 参考 → 控制 → 硬件
-        if (static_cast<int>(executor->Update()) < 0) {
+        if (pending_event == PendingEvent::Error) {
             impl_->process_event(EventErrorOccurred{});
             return;
         }
 
-      // ③ 运动完成且未处于暂停态，说明到达目标位置了，发送EventSuccessed事件，进入STOPPED（注意EventAtTarget不行，因为STOPPING不支持）
-      if (r == Result::PlanFinished && !impl_->is(sml::state<class PAUSED>)) {
-        impl_->process_event(EventSuccessed{});
-      }
+        if (pending_event == PendingEvent::Success) {
+            impl_->process_event(EventSuccessed{});
+        }
     }
 
     // ============================================================================
@@ -933,9 +1052,11 @@ namespace rocos {
             Result rc = new_motion->Reset();
             if (rc != Result::NoError) return rc;
 
-            motion = std::move(new_motion); // unique_ptr会自动清理旧对象，只需要在析构中处理资源清理即可
-
-            executor->SwitchMotion(motion.get());
+            {
+                std::lock_guard<std::mutex> lock(mtx_);
+                motion = std::move(new_motion); // unique_ptr会自动清理旧对象，只需要在析构中处理资源清理即可
+                executor->SwitchMotion(motion.get());
+            }
             return Result::NoError;
         };
         if (impl_->process_event(EventStartReq{})) {
@@ -948,7 +1069,7 @@ namespace rocos {
                 log_ptr_->error("机器人处于ERROR_STATE状态，无法执行MoveJ指令，请先复位");
                 return Result::Fatal;
             } else {
-                log_ptr_->error("机器人当前状态无法执行MoveJ指令");
+                log_ptr_->error("机器人当前状态无法执行MoveJ指令, 当前状态: {}", GetStateString());
                 return Result::ConflictTaskRunning;
             }
         }
@@ -1001,9 +1122,11 @@ namespace rocos {
             // Result rc = new_motion->Reset();
             if (rc != Result::NoError) return rc;
 
-            motion = std::move(new_motion);
-
-            executor->SwitchMotion(motion.get());
+            {
+                std::lock_guard<std::mutex> lock(mtx_);
+                motion = std::move(new_motion);
+                executor->SwitchMotion(motion.get());
+            }
             return Result::NoError;
 
             log_ptr_->error("executor is nullptr");
@@ -1278,8 +1401,11 @@ namespace rocos {
             Result rc = new_motion->Reset();
             if (rc != Result::NoError) return rc;
 
-            motion = std::move(new_motion);
-            executor->SwitchMotion(motion.get());
+            {
+                std::lock_guard<std::mutex> lock(mtx_);
+                motion = std::move(new_motion);
+                executor->SwitchMotion(motion.get());
+            }
             return Result::NoError;
         };
 
@@ -1311,8 +1437,11 @@ namespace rocos {
             Result rc = new_motion->Reset();
             if (rc != Result::NoError) return rc;
 
-            motion = std::move(new_motion);
-            executor->SwitchMotion(motion.get());
+            {
+                std::lock_guard<std::mutex> lock(mtx_);
+                motion = std::move(new_motion);
+                executor->SwitchMotion(motion.get());
+            }
             return Result::NoError;
         };
 
@@ -1326,8 +1455,11 @@ namespace rocos {
 
     Result Robot::PauseMotion() {
         //TODO: 直接判断是否支持暂停，不支持直接忽略请求
-        if (!executor->CanPause()) {
-            return Result::FunctionNotSupported;
+        {
+            std::lock_guard<std::mutex> lock(mtx_);
+            if (!executor->CanPause()) {
+                return Result::FunctionNotSupported;
+            }
         }
 
         if (!impl_->process_event(EventPauseReq{})) {
@@ -1340,8 +1472,11 @@ namespace rocos {
 
     Result Robot::StopMotion() {
         //TODO: 直接判断是否支持停止，不支持直接忽略，但应该都需要支持，所以后续要删掉
-        if (!executor->CanStop()) {
-            return Result::FunctionNotSupported;
+        {
+            std::lock_guard<std::mutex> lock(mtx_);
+            if (!executor->CanStop()) {
+                return Result::FunctionNotSupported;
+            }
         }
 
         if (!impl_->process_event(EventStopReq{})) {
@@ -1353,8 +1488,11 @@ namespace rocos {
 
     Result Robot::ResumeMotion() {
         //TODO: 直接判断是否支持恢复，不支持直接忽略请求
-        if (!executor->CanResume()) {
-            return Result::FunctionNotSupported;
+        {
+            std::lock_guard<std::mutex> lock(mtx_);
+            if (!executor->CanResume()) {
+                return Result::FunctionNotSupported;
+            }
         }
 
         if (!impl_->process_event(EventResumeReq{})) {
@@ -1410,13 +1548,20 @@ namespace rocos {
     Result Robot::MoveJogging(const JogVec &direction, double speed,
                               double timeout, double dir_threshold) {
         // ── 分支 1：已有活跃 MoveJog → 旁路喂饭 ──
-        if (auto *jog = dynamic_cast<MoveJog *>(motion.get())) {
-            const Result rc = jog->FeedJog(direction, speed);
-            if (rc == Result::NoError) return rc;
+        {
+            std::lock_guard<std::mutex> lock(mtx_);
+            if (auto *jog = dynamic_cast<MoveJog *>(motion.get())) {
+                const Result rc = jog->FeedJog(direction, speed);
+                if (rc == Result::NoError) return rc;
+            }
         }
 
         // ── 分支 2：其他 motion 正在运行 → 拒绝 ──
-        if (motion && IsRunning()) return Result::ConflictTaskRunning;
+        const bool running = IsRunning();
+        {
+            std::lock_guard<std::mutex> lock(mtx_);
+            if (motion && running) return Result::ConflictTaskRunning;
+        }
 
         // ── 分支 3：全新启动 ──
         data_ready_callback_ = [this, direction, speed, timeout,
@@ -1434,9 +1579,11 @@ namespace rocos {
                     rc = new_jog->FeedJog(direction, speed);
                     if (rc != Result::NoError) return rc;
 
-                    motion = std::move(new_jog);
-
-                    executor->SwitchMotion(motion.get());
+                    {
+                        std::lock_guard<std::mutex> lock(mtx_);
+                        motion = std::move(new_jog);
+                        executor->SwitchMotion(motion.get());
+                    }
                     return Result::NoError;
 
                     log_ptr_->error("executor is nullptr");
@@ -1458,13 +1605,20 @@ namespace rocos {
     Result Robot::MoveNullJogging(const JntArray &intent_direction, double speed,
                                   double timeout, double dir_threshold) {
         // ── 分支 1：已有活跃 MoveNullJog → 旁路喂饭 ──
-        if (auto *jog = dynamic_cast<MoveNullJog *>(motion.get())) {
-            const Result rc = jog->FeedNullJog(intent_direction, speed);
-            if (rc == Result::NoError) return rc;
+        {
+            std::lock_guard<std::mutex> lock(mtx_);
+            if (auto *jog = dynamic_cast<MoveNullJog *>(motion.get())) {
+                const Result rc = jog->FeedNullJog(intent_direction, speed);
+                if (rc == Result::NoError) return rc;
+            }
         }
 
         // ── 分支 2：其他 motion 正在运行 → 拒绝 ──
-        if (motion && IsRunning()) return Result::ConflictTaskRunning;
+        const bool running = IsRunning();
+        {
+            std::lock_guard<std::mutex> lock(mtx_);
+            if (motion && running) return Result::ConflictTaskRunning;
+        }
 
         // ── 分支 3：全新启动 ──
         data_ready_callback_ = [this, intent_direction, speed, timeout, dir_threshold]() -> Result {
@@ -1482,9 +1636,11 @@ namespace rocos {
             rc = new_jog->FeedNullJog(intent_direction, speed);
             if (rc != Result::NoError) return rc;
 
-            motion = std::move(new_jog);
-
-            executor->SwitchMotion(motion.get());
+            {
+                std::lock_guard<std::mutex> lock(mtx_);
+                motion = std::move(new_jog);
+                executor->SwitchMotion(motion.get());
+            }
             return Result::NoError;
 
             log_ptr_->error("executor is nullptr");
@@ -1507,13 +1663,20 @@ namespace rocos {
     Result Robot::MoveSvdJogging(const std::vector<double> &dim_speeds,
                                  double timeout, double dir_threshold) {
         // ── 分支 1：已有活跃 MoveSvdJog → 旁路喂饭 ──
-        if (auto *jog = dynamic_cast<MoveSvdJog *>(motion.get())) {
-            const Result rc = jog->FeedSvdJog(dim_speeds);
-            if (rc == Result::NoError) return rc;
+        {
+            std::lock_guard<std::mutex> lock(mtx_);
+            if (auto *jog = dynamic_cast<MoveSvdJog *>(motion.get())) {
+                const Result rc = jog->FeedSvdJog(dim_speeds);
+                if (rc == Result::NoError) return rc;
+            }
         }
 
         // ── 分支 2：其他 motion 正在运行 → 拒绝 ──
-        if (motion && IsRunning()) return Result::ConflictTaskRunning;
+        const bool running = IsRunning();
+        {
+            std::lock_guard<std::mutex> lock(mtx_);
+            if (motion && running) return Result::ConflictTaskRunning;
+        }
 
         // ── 分支 3：全新启动 ──
         data_ready_callback_ = [this, dim_speeds, timeout, dir_threshold]() -> Result {
@@ -1531,9 +1694,11 @@ namespace rocos {
             rc = new_jog->FeedSvdJog(dim_speeds);
             if (rc != Result::NoError) return rc;
 
-            motion = std::move(new_jog);
-
-            executor->SwitchMotion(motion.get());
+            {
+                std::lock_guard<std::mutex> lock(mtx_);
+                motion = std::move(new_jog);
+                executor->SwitchMotion(motion.get());
+            }
             return Result::NoError;
 
             log_ptr_->error("executor is nullptr");

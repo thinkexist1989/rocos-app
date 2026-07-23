@@ -68,7 +68,7 @@ private:
     JntArray tau_offset_;    // 关节力矩零飘 [Nm]
     double dt_{0.001};       // 控制周期 [s]
 
-    static constexpr double kDefaultStiffness = 100.0;   // Nm/rad
+    static constexpr double kDefaultStiffness = 500.0;   // Nm/rad
     static constexpr double kDefaultDamping  = 20.0;     // Nm·s/rad
     static constexpr double kDefaultInertia  = 1.0;      // kg·m²
     static constexpr int8_t CST_MODE = 10;               // Cyclic Synchronous Torque

@@ -40,6 +40,12 @@ std::unique_ptr<rocos::Robot> makeRobotInState(const std::string& target) {
         if (robot->GetStateString() == target) {
             return robot;
         }
+        if (target == "STOPPED" && robot->GetStateString() == "IDLE") {
+            (void)robot->SetEnabled();
+            if (robot->GetStateString() == target) {
+                return robot;
+            }
+        }
     }
     return nullptr;
 }
@@ -66,12 +72,12 @@ std::unique_ptr<rocos::Robot> makeRobotInErrorState() {
 
 }  // namespace
 
-TEST_CASE("Robot FSM - 构造后经 RESETTING 进入 STOPPED 或 IDLE") {
-    // 构造器发出 EventResetReq，RESETTING 内的 on_fsm_reset() 根据
-    // randomBool() 结果发出 EventEnabled(→STOPPED) 或 EventDisabled(→IDLE)。
+TEST_CASE("Robot FSM - 构造后经 RESETTING 进入 IDLE") {
+    // 构造器发出 EventResetReq，但启动初始化只建立 disabled 空闲态；
+    // 故障复位仍由 ResetFault() 负责重新上使能并回到 STOPPED。
     rocos::Robot robot;
     const auto state = robot.GetStateString();
-    CHECK((state == "STOPPED" || state == "IDLE"));
+    CHECK(state == "IDLE");
     CHECK_FALSE(robot.IsRunning());
 }
 
