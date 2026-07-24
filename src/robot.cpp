@@ -643,9 +643,9 @@ namespace rocos {
     }
 
 
-    Robot::Robot() : impl_(std::make_unique<Impl>(*this)) {
-        log_ptr_ = Logger::getInstance("Robot");
-
+    Robot::Robot()
+        : log_ptr_(Logger::getInstance("Robot")),
+          impl_(std::make_unique<Impl>(*this)) {
         executor = std::make_unique<Executor>();
 
         hardware = std::make_unique<Hardware>("hardware_talon_config.yaml", 0); //TODO: 初始化Hardware指针，后续路径需要从配置文件加载
@@ -660,8 +660,11 @@ namespace rocos {
         motion = std::make_unique<MoveHold>(hardware->GetPosition());
         executor->SwitchMotion(motion.get());
 
-
-        SetWorkMode("position");
+        const Result work_mode_result = SetWorkMode("position");
+        if (work_mode_result != Result::NoError) {
+          log_ptr_->error("机器人默认工作模式初始化失败: {}", static_cast<int>(work_mode_result));
+          throw std::runtime_error("Robot default work mode initialization failed");
+        }
 
         log_ptr_->info("机器人开始初始化");
         impl_->process_event(EventResetReq{}); // 进入初始化状态
@@ -821,7 +824,11 @@ namespace rocos {
 
     Result Robot::SetWorkMode(const std::string& mode) {
         // 仅允许在 IDLE 或 STOPPED 状态下切换控制器
-        if (!impl_->is(sml::state<class IDLE>) && !impl_->is(sml::state<class STOPPED>)) {
+        const bool is_switchable_state =
+            impl_->is(sml::state<class IDLE>) ||
+            impl_->is(sml::state<class STOPPED>) ||
+            impl_->is(sml::state<class ERROR_STATE>); // 允许在 ERROR_STATE 下切换控制器，以便恢复
+        if (!is_switchable_state) {
             log_ptr_->error("SetWorkMode 只能在 IDLE 或 STOPPED 状态下调用, 当前状态: {}",
                             GetStateString());
             return Result::IllegalParameter;
@@ -861,16 +868,47 @@ namespace rocos {
         {
             std::lock_guard<std::mutex> lock(mtx_);
 
-            // 先释放旧 controller（析构安全兜底: SetPosition=curr → SetMode=CSP）
-            // 再 SetReady 新 controller（覆盖为正确的模式: CST / CSP 等）
+            if (!executor->SwitchController(nullptr)) {
+                log_ptr_->error("SetWorkMode: 清空 Executor Controller 失败, mode={}", mode);
+                return Result::Fatal;
+            }
             controller.reset();
+
             rc = new_controller->SetReady();
             if (rc != Result::NoError) {
                 log_ptr_->error("SetWorkMode: SetReady 失败, mode={}", mode);
+
+                auto fallback_controller = std::make_unique<PositionController>();
+                Result fallback_rc = fallback_controller->SetHardware(hardware.get());
+                if (fallback_rc != Result::NoError) {
+                    log_ptr_->error("SetWorkMode: fallback SetHardware 失败");
+                    return rc;
+                }
+
+                fallback_rc = fallback_controller->SetModel(model.get());
+                if (fallback_rc != Result::NoError) {
+                    log_ptr_->error("SetWorkMode: fallback SetModel 失败");
+                    return rc;
+                }
+
+                fallback_rc = fallback_controller->SetReady();
+                if (fallback_rc != Result::NoError) {
+                    log_ptr_->error("SetWorkMode: fallback SetReady 失败");
+                    return rc;
+                }
+
+                controller = std::move(fallback_controller);
+                if (!executor->SwitchController(controller.get())) {
+                    log_ptr_->error("SetWorkMode: fallback SwitchController 失败");
+                    return Result::Fatal;
+                }
                 return rc;
             }
             controller = std::move(new_controller);
-            executor->SwitchController(controller.get());
+            if (!executor->SwitchController(controller.get())) {
+                log_ptr_->error("SetWorkMode: SwitchController 失败, mode={}", mode);
+                return Result::Fatal;
+            }
         }
 
         log_ptr_->info("SetWorkMode: 成功切换到模式 '{}'", mode);

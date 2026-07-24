@@ -375,11 +375,12 @@ class Robot {
   std::unique_ptr<JointBinding> joint_binding_;
   std::string joint_binding_path_{"joint_binding.yaml"};
 
+  Logger::logger_ptr log_ptr_ = nullptr;
+
   //// 机器人状态机封装
   struct Impl;
   std::unique_ptr<Impl> impl_;
 
-  Logger::logger_ptr log_ptr_ = nullptr;
 
   std::function<Result()> data_ready_callback_ = nullptr;
 
