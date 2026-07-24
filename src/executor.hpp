@@ -48,24 +48,21 @@ namespace rocos {
 
         inline Result Stop() {
             if (motion_) {
-                Result rc = motion_->Stop();
-                return rc;
+                return motion_->Stop();
             } else
                 return Result::Fatal;
         }
 
         inline Result Resume() {
             if (motion_) {
-                Result rc = motion_->Resume();
-                return rc;
+                return motion_->Resume();
             } else
                 return Result::Fatal;
         }
 
         inline Result Pause() {
             if (motion_) {
-                Result rc = motion_->Pause();
-                return rc;
+                return motion_->Pause();
             } else
                 return Result::Fatal;
         }

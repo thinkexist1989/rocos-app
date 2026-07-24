@@ -386,27 +386,29 @@ class Robot {
   double dt_=0.001;
   //////////FSM Related function (INTERNAL) ///////////////
  public:
-  void on_fsm_reset();
+  void on_fsm_resetting();
 
-  void on_fsm_enable();
+  void on_fsm_enabling();
 
-  void on_fsm_disable();
+  void on_fsm_disabling();
 
-  void on_fsm_start();
+  void on_fsm_starting();
 
-  void on_fsm_run();
+  void on_fsm_running();
 
-  void on_fsm_stop();
+  void on_fsm_stopping();
 
-  void on_fsm_pause();
+  void on_fsm_pausing();
 
-  void on_fsm_resume();
+  void on_fsm_resuming();
 
   void on_fsm_identify();
 
-  void on_fsm_servo();
+  void on_fsm_servoing();
 
   void on_fsm_error();
+
+  void on_fsm_stopped();
 
 
   //////////测试用///////////

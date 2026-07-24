@@ -19,32 +19,30 @@
 
 #include "robot.hpp"
 
-#include <boost/sml.hpp>
-#include <kdl_parser/kdl_parser.hpp>  // 用于将urdf文件解析为KDL::Tree
 #include <yaml-cpp/yaml.h>
 
-#include <chrono>
+#include <boost/sml.hpp>
 #include <cctype>
+#include <chrono>
 #include <fstream>
+#include <kdl_parser/kdl_parser.hpp>  // 用于将urdf文件解析为KDL::Tree
 #include <sstream>
 
+#include "cartesian_impedance_controller.hpp"
 #include "hardware.hpp"
-
-#include "move_joint.hpp"
-#include "move_line.hpp"           // v3.0 保留，原有在线规划版本
-#include "move_line_offline.hpp"   // v3.0 离线规划 + 全轨迹 IK 验证版本
+#include "joint_admittance_controller.hpp"
+#include "joint_impedance_controller.hpp"
+#include "model.hpp"
 #include "move_circle.hpp"
 #include "move_circle_offline.hpp"  // v3.0 离线圆弧规划 + 全轨迹 IK 验证版本
+#include "move_hold.hpp"
 #include "move_jog.hpp"
+#include "move_joint.hpp"
+#include "move_line.hpp"          // v3.0 保留，原有在线规划版本
+#include "move_line_offline.hpp"  // v3.0 离线规划 + 全轨迹 IK 验证版本
 #include "move_null_jog.hpp"
 #include "move_svd_jog.hpp"
-
 #include "position_controller.hpp"
-#include "joint_impedance_controller.hpp"
-#include "joint_admittance_controller.hpp"
-#include "cartesian_impedance_controller.hpp"
-#include "model.hpp"
-
 
 namespace {
     // 状态定义
@@ -226,15 +224,16 @@ namespace {
 
     namespace sml = boost::sml;
 
-    const auto action_start = [](rocos::Robot &robot) { robot.on_fsm_start(); };
-    const auto action_run = [](rocos::Robot &robot) { robot.on_fsm_run(); }; //TODO：目前没有任何处理
-    const auto action_pause = [](rocos::Robot &robot) { robot.on_fsm_pause(); };
-    const auto action_resume = [](rocos::Robot &robot) { robot.on_fsm_resume(); };
-    const auto action_stop = [](rocos::Robot &robot) { robot.on_fsm_stop(); };
-    const auto action_reset = [](rocos::Robot &robot) { robot.on_fsm_reset(); };
-    const auto action_enable = [](rocos::Robot &robot) { robot.on_fsm_enable(); };
-    const auto action_disable = [](rocos::Robot &robot) { robot.on_fsm_disable(); };
-    const auto action_servo = [](rocos::Robot &robot) { robot.on_fsm_servo(); };
+    const auto action_stopped = [](rocos::Robot &robot) { robot.on_fsm_stopped(); };
+    const auto action_starting = [](rocos::Robot &robot) { robot.on_fsm_starting(); };
+    const auto action_running = [](rocos::Robot &robot) { robot.on_fsm_running(); }; //TODO：目前没有任何处理
+    const auto action_pausing = [](rocos::Robot &robot) { robot.on_fsm_pausing(); };
+    const auto action_resuming = [](rocos::Robot &robot) { robot.on_fsm_resuming(); };
+    const auto action_stopping = [](rocos::Robot &robot) { robot.on_fsm_stopping(); };
+    const auto action_resetting = [](rocos::Robot &robot) { robot.on_fsm_resetting(); };
+    const auto action_enabling = [](rocos::Robot &robot) { robot.on_fsm_enabling(); };
+    const auto action_disabling = [](rocos::Robot &robot) { robot.on_fsm_disabling(); };
+    const auto action_servoing = [](rocos::Robot &robot) { robot.on_fsm_servoing(); };
     const auto action_error = [](rocos::Robot &robot) { robot.on_fsm_error(); }; //TODO: 进入错误状态时的必要处理
 
     struct StateMachine {
@@ -248,11 +247,12 @@ namespace {
 
                 state<class IDLE> + event<EventEnableReq> = state<class ENABLING>, // 1 IDLE->ENABLING
 
+                state<class STOPPED> + sml::on_entry<_> / action_stopped, // 2 STOPPED->DISABLING
                 state<class STOPPED> + event<EventDisableReq> = state<class DISABLING>, // 2 STOPPED->DISABLING
                 state<class STOPPED> + event<EventStartReq> = state<class STARTING>, //   STOPPED->STARING
                 state<class STOPPED> + event<EventServoReq> = state<class SERVOING>, //   STOPPED->SERVOING
 
-                state<class RUNNING> + sml::on_entry<_> / action_run, // 3 RUNNING
+                state<class RUNNING> + sml::on_entry<_> / action_running, // 3 RUNNING
                 state<class RUNNING> + event<EventStopped> = state<class STOPPED>,
                 //todo     EventAtTarget不是必要的应该直接success
                 state<class RUNNING> + event<EventAtTarget> = state<class STOPPED>,
@@ -264,26 +264,26 @@ namespace {
                 state<class PAUSED> + event<EventResumeReq> = state<class RESUMING>, // 4 PAUSED->RESUMING
                 state<class PAUSED> + event<EventStopReq> = state<class STOPPING>, //   PAUSED->STOPPING
 
-                state<class SERVOING> + sml::on_entry<_> / action_servo, // 5 SERVOING
+                state<class SERVOING> + sml::on_entry<_> / action_servoing, // 5 SERVOING
                 state<class SERVOING> + event<EventStopReq> = state<class STOPPING>, //   SERVOING->STOPPING
 
-                state<class ENABLING> + sml::on_entry<_> / action_enable, // 6 ENABLING
+                state<class ENABLING> + sml::on_entry<_> / action_enabling, // 6 ENABLING
                 state<class ENABLING> + event<EventEnabled> = state<class STOPPED>, // 6 ENABLING->STOPPED
 
-                state<class DISABLING> + sml::on_entry<_> / action_disable, // 7 DISABLING
+                state<class DISABLING> + sml::on_entry<_> / action_disabling, // 7 DISABLING
                 state<class DISABLING> + event<EventDisabled> = state<class IDLE>, //   DISABLING->IDLE
 
 
-                state<class STARTING> + sml::on_entry<_> / action_start, // 8 STARTING
+                state<class STARTING> + sml::on_entry<_> / action_starting, // 8 STARTING
                 state<class STARTING> + event<EventAtTarget> = state<class STOPPED>,
                 state<class STARTING> + event<EventStartFailedReq> = state<class STOPPED>,
                 state<class STARTING> + event<EventRunning> = state<class RUNNING>, //   STARTING->RUNNING
 
-                state<class STOPPING> + sml::on_entry<_> / action_stop, // 9 STOPPING
+                state<class STOPPING> + sml::on_entry<_> / action_stopping, // 9 STOPPING
                 state<class STOPPING> + event<EventStopped> = state<class STOPPED>,
                 state<class STOPPING> + event<EventSuccessed> = state<class STOPPED>, //   STOPPING->STOPPED
 
-                state<class PAUSING> + sml::on_entry<_> / action_pause, // 10 PAUSING->RESUMING
+                state<class PAUSING> + sml::on_entry<_> / action_pausing, // 10 PAUSING->RESUMING
                 // TODO                这个地方应该是success
                 state<class PAUSING> + event<EventStopped> = state<class PAUSED>,
                 state<class PAUSING> + event<EventStopReq> = state<class STOPPING>,
@@ -291,12 +291,12 @@ namespace {
                 state<class PAUSING> + event<EventSuccessed> = state<class PAUSED>, //TODO: 为什么需要Successed
                 //   PAUSING->PAUSED
 
-                state<class RESUMING> + sml::on_entry<_> / action_resume, // 11 RESUMING
+                state<class RESUMING> + sml::on_entry<_> / action_resuming, // 11 RESUMING
                 state<class RESUMING> + event<EventRunning> = state<class RUNNING>,
                 state<class RESUMING> + event<EventStopReq> = state<class STOPPING>,
                 state<class RESUMING> + event<EventSuccessed> = state<class RUNNING>, //    RESUMING->RUNNING
 
-                state<class RESETTING> + sml::on_entry<_> / action_reset, // 12 RESETTING
+                state<class RESETTING> + sml::on_entry<_> / action_resetting, // 12 RESETTING
                 state<class RESETTING> + event<EventDisabled> = state<class IDLE>, // 启动初始化完成后保持下使能空闲态
                 state<class RESETTING> + event<EventEnabled> = state<class STOPPED>, //    RESETTING->STOPPED
 
@@ -348,7 +348,7 @@ namespace rocos {
 
 #pragma region 状态机action处理函数
 
-    void Robot::on_fsm_enable() {
+    void Robot::on_fsm_enabling() {
         log_ptr_->info("机器人正在上使能中");
 
         setEnabled();
@@ -364,7 +364,7 @@ namespace rocos {
         }
     }
 
-    void Robot::on_fsm_disable() {
+    void Robot::on_fsm_disabling() {
         log_ptr_->info("机器人正在下使能中");
 
         setDisabled();
@@ -377,7 +377,7 @@ namespace rocos {
         }
     }
 
-    void Robot::on_fsm_start() {
+    void Robot::on_fsm_starting() {
         // 此处确认启动成功并转入 RUNNING。
         auto rc = data_ready_callback_();
         if (rc != Result::NoError) {
@@ -399,12 +399,12 @@ namespace rocos {
         impl_->process_event(EventRunning{});
     }
 
-    void Robot::on_fsm_run() {
+    void Robot::on_fsm_running() {
         log_ptr_->info("Robot is running.");
 
     }
 
-    void Robot::on_fsm_stop() {
+    void Robot::on_fsm_stopping() {
 
         Result rc = Result::Fatal;
         {
@@ -420,7 +420,7 @@ namespace rocos {
 
     }
 
-    void Robot::on_fsm_pause() {
+    void Robot::on_fsm_pausing() {
         // PAUSING 进入：确认暂停并转入 PAUSED。
         Result rc = Result::Fatal;
         {
@@ -437,7 +437,7 @@ namespace rocos {
 
     }
 
-    void Robot::on_fsm_resume() {
+    void Robot::on_fsm_resuming() {
         // CONTINUING 进入：确认继续并转回 RUNNING。
         Result rc = Result::Fatal;
         {
@@ -458,8 +458,20 @@ namespace rocos {
       log_ptr_->info("机器人进入ERROR");
 
     }
+    void Robot::on_fsm_stopped() {
+      log_ptr_->info("机器人进入STOPPED状态");
 
-    void Robot::on_fsm_reset() {
+      {
+        std::lock_guard<std::mutex> lock(mtx_);
+
+        motion = std::make_unique<MoveHold>(hardware->GetPosition());
+        executor->SwitchMotion(motion.get());
+
+      }
+
+    }
+
+    void Robot::on_fsm_resetting() {
         log_ptr_->info("机器人进入RESETTING，开始清除报警并重新建立使能状态");
 
         bool controller_reset_failed = false;
@@ -487,7 +499,7 @@ namespace rocos {
         }
 
         if (hardware) {
-            const Result clear_result = hardware->ClearFault();
+            const Result clear_result = hardware->ClearFault(); //TODO： 这一步会下使能
             if (clear_result != Result::NoError &&
                 clear_result != Result::FunctionNotSupported) {
                 log_ptr_->error("ResetFault清除硬件报警失败: {}", static_cast<int>(clear_result));
@@ -499,7 +511,6 @@ namespace rocos {
             }
         }
 
-        // setEnabled();
         if (IsEnabled()) {
             log_ptr_->info("ResetFault成功，机器人已经使能，准备进入STOPPED状态");
             impl_->process_event(EventEnabled{}); // 模拟初始化成功事件
@@ -510,7 +521,7 @@ namespace rocos {
         }
     }
 
-    void Robot::on_fsm_servo() {
+    void Robot::on_fsm_servoing() {
         log_ptr_->info("Robot is servoing...");
     }
 
@@ -644,8 +655,10 @@ namespace rocos {
 
         dt_=hardware->GetDt()/1000000.0; // 将微秒转换为秒
 
+        executor->SwitchHardware(hardware.get());
 
-
+        motion = std::make_unique<MoveHold>(hardware->GetPosition());
+        executor->SwitchMotion(motion.get());
 
 
         SetWorkMode("position");
@@ -866,11 +879,17 @@ namespace rocos {
 
 
     bool Robot::IsEnabled() const {
+        if (hardware == nullptr) {
+            return false;
+        }
         auto state = hardware->GetState();
         return state == JntState::ENABLED;
     }
 
     bool Robot::IsDisabled() const {
+        if (hardware == nullptr) {
+            return false;
+        }
         auto state = hardware->GetState();
         return state == JntState::DISABLED;
     }
@@ -980,8 +999,6 @@ namespace rocos {
 
     Result Robot::MoveJ(const JntArray &q_goal,
                         double v_limit, double a_limit, double j_limit) {
-        // if (!IsEnabled())   return Result::NotEnabled;
-        // if (motion && IsRunning()) return Result::ConflictTaskRunning;
 
         data_ready_callback_ = [this, q_goal, v_limit, a_limit, j_limit]() -> Result {
             const int n = getJointNum();

@@ -94,9 +94,6 @@ bool Executor::SwitchController(ControllerInterface* new_controller) {
 }
 
 bool Executor::SwitchHardware(HardwareInterface* new_hardware) {
-  if (hardware_)
-        hardware_->Reset(); //对之前的hardware指针进行重置
-
   hardware_ = new_hardware;
   return true;
 }
