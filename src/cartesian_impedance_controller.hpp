@@ -28,21 +28,19 @@ namespace rocos {
 ///   1. 获取当前 q, q̇
 ///   2. FK → 当前笛卡尔位姿 x_cur
 ///   3. J = GetJacobian(q)
-///   4. Δx = diff(x_cur, x_des)              ← 6D 误差 twist（在当前工具系下表达）
+///   4. Δx_base = diff(x_cur, x_des)          ← 6D 误差 twist（基坐标系下，KDL 定义）
 ///   5. v_ee_base = J · q̇                     ← 末端速度 twist（基坐标系）
-///   6. v_ee_cur  = Ad(R_cur^T) · v_ee_base   ← 末端速度 twist（工具系）
-///   7. F_cur = K_p·Δx - K_d·v_ee_cur        ← 阻抗力/力矩（工具系）
-///   8. F_base = Ad(R_cur)^T · F_cur          ← 阻抗力/力矩（基坐标系）
-///   9. τ_imp = J^T · F_base                  ← Jacobian 转置映射到关节力矩
-///  10. τ_null = N · (K_p_null·(q_null_des-q) - K_d_null·q̇)  ← 零空间阻抗
-///      N = I - J#·J 是阻尼伪逆零空间投影矩阵
-///  11. τ_raw = τ_imp + τ_null + τ_grav
+///   6. Δx_tool = Ad_{g^{-1}} · Δx_base       ← 误差变换到工具系
+///   7. v_ee_cur  = Ad_{g^{-1}} · v_ee_base   ← 速度变换到工具系
+///   8. F_cur = K_p·Δx_tool - K_d·v_ee_cur   ← 阻抗力/力矩（工具系）
+///   9. F_base = Ad_g · F_cur                 ← 力/力矩变换回基坐标系
+///  10. τ_imp = J^T · F_base                  ← Jacobian 转置映射到关节力矩
+///  11. τ_raw = τ_imp + τ_grav
 ///  12. Rate limit: |τ_new - τ_prev| ≤ τ_rate_limit · dt
 ///  13. Saturation: clamp(τ_new, -τ_max, +τ_max)
 ///  14. SetTorque(τ_cmd)，CST 模式 (mode=10)
 ///
 /// 阻抗参数在工具系（末端当前坐标系）下定义，使刚度方向对操作者直观。
-/// 零空间阻抗使冗余关节收敛到期望构型，同时不影响末端位姿。
 class CartesianImpedanceController : public ControllerInterface {
 public:
     CartesianImpedanceController() = default;
@@ -65,14 +63,6 @@ public:
     /// @brief 设置笛卡尔转动阻尼 [Nm·s/rad]，默认 10
     Result SetRotationalDamping(double D);
 
-    // ---- 零空间阻抗参数 ----
-    /// @brief 设置零空间关节刚度 [Nm/rad]，默认 50
-    Result SetNullspaceStiffness(double K);
-    /// @brief 设置零空间关节阻尼 [Nm·s/rad]，默认 10
-    Result SetNullspaceDamping(double D);
-    /// @brief 设置零空间期望关节位置（冗余关节收敛目标，如 elbow 优化姿态）
-    Result SetNullspaceReference(const JntArray& q_nullspace);
-
     // ---- 力矩安全参数 ----
     /// @brief 设置力矩变化率限制 [Nm/s]，0 表示不限制，默认 0
     Result SetTorqueRateLimit(double limit);
@@ -87,29 +77,24 @@ private:
     // 笛卡尔位姿
     Frame x_des_;              ///< 期望笛卡尔位姿（每周期由 GenerateCmd 更新）
     bool x_des_valid_{false};  ///< x_des_ 是否已被设置
+    /// 当 x_des_ 来自 Frame（笛卡尔运动）时设为 true，
+    /// 阻止后续 JntArray（hold_position_）覆盖，避免运动结束后放弃剩余跟踪误差
+    bool x_des_from_frame_{false};
 
     // 笛卡尔阻抗增益（工具系）
-    double K_p_lin_{500.0};    ///< 平动刚度 [N/m]
-    double K_p_ang_{50.0};     ///< 转动刚度 [Nm/rad]
-    double K_d_lin_{100.0};    ///< 平动阻尼 [N·s/m]
-    double K_d_ang_{10.0};     ///< 转动阻尼 [Nm·s/rad]
-
-    // 零空间阻抗
-    double K_p_null_{50.0};        ///< 零空间关节刚度 [Nm/rad]
-    double K_d_null_{10.0};        ///< 零空间关节阻尼 [Nm·s/rad]
-    JntArray q_nullspace_des_;     ///< 零空间期望关节位置
-    bool q_nullspace_valid_{false};///< q_nullspace_des_ 是否有效
-    bool q_nullspace_user_set_{false}; ///< 是否由用户显式设置（禁止 GenerateCmd 覆盖）
+    double K_p_lin_{1500.0};    ///< 平动刚度 [N/m]（需足够大以克服关节静摩擦）
+    double K_p_ang_{120.0};     ///< 转动刚度 [Nm/rad]
+    double K_d_lin_{120.0};     ///< 平动阻尼 [N·s/m]
+    double K_d_ang_{15.0};      ///< 转动阻尼 [Nm·s/rad]
 
     // 力矩安全
-    double tau_rate_limit_{0.0};   ///< 力矩变化率限制 [Nm/s]，0=不限制
+    double tau_rate_limit_{200.0};  ///< 力矩变化率限制 [Nm/s]，0=不限制
     double tau_max_{0.0};          ///< 关节力矩饱和值 [Nm]，0=不限制
     JntArray tau_prev_;            ///< 上一周期输出的力矩（用于变化率限制）
     bool tau_prev_valid_{false};   ///< tau_prev_ 是否有效
     double dt_{0.001};             ///< 控制周期 [s]
 
     static constexpr int8_t CST_MODE = 10;  // Cyclic Synchronous Torque
-    static constexpr double kNullspaceDampingLambda = 0.01;  // 阻尼伪逆因子
 };
 
 } // namespace rocos
