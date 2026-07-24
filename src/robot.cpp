@@ -235,8 +235,7 @@ namespace {
     const auto action_enable = [](rocos::Robot &robot) { robot.on_fsm_enable(); };
     const auto action_disable = [](rocos::Robot &robot) { robot.on_fsm_disable(); };
     const auto action_servo = [](rocos::Robot &robot) { robot.on_fsm_servo(); };
-    const auto action_error = [](rocos::Robot &robot) {
-    }; //TODO: 进入错误状态时的必要处理
+    const auto action_error = [](rocos::Robot &robot) { robot.on_fsm_error(); }; //TODO: 进入错误状态时的必要处理
 
     struct StateMachine {
         auto operator()() const noexcept {
@@ -355,7 +354,6 @@ namespace rocos {
         setEnabled();
 
         if (IsEnabled()) {
-            hold_position_ = hardware->GetPosition();  // 锁当前位置作为保持参考
             startControlThread();
 
             log_ptr_->info("机器人上使能成功，准备进入STOPPED状态");
@@ -452,22 +450,17 @@ namespace rocos {
         }
 
     }
+    void Robot::on_fsm_identify() {
+
+    }
+
+    void Robot::on_fsm_error() {
+      log_ptr_->info("机器人进入ERROR");
+
+    }
 
     void Robot::on_fsm_reset() {
         log_ptr_->info("机器人进入RESETTING，开始清除报警并重新建立使能状态");
-
-        if (boot_reset_to_idle_) {
-            boot_reset_to_idle_ = false;
-            setDisabled();
-            if (IsDisabled()) {
-                log_ptr_->info("机器人启动初始化完成，保持IDLE状态");
-                impl_->process_event(EventDisabled{});
-            } else {
-                log_ptr_->error("机器人启动初始化下使能失败，进入ERROR_STATE");
-                impl_->process_event(EventErrorOccurred{});
-            }
-            return;
-        }
 
         bool controller_reset_failed = false;
         {
@@ -506,14 +499,14 @@ namespace rocos {
             }
         }
 
-        setEnabled();
+        // setEnabled();
         if (IsEnabled()) {
             log_ptr_->info("ResetFault成功，机器人已经使能，准备进入STOPPED状态");
             impl_->process_event(EventEnabled{}); // 模拟初始化成功事件
-            startControlThread();
+            startControlThread(); //TODO: 兼容设计，原本在Enabling中启动线程
         } else {
-            log_ptr_->error("ResetFault后重新使能失败，保持ERROR_STATE");
-            impl_->process_event(EventErrorOccurred{});
+          log_ptr_->info("机器人启动初始化完成，保持IDLE状态");
+          impl_->process_event(EventDisabled{});
         }
     }
 
@@ -524,10 +517,8 @@ namespace rocos {
 #pragma endregion
 
     void Robot::startControlThread() {
-        if (control_thread_.joinable()) {
-            log_ptr_->warn("控制线程对象仍为joinable，跳过重复启动");
-            return;
-        }
+
+      stopControlThread();
 
         control_thread_ = std::thread([this]() {
             while (IsControlActive()) {
@@ -552,102 +543,112 @@ namespace rocos {
         control_thread_.join();
     }
 
+    void Robot::jointBinding() {
+      // --- JointBinding 初始化：在 controller 创建之前完成轴绑定 ---
+        const auto model_joint_names = model->GetJointNames();
+        const auto hardware_drive_ids = hardware->GetDriveIds();
+
+        log_ptr_->info(
+            "JointBinding 开始初始化: model joints={} [{}], hw drives={} [{}], "
+            "yaml={}",
+            model_joint_names.size(), joinNames(model_joint_names),
+            hardware_drive_ids.size(), joinDriveIds(hardware_drive_ids),
+            joint_binding_path_);
+
+        joint_binding_ = std::make_unique<JointBinding>();
+        Result rc =
+            joint_binding_->Configure(model_joint_names, hardware_drive_ids);
+        if (rc != Result::NoError) {
+          log_ptr_->error(
+              "JointBinding Configure 失败: model joints={}, hw drives={}",
+              model_joint_names.size(), hardware_drive_ids.size());
+          throw std::runtime_error(
+              "JointBinding Configure failed: model joints=" +
+              std::to_string(model_joint_names.size()) +
+              " hw drives=" + std::to_string(hardware_drive_ids.size()));
+        }
+
+        // 检查 joint_binding.yaml 是否存在
+        std::ifstream binding_file(joint_binding_path_);
+        if (binding_file.good()) {
+          log_ptr_->info("发现 JointBinding YAML，使用显式绑定: {}",
+                         joint_binding_path_);
+          rc = joint_binding_->LoadFromYaml(joint_binding_path_);
+          if (rc != Result::NoError) {
+            log_ptr_->error("JointBinding YAML 加载失败: {}",
+                            joint_binding_path_);
+            throw std::runtime_error("JointBinding LoadFromYaml failed: " +
+                                     joint_binding_path_);
+          }
+        } else {
+          // 无 YAML 时要求 model joint 数量 == hardware drive 数量
+          if (model_joint_names.size() != hardware_drive_ids.size()) {
+            log_ptr_->error(
+                "JointBinding YAML 不存在且数量不匹配: yaml={}, model "
+                "joints={}, hw drives={}",
+                joint_binding_path_, model_joint_names.size(),
+                hardware_drive_ids.size());
+            throw std::runtime_error(
+                "joint_binding.yaml missing and joint/drive count mismatch: "
+                "model=" +
+                std::to_string(model_joint_names.size()) +
+                " hw=" + std::to_string(hardware_drive_ids.size()));
+          }
+          log_ptr_->warn(
+              "JointBinding YAML 不存在，使用默认顺序绑定: model joints={}, hw "
+              "drives={}",
+              model_joint_names.size(), hardware_drive_ids.size());
+          // 自动生成默认顺序绑定
+          for (size_t i = 0; i < model_joint_names.size(); ++i) {
+            joint_binding_->Bind(model_joint_names[i], hardware_drive_ids[i]);
+          }
+        }
+
+        rc = joint_binding_->Validate();
+        if (rc != Result::NoError) {
+          log_ptr_->error("JointBinding Validate 失败: yaml={}",
+                          joint_binding_path_);
+          throw std::runtime_error("JointBinding Validate failed");
+        }
+
+        const auto model_index_to_drive_id =
+            joint_binding_->GetModelIndexToDriveIds();
+        log_ptr_->info(
+            "准备写入 Hardware JointBinding: model_index_to_drive_id=[{}]",
+            joinDriveIds(model_index_to_drive_id));
+        rc = hardware->SetJointBinding(model_index_to_drive_id);
+        if (rc != Result::NoError) {
+          log_ptr_->error(
+              "Hardware SetJointBinding 失败: model_index_to_drive_id=[{}]",
+              joinDriveIds(model_index_to_drive_id));
+          throw std::runtime_error("Hardware SetJointBinding failed");
+        }
+
+        log_ptr_->info(
+            "JointBinding 初始化完成: model joints={}, hw drives={}, "
+            "binding={}",
+            model_joint_names.size(), hardware_drive_ids.size(),
+            joint_binding_path_);
+    }
+
 
     Robot::Robot() : impl_(std::make_unique<Impl>(*this)) {
         log_ptr_ = Logger::getInstance("Robot");
 
+        executor = std::make_unique<Executor>();
+
         hardware = std::make_unique<Hardware>("hardware_talon_config.yaml", 0); //TODO: 初始化Hardware指针，后续路径需要从配置文件加载
         model = std::make_unique<Model>("robot.urdf", "base_link", "link_7"); //TODO：初始化Model指针，后续路径需要从配置文件加载
 
-        // --- JointBinding 初始化：在 controller 创建之前完成轴绑定 ---
-        {
-            const auto model_joint_names = model->GetJointNames();
-            const auto hardware_drive_ids = hardware->GetDriveIds();
+        jointBinding();
 
-            log_ptr_->info("JointBinding 开始初始化: model joints={} [{}], hw drives={} [{}], yaml={}",
-                           model_joint_names.size(), joinNames(model_joint_names),
-                           hardware_drive_ids.size(), joinDriveIds(hardware_drive_ids),
-                           joint_binding_path_);
-
-            joint_binding_ = std::make_unique<JointBinding>();
-            Result rc = joint_binding_->Configure(model_joint_names, hardware_drive_ids);
-            if (rc != Result::NoError) {
-                log_ptr_->error("JointBinding Configure 失败: model joints={}, hw drives={}",
-                                model_joint_names.size(), hardware_drive_ids.size());
-                throw std::runtime_error("JointBinding Configure failed: model joints="
-                    + std::to_string(model_joint_names.size()) + " hw drives="
-                    + std::to_string(hardware_drive_ids.size()));
-            }
-
-            // 检查 joint_binding.yaml 是否存在
-            std::ifstream binding_file(joint_binding_path_);
-            if (binding_file.good()) {
-                log_ptr_->info("发现 JointBinding YAML，使用显式绑定: {}", joint_binding_path_);
-                rc = joint_binding_->LoadFromYaml(joint_binding_path_);
-                if (rc != Result::NoError) {
-                    log_ptr_->error("JointBinding YAML 加载失败: {}", joint_binding_path_);
-                    throw std::runtime_error("JointBinding LoadFromYaml failed: " + joint_binding_path_);
-                }
-            } else {
-                // 无 YAML 时要求 model joint 数量 == hardware drive 数量
-                if (model_joint_names.size() != hardware_drive_ids.size()) {
-                    log_ptr_->error("JointBinding YAML 不存在且数量不匹配: yaml={}, model joints={}, hw drives={}",
-                                    joint_binding_path_, model_joint_names.size(), hardware_drive_ids.size());
-                    throw std::runtime_error(
-                        "joint_binding.yaml missing and joint/drive count mismatch: model="
-                        + std::to_string(model_joint_names.size())
-                        + " hw=" + std::to_string(hardware_drive_ids.size()));
-                }
-                log_ptr_->warn("JointBinding YAML 不存在，使用默认顺序绑定: model joints={}, hw drives={}",
-                               model_joint_names.size(), hardware_drive_ids.size());
-                // 自动生成默认顺序绑定
-                for (size_t i = 0; i < model_joint_names.size(); ++i) {
-                    joint_binding_->Bind(model_joint_names[i], hardware_drive_ids[i]);
-                }
-            }
-            
-            rc = joint_binding_->Validate();
-            if (rc != Result::NoError) {
-                log_ptr_->error("JointBinding Validate 失败: yaml={}", joint_binding_path_);
-                throw std::runtime_error("JointBinding Validate failed");
-            }
-
-            const auto model_index_to_drive_id = joint_binding_->GetModelIndexToDriveIds();
-            log_ptr_->info("准备写入 Hardware JointBinding: model_index_to_drive_id=[{}]",
-                           joinDriveIds(model_index_to_drive_id));
-            rc = hardware->SetJointBinding(model_index_to_drive_id);
-            if (rc != Result::NoError) {
-                log_ptr_->error("Hardware SetJointBinding 失败: model_index_to_drive_id=[{}]",
-                                joinDriveIds(model_index_to_drive_id));
-                throw std::runtime_error("Hardware SetJointBinding failed");
-            }
-
-            log_ptr_->info("JointBinding 初始化完成: model joints={}, hw drives={}, binding={}",
-                           model_joint_names.size(), hardware_drive_ids.size(),
-                           joint_binding_path_);
-        }
         dt_=hardware->GetDt()/1000000.0; // 将微秒转换为秒
-        controller = std::make_unique<PositionController>(); //TODO： 默认加载位置控制器
 
-        Result rc = controller->SetHardware(hardware.get()); //TODO：控制器需要传入硬件指针，可以考虑初始化时导入
 
-        if (rc != Result::NoError) {
-            throw std::runtime_error("PositionController SetHardware failed");
-        }
 
-        rc = controller->SetModel(model.get());
-        if (rc != Result::NoError) {
-            throw std::runtime_error("PositionController SetModel failed");
-        }
 
-        executor = std::make_unique<Executor>(
-            motion.get(),
-            controller.get(),
-            hardware.get());
 
-        // motion = std::make_unique<MoveJoint>();
-        // controller = std::make_unique<PositionController>(); //TODO: 默认加载位置控制器
-
+        SetWorkMode("position");
 
         log_ptr_->info("机器人开始初始化");
         impl_->process_event(EventResetReq{}); // 进入初始化状态
@@ -752,10 +753,12 @@ namespace rocos {
 
     Result Robot::SetEnabled() {
         log_ptr_->info("收到上使能指令");
-        if (impl_->is(sml::state<class IDLE>) ||
-            impl_->is(sml::state<class ERROR_STATE>)) {
-            stopControlThread();
-        }
+
+        //TODO: 代码清理 by think
+        // if (impl_->is(sml::state<class IDLE>) ||
+        //     impl_->is(sml::state<class ERROR_STATE>)) {
+        //     stopControlThread();
+        // }
 
         if (!impl_->process_event(EventEnableReq{})) {
             log_ptr_->error("当前状态无法执行上使能指令");
@@ -772,10 +775,11 @@ namespace rocos {
             return Result::JointStateError;
         }
 
-        if (impl_->is(sml::state<class IDLE>) ||
-            impl_->is(sml::state<class ERROR_STATE>)) {
-            stopControlThread();
-        }
+        //TODO: 代码清理 by think
+        // if (impl_->is(sml::state<class IDLE>) ||
+        //     impl_->is(sml::state<class ERROR_STATE>)) {
+        //     stopControlThread();
+        // }
 
         return Result::NoError;
     }
@@ -787,7 +791,7 @@ namespace rocos {
             return Result::JointStateError;
         }
 
-        stopControlThread();
+        // stopControlThread(); //TODO： 代码清理 by think
 
         if (!impl_->process_event(EventResetReq{})) {
             log_ptr_->error("ResetFault状态机事件被拒绝，当前状态: {}", GetStateString());
@@ -854,7 +858,6 @@ namespace rocos {
             }
             controller = std::move(new_controller);
             executor->SwitchController(controller.get());
-            hold_position_ = hardware->GetPosition();  // 切换控制器时更新保持位置
         }
 
         log_ptr_->info("SetWorkMode: 成功切换到模式 '{}'", mode);
@@ -951,84 +954,24 @@ namespace rocos {
     }
 
     // ============================================================================
-    // RunCycle：控制循环主函数，1000Hz 调用
+    // RunCycle：控制循环主函数
     //
-    // 解耦为两层：
-    //   伺服层 — 始终运行（STOPPED 也跑），控制器持续更新硬件指令
-    //            无 motion 时以当前位置为参考，阻抗/导纳控制器自然退化为阻尼+重力补偿
-    //   运动层 — 仅在有活跃 motion 时推进，完成后清理 motion 并发送 EventSuccessed
     // ============================================================================
 
     void Robot::RunCycle() {
-        enum class PendingEvent {
-            None,
-            Error,
-            Success
-        };
+      Result res = Result::NoError;
+      {
+        std::lock_guard<std::mutex> lock(mtx_);
+        res = executor->Update();
+      }
 
-        PendingEvent pending_event = PendingEvent::None;
-        const bool paused = impl_->is(sml::state<class PAUSED>);
+      if (static_cast<int>(res) < 0) {
+        impl_->process_event(EventErrorOccurred{});
+      }
+      else if (static_cast<int>(res) > 0) {
+        impl_->process_event(EventSuccessed{});
+      }
 
-        {
-            std::lock_guard<std::mutex> lock(mtx_);
-
-            Result motion_result = Result::NoError;
-            if (motion) {
-                motion_result = motion->Update();
-                if (static_cast<int>(motion_result) < 0) {
-                    pending_event = PendingEvent::Error;
-                }
-            }
-
-            if (pending_event == PendingEvent::None && controller && hardware) {
-                Reference ref;
-                if (motion) {
-                    // 有运动 → 先推进规划器，再下发本周期更新后的参考。
-                    const Result ref_result = motion->GenerateRef(ref);
-                    if (static_cast<int>(ref_result) < 0) {
-                        pending_event = PendingEvent::Error;
-                    }
-                } else {
-                    ref = hold_position_;
-                }
-
-                if (pending_event == PendingEvent::None) {
-                    JntArray q_cmd;
-                    Result cmd_result = controller->GenerateCmd(ref, q_cmd);
-                    if (static_cast<int>(cmd_result) < 0) {
-                        pending_event = PendingEvent::Error;
-                    } else {
-                        cmd_result = controller->UpdateCmd(q_cmd);
-                        if (static_cast<int>(cmd_result) < 0) {
-                            pending_event = PendingEvent::Error;
-                        }
-                    }
-                }
-            }
-
-            // 运动完成且未处于暂停态 → 锁定当前位置 → 清理 motion → 进入 STOPPED
-            // 伺服层继续运行，以锁定位置为参考保持位姿
-            if (pending_event == PendingEvent::None &&
-                motion &&
-                motion_result == Result::PlanFinished &&
-                !paused) {
-                hold_position_ = hardware->GetPosition();  // 锁住，不让阻抗漂移
-                motion.reset();
-                if (executor) {
-                    executor->SwitchMotion(nullptr);
-                }
-                pending_event = PendingEvent::Success;
-            }
-        }
-
-        if (pending_event == PendingEvent::Error) {
-            impl_->process_event(EventErrorOccurred{});
-            return;
-        }
-
-        if (pending_event == PendingEvent::Success) {
-            impl_->process_event(EventSuccessed{});
-        }
     }
 
     // ============================================================================

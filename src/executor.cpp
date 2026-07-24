@@ -37,7 +37,11 @@ Executor::~Executor() {
 }
 
 Result Executor::Update() {
-  if (!motion_ || !controller_) return Result::PlanError;
+
+  Result res = Result::NoError;
+  int sum = 0; //TODO:
+
+  // if (!motion_ || !controller_) return Result::PlanError;
 
   profiler_->MeasureEnd(kCycleMeasurement);
   profiler_->MeasureStart(kExecutorMeasurement);
@@ -45,24 +49,40 @@ Result Executor::Update() {
   // ① Motion → 当前参考位姿
   profiler_->MeasureStart(kMotionMeasurement);
   Reference ref;
-  Result res = motion_->GenerateRef(ref);
+  res = motion_->Update(); //TODO: Update要删除，逻辑合并到GenerateRef中
+  motion_->GenerateRef(ref);
+
   profiler_->MeasureEnd(kMotionMeasurement);
+
   if (static_cast<int>(res) < 0) return res;
+
+  sum += static_cast<int>(res);
 
   // ② Controller → 参考转关节指令
   profiler_->MeasureStart(kControllerMeasurement);
   JntArray q_cmd;
   res = controller_->GenerateCmd(ref, q_cmd);
   profiler_->MeasureEnd(kControllerMeasurement);
+
   if (static_cast<int>(res) < 0) return res;
+
+  sum += static_cast<int>(res);
+
 
   // ③ 下发硬件
   res = controller_->UpdateCmd(q_cmd);
-if (static_cast<int>(res) < 0) return res;
+
+  if (static_cast<int>(res) < 0) return res;
+  sum += static_cast<int>(res);
 
 
   profiler_->MeasureEnd(kExecutorMeasurement);
   profiler_->MeasureStart(kCycleMeasurement);
+
+  if (sum > 0) {
+    return Result::PlanFinished;
+  }
+
   return Result::NoError;
 }
 
