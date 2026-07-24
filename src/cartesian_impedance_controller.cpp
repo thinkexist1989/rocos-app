@@ -70,11 +70,6 @@ Result CartesianImpedanceController::SetReady() {
         }
     }
 
-    // 将当前实际关节位置作为零空间期望位置的初始值
-    q_nullspace_des_ = q_act;
-    q_nullspace_valid_ = true;
-    q_nullspace_user_set_ = false;  // 系统自动设置，允许 GenerateCmd 后续更新
-
     // 初始化上一周期力矩为重力补偿值，使变化率限制从安全起点开始
     tau_prev_ = tau_grav;
     tau_prev_valid_ = true;
@@ -93,8 +88,7 @@ Result CartesianImpedanceController::SetReady() {
 bool CartesianImpedanceController::Reset() {
     mode_set_ = false;
     x_des_valid_ = false;
-    q_nullspace_valid_ = false;
-    q_nullspace_user_set_ = false;
+    x_des_from_frame_ = false;
     tau_prev_valid_ = false;
     return true;
 }
@@ -143,13 +137,12 @@ Result CartesianImpedanceController::GenerateCmd(const Reference& ref_in,
             return fk_res;
         }
 
-        x_des_ = x_fk;
-        x_des_valid_ = true;
-
-        // 自动更新零空间期望位置为参考关节角（仅当用户未显式设置时）
-        if (!q_nullspace_user_set_) {
-            q_nullspace_des_ = *q_ref;
-            q_nullspace_valid_ = true;
+        // x_des_ 来自 Frame（笛卡尔运动如 MoveL）时，阻止 hold_position_ 的
+        // JntArray 覆盖，避免运动结束后因柔顺跟踪滞后导致 x_des_ 跳变→放弃剩余误差。
+        // 但 x_des_ 来自 JntArray（初始设置或 MoveJ）时，允许继续更新。
+        if (!x_des_from_frame_) {
+            x_des_ = x_fk;
+            x_des_valid_ = true;
         }
 
         q_cmd = *q_ref;
@@ -160,6 +153,7 @@ Result CartesianImpedanceController::GenerateCmd(const Reference& ref_in,
     if (auto* frame_ref = std::get_if<Frame>(&ref_in)) {
         x_des_ = *frame_ref;
         x_des_valid_ = true;
+        x_des_from_frame_ = true;  // 标记来源为 Frame，保护不被 hold_position_ 覆盖
 
         // 通过 IK 将期望位姿转为关节角
         if (hardware_ != nullptr && model_ != nullptr) {
@@ -170,12 +164,6 @@ Result CartesianImpedanceController::GenerateCmd(const Reference& ref_in,
                 Result ik_res = model_->InverseKinematics(q_curr, *frame_ref, q_out);
                 if (ik_res == Result::NoError) {
                     q_cmd = q_out;
-
-                    // 自动将 IK 解作为零空间期望位置（仅当用户未显式设置时）
-                    if (!q_nullspace_user_set_) {
-                        q_nullspace_des_ = q_out;
-                        q_nullspace_valid_ = true;
-                    }
                 } else {
                     // IK 失败时保持当前关节角
                     q_cmd = q_curr;
@@ -189,16 +177,17 @@ Result CartesianImpedanceController::GenerateCmd(const Reference& ref_in,
 }
 
 // ==========================================================================
-// UpdateCmd — 笛卡尔空间阻抗控制 + 零空间阻抗 + 力矩安全保护
+// UpdateCmd — 笛卡尔空间阻抗控制 + 力矩安全保护
 //
 //   核心公式：
-//     Δx     = diff(x_cur, x_des)          ← 6D 位姿误差（工具系）
-//     v_cur  = R_cur^T · (J · q̇_act)       ← 末端速度（工具系）
-//     F_cur  = K_p·Δx - K_d·v_cur          ← 阻抗力/力矩（工具系）
-//     F_base = R_cur · F_cur               ← 转回基坐标系
-//     τ_imp  = J^T · F_base                ← Jacobian 转置映射到关节力矩
-//     τ_null = N · (K_p_null·Δq - K_d_null·q̇)  ← 零空间阻抗
-//     τ_raw  = τ_imp + τ_null + τ_grav
+//     Δx_base = diff(x_cur, x_des)          ← 6D 位姿误差（基坐标系，KDL::diff 定义）
+//     Δx_tool = R_cur^T · Δx_base           ← 误差变换到工具系
+//     v_base   = J · q̇_act                   ← 末端速度（基坐标系）
+//     v_cur    = R_cur^T · v_base            ← 速度变换到工具系
+//     F_cur    = K_p·Δx_tool - K_d·v_cur    ← 阻抗力/力矩（工具系）
+//     F_base   = R_cur · F_cur              ← 转回基坐标系
+//     τ_imp    = J^T · F_base                ← Jacobian 转置映射到关节力矩
+//     τ_raw    = τ_imp + τ_grav
 //     经过变化率限制和饱和后下发
 // ==========================================================================
 
@@ -244,8 +233,12 @@ Result CartesianImpedanceController::UpdateCmd(const JntArray& q_cmd) {
         return jac_res;
     }
 
-    // ---- 3. 6D 位姿误差 Δx = diff(x_cur, x_des)（工具系下表达） ----
-    Twist x_err = KDL::diff(x_cur, x_des_);
+    // 提取当前末端姿态矩阵，后续多处使用
+    const KDL::Rotation& R_cur = x_cur.M;
+
+    // ---- 3. 6D 位姿误差 Δx = diff(x_cur, x_des)（基坐标系下表达） ----
+    // 注意: KDL::diff(F_a_b1, F_a_b2) 返回的 twist 在基坐标系 a 下表达
+    Twist x_err_base = KDL::diff(x_cur, x_des_);
 
     // ---- 4. 末端速度 v_base = J · q̇（基坐标系） ----
     Twist v_base;
@@ -259,10 +252,13 @@ Result CartesianImpedanceController::UpdateCmd(const JntArray& q_cmd) {
         v_base.rot = Vector(v_ee(3), v_ee(4), v_ee(5));
     }
 
-    // ---- 5. 速度变换到工具系：v_cur = R_cur^T · v_base ----
-    Twist v_cur;
+    // ---- 5. 位姿误差和速度变换到工具系 ----
+    // Δx_tool = Ad_{g^{-1}} · Δx_base:  vel_tool = R_cur^T · vel_base
+    Twist x_err_tool, v_cur;
+    x_err_tool.vel = R_cur.Inverse() * x_err_base.vel;
+    x_err_tool.rot = R_cur.Inverse() * x_err_base.rot;
+
     if (has_velocity) {
-        const KDL::Rotation& R_cur = x_cur.M;
         v_cur.vel = R_cur.Inverse() * v_base.vel;
         v_cur.rot = R_cur.Inverse() * v_base.rot;
     }
@@ -270,16 +266,15 @@ Result CartesianImpedanceController::UpdateCmd(const JntArray& q_cmd) {
     // ---- 6. 阻抗力/力矩（工具系下） ----
     Wrench F_cur;
     F_cur.force  = Vector(
-        K_p_lin_ * x_err.vel.x() - K_d_lin_ * v_cur.vel.x(),
-        K_p_lin_ * x_err.vel.y() - K_d_lin_ * v_cur.vel.y(),
-        K_p_lin_ * x_err.vel.z() - K_d_lin_ * v_cur.vel.z());
+        K_p_lin_ * x_err_tool.vel.x() - K_d_lin_ * v_cur.vel.x(),
+        K_p_lin_ * x_err_tool.vel.y() - K_d_lin_ * v_cur.vel.y(),
+        K_p_lin_ * x_err_tool.vel.z() - K_d_lin_ * v_cur.vel.z());
     F_cur.torque = Vector(
-        K_p_ang_ * x_err.rot.x() - K_d_ang_ * v_cur.rot.x(),
-        K_p_ang_ * x_err.rot.y() - K_d_ang_ * v_cur.rot.y(),
-        K_p_ang_ * x_err.rot.z() - K_d_ang_ * v_cur.rot.z());
+        K_p_ang_ * x_err_tool.rot.x() - K_d_ang_ * v_cur.rot.x(),
+        K_p_ang_ * x_err_tool.rot.y() - K_d_ang_ * v_cur.rot.y(),
+        K_p_ang_ * x_err_tool.rot.z() - K_d_ang_ * v_cur.rot.z());
 
-    // ---- 7. 力/力矩变换到基坐标系：F_base = R_cur · F_cur ----
-    const KDL::Rotation& R_cur = x_cur.M;
+    // ---- 7. 力/力矩变换到基坐标系：F_base = Ad_g · F_cur = R_cur · F_cur ----
     Wrench F_base;
     F_base.force  = R_cur * F_cur.force;
     F_base.torque = R_cur * F_cur.torque;
@@ -291,45 +286,7 @@ Result CartesianImpedanceController::UpdateCmd(const JntArray& q_cmd) {
 
     Eigen::VectorXd tau_imp_eig = J_out.data.transpose() * F_vec;
 
-    // ---- 9. 零空间阻抗 τ_null = N · (K_p_null·Δq - K_d_null·q̇) ----
-    //        N = I - J#·J  是阻尼伪逆零空间投影矩阵
-    JntArray tau_null(n);
-    {
-        for (unsigned int i = 0; i < n; ++i) {
-            tau_null(i) = 0.0;
-        }
-    }
-
-    if (q_nullspace_valid_ && q_nullspace_des_.rows() == n) {
-        // 构建零空间投影矩阵 N = I - J^T·(J·J^T + λ²I)^(-1)·J
-        const auto& J = J_out.data;  // 6×n
-        const double lambda = kNullspaceDampingLambda;
-
-        Eigen::Matrix<double, 6, 6> JJt = J * J.transpose();
-        JJt.diagonal().array() += lambda * lambda;
-
-        // 阻尼伪逆: J# = J^T · (J·J^T + λ²I)^(-1)   (n×6)
-        Eigen::MatrixXd J_pinv = J.transpose() * JJt.llt().solve(Eigen::Matrix<double, 6, 6>::Identity());
-
-        // 零空间投影: N = I - J# · J   (n×n)
-        Eigen::MatrixXd N_mat = Eigen::MatrixXd::Identity(n, n) - J_pinv * J;
-
-        // 关节空间零空间阻抗: τ_null_raw = K_p_null·(q_des - q) - K_d_null·q̇
-        Eigen::VectorXd tau_null_raw(n);
-        for (unsigned int i = 0; i < n; ++i) {
-            const double pos_err = q_nullspace_des_(i) - q_act(i);
-            const double vel_damp = has_velocity ? K_d_null_ * q_dot_act(i) : 0.0;
-            tau_null_raw(i) = K_p_null_ * pos_err - vel_damp;
-        }
-
-        // 投影到零空间
-        Eigen::VectorXd tau_null_eig = N_mat * tau_null_raw;
-        for (unsigned int i = 0; i < n; ++i) {
-            tau_null(i) = tau_null_eig(i);
-        }
-    }
-
-    // ---- 10. 重力补偿：τ_grav = InverseDynamics(q, 0, 0, ∅) ----
+    // ---- 9. 重力补偿：τ_grav = InverseDynamics(q, 0, 0, ∅) ----
     JntArray tau_grav(n);
     {
         JntArray zero(n);
@@ -343,13 +300,13 @@ Result CartesianImpedanceController::UpdateCmd(const JntArray& q_cmd) {
         }
     }
 
-    // ---- 11. 合成原始力矩 τ_raw = τ_imp + τ_null + τ_grav ----
+    // ---- 10. 合成原始力矩 τ_raw = τ_imp + τ_grav ----
     JntArray tau_raw(n);
     for (unsigned int i = 0; i < n; ++i) {
-        tau_raw(i) = tau_imp_eig(i) + tau_null(i) + tau_grav(i);
+        tau_raw(i) = tau_imp_eig(i) + tau_grav(i);
     }
 
-    // ---- 12. 力矩变化率限制 ----
+    // ---- 11. 力矩变化率限制 ----
     JntArray tau(n);
     if (tau_rate_limit_ > 0.0 && tau_prev_valid_ && tau_prev_.rows() == n) {
         const double max_delta = tau_rate_limit_ * dt_;
@@ -362,18 +319,18 @@ Result CartesianImpedanceController::UpdateCmd(const JntArray& q_cmd) {
         tau = tau_raw;
     }
 
-    // ---- 13. 力矩饱和 ----
+    // ---- 12. 力矩饱和 ----
     if (tau_max_ > 0.0) {
         for (unsigned int i = 0; i < n; ++i) {
             tau(i) = std::max(-tau_max_, std::min(tau_max_, tau(i)));
         }
     }
 
-    // ---- 14. 保存当前力矩供下一周期变化率限制 ----
+    // ---- 13. 保存当前力矩供下一周期变化率限制 ----
     tau_prev_ = tau;
     tau_prev_valid_ = true;
 
-    // ---- 15. 下发力矩指令（CST 模式） ----
+    // ---- 14. 下发力矩指令（CST 模式） ----
     if (!mode_set_) {
         hardware_->SetMode(CST_MODE);
         mode_set_ = true;
@@ -416,41 +373,6 @@ Result CartesianImpedanceController::SetRotationalDamping(double D) {
         return Result::ParameterNanOrInf;
     }
     K_d_ang_ = D;
-    return Result::NoError;
-}
-
-// ==========================================================================
-// 零空间阻抗参数
-// ==========================================================================
-
-Result CartesianImpedanceController::SetNullspaceStiffness(double K) {
-    if (!std::isfinite(K) || K < 0.0) {
-        return Result::ParameterNanOrInf;
-    }
-    K_p_null_ = K;
-    return Result::NoError;
-}
-
-Result CartesianImpedanceController::SetNullspaceDamping(double D) {
-    if (!std::isfinite(D) || D < 0.0) {
-        return Result::ParameterNanOrInf;
-    }
-    K_d_null_ = D;
-    return Result::NoError;
-}
-
-Result CartesianImpedanceController::SetNullspaceReference(const JntArray& q_nullspace) {
-    if (q_nullspace.rows() == 0) {
-        return Result::MoveInput;
-    }
-    for (unsigned int i = 0; i < q_nullspace.rows(); ++i) {
-        if (!std::isfinite(q_nullspace(i))) {
-            return Result::ParameterNanOrInf;
-        }
-    }
-    q_nullspace_des_ = q_nullspace;
-    q_nullspace_valid_ = true;
-    q_nullspace_user_set_ = true;  // 用户显式设置，禁止 GenerateCmd 覆盖
     return Result::NoError;
 }
 

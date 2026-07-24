@@ -269,32 +269,6 @@ TEST_CASE("CartesianImpedance - 笛卡尔阻抗参数") {
     }
 }
 
-TEST_CASE("CartesianImpedance - 零空间参数") {
-    rocos::CartesianImpedanceController ctrl;
-
-    SUBCASE("SetNullspaceStiffness 正常") {
-        CHECK(ctrl.SetNullspaceStiffness(60.0) == rocos::Result::NoError);
-    }
-    SUBCASE("SetNullspaceStiffness 负值 → ParameterNanOrInf") {
-        CHECK(ctrl.SetNullspaceStiffness(-10.0) == rocos::Result::ParameterNanOrInf);
-    }
-    SUBCASE("SetNullspaceDamping 正常") {
-        CHECK(ctrl.SetNullspaceDamping(15.0) == rocos::Result::NoError);
-    }
-    SUBCASE("SetNullspaceReference 正常") {
-        CHECK(ctrl.SetNullspaceReference(makeConstJntArray(7, 0.5)) == rocos::Result::NoError);
-    }
-    SUBCASE("SetNullspaceReference 空数组 → MoveInput") {
-        rocos::JntArray empty_q{};
-        CHECK(ctrl.SetNullspaceReference(empty_q) == rocos::Result::MoveInput);
-    }
-    SUBCASE("SetNullspaceReference 含 NaN → ParameterNanOrInf") {
-        auto q = makeConstJntArray(7, 0.5);
-        q(3) = std::numeric_limits<double>::quiet_NaN();
-        CHECK(ctrl.SetNullspaceReference(q) == rocos::Result::ParameterNanOrInf);
-    }
-}
-
 TEST_CASE("CartesianImpedance - 力矩安全参数") {
     rocos::CartesianImpedanceController ctrl;
 
@@ -410,8 +384,8 @@ TEST_CASE("CartesianImpedance - UpdateCmd 笛卡尔阻抗力矩") {
     SUBCASE("位置误差产生 X 方向力矩") {
         // FK: p_cur = (q[0], q[1], q[2]) = (0,0,0)
         // 设 x_des_.p = (1,0,0) → Δx = diff(I, Frame((1,0,0))) = Twist([1,0,0],[0,0,0])
-        // F_cur = K_p_lin(500)*[1,0,0] - K_d*0 = [500,0,0]
-        // J^T * F: col_0=[1,0,0,0,0,0] → τ[0] = 1*500 + 0 = 500
+        // F_cur = K_p_lin(1500)*[1,0,0] - K_d*0 = [1500,0,0]
+        // J^T * F: col_0=[1,0,0,0,0,0] → τ[0] = 1*1500 + 0 = 1500
         hw.fake_position_ = makeConstJntArray(7, 0.0);
         hw.fake_velocity_ = makeConstJntArray(7, 0.0);
 
@@ -423,7 +397,7 @@ TEST_CASE("CartesianImpedance - UpdateCmd 笛卡尔阻抗力矩") {
 
         CHECK(ctrl.UpdateCmd(makeConstJntArray(7)) == rocos::Result::NoError);
         CHECK(hw.last_set_torque_.rows() == 7u);
-        CHECK(hw.last_set_torque_(0) == doctest::Approx(500.0).epsilon(0.01));
+        CHECK(hw.last_set_torque_(0) == doctest::Approx(1500.0).epsilon(0.01));
     }
 
     SUBCASE("Y 方向误差产生对应力矩") {
@@ -437,8 +411,8 @@ TEST_CASE("CartesianImpedance - UpdateCmd 笛卡尔阻抗力矩") {
                          dummy_q_cmd);
 
         CHECK(ctrl.UpdateCmd(makeConstJntArray(7)) == rocos::Result::NoError);
-        // col_1=[0,1,0,0,0,0] → τ[1] = 1*500 = 500
-        CHECK(hw.last_set_torque_(1) == doctest::Approx(500.0).epsilon(0.01));
+        // col_1=[0,1,0,0,0,0] → τ[1] = 1*1500 = 1500
+        CHECK(hw.last_set_torque_(1) == doctest::Approx(1500.0).epsilon(0.01));
     }
 
     SUBCASE("自定义刚度改变力矩比例") {
@@ -512,8 +486,8 @@ TEST_CASE("CartesianImpedance - 阻尼项") {
     SUBCASE("正速度 → 阻尼产生反向力矩") {
         // v_base = J * q̇, J col_0=[1,0,0,...], q̇[0]=2 → v_base.vel.x = 2
         // v_cur = R^T * v_base, R=I → v_cur.vel.x = 2
-        // F_cur.force.x = K_p*0 - K_d_lin*2 = -200
-        // τ[0] = 1*(-200) = -200
+        // F_cur.force.x = K_p*0 - K_d_lin(120)*2 = -240
+        // τ[0] = 1*(-240) = -240
         hw.fake_position_ = makeConstJntArray(7, 0.0);
         hw.fake_velocity_ = makeConstJntArray(7, 0.0);
         hw.fake_velocity_(0) = 2.0;  // q̇[0] = 2
@@ -526,8 +500,8 @@ TEST_CASE("CartesianImpedance - 阻尼项") {
                          dummy_q_cmd);
 
         CHECK(ctrl.UpdateCmd(makeConstJntArray(7)) == rocos::Result::NoError);
-        // τ[0] = K_p_lin*0 - K_d_lin*2 = -200
-        CHECK(hw.last_set_torque_(0) == doctest::Approx(-200.0).epsilon(0.01));
+        // τ[0] = K_p_lin*0 - K_d_lin*2 = -240
+        CHECK(hw.last_set_torque_(0) == doctest::Approx(-240.0).epsilon(0.01));
     }
 
     SUBCASE("无速度反馈 → 阻尼项为零") {
@@ -542,94 +516,13 @@ TEST_CASE("CartesianImpedance - 阻尼项") {
                          dummy_q_cmd);
 
         CHECK(ctrl.UpdateCmd(makeConstJntArray(7)) == rocos::Result::NoError);
-        // τ[0] = 500*1 - 0 = 500（无阻尼）
-        CHECK(hw.last_set_torque_(0) == doctest::Approx(500.0).epsilon(0.01));
+        // τ[0] = 1500*1 - 0 = 1500（无阻尼）
+        CHECK(hw.last_set_torque_(0) == doctest::Approx(1500.0).epsilon(0.01));
     }
 }
 
 // ==========================================================================
-// §7. 零空间阻抗
-// ==========================================================================
-
-TEST_CASE("CartesianImpedance - 零空间阻抗") {
-    FakeHardware hw;
-    FakeModel model;
-    model.grav_torque_ = 0.0;
-
-    SUBCASE("零空间参考含偏差 → 零空间力矩非零") {
-        // q_act = [0,0,0,0,0,0,0], q_nullspace_des = [1,1,1,1,1,1,1]
-        // τ_null = N * (K_p_null * Δq - K_d_null * q̇)
-        // 对于 7-DOF Jacobian (6×7)，N 有一个 1D 零空间
-        // 零空间力矩投影后应为非零值
-        hw.fake_position_ = makeConstJntArray(7, 0.0);
-        hw.fake_velocity_ = makeConstJntArray(7, 0.0);
-
-        rocos::CartesianImpedanceController ctrl;
-        ctrl.SetHardware(&hw);
-        ctrl.SetModel(&model);
-        ctrl.SetNullspaceStiffness(100.0);
-        ctrl.SetNullspaceReference(makeConstJntArray(7, 1.0));
-        // x_des == x_cur → 笛卡尔阻抗力矩为零
-        ctrl.GenerateCmd(rocos::Reference{makeFrame(0.0, 0.0, 0.0)},
-                         dummy_q_cmd);
-
-        CHECK(ctrl.UpdateCmd(makeConstJntArray(7)) == rocos::Result::NoError);
-
-        // 零空间力矩应全部非零（每个关节都有零空间分量）
-        double sum_abs = 0.0;
-        for (unsigned int i = 0; i < 7; ++i) {
-            sum_abs += std::abs(hw.last_set_torque_(i));
-        }
-        CHECK(sum_abs > 1.0);  // 非零
-    }
-
-    SUBCASE("无零空间参考 → 零空间力矩为零") {
-        hw.fake_position_ = makeConstJntArray(7, 0.0);
-        hw.fake_velocity_ = makeConstJntArray(7, 0.0);
-
-        rocos::CartesianImpedanceController ctrl;
-        ctrl.SetHardware(&hw);
-        ctrl.SetModel(&model);
-        // 不设 nullspace reference
-        ctrl.GenerateCmd(rocos::Reference{makeFrame(0.0, 0.0, 0.0)},
-                         dummy_q_cmd);
-
-        CHECK(ctrl.UpdateCmd(makeConstJntArray(7)) == rocos::Result::NoError);
-        // 零空间无参考 → τ_null=0, τ_imp=0, τ_grav=0 → τ=0
-        double sum_abs = 0.0;
-        for (unsigned int i = 0; i < 7; ++i) {
-            sum_abs += std::abs(hw.last_set_torque_(i));
-        }
-        CHECK(sum_abs == doctest::Approx(0.0).epsilon(0.01));
-    }
-
-    SUBCASE("Reset 清除零空间参考") {
-        hw.fake_position_ = makeConstJntArray(7, 0.0);
-        hw.fake_velocity_ = makeConstJntArray(7, 0.0);
-
-        rocos::CartesianImpedanceController ctrl;
-        ctrl.SetHardware(&hw);
-        ctrl.SetModel(&model);
-        ctrl.SetNullspaceReference(makeConstJntArray(7, 1.0));
-        ctrl.GenerateCmd(rocos::Reference{makeFrame(0.0, 0.0, 0.0)},
-                         dummy_q_cmd);
-        ctrl.Reset();
-        // Reset 后 x_des_valid_ 也清除了，需要重新 GenerateCmd
-        ctrl.GenerateCmd(rocos::Reference{makeFrame(0.0, 0.0, 0.0)},
-                         dummy_q_cmd);
-
-        CHECK(ctrl.UpdateCmd(makeConstJntArray(7)) == rocos::Result::NoError);
-
-        double sum_abs = 0.0;
-        for (unsigned int i = 0; i < 7; ++i) {
-            sum_abs += std::abs(hw.last_set_torque_(i));
-        }
-        CHECK(sum_abs == doctest::Approx(0.0).epsilon(0.01));
-    }
-}
-
-// ==========================================================================
-// §8. 力矩变化率限制
+// §7. 力矩变化率限制
 // ==========================================================================
 
 TEST_CASE("CartesianImpedance - 力矩变化率限制") {
@@ -646,7 +539,7 @@ TEST_CASE("CartesianImpedance - 力矩变化率限制") {
     // 设一个小的变化率限制: 100 Nm/s, dt≈0.001 → max_delta = 0.1 Nm/step
     ctrl.SetTorqueRateLimit(100.0);
 
-    // x_des 偏移 1m → 稳态力矩 = 500 Nm
+    // x_des 偏移 1m → 稳态力矩 = 1500 Nm
     ctrl.GenerateCmd(rocos::Reference{makeFrame(1.0, 0.0, 0.0)},
                      dummy_q_cmd);
 
@@ -654,15 +547,15 @@ TEST_CASE("CartesianImpedance - 力矩变化率限制") {
     // 所以第一拍 tau_prev_valid_ 为 false，应直接输出完整力矩
     CHECK(ctrl.UpdateCmd(makeConstJntArray(7)) == rocos::Result::NoError);
     double first_torque = hw.last_set_torque_(0);
-    // 第一拍无限制，直接输出 500
-    CHECK(first_torque == doctest::Approx(500.0).epsilon(0.01));
+    // 第一拍无限制，直接输出 1500
+    CHECK(first_torque == doctest::Approx(1500.0).epsilon(0.01));
 
     // 第二次调用：tau_prev_ = first_torque
-    // 此时位置仍为 (0,0,0)，x_des 仍为 (1,0,0)，稳态力矩仍为 500
+    // 此时位置仍为 (0,0,0)，x_des 仍为 (1,0,0)，稳态力矩仍为 1500
     // 但 rate limiter 已被 tau_prev_valid_ 激活
-    // 由于稳态不变，Δτ = 0，力矩保持 500
+    // 由于稳态不变，Δτ = 0，力矩保持 1500
     CHECK(ctrl.UpdateCmd(makeConstJntArray(7)) == rocos::Result::NoError);
-    CHECK(hw.last_set_torque_(0) == doctest::Approx(500.0).epsilon(0.01));
+    CHECK(hw.last_set_torque_(0) == doctest::Approx(1500.0).epsilon(0.01));
 
     SUBCASE("变化率限制设为 0 → 不限制") {
         rocos::CartesianImpedanceController ctrl2;
@@ -673,12 +566,12 @@ TEST_CASE("CartesianImpedance - 力矩变化率限制") {
                           dummy_q_cmd);
         CHECK(ctrl2.UpdateCmd(makeConstJntArray(7)) == rocos::Result::NoError);
         // 直接输出完整力矩
-        CHECK(hw.last_set_torque_(0) == doctest::Approx(500.0).epsilon(0.01));
+        CHECK(hw.last_set_torque_(0) == doctest::Approx(1500.0).epsilon(0.01));
     }
 }
 
 // ==========================================================================
-// §9. 力矩饱和
+// §8. 力矩饱和
 // ==========================================================================
 
 TEST_CASE("CartesianImpedance - 力矩饱和") {
@@ -712,7 +605,7 @@ TEST_CASE("CartesianImpedance - 力矩饱和") {
         ctrl2.GenerateCmd(rocos::Reference{makeFrame(1.0, 0.0, 0.0)},
                           dummy_q_cmd);
         CHECK(ctrl2.UpdateCmd(makeConstJntArray(7)) == rocos::Result::NoError);
-        CHECK(hw.last_set_torque_(0) == doctest::Approx(500.0).epsilon(0.01));
+        CHECK(hw.last_set_torque_(0) == doctest::Approx(1500.0).epsilon(0.01));
     }
 
     SUBCASE("负方向同样被限制") {
@@ -732,7 +625,7 @@ TEST_CASE("CartesianImpedance - 力矩饱和") {
 }
 
 // ==========================================================================
-// §10. CST 模式管理
+// §9. CST 模式管理
 // ==========================================================================
 
 TEST_CASE("CartesianImpedance - CST 模式管理") {
@@ -771,7 +664,7 @@ TEST_CASE("CartesianImpedance - CST 模式管理") {
 }
 
 // ==========================================================================
-// §11. 异常路径
+// §10. 异常路径
 // ==========================================================================
 
 TEST_CASE("CartesianImpedance - 异常路径") {
@@ -823,7 +716,7 @@ TEST_CASE("CartesianImpedance - 异常路径") {
 }
 
 // ==========================================================================
-// §12. SetReady 初始化
+// §11. SetReady 初始化
 // ==========================================================================
 
 TEST_CASE("CartesianImpedance - SetReady") {
@@ -850,25 +743,24 @@ TEST_CASE("CartesianImpedance - SetReady") {
         CHECK(hw.set_mode_count_ == 1);
     }
 
-    SUBCASE("SetReady 后零空间参考初始化为当前关节位置") {
+    SUBCASE("SetReady 后力矩安全初始化正确") {
         CHECK(ctrl.SetReady() == rocos::Result::NoError);
 
-        // 校验：零空间参考已初始化 → 阻抗力矩中零空间分量为零
-        // (因为 q_nullspace_des == q_act == 0)
+        // τ_prev_ 初始化为重力补偿值，变化率限制从安全起点开始
         ctrl.GenerateCmd(rocos::Reference{makeFrame(0.0, 0.0, 0.0)},
                          dummy_q_cmd);
         CHECK(ctrl.UpdateCmd(makeConstJntArray(7)) == rocos::Result::NoError);
 
-        // 零空间 error = 0 → τ_null = 0, τ_imp = 0 → τ = τ_grav = 7
+        // 无位置误差 → τ_imp = 0 → τ = τ_grav = 7
         CHECK(hw.last_set_torque_(0) == doctest::Approx(7.0).epsilon(0.01));
     }
 }
 
 // ==========================================================================
-// §13. 综合场景
+// §12. 综合场景
 // ==========================================================================
 
-TEST_CASE("CartesianImpedance - 综合：刚度 + 阻尼 + 重力 + 零空间") {
+TEST_CASE("CartesianImpedance - 综合：刚度 + 阻尼 + 重力") {
     FakeHardware hw;
     FakeModel model;
     model.grav_torque_ = 3.0;
@@ -885,8 +777,6 @@ TEST_CASE("CartesianImpedance - 综合：刚度 + 阻尼 + 重力 + 零空间") 
     ctrl.SetModel(&model);
     ctrl.SetTranslationalStiffness(200.0);  // 200 N/m
     ctrl.SetTranslationalDamping(50.0);     // 50 N·s/m
-    ctrl.SetNullspaceStiffness(30.0);
-    ctrl.SetNullspaceReference(makeConstJntArray(7, 0.5));
 
     // x_des = (0.3, 0.2, 0.0) → p_des - p_cur = (0.2, 0.2, 0)
     ctrl.GenerateCmd(rocos::Reference{makeFrame(0.3, 0.2, 0.0)},
@@ -899,14 +789,315 @@ TEST_CASE("CartesianImpedance - 综合：刚度 + 阻尼 + 重力 + 零空间") 
     //   v_cur.vel = R^T * J*q̇, J*[0.5,0,0,...]^T = [0.5,0,0,0,0,0]^T → v_cur.vel = (0.5, 0, 0)
     //   F_cur.force = 200*(0.2,0.2,0) - 50*(0.5,0,0) = (40-25, 40-0, 0) = (15, 40, 0)
     //   τ_imp[0] = J_col_0^T * F = [1,0,0]^T * [15,40,0]^T = 15
-    //
-    //   零空间力矩有非零分量
     //   τ_grav[0] = 3
-    //
-    //   τ_raw[0] = 15 + τ_null[0] + 3
-    //
-    // 至少保证力矩有值且在合理范围
-    CHECK(std::abs(hw.last_set_torque_(0)) > 1.0);
-    CHECK(std::abs(hw.last_set_torque_(0)) < 100.0);
+    //   τ_raw[0] = 15 + 3 = 18
+    CHECK(hw.last_set_torque_(0) == doctest::Approx(18.0).epsilon(0.01));
     CHECK(hw.last_set_torque_.rows() == 7u);
+}
+
+// ==========================================================================
+// §13. 非零末端姿态 — 验证坐标系变换正确性
+// ==========================================================================
+
+/// @brief FakeModel 变体: FK 返回绕 Z 轴旋转 90° 的姿态
+class FakeModelRotated : public rocos::ModelInterface {
+public:
+    bool fk_should_fail_{false};
+    double grav_torque_{0.0};
+
+    rocos::Result ForwardKinematics(const rocos::JntArray& q_in,
+                                    rocos::Frame& p_out) override {
+        if (fk_should_fail_) return rocos::Result::FkCalcFail;
+        double x = q_in.rows() > 0 ? q_in(0) : 0.0;
+        double y = q_in.rows() > 1 ? q_in(1) : 0.0;
+        double z = q_in.rows() > 2 ? q_in(2) : 0.0;
+        // 绕 Z 轴旋转 90°: R_cur = Rz(π/2)
+        p_out = rocos::Frame(KDL::Rotation::RPY(0.0, 0.0, M_PI_2),
+                             KDL::Vector(x, y, z));
+        return rocos::Result::NoError;
+    }
+
+    rocos::Result InverseKinematics(const rocos::JntArray& q_in,
+                                     const rocos::Frame&,
+                                     rocos::JntArray& q_out) override {
+        q_out = q_in;
+        return rocos::Result::NoError;
+    }
+
+    rocos::Result GetJacobian(const rocos::JntArray& q,
+                              rocos::Jacobian& J_out) override {
+        (void)q;
+        const unsigned int n = q.rows();
+        J_out.resize(n);
+        for (unsigned int j = 0; j < n; ++j) {
+            KDL::Vector vel(0.0, 0.0, 0.0), rot(0.0, 0.0, 0.0);
+            switch (j) {
+                case 0: vel = KDL::Vector(1.0, 0.0, 0.0); break;
+                case 1: vel = KDL::Vector(0.0, 1.0, 0.0); break;
+                case 2: vel = KDL::Vector(0.0, 0.0, 1.0); break;
+                case 3: rot = KDL::Vector(1.0, 0.0, 0.0); break;
+                case 4: rot = KDL::Vector(0.0, 1.0, 0.0); break;
+                case 5: rot = KDL::Vector(0.0, 0.0, 1.0); break;
+                default:
+                    vel = KDL::Vector(0.3, 0.3, 0.3);
+                    rot = KDL::Vector(0.3, 0.3, 0.3);
+                    break;
+            }
+            J_out.setColumn(j, KDL::Twist(vel, rot));
+        }
+        return rocos::Result::NoError;
+    }
+
+    rocos::Result InverseDynamics(const rocos::JntArray&,
+                                  const rocos::JntArray&,
+                                  const rocos::JntArray&,
+                                  const rocos::Wrenches&,
+                                  rocos::JntArray& torques) override {
+        for (unsigned int i = 0; i < torques.rows(); ++i) {
+            torques(i) = grav_torque_;
+        }
+        return rocos::Result::NoError;
+    }
+
+    rocos::Result ForwardDynamics(const rocos::JntArray&,
+                                  const rocos::JntArray&,
+                                  const rocos::JntArray&,
+                                  const rocos::Wrenches&,
+                                  rocos::JntArray&) override {
+        return rocos::Result::NoError;
+    }
+
+    int GetJointNum() const override { return 7; }
+    std::vector<std::string> GetJointNames() const override { return {}; }
+};
+
+TEST_CASE("CartesianImpedance - 非零姿态: 位置误差方向正确") {
+    // R_cur = Rz(90°), p_cur = (0,0,0)
+    // p_des = (0, 1.0, 0) → 基坐标系下误差在 +Y 方向
+    //
+    // 修复后:
+    //   Δx_base.vel = (0, 1.0, 0)           ← KDL::diff 在基坐标系
+    //   Δx_tool.vel = Rz(-90°) * (0,1,0) = (1.0, 0, 0)  ← 变换到工具系
+    //   F_cur.force  = Kp(1500) * (1,0,0) = (1500, 0, 0)    ← 工具系 +X
+    //   F_base.force = Rz(90°) * (1500,0,0) = (0, 1500, 0) ← 基坐标系 +Y ✓
+    //   τ[0] = J_col0^T * F_base = [1,0,0]·[0,1500,0] = 0
+    //   τ[1] = J_col1^T * F_base = [0,1,0]·[0,1500,0] = 1500
+    //
+    // 修复前（错误）:
+    //   F_cur.force  = Kp * (0,1,0) = (0, 500, 0)       ← 误当工具系
+    //   F_base.force = Rz(90°) * (0,500,0) = (-500, 0, 0) ← 基坐标系 -X ✗
+
+    FakeHardware hw;
+    FakeModelRotated model;
+    hw.fake_position_ = makeConstJntArray(7, 0.0);
+    hw.fake_velocity_ = makeConstJntArray(7, 0.0);
+
+    rocos::CartesianImpedanceController ctrl;
+    ctrl.SetHardware(&hw);
+    ctrl.SetModel(&model);
+    // x_des: p = (0, 1.0, 0), R = Rz(90°)（与当前姿态相同，误差仅为平移）
+    rocos::Frame x_des(KDL::Rotation::RPY(0.0, 0.0, M_PI_2),
+                       KDL::Vector(0.0, 1.0, 0.0));
+    ctrl.GenerateCmd(rocos::Reference{x_des}, dummy_q_cmd);
+
+    CHECK(ctrl.UpdateCmd(makeConstJntArray(7)) == rocos::Result::NoError);
+
+    // τ[0] ≈ 0（力在 Y 方向，J_col0 在 X 方向 → 点积=0）
+    CHECK(hw.last_set_torque_(0) == doctest::Approx(0.0).epsilon(0.01));
+    // τ[1] ≈ 1500（力在 Y 方向，J_col1 在 Y 方向 → 点积=1500）
+    CHECK(hw.last_set_torque_(1) == doctest::Approx(1500.0).epsilon(0.01));
+}
+
+TEST_CASE("CartesianImpedance - 非零姿态: 零误差 → 零阻抗力") {
+    // 当前位姿 == 期望位姿 → 无论姿态如何，阻抗力应为 0
+    FakeHardware hw;
+    FakeModelRotated model;
+    hw.fake_position_ = makeConstJntArray(7, 0.0);
+    hw.fake_velocity_ = makeConstJntArray(7, 0.0);
+
+    rocos::CartesianImpedanceController ctrl;
+    ctrl.SetHardware(&hw);
+    ctrl.SetModel(&model);
+    // x_des == x_cur: p=(0,0,0), R=Rz(90°)
+    rocos::Frame x_des(KDL::Rotation::RPY(0.0, 0.0, M_PI_2),
+                       KDL::Vector(0.0, 0.0, 0.0));
+    ctrl.GenerateCmd(rocos::Reference{x_des}, dummy_q_cmd);
+
+    CHECK(ctrl.UpdateCmd(makeConstJntArray(7)) == rocos::Result::NoError);
+    // 零位姿误差 → 所有关节的阻抗力矩部分为 0
+    for (unsigned int i = 0; i < 7; ++i) {
+        CHECK(hw.last_set_torque_(i) == doctest::Approx(0.0).epsilon(0.01));
+    }
+}
+
+TEST_CASE("CartesianImpedance - 非零姿态: X 方向误差在旋转后仍正确") {
+    // R_cur = Rz(90°), p_cur = (0,0,0)
+    // p_des = (1.0, 0, 0) → 基坐标系下误差在 +X 方向
+    //
+    //   Δx_base.vel = (1.0, 0, 0)
+    //   Δx_tool.vel = Rz(-90°) * (1,0,0) = (0, -1.0, 0)
+    //   F_cur.force  = Kp(1500) * (0,-1,0) = (0, -1500, 0)
+    //   F_base.force = Rz(90°) * (0,-1500,0) = (1500, 0, 0)  ← 基坐标系 +X ✓
+    //   τ[0] = [1,0,0]·[1500,0,0] = 1500
+    //   τ[1] = [0,1,0]·[1500,0,0] = 0
+
+    FakeHardware hw;
+    FakeModelRotated model;
+    hw.fake_position_ = makeConstJntArray(7, 0.0);
+    hw.fake_velocity_ = makeConstJntArray(7, 0.0);
+
+    rocos::CartesianImpedanceController ctrl;
+    ctrl.SetHardware(&hw);
+    ctrl.SetModel(&model);
+    rocos::Frame x_des(KDL::Rotation::RPY(0.0, 0.0, M_PI_2),
+                       KDL::Vector(1.0, 0.0, 0.0));
+    ctrl.GenerateCmd(rocos::Reference{x_des}, dummy_q_cmd);
+
+    CHECK(ctrl.UpdateCmd(makeConstJntArray(7)) == rocos::Result::NoError);
+    CHECK(hw.last_set_torque_(0) == doctest::Approx(1500.0).epsilon(0.01));
+    CHECK(hw.last_set_torque_(1) == doctest::Approx(0.0).epsilon(0.01));
+}
+
+TEST_CASE("CartesianImpedance - 非零姿态: 合力大小不随姿态改变") {
+    // 同样的位置误差幅值(1m)，不管 R_cur 是什么，阻抗力大小应相同
+    // 验证: R * (Kp * R^T * e) = Kp * e（标量刚度时旋转不变）
+    // |F_base| = Kp * |e| = 1500 * 1.0 = 1500
+
+    FakeHardware hw;
+    FakeModelRotated model;
+    hw.fake_position_ = makeConstJntArray(7, 0.0);
+    hw.fake_velocity_ = makeConstJntArray(7, 0.0);
+
+    rocos::CartesianImpedanceController ctrl;
+    ctrl.SetHardware(&hw);
+    ctrl.SetModel(&model);
+    // 期望位置在基坐标系 (1,0,0)，距当前 1m
+    rocos::Frame x_des(KDL::Rotation::RPY(0.0, 0.0, M_PI_2),
+                       KDL::Vector(1.0, 0.0, 0.0));
+    ctrl.GenerateCmd(rocos::Reference{x_des}, dummy_q_cmd);
+
+    CHECK(ctrl.UpdateCmd(makeConstJntArray(7)) == rocos::Result::NoError);
+
+    // 合力: τ = J^T * F_base, J_col0=[1,0,0], J_col1=[0,1,0]
+    // F_base = (1500, 0, 0) → |F| = 1500
+    // τ[0]^2 + τ[1]^2 = 1500^2 + 0^2 = 2250000
+    double f_sq = hw.last_set_torque_(0) * hw.last_set_torque_(0)
+                + hw.last_set_torque_(1) * hw.last_set_torque_(1);
+    CHECK(f_sq == doctest::Approx(2250000.0).epsilon(0.01));
+}
+
+// ==========================================================================
+// §14. x_des_ 保持行为 — 运动结束后不因 hold_position_ 而跳变
+// ==========================================================================
+
+TEST_CASE("CartesianImpedance - x_des_ 保持: JntArray 不覆盖已设置的 Frame") {
+    // 场景: 先通过 Frame 设置期望位姿（模拟 MoveL 的最后一帧），
+    //       再用 JntArray 调用 GenerateCmd（模拟运动结束后 hold_position_），
+    //       验证 x_des_ 不会被 FK(hold_position_) 覆盖。
+    //
+    // 这确保运动结束后机器人继续追踪运动最后的期望位姿，而非"放弃"剩余误差。
+
+    FakeHardware hw;
+    FakeModel model;
+    model.grav_torque_ = 0.0;
+    hw.fake_position_ = makeConstJntArray(7, 0.0);
+    hw.fake_velocity_ = makeConstJntArray(7, 0.0);
+
+    rocos::CartesianImpedanceController ctrl;
+    ctrl.SetHardware(&hw);
+    ctrl.SetModel(&model);
+
+    // Step 1: 模拟 MoveL 最后帧 — 设置期望位姿 p=(0.5, 0, 0)
+    rocos::Frame target_frame = makeFrame(0.5, 0.0, 0.0);
+    ctrl.GenerateCmd(rocos::Reference{target_frame}, dummy_q_cmd);
+
+    // Step 2: 模拟运动结束后 hold_position_ — p_cur=(0,0,0), FK→p=(0,0,0)
+    // 如果 x_des_ 被覆盖，期望位姿会跳回 (0,0,0)，误差消失→力矩归零
+    // 正确行为: x_des_ 保持 (0.5,0,0)，误差为 0.5m，力矩=Kp*0.5=750
+    auto hold_pos = makeConstJntArray(7, 0.0);
+    rocos::JntArray q_cmd;
+    ctrl.GenerateCmd(rocos::Reference{hold_pos}, q_cmd);
+
+    CHECK(ctrl.UpdateCmd(makeConstJntArray(7)) == rocos::Result::NoError);
+    // 期望位姿应保持 p=(0.5,0,0)，力矩 = 1500 * 0.5 = 750
+    CHECK(hw.last_set_torque_(0) == doctest::Approx(750.0).epsilon(0.01));
+}
+
+TEST_CASE("CartesianImpedance - x_des_ 保持: Reset 后首次 JntArray 正常设置") {
+    // Reset 后 x_des_valid_=false，首次 JntArray 应正常设置 x_des_
+
+    FakeHardware hw;
+    FakeModel model;
+    model.grav_torque_ = 0.0;
+    hw.fake_position_ = makeConstJntArray(7, 0.0);
+    hw.fake_velocity_ = makeConstJntArray(7, 0.0);
+
+    rocos::CartesianImpedanceController ctrl;
+    ctrl.SetHardware(&hw);
+    ctrl.SetModel(&model);
+
+    // Step 1: 先设一个 Frame
+    ctrl.GenerateCmd(rocos::Reference{makeFrame(1.0, 0.0, 0.0)}, dummy_q_cmd);
+    CHECK(ctrl.UpdateCmd(makeConstJntArray(7)) == rocos::Result::NoError);
+    CHECK(hw.last_set_torque_(0) == doctest::Approx(1500.0).epsilon(0.01));
+
+    // Step 2: Reset → x_des_valid_ = false
+    ctrl.Reset();
+
+    // Step 3: JntArray 首次调用 — 应正常用 FK 设置 x_des_ = FK((0.1,0,0,...))→p=(0.1,0,0)
+    auto hold_pos = makeConstJntArray(7, 0.0);
+    hold_pos(0) = 0.1;  // q[0]=0.1 → FK.p.x=0.1
+    rocos::JntArray q_cmd;
+    ctrl.GenerateCmd(rocos::Reference{hold_pos}, q_cmd);
+
+    // 当前 p_cur=(0.1,0,0) = x_des_ → 误差 ≈ 0
+    hw.fake_position_(0) = 0.1;  // 更新当前位置到新期望点
+    CHECK(ctrl.UpdateCmd(makeConstJntArray(7)) == rocos::Result::NoError);
+    CHECK(hw.last_set_torque_(0) == doctest::Approx(0.0).epsilon(0.01));
+}
+
+TEST_CASE("CartesianImpedance - x_des_ 保持: JntArray→JntArray 仍正常更新 (MoveJ)") {
+    // 当 x_des_ 来源是 JntArray（非 Frame）时，后续 JntArray 应继续更新。
+    // 这确保 MoveJ（关节空间运动）在 cart_imp 模式下仍能正常工作。
+
+    FakeHardware hw;
+    FakeModel model;
+    model.grav_torque_ = 0.0;
+    hw.fake_position_ = makeConstJntArray(7, 0.0);
+    hw.fake_velocity_ = makeConstJntArray(7, 0.0);
+
+    rocos::CartesianImpedanceController ctrl;
+    ctrl.SetHardware(&hw);
+    ctrl.SetModel(&model);
+    ctrl.SetTorqueRateLimit(0.0);  // 关闭速率限制，仅测试 x_des_ 更新逻辑
+
+    // Step 1: 初始 hold_position_ (JntArray) — q=(0,0,0), FK→p=(0,0,0)
+    auto hold_init = makeConstJntArray(7, 0.0);
+    rocos::JntArray q_cmd;
+    ctrl.GenerateCmd(rocos::Reference{hold_init}, q_cmd);
+    // x_des_ = FK(0,0,0) = (0,0,0), x_des_from_frame_ = false
+
+    // 当前位置 = 期望位置 → 无误差
+    CHECK(ctrl.UpdateCmd(makeConstJntArray(7)) == rocos::Result::NoError);
+    CHECK(hw.last_set_torque_(0) == doctest::Approx(0.0).epsilon(0.01));
+
+    // Step 2: 模拟 MoveJ 第一步 — q=(1,0,0,...), FK→p=(1,0,0)
+    auto movej_step1 = makeConstJntArray(7, 0.0);
+    movej_step1(0) = 1.0;  // q[0]=1 → FK.p.x=1
+    ctrl.GenerateCmd(rocos::Reference{movej_step1}, q_cmd);
+    // x_des_from_frame_ = false → x_des_ 应更新为 FK(1,0,0) = (1,0,0)
+
+    // 当前 p_cur=(0,0,0), x_des=(1,0,0) → 误差 1m → 力矩 = 1500
+    CHECK(ctrl.UpdateCmd(makeConstJntArray(7)) == rocos::Result::NoError);
+    CHECK(hw.last_set_torque_(0) == doctest::Approx(1500.0).epsilon(0.01));
+
+    // Step 3: 模拟 MoveJ 第二步 — q=(2,0,0,...), FK→p=(2,0,0)
+    auto movej_step2 = makeConstJntArray(7, 0.0);
+    movej_step2(0) = 2.0;
+    ctrl.GenerateCmd(rocos::Reference{movej_step2}, q_cmd);
+    // 应继续更新 x_des_ = (2,0,0)
+
+    // 误差 2m → 力矩 = 3000
+    CHECK(ctrl.UpdateCmd(makeConstJntArray(7)) == rocos::Result::NoError);
+    CHECK(hw.last_set_torque_(0) == doctest::Approx(3000.0).epsilon(0.01));
 }
