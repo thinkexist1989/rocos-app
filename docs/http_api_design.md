@@ -311,6 +311,7 @@ int main(int argc, char* argv[]) {
 
 ```json
 {
+  "work_mode": "position",
   "joint_states": [
     {
       "name": "joint_1",

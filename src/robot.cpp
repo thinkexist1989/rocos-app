@@ -733,6 +733,10 @@ namespace rocos {
         snap.is_running = IsRunning();
         snap.control_active = IsControlActive();
         snap.motion_busy = IsMotionBusy();
+        {
+            std::lock_guard<std::mutex> lock(mtx_);
+            snap.work_mode = work_mode_;
+        }
 
         // 关节状态
         const int n = getJointNum();
@@ -902,6 +906,7 @@ namespace rocos {
                     log_ptr_->error("SetWorkMode: fallback SwitchController 失败");
                     return Result::Fatal;
                 }
+                work_mode_ = "position";
                 return rc;
             }
             controller = std::move(new_controller);
@@ -909,6 +914,7 @@ namespace rocos {
                 log_ptr_->error("SetWorkMode: SwitchController 失败, mode={}", mode);
                 return Result::Fatal;
             }
+            work_mode_ = mode;
         }
 
         log_ptr_->info("SetWorkMode: 成功切换到模式 '{}'", mode);

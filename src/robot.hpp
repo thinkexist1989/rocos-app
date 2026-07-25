@@ -70,6 +70,7 @@ class Robot {
     bool is_running{false};
     bool control_active{false};
     bool motion_busy{false};
+    std::string work_mode;
 
     // --- 单轴状态 ---
     struct JointState {
@@ -363,13 +364,15 @@ class Robot {
   void joinControlThreadIfJoinable();
   void jointBinding();
   std::thread control_thread_;               // 控制线程句柄
-  std::mutex mtx_;
+  mutable std::mutex mtx_;
 
   // 命名坐标系注册表：key 是上位机展示和选择的坐标系 name，value 是对应位姿。
   std::map<std::string, Frame> tool_frames_;
   std::map<std::string, Frame> object_frames_;
   std::string active_tool_frame_name_;
   std::string active_object_frame_name_;
+
+  std::string work_mode_ {"position"};  // 当前工作模式字符串: "position" | "jnt_imp" | "jnt_admit_teach" | "cart_imp" | "ee_admit_teach"
 
   //// Joint binding
   std::unique_ptr<JointBinding> joint_binding_;

@@ -74,6 +74,7 @@
 | `is_running` | boolean | 是否正在运行 |
 | `control_active` | boolean | 控制是否激活 |
 | `motion_busy` | boolean | 是否有运动在执行 |
+| `work_mode` | string | 当前工作模式，取值：`position`、`jnt_imp`、`jnt_admit_teach`、`cart_imp` |
 | `timestamp` | number | 快照时刻（epoch 秒） |
 | `joint_states` | JointState[] | 各关节状态数组 |
 | `flange` | Pose | 法兰位姿 |

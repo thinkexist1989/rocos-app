@@ -531,6 +531,7 @@ void RobotHttpServer::handleGetRobotState(const httplib::Request& req, httplib::
     data["is_running"] = snap.is_running;
     data["control_active"] = snap.control_active;
     data["motion_busy"] = snap.motion_busy;
+    data["work_mode"] = snap.work_mode;
     data["timestamp"] = snap.timestamp;
 
     // 关节状态
