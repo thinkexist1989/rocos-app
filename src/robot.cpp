@@ -126,7 +126,7 @@ namespace {
         return true;
     }
 
-    std::vector<std::string> collectFrameNames(const std::map<std::string, rocos::Frame> &frames) {
+    std::vector<std::string> collectFrameNames(const std::unordered_map<std::string, rocos::Frame> &frames) {
         std::vector<std::string> names;
         names.reserve(frames.size());
         for (const auto &frame : frames) {
@@ -193,7 +193,7 @@ namespace {
         return true;
     }
 
-    YAML::Node frameMapToYaml(const std::map<std::string, rocos::Frame> &frames) {
+    YAML::Node frameMapToYaml(const std::unordered_map<std::string, rocos::Frame> &frames) {
         YAML::Node node;
         for (const auto &frame : frames) {
             node[frame.first] = frameToYaml(frame.second);
@@ -205,7 +205,7 @@ namespace {
         return rocos::Twist(rotation * twist.vel, rotation * twist.rot);
     }
 
-    bool yamlToFrameMap(const YAML::Node &node, std::map<std::string, rocos::Frame> &frames) {
+    bool yamlToFrameMap(const YAML::Node &node, std::unordered_map<std::string, rocos::Frame> &frames) {
         frames.clear();
         if (!node) return true;
         if (!node.IsMap()) return false;
@@ -1309,8 +1309,8 @@ namespace rocos {
         try {
             if (log_ptr_) log_ptr_->info("开始加载坐标系 YAML: {}", path);
             YAML::Node root = YAML::LoadFile(path);
-            std::map<std::string, Frame> loaded_tools;
-            std::map<std::string, Frame> loaded_objects;
+            std::unordered_map<std::string, Frame> loaded_tools;
+            std::unordered_map<std::string, Frame> loaded_objects;
             if (!yamlToFrameMap(root["tools"], loaded_tools)) {
                 if (log_ptr_) log_ptr_->error("加载坐标系 YAML 失败: tools 字段非法, path={}", path);
                 return Result::IllegalParameter;

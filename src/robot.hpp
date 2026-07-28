@@ -18,7 +18,7 @@
 // email: luoyang@sia.cn
 #pragma once
 
-#include <map>
+#include <unordered_map>
 #include <string>
 #include <thread>
 #include <vector>
@@ -367,8 +367,8 @@ class Robot {
   mutable std::mutex mtx_;
 
   // 命名坐标系注册表：key 是上位机展示和选择的坐标系 name，value 是对应位姿。
-  std::map<std::string, Frame> tool_frames_;
-  std::map<std::string, Frame> object_frames_;
+  std::unordered_map<std::string, Frame> tool_frames_;
+  std::unordered_map<std::string, Frame> object_frames_;
   std::string active_tool_frame_name_;
   std::string active_object_frame_name_;
 

@@ -24,7 +24,7 @@
 #include <condition_variable>
 #include <json.hpp>
 #include <kdl/frames.hpp>
-#include <map>
+#include <unordered_map>
 #include <memory>
 #include <mutex>
 #include <queue>
@@ -155,7 +155,7 @@ private:
     std::unique_ptr<httplib::Server> server_;
     std::unique_ptr<std::thread> thread_;
     std::mutex taskMutex_;
-    std::map<std::string, nlohmann::json> taskMap_;
+    std::unordered_map<std::string, nlohmann::json> taskMap_;
     long long taskCounter_;
 
     // Thread pool for async motion tasks

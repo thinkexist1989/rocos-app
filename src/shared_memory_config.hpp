@@ -20,7 +20,7 @@
 #include <fcntl.h>
 #include <iostream>
 #include <limits>
-#include <map>
+#include <unordered_map>
 #include <semaphore.h>
 #include <sstream>
 #include <string>
@@ -178,7 +178,7 @@ public:
     // Automatically calls init() (getSharedMemory + getPdDataMemoryProvider).
     // -----------------------------------------------------------------------
     static SharedMemoryConfig *getInstance(int id = 0) {
-        static std::map<int, SharedMemoryConfig *> instances;
+        static std::unordered_map<int, SharedMemoryConfig *> instances;
         if (instances.find(id) == instances.end()) {
             std::cout << "[SHM] Create new SharedMemoryConfig instance: " << id << std::endl;
             instances[id] = new SharedMemoryConfig(id);

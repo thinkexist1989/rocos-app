@@ -19,7 +19,7 @@
 #pragma once
 
 #include <cstdint>
-#include <map>
+#include <unordered_map>
 #include <string>
 #include <vector>
 
@@ -77,7 +77,7 @@ class JointBinding {
  private:
   std::vector<std::string> model_joint_names_;
   std::vector<int32_t> hardware_drive_ids_;
-  std::map<std::string, int32_t> joint_to_drive_id_;
+  std::unordered_map<std::string, int32_t> joint_to_drive_id_;
 };
 
 }  // namespace rocos
