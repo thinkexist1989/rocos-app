@@ -5,7 +5,7 @@
 
 namespace rocos {
     enum class Result : int {
-        PlanFinished = 1000,
+        PlanFinished = 100, // 成功的状态要小于1000 by think
 
 
         NoError = 0,
@@ -26,6 +26,9 @@ namespace rocos {
         IpAddressNotRegister = -1013,
         RobotArmOverNumber = -1014,
         SocketOtherError = -1015,
+        ServoBindFail = -1016,           // UDP 绑定失败
+        ServoThreadStartFailed = -1017,  // UDP 接收线程创建失败
+        ServoNotInitialized = -1018,     // MoveServo 未正确初始化
 
         // 硬件错误
         JointRegistError = -2001,
@@ -185,6 +188,9 @@ namespace rocos {
             RESULT_CASE(IpAddressNotRegister);
             RESULT_CASE(RobotArmOverNumber);
             RESULT_CASE(SocketOtherError);
+            RESULT_CASE(ServoBindFail);
+            RESULT_CASE(ServoThreadStartFailed);
+            RESULT_CASE(ServoNotInitialized);
             RESULT_CASE(JointRegistError);
             RESULT_CASE(EepromRead);
             RESULT_CASE(EepromWrite);

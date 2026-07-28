@@ -74,6 +74,7 @@ add_subdirectory(3rdparty/spdlog)
 add_subdirectory(3rdparty/sml)
 add_subdirectory(3rdparty/lua)
 add_subdirectory(3rdparty/sol2)
+add_subdirectory(3rdparty/sockpp)
 
 
 ###########
@@ -155,6 +156,7 @@ add_library(robot
         src/move_jog.cpp
         src/move_null_jog.cpp
         src/move_svd_jog.cpp
+        src/move_servo.cpp
 
         src/position_controller.cpp
         src/joint_impedance_controller.cpp
@@ -183,6 +185,7 @@ target_link_libraries(robot
         sml::sml
         sol2::sol2
         orocos-kdl
+        sockpp
         )
 add_library(rocos::robot ALIAS robot)
 

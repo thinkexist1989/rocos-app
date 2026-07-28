@@ -42,6 +42,7 @@
 #include "move_line_offline.hpp"  // v3.0 离线规划 + 全轨迹 IK 验证版本
 #include "move_null_jog.hpp"
 #include "move_svd_jog.hpp"
+#include "move_servo.hpp"
 #include "position_controller.hpp"
 
 namespace {
@@ -523,6 +524,13 @@ namespace rocos {
 
     void Robot::on_fsm_servoing() {
         log_ptr_->info("Robot is servoing...");
+        if (data_ready_callback_) {
+            Result rc = data_ready_callback_();
+            if (rc != Result::NoError && rc != Result::PlanFinished) {
+                log_ptr_->error("伺服模式启动失败: {}", static_cast<int>(rc));
+                impl_->process_event(EventErrorOccurred{});
+            }
+        }
     }
 
 #pragma endregion
@@ -951,7 +959,8 @@ namespace rocos {
                || impl_->is(sml::state<class STOPPING>)
                || impl_->is(sml::state<class DISABLING>)
                || impl_->is(sml::state<class STOPPED>)
-               || impl_->is(sml::state<class STARTING>);
+               || impl_->is(sml::state<class STARTING>)
+               || impl_->is(sml::state<class SERVOING>);
     }
 
     bool Robot::IsMotionBusy() const {
@@ -1716,4 +1725,32 @@ namespace rocos {
         }
         return Result::NoError;
     }
+    // ============================================================================
+    // MoveServoing —— UDP 伺服模式
+    // ============================================================================
+
+    Result Robot::MoveServoing(uint16_t port) {
+        data_ready_callback_ = [this, port]() -> Result {
+            auto servo = std::make_unique<MoveServo>(
+                hardware.get(), model.get(), port);
+            Result rc = servo->Reset();
+            if (rc != Result::NoError) {
+                return rc;
+            }
+            {
+                std::lock_guard<std::mutex> lock(mtx_);
+                motion = std::move(servo);
+                executor->SwitchMotion(motion.get());
+            }
+            return Result::NoError;
+        };
+
+        if (!impl_->process_event(EventServoReq{})) {
+            if (impl_->is(sml::state<class IDLE>)) return Result::NotEnabled;
+            if (impl_->is(sml::state<class ERROR_STATE>)) return Result::Fatal;
+            return Result::ConflictTaskRunning;
+        }
+        return Result::NoError;
+    }
+
 } // namespace rocos
