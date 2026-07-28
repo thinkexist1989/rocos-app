@@ -1726,6 +1726,36 @@ namespace rocos {
         return Result::NoError;
     }
     // ============================================================================
+    // SetServoMode —— 设置伺服运动模式
+    // ============================================================================
+
+    Result Robot::SetServoMode(const std::string& mode_str) {
+        MotionMode new_mode;
+        if (mode_str == "joint") {
+            new_mode = MotionMode::kJointPosition;
+        } else if (mode_str == "cartesian") {
+            new_mode = MotionMode::kCartesianPosition;
+        } else {
+            log_ptr_->error("SetServoMode: 未知模式 '{}', 仅支持 joint / cartesian", mode_str);
+            return Result::IllegalParameter;
+        }
+
+        servo_mode_ = new_mode;
+
+        // 如果当前正在伺服模式，动态更新运行中的 MoveServo
+        if (impl_->is(sml::state<class SERVOING>)) {
+            std::lock_guard<std::mutex> lock(mtx_);
+            auto* servo = dynamic_cast<MoveServo*>(motion.get());
+            if (servo) {
+                servo->SetMode(new_mode);
+            }
+        }
+
+        log_ptr_->info("伺服模式已设置为: {}", mode_str);
+        return Result::NoError;
+    }
+
+    // ============================================================================
     // MoveServoing —— UDP 伺服模式
     // ============================================================================
 
@@ -1733,6 +1763,7 @@ namespace rocos {
         data_ready_callback_ = [this, port]() -> Result {
             auto servo = std::make_unique<MoveServo>(
                 hardware.get(), model.get(), port);
+            servo->SetMode(servo_mode_);
             Result rc = servo->Reset();
             if (rc != Result::NoError) {
                 return rc;

@@ -7,6 +7,7 @@ tags:
   - name: 机器人状态与信息
   - name: 基础控制
   - name: 空间运动控制 (Motion)
+  - name: 伺服控制 (Servo)
   - name: 点动控制 (Jogging)
   - name: 坐标系管理 (Frame)
   - name: 标定
@@ -214,6 +215,85 @@ paths:
       responses:
         '200':
           description: 模式切换成功
+          headers: {}
+      security: []
+  /api/robot/servo/start:
+    post:
+      summary: 启动 UDP 伺服运动模式
+      deprecated: false
+      description: >
+        进入 SERVOING 状态，在 localhost 上启动 UDP 伺服线程。 机器人开始监听指定端口，接收外部
+        MotionGeneratorCommand 并回复 RobotState。
+      tags:
+        - 伺服控制 (Servo)
+      parameters: []
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                port:
+                  type: integer
+                  default: 8081
+                  description: UDP 监听端口
+        required: false
+      responses:
+        '200':
+          description: 伺服模式启动结果
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MotionResponse'
+          headers: {}
+      security: []
+  /api/robot/servo/stop:
+    post:
+      summary: 停止 UDP 伺服运动模式
+      deprecated: false
+      description: 退出 SERVOING 状态，回到 STOPPED，关闭 UDP 线程和 socket
+      tags:
+        - 伺服控制 (Servo)
+      parameters: []
+      responses:
+        '200':
+          description: 伺服模式停止结果
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MotionResponse'
+          headers: {}
+      security: []
+  /api/robot/servo/mode:
+    post:
+      summary: 设置伺服运动模式
+      deprecated: false
+      description: 设置伺服模式为关节空间（joint）或笛卡尔空间（cartesian），可在启动前或运行中调用
+      tags:
+        - 伺服控制 (Servo)
+      parameters: []
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - mode
+              properties:
+                mode:
+                  type: string
+                  enum:
+                    - joint
+                    - cartesian
+                  description: joint=关节空间位置控制, cartesian=笛卡尔空间位姿控制
+        required: true
+      responses:
+        '200':
+          description: 模式切换结果
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MotionResponse'
           headers: {}
       security: []
   /api/robot/movej:

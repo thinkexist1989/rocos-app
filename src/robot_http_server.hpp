@@ -68,6 +68,11 @@ private:
     void handleIsEnabled(const httplib::Request& req, httplib::Response& res);
     void handleSetWorkMode(const httplib::Request& req, httplib::Response& res);
 
+    // ---- Servo Control ----
+    void handleServoStart(const httplib::Request& req, httplib::Response& res);
+    void handleServoStop(const httplib::Request& req, httplib::Response& res);
+    void handleServoMode(const httplib::Request& req, httplib::Response& res);
+
     // ---- Motion Control ----
     void handleMoveJ(const httplib::Request& req, httplib::Response& res);
     void handleMoveJ_IK(const httplib::Request& req, httplib::Response& res);

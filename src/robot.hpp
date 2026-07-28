@@ -27,6 +27,7 @@
 
 #include "types.hpp"
 #include "result.hpp"
+#include "servo_type.hpp"
 #include "logger.hpp"
 
 
@@ -175,6 +176,9 @@ class Robot {
                           double timeout = 0.1, double dir_threshold = 0.99);
 
   Result MoveServoing(uint16_t port = 8081);
+
+  /// @brief 设置伺服运动模式（joint / cartesian），可在启动前或运行中调用
+  Result SetServoMode(const std::string& mode_str);
 
   Result MoveJ(const JntArray& q_goal,
                double v_limit = 1.0, double a_limit = 2.0, double j_limit = 10.0);
@@ -375,6 +379,8 @@ class Robot {
   std::string active_object_frame_name_;
 
   std::string work_mode_ {"position"};  // 当前工作模式字符串: "position" | "jnt_imp" | "jnt_admit_teach" | "cart_imp" | "ee_admit_teach"
+
+  MotionMode servo_mode_{MotionMode::kJointPosition};  // 伺服运动模式: kJointPosition | kCartesianPosition
 
   //// Joint binding
   std::unique_ptr<JointBinding> joint_binding_;

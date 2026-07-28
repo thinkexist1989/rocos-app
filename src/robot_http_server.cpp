@@ -261,6 +261,11 @@ void RobotHttpServer::registerRoutes() {
     server_->Post("/api/robot/reset", [this](auto& req, auto& res) { handleReset(req, res); });
     server_->Post("/api/robot/workmode", [this](auto& req, auto& res) { handleSetWorkMode(req, res); });
 
+    // Robot servo control
+    server_->Post("/api/robot/servo/start", [this](auto& req, auto& res) { handleServoStart(req, res); });
+    server_->Post("/api/robot/servo/stop", [this](auto& req, auto& res) { handleServoStop(req, res); });
+    server_->Post("/api/robot/servo/mode", [this](auto& req, auto& res) { handleServoMode(req, res); });
+
     // Robot motion control
     server_->Post("/api/robot/movej", [this](auto& req, auto& res) { handleMoveJ(req, res); });
     server_->Post("/api/robot/movej_ik", [this](auto& req, auto& res) { handleMoveJ_IK(req, res); });
@@ -764,6 +769,71 @@ void RobotHttpServer::handleSetWorkMode(const httplib::Request& req, httplib::Re
              resultSucceeded(result)
                  ? "Work mode set to " + mode_str
                  : "Failed to set work mode",
+             data);
+}
+
+// ============================================================================
+// Servo Control Handlers
+// ============================================================================
+
+void RobotHttpServer::handleServoStart(const httplib::Request& req, httplib::Response& res) {
+    log_ptr_->info("POST /api/robot/servo/start");
+
+    nlohmann::json body = nlohmann::json::parse(req.body, nullptr, false);
+    uint16_t port = 8081;
+    if (!body.is_discarded() && body.contains("port") && body["port"].is_number()) {
+        int p = body["port"].get<int>();
+        if (p > 0 && p <= 65535) {
+            port = static_cast<uint16_t>(p);
+        }
+    }
+
+    const Result result = robot_->MoveServoing(port);
+    nlohmann::json data;
+    data["robot_state"] = robot_->GetStateString();
+    data["control_active"] = robot_->IsControlActive();
+    data["port"] = port;
+
+    sendJson(res, resultSucceeded(result), resultCode(result),
+             resultSucceeded(result) ? "Servo mode started"
+                                     : "Servo start failed",
+             data);
+}
+
+void RobotHttpServer::handleServoStop(const httplib::Request& req, httplib::Response& res) {
+    log_ptr_->info("POST /api/robot/servo/stop");
+
+    const Result result = robot_->StopMotion();
+    nlohmann::json data;
+    data["robot_state"] = robot_->GetStateString();
+    data["control_active"] = robot_->IsControlActive();
+
+    sendJson(res, resultSucceeded(result), resultCode(result),
+             resultSucceeded(result) ? "Servo mode stopped"
+                                     : "Servo stop failed",
+             data);
+}
+
+void RobotHttpServer::handleServoMode(const httplib::Request& req, httplib::Response& res) {
+    log_ptr_->info("POST /api/robot/servo/mode");
+
+    nlohmann::json body = nlohmann::json::parse(req.body, nullptr, false);
+    if (body.is_discarded() || !body.contains("mode") || !body["mode"].is_string()) {
+        sendJson(res, false, 1001, "Invalid JSON or missing 'mode' field");
+        return;
+    }
+
+    const std::string mode_str = body["mode"].get<std::string>();
+    const Result result = robot_->SetServoMode(mode_str);
+
+    nlohmann::json data;
+    data["mode"] = mode_str;
+    data["robot_state"] = robot_->GetStateString();
+
+    sendJson(res, resultSucceeded(result), resultCode(result),
+             resultSucceeded(result)
+                 ? "Servo mode set to " + mode_str
+                 : "Failed to set servo mode",
              data);
 }
 
