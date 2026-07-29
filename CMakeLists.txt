@@ -509,3 +509,9 @@ target_link_libraries(lua_runner
         PRIVATE
         robot
         )
+
+add_executable(udp_example examples/udp_example.cpp)
+target_link_libraries(udp_example
+        PRIVATE
+        robot
+        )
