@@ -267,6 +267,7 @@ namespace {
 
                 state<class SERVOING> + sml::on_entry<_> / action_servoing, // 5 SERVOING
                 state<class SERVOING> + event<EventStopReq> = state<class STOPPING>, //   SERVOING->STOPPING
+                state<class SERVOING> + event<EventSuccessed> = state<class STOPPED>, //   SERVOING->STOPPED（安全兜底）
 
                 state<class ENABLING> + sml::on_entry<_> / action_enabling, // 6 ENABLING
                 state<class ENABLING> + event<EventEnabled> = state<class STOPPED>, // 6 ENABLING->STOPPED
@@ -457,7 +458,12 @@ namespace rocos {
 
     void Robot::on_fsm_error() {
       log_ptr_->info("机器人进入ERROR");
-
+      {
+        std::lock_guard<std::mutex> lock(mtx_);
+        if (motion) {
+          motion->Stop();  // 停止当前 motion，确保 MoveServo 的 UDP 线程等资源被释放
+        }
+      }
     }
     void Robot::on_fsm_stopped() {
       log_ptr_->info("机器人进入STOPPED状态");
@@ -1075,6 +1081,7 @@ namespace rocos {
         if (impl_->process_event(EventStartReq{})) {
             // STOPPED → RUNNING
         } else {
+            data_ready_callback_ = nullptr;  // 切换失败，清除无效回调
             if (impl_->is(sml::state<class IDLE>)) {
                 log_ptr_->error("机器人处于IDLE状态，无法执行MoveJ指令，请先上使能");
                 return Result::NotEnabled;
@@ -1147,6 +1154,7 @@ namespace rocos {
         };
 
         if (!impl_->process_event(EventStartReq{})) {
+            data_ready_callback_ = nullptr;  // 切换失败，清除无效回调
             if (impl_->is(sml::state<class IDLE>)) return Result::NotEnabled;
             if (impl_->is(sml::state<class ERROR_STATE>)) return Result::Fatal;
             return Result::ConflictTaskRunning;
@@ -1423,6 +1431,7 @@ namespace rocos {
         };
 
         if (!impl_->process_event(EventStartReq{})) {
+            data_ready_callback_ = nullptr;  // 切换失败，清除无效回调
             if (impl_->is(sml::state<class IDLE>)) return Result::NotEnabled;
             if (impl_->is(sml::state<class ERROR_STATE>)) return Result::Fatal;
             return Result::ConflictTaskRunning;
@@ -1459,6 +1468,7 @@ namespace rocos {
         };
 
         if (!impl_->process_event(EventStartReq{})) {
+            data_ready_callback_ = nullptr;  // 切换失败，清除无效回调
             if (impl_->is(sml::state<class IDLE>)) return Result::NotEnabled;
             if (impl_->is(sml::state<class ERROR_STATE>)) return Result::Fatal;
             return Result::ConflictTaskRunning;
@@ -1604,6 +1614,7 @@ namespace rocos {
                 };
 
         if (!impl_->process_event(EventStartReq{})) {
+            data_ready_callback_ = nullptr;  // 切换失败，清除无效回调
             if (impl_->is(sml::state<class IDLE>)) return Result::NotEnabled;
             if (impl_->is(sml::state<class ERROR_STATE>)) return Result::Fatal;
             return Result::ConflictTaskRunning;
@@ -1661,6 +1672,7 @@ namespace rocos {
         };
 
         if (!impl_->process_event(EventStartReq{})) {
+            data_ready_callback_ = nullptr;  // 切换失败，清除无效回调
             if (impl_->is(sml::state<class IDLE>)) return Result::NotEnabled;
             if (impl_->is(sml::state<class ERROR_STATE>)) return Result::Fatal;
             return Result::ConflictTaskRunning;
@@ -1719,6 +1731,7 @@ namespace rocos {
         };
 
         if (!impl_->process_event(EventStartReq{})) {
+            data_ready_callback_ = nullptr;  // 切换失败，清除无效回调
             if (impl_->is(sml::state<class IDLE>)) return Result::NotEnabled;
             if (impl_->is(sml::state<class ERROR_STATE>)) return Result::Fatal;
             return Result::ConflictTaskRunning;
@@ -1748,6 +1761,8 @@ namespace rocos {
             auto* servo = dynamic_cast<MoveServo*>(motion.get());
             if (servo) {
                 servo->SetMode(new_mode);
+            } else {
+                log_ptr_->warn("SetServoMode: 当前 motion 不是 MoveServo 实例，无法动态更新模式");
             }
         }
 
@@ -1777,6 +1792,7 @@ namespace rocos {
         };
 
         if (!impl_->process_event(EventServoReq{})) {
+            data_ready_callback_ = nullptr;  // 切换失败，清除无效回调
             if (impl_->is(sml::state<class IDLE>)) return Result::NotEnabled;
             if (impl_->is(sml::state<class ERROR_STATE>)) return Result::Fatal;
             return Result::ConflictTaskRunning;

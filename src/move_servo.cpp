@@ -265,14 +265,14 @@ void MoveServo::udpReceiveLoop() {
     auto sock = sock_.clone();
     sock.set_non_blocking(true);
 
-    char                 buf[sizeof(MotionGeneratorCommand)];
-    uint64_t             latest_msg_id = 0;
-    sockpp::inet_address addr;
-    bool                 received = false;
+    char                       buf[sizeof(MotionGeneratorCommand)];
+    MotionGeneratorCommand     best_cmd{};   // 保存 message_id 最大的完整指令
+    sockpp::inet_address       addr;
+    bool                       received = false;
 
     while (running_.load(std::memory_order_relaxed)) {
         // ================================================================
-        // Phase 1: 非阻塞排空积压包，保留 message_id 最大的
+        // Phase 1: 非阻塞排空积压包，保留 message_id 最大的完整指令
         // ================================================================
         while (running_.load(std::memory_order_relaxed)) {
             ssize_t n = sock.recv_from(buf, sizeof(buf), &addr);
@@ -284,8 +284,9 @@ void MoveServo::udpReceiveLoop() {
             }
 
             auto* cmd = reinterpret_cast<MotionGeneratorCommand*>(buf);
-            if (!received || cmd->message_id > latest_msg_id) {
-                latest_msg_id = cmd->message_id;
+            if (!received || cmd->message_id > best_cmd.message_id) {
+                // 保存完整指令数据，避免 buf 被后续 recv_from 覆盖后丢失
+                best_cmd = *cmd;
                 received = true;
             }
         }
@@ -297,7 +298,7 @@ void MoveServo::udpReceiveLoop() {
             // 将指令写入共享缓冲区（供 GenerateRef 消费）
             {
                 std::lock_guard<std::mutex> lock(mtx_);
-                cmd_ = *reinterpret_cast<MotionGeneratorCommand*>(buf);
+                cmd_ = best_cmd;
                 has_new_cmd_ = true;
             }
 
