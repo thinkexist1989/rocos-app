@@ -170,9 +170,6 @@ Result MoveServo::Stop() {
 // ============================================================================
 
 Result MoveServo::Update() {
-    if (stopped_.load(std::memory_order_relaxed)) {
-        return Result::PlanFinished;   // 伪装为PlanFinished，用于切换状态机 by think
-    }
     return Result::NoError;
 }
 
@@ -181,37 +178,95 @@ Result MoveServo::Update() {
 // ============================================================================
 
 Result MoveServo::GenerateRef(Reference& ref_out) {
+
+    MotionGeneratorCommand local_cmd;
+    bool                   has_cmd = false;
+    {
+        std::lock_guard<std::mutex> lock(mtx_);
+        has_cmd = has_new_cmd_;
+        if (has_cmd) {
+            local_cmd = cmd_;
+        }
+    }
+
+    // 尚未收到任何指令：必须回填当前位置。Reference 默认构造持有空 JntArray，
+    // 直接返回会让下游 Controller 拿到零维参考而失去位置锁定。
+    if (!has_cmd) {
+        Result rc = fillCurrentReference(ref_out);
+        if (static_cast<int>(rc) < 0) {
+            return rc;
+        }
+    } else {
+        switch (current_mode_) {
+        case MotionMode::kJointPosition: {
+            JntArray q_ref(static_cast<unsigned int>(joint_count_));
+            for (int i = 0; i < joint_count_; ++i) {
+                q_ref(i) = local_cmd.q_c[static_cast<size_t>(i)];
+            }
+            ref_out = std::move(q_ref);
+            break;
+        }
+        case MotionMode::kCartesianPosition: {
+            Frame f = matrixToFrame(local_cmd.tcp_c);
+            ref_out = std::move(f);
+            break;
+        }
+        case MotionMode::kNone:
+        default: {
+            Result rc = fillCurrentReference(ref_out);
+            if (static_cast<int>(rc) < 0) {
+                return rc;
+            }
+            break;
+        }
+        }
+    }
+
     if (stopped_.load(std::memory_order_relaxed)) {
         return Result::PlanFinished;
     }
 
-    MotionGeneratorCommand local_cmd;
-    {
-        std::lock_guard<std::mutex> lock(mtx_);
-        if (!has_new_cmd_) {
-            return Result::NoError;  // 尚未收到指令，保持当前位置
-        }
-        local_cmd = cmd_;
+    return Result::NoError;
+}
+
+// ============================================================================
+// fillCurrentReference —— 按当前模式把机器人实际位置填入 Reference
+// ============================================================================
+
+Result MoveServo::fillCurrentReference(Reference& ref_out) {
+    if (hw_ == nullptr) {
+        return Result::ParameterPointerEqualsNullptr;
+    }
+    if (joint_count_ <= 0) {
+        return Result::UnmatchedJointsNumber;
     }
 
-    switch (current_mode_) {
-    case MotionMode::kJointPosition: {
-        JntArray q_ref(static_cast<unsigned int>(joint_count_));
-        for (int i = 0; i < joint_count_; ++i) {
-            q_ref(i) = local_cmd.q_c[static_cast<size_t>(i)];
-        }
-        ref_out = std::move(q_ref);
-        return Result::NoError;
+    JntArray q_now = hw_->GetPosition();
+    if (static_cast<int>(q_now.rows()) < joint_count_) {
+        return Result::UnmatchedJointsNumber;
     }
-    case MotionMode::kCartesianPosition: {
-        Frame f = matrixToFrame(local_cmd.tcp_c);
+
+    if (current_mode_ == MotionMode::kCartesianPosition) {
+        if (model_ == nullptr) {
+            return Result::ParameterPointerEqualsNullptr;
+        }
+        Frame  f;
+        Result rc = model_->ForwardKinematics(q_now, f);
+        if (static_cast<int>(rc) < 0) {
+            return rc;
+        }
         ref_out = std::move(f);
         return Result::NoError;
     }
-    case MotionMode::kNone:
-    default:
-        return Result::NoError;
+
+    // kJointPosition / kNone：截断到实际轴数，保持与指令分支一致的维度
+    JntArray q_ref(static_cast<unsigned int>(joint_count_));
+    for (int i = 0; i < joint_count_; ++i) {
+        auto ui  = static_cast<unsigned int>(i);
+        q_ref(ui) = q_now(ui);
     }
+    ref_out = std::move(q_ref);
+    return Result::NoError;
 }
 
 // ============================================================================

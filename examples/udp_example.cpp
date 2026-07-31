@@ -77,6 +77,20 @@ int main(int argc, char* argv[]) {
     httplib::Client http(host, http_port);
     http.set_connection_timeout(5);
 
+
+    // ---- Step 2: 设置伺服模式为关节空间 ----
+    {
+        nlohmann::json body;
+        body["mode"] = "joint";
+        auto res = http.Post("/api/robot/servo/mode",
+                             body.dump(), "application/json");
+        if (res) {
+          auto json = nlohmann::json::parse(res->body);
+          std::cout << "[INFO] ✓ 伺服模式: "
+                    << json.value("message", "") << "\n";
+        }
+    }
+
     {
         nlohmann::json body;
         body["port"] = udp_port;

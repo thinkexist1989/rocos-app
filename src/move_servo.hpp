@@ -81,6 +81,10 @@ class MoveServo : public MotionInterface {
   // ─── 从硬件读取状态并构建 RobotState（UDP 线程内调用） ───
   RobotState buildRobotState();
 
+  /// @brief 无新指令时的兜底：按 current_mode_ 把当前实际位置填入 ref_out
+  ///        kJointPosition/kNone → 当前关节角；kCartesianPosition → FK 得到的位姿
+  Result fillCurrentReference(Reference& ref_out);
+
   // ─── 矩阵转换辅助：16 元素 row-major 4x4 <-> KDL::Frame ───
   static Frame matrixToFrame(const std::array<double, 16>& mat);
   static void  frameToMatrix(const Frame& f, std::array<double, 16>& mat);

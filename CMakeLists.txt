@@ -447,6 +447,15 @@ add_test(NAME move_joint_test COMMAND move_joint_test)
 set_tests_properties(move_joint_test PROPERTIES
         WORKING_DIRECTORY ${CMAKE_SOURCE_DIR})
 
+add_executable(move_servo_test test/move_servo_test.cc)
+target_link_libraries(move_servo_test
+        PRIVATE
+        robot
+        )
+add_test(NAME move_servo_test COMMAND move_servo_test)
+set_tests_properties(move_servo_test PROPERTIES
+        WORKING_DIRECTORY ${CMAKE_SOURCE_DIR})
+
 add_executable(move_line_test test/move_line_test.cc)
 target_link_libraries(move_line_test
         PRIVATE

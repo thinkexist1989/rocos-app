@@ -54,7 +54,8 @@ Result Executor::Update() {
 
   profiler_->MeasureEnd(kMotionMeasurement);
 
-  if (static_cast<int>(res) < 0) return res;
+  if (static_cast<int>(res) < 0)
+    return res;
 
   sum += static_cast<int>(res);
 
@@ -64,7 +65,8 @@ Result Executor::Update() {
   res = controller_->GenerateCmd(ref, q_cmd);
   profiler_->MeasureEnd(kControllerMeasurement);
 
-  if (static_cast<int>(res) < 0) return res;
+  if (static_cast<int>(res) < 0)
+    return res;
 
   sum += static_cast<int>(res);
 
@@ -72,7 +74,9 @@ Result Executor::Update() {
   // ③ 下发硬件
   res = controller_->UpdateCmd(q_cmd);
 
-  if (static_cast<int>(res) < 0) return res;
+  if (static_cast<int>(res) < 0)
+    return res;
+
   sum += static_cast<int>(res);
 
 

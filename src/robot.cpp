@@ -243,7 +243,7 @@ namespace {
             return make_transition_table(
                 // 初始化
                 *state<class ERROR_STATE> + event<EventResetReq> = state<class RESETTING>, // 0 ERROR_STATE->RESETTING
-                state<class ERROR_STATE> + event<EventStopReq> = state<class STOPPING>, //   ERROR_STATE->STOPPING
+                // state<class ERROR_STATE> + event<EventStopReq> = state<class STOPPING>, //   ERROR_STATE->STOPPING
                 state<class ERROR_STATE> + sml::on_entry<_> / action_error, //   ERROR_STATE->RESETTING
 
                 state<class IDLE> + event<EventEnableReq> = state<class ENABLING>, // 1 IDLE->ENABLING
@@ -529,7 +529,7 @@ namespace rocos {
     }
 
     void Robot::on_fsm_servoing() {
-        log_ptr_->info("Robot is servoing...");
+        log_ptr_->info("机器人已进入SERVOING状态");
         if (data_ready_callback_) {
             Result rc = data_ready_callback_();
             if (rc != Result::NoError && rc != Result::PlanFinished) {
@@ -1044,9 +1044,11 @@ namespace rocos {
       }
 
       if (static_cast<int>(res) < 0) {
+        log_ptr_->error("机器人控制循环出现错误: {}", static_cast<int>(res));
         impl_->process_event(EventErrorOccurred{});
       }
       else if (static_cast<int>(res) > 0) {
+        log_ptr_->info("机器人控制循环成功完成: {}", static_cast<int>(res));
         impl_->process_event(EventSuccessed{});
       }
 
@@ -1792,6 +1794,7 @@ namespace rocos {
         };
 
         if (!impl_->process_event(EventServoReq{})) {
+            log_ptr_->error("启动伺服失败，端口号：{}", port);
             data_ready_callback_ = nullptr;  // 切换失败，清除无效回调
             if (impl_->is(sml::state<class IDLE>)) return Result::NotEnabled;
             if (impl_->is(sml::state<class ERROR_STATE>)) return Result::Fatal;

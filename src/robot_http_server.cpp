@@ -285,22 +285,6 @@ void RobotHttpServer::registerRoutes() {
     server_->Post("/api/robot/jog/svd", [this](auto& req, auto& res) { handleJogSvd(req, res); });
     server_->Post("/api/robot/jog/stop", [this](auto& req, auto& res) { handleJogStop(req, res); });
 
-    // Legacy jogging aliases — 上位机仍在使用 flag 格式
-    // server_->Post("/api/drag/start", [this](auto& req, auto& res) { handleJogCompat(req, res); });
-    // server_->Post("/api/drag/stop", [this](auto& req, auto& res) { handleJogStop(req, res); });
-    // server_->Post("/api/robot/jog", [this](auto& req, auto& res) { handleJogCompat(req, res); });
-
-    // Legacy motion aliases kept for existing clients during API migration.
-    // server_->Post("/api/move/joint", [this](auto& req, auto& res) { handleMoveJ(req, res); });
-    // server_->Post("/api/move/joint_ik", [this](auto& req, auto& res) { handleMoveJ_IK(req, res); });
-    // server_->Post("/api/move/linear", [this](auto& req, auto& res) { handleMoveL(req, res); });
-    // server_->Post("/api/move/linear_fk", [this](auto& req, auto& res) { handleMoveL_FK(req, res); });
-    // server_->Post("/api/move/circle", [this](auto& req, auto& res) { handleMoveC(req, res); });
-    // server_->Post("/api/move/pause", [this](auto& req, auto& res) { handlePause(req, res); });
-    // server_->Post("/api/move/resume", [this](auto& req, auto& res) { handleResume(req, res); });
-    // server_->Post("/api/move/stop", [this](auto& req, auto& res) { handleStop(req, res); });
-    // server_->Get("/api/move/status", [this](auto& req, auto& res) { handleMoveStatus(req, res); });
-
     // Frame management
     server_->Get("/api/robot/tool_frames", [this](auto& req, auto& res) { handleGetToolFrameNames(req, res); });
     server_->Get("/api/robot/object_frames", [this](auto& req, auto& res) { handleGetObjectFrameNames(req, res); });
