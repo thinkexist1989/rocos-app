@@ -161,7 +161,65 @@ int main(int argc, char* argv[]) {
         return 1;
     }
 
-    // 设置接收超时 500us —— 避免 recv 永久阻塞影响控制周期
+    // ---- Step 4: 获取初始机器人状态（先用长超时探测，再恢复短超时）----
+    MotionGeneratorCommand cmd{};
+    RobotState             state{};
+
+    // 探测阶段：超时设 200ms，等待 UDP 线程就绪并回包
+    {
+        struct timeval tv {};
+        tv.tv_sec  = 0;
+        tv.tv_usec = 200000;  // 200ms
+        setsockopt(sockfd, SOL_SOCKET, SO_RCVTIMEO,
+                   reinterpret_cast<const char*>(&tv), sizeof(tv));
+    }
+
+    bool probe_ok = false;
+    for (int attempt = 0; attempt < 10 && !probe_ok; ++attempt) {
+        // message_id = 0 → 服务端识别为纯查询包，只回复状态，不更新运动指令
+        cmd.message_id = 0;
+        send(sockfd, &cmd, sizeof(cmd), 0);
+
+        char    buf[sizeof(RobotState)];
+        ssize_t n = recv(sockfd, buf, sizeof(buf), 0);
+        if (n == static_cast<ssize_t>(sizeof(RobotState))) {
+            std::memcpy(&state, buf, sizeof(RobotState));
+            probe_ok = true;
+        }
+    }
+
+    if (probe_ok) {
+        std::cout << "[INFO] ✓ 获取初始状态, server_msg_id="
+                  << state.message_id << "\n";
+        std::cout << "[INFO]   关节位置 q = [";
+        for (int i = 0; i < static_cast<int>(MAX_DOF); ++i) {
+            std::cout << std::fixed << std::setprecision(4) << state.q[i];
+            if (i < static_cast<int>(MAX_DOF) - 1) std::cout << ", ";
+        }
+        std::cout << "]\n";
+    } else {
+        std::cerr << "[ERROR] 探测失败：无法获取初始关节位置，请检查伺服是否正常启动\n";
+        close(sockfd);
+        http.Post("/api/robot/servo/stop", "", "application/json");
+        return 1;
+    }
+
+    // 以当前位置作为 sin 运动基准，同时初始化 cmd.q_c
+    // 避免探测包的零位指令被控制器在首个有效指令到来前执行
+    double q_init[MAX_DOF]{};
+    int    actual_dof = 0;  // 从探测响应推断实际关节数
+    for (int i = 0; i < static_cast<int>(MAX_DOF); ++i) {
+        q_init[i]  = state.q[i];
+        cmd.q_c[i] = state.q[i];
+        // state.q 由服务端填充到 joint_count 位，之后为 0；取最后一个非全零 index
+        if (state.q[i] != 0.0 || i == 0) {
+            actual_dof = i + 1;
+        }
+    }
+    // 若全为 0（仿真零位），至少用 MAX_DOF 作回退
+    if (actual_dof == 0) actual_dof = static_cast<int>(MAX_DOF);
+
+    // 恢复 500us 超时 —— 控制循环非阻塞 recv
     {
         struct timeval tv {};
         tv.tv_sec  = 0;
@@ -170,38 +228,18 @@ int main(int argc, char* argv[]) {
                    reinterpret_cast<const char*>(&tv), sizeof(tv));
     }
 
-    // ---- Step 4: 获取初始机器人状态 ----
-    MotionGeneratorCommand cmd{};
-    RobotState             state{};
+    // ---- Sin 运动参数 ----
+    // 每个关节使用不同频率，确保在任意时刻各关节指令值都明显不同
+    // 频率间隔 0.1 Hz，关节 i 的频率 = kSinBaseFreq + i * kSinFreqStep
+    constexpr double kSinAmplitude = 0.1;      // 幅值 [rad]，约 5.7°
+    constexpr double kSinBaseFreq  = 0.2;      // 关节 0 的频率 [Hz]
+    constexpr double kSinFreqStep  = 0.1;      // 相邻关节频率差 [Hz]
+    constexpr double kTwoPi        = 6.283185307179586;
 
-    // 发送探测包以获取当前关节位置
-    cmd.message_id = 1;
-    send(sockfd, &cmd, sizeof(cmd), 0);
-
-    {
-        char    buf[sizeof(RobotState)];
-        ssize_t n = recv(sockfd, buf, sizeof(buf), 0);
-        if (n == static_cast<ssize_t>(sizeof(RobotState))) {
-            std::memcpy(&state, buf, sizeof(RobotState));
-            std::cout << "[INFO] ✓ 获取初始状态, server_msg_id="
-                      << state.message_id << "\n";
-            std::cout << "[INFO]   关节位置 q = [";
-            for (int i = 0; i < 6; ++i) {
-                std::cout << std::fixed << std::setprecision(4)
-                          << state.q[i];
-                if (i < 5) std::cout << ", ";
-            }
-            std::cout << "]\n";
-        } else {
-            std::cout << "[WARN] 首次探测未收到回复 (recv=" << n
-                      << ")，将以零位为目标继续运行\n";
-        }
-    }
-
-    // 以当前位置作为目标（hold position，仅测试通信链路）
-    for (int i = 0; i < static_cast<int>(MAX_DOF); ++i) {
-        cmd.q_c[i] = state.q[i];
-    }
+    std::cout << "[INFO] Sin 运动参数: 幅值=" << kSinAmplitude
+              << " rad, 基础频率=" << kSinBaseFreq
+              << " Hz, 关节间频率差=" << kSinFreqStep << " Hz\n";
+    std::cout << "[INFO] 实际关节数 (actual_dof)=" << actual_dof << "\n\n";
 
     // ---- Step 5: 1kHz 伺服控制循环 ----
     constexpr int    kTargetHz        = 1000;
@@ -223,7 +261,7 @@ int main(int argc, char* argv[]) {
     double  min_rtt_us    = 1e9;
     double  max_rtt_us    = 0.0;
 
-    uint64_t cmd_msg_id = 1;
+    uint64_t cmd_msg_id = 0;  // 控制包从 1 开始（第一次 ++cmd_msg_id = 1）
 
     auto loop_start  = std::chrono::steady_clock::now();
     auto next_wakeup = loop_start;
@@ -232,6 +270,29 @@ int main(int argc, char* argv[]) {
 
     while (g_running) {
         auto cycle_begin = std::chrono::steady_clock::now();
+
+        // ---- 计算当前运动时间 [s] ----
+        double t_s = static_cast<double>(
+            std::chrono::duration_cast<std::chrono::microseconds>(
+                cycle_begin - loop_start).count()) * 1e-6;
+
+        // ---- 生成 sin 关节指令 ----
+        // 各关节使用不同频率，保证任意时刻值明显不同，便于验证通信
+        for (int i = 0; i < static_cast<int>(MAX_DOF); ++i) {
+            const double freq = kSinBaseFreq + kSinFreqStep * static_cast<double>(i);
+            cmd.q_c[i] = q_init[i] + kSinAmplitude * std::sin(kTwoPi * freq * t_s);
+        }
+
+        // ---- 客户端诊断：每秒打印一次指令，确认 sin 值随时间变化 ----
+        if (total_loops % kReportInterval == 0 && total_loops > 0) {
+            std::cout << "[CMD]  t=" << std::fixed << std::setprecision(2) << t_s
+                      << "s q=[";
+            for (int i = 0; i < actual_dof; ++i) {
+                std::cout << std::setprecision(4) << cmd.q_c[i];
+                if (i < actual_dof - 1) std::cout << ",";
+            }
+            std::cout << "]\n";
+        }
 
         // ---- 周期滞后检测 ----
         auto lag = std::chrono::duration_cast<std::chrono::microseconds>(

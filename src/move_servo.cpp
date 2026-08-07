@@ -22,6 +22,8 @@
 #include <algorithm>
 #include <chrono>
 
+#include "logger.hpp"
+
 namespace rocos {
 
 // ============================================================================
@@ -182,12 +184,28 @@ Result MoveServo::GenerateRef(Reference& ref_out) {
         }
     }
 
+    // DEBUG: GenerateRef 调用计数
+    static uint64_t gen_ref_count = 0;
+    ++gen_ref_count;
+
     // 尚未收到任何指令：必须回填当前位置。Reference 默认构造持有空 JntArray，
     // 直接返回会让下游 Controller 拿到零维参考而失去位置锁定。
     if (!has_cmd) {
         Result rc = fillCurrentReference(ref_out);
         if (static_cast<int>(rc) < 0) {
             return rc;
+        }
+
+        // DEBUG: 每 500 次报告一次 — 无指令时的兜底状态
+        if (gen_ref_count % 500 == 0) {
+            auto log_ptr = Logger::getInstance("MoveServo::GenRef");
+            auto* q_ref = std::get_if<JntArray>(&ref_out);
+            log_ptr->warn(
+                "[GENREF] #{} NO-CMD fallback → q=[{:.4f},{:.4f},{:.4f},{:.4f},{:.4f},{:.4f}]",
+                gen_ref_count,
+                q_ref ? (*q_ref)(0) : -1.0, q_ref ? (*q_ref)(1) : -1.0,
+                q_ref ? (*q_ref)(2) : -1.0, q_ref ? (*q_ref)(3) : -1.0,
+                q_ref ? (*q_ref)(4) : -1.0, q_ref ? (*q_ref)(5) : -1.0);
         }
     } else {
         switch (current_mode_) {
@@ -196,6 +214,17 @@ Result MoveServo::GenerateRef(Reference& ref_out) {
             for (int i = 0; i < joint_count_; ++i) {
                 q_ref(i) = local_cmd.q_c[static_cast<size_t>(i)];
             }
+
+            // DEBUG: 每 500 次打印一次指令关节值
+            if (gen_ref_count % 500 == 0) {
+                auto log_ptr = Logger::getInstance("MoveServo::GenRef");
+                log_ptr->info(
+                    "[GENREF] #{} JOINT cmd → q=[{:.4f},{:.4f},{:.4f},{:.4f},{:.4f},{:.4f}]",
+                    gen_ref_count,
+                    q_ref(0), q_ref(1), q_ref(2),
+                    q_ref(3), q_ref(4), q_ref(5));
+            }
+
             ref_out = std::move(q_ref);
             break;
         }
@@ -318,10 +347,18 @@ void MoveServo::udpReceiveLoop() {
     sockpp::inet_address       addr;
     bool                       received = false;
 
+    auto log_ptr = Logger::getInstance("MoveServo::UDP");
+    uint64_t recv_count = 0;          // 收到有效包的累计计数
+    uint64_t outer_loop_count = 0;    // 外层循环计数
+    uint64_t last_msg_id = 0;         // 上一次收到的 message_id
+
     while (running_.load(std::memory_order_relaxed)) {
+        ++outer_loop_count;
+
         // ================================================================
         // Phase 1: 非阻塞排空积压包，保留 message_id 最大的完整指令
         // ================================================================
+        int batch_count = 0;  // 本轮收到的有效包数
         while (running_.load(std::memory_order_relaxed)) {
             ssize_t n = sock.recv_from(buf, sizeof(buf), &addr);
             if (n <= 0) {
@@ -337,27 +374,43 @@ void MoveServo::udpReceiveLoop() {
                 best_cmd = *cmd;
                 received = true;
             }
+            ++batch_count;
         }
 
         // ================================================================
-        // 收到有效指令 → 写入共享缓冲区 + 回复 RobotState
+        // 收到有效指令 → 回复 RobotState；仅 message_id > 0 时更新运动指令
+        // message_id == 0 为纯查询包，不写入共享缓冲区
         // ================================================================
         if (received) {
-            // 将指令写入共享缓冲区（供 GenerateRef 消费）
-            {
+            if (best_cmd.message_id > 0) {
                 std::lock_guard<std::mutex> lock(mtx_);
                 cmd_ = best_cmd;
                 has_new_cmd_ = true;
             }
 
-            // 读取硬件状态，构建 RobotState
-            RobotState state = buildRobotState();
+            // DEBUG: 每 100 个包打印一次接收统计（含更多诊断信息）
+            ++recv_count;
+            if (recv_count % 100 == 0) {
+                uint64_t msg_id_delta = (last_msg_id > 0)
+                    ? best_cmd.message_id - last_msg_id
+                    : 0;
+                last_msg_id = best_cmd.message_id;
 
-            // 通过同一 socket 发送 RobotState 回客户端
+                log_ptr->info(
+                    "[UDP-RECV] #{} loop=#{} batch={} msg_id={} Δ={} mode={} "
+                    "q_c=[{:.4f},{:.4f},{:.4f},{:.4f},{:.4f},{:.4f}]",
+                    recv_count, outer_loop_count, batch_count,
+                    best_cmd.message_id, msg_id_delta,
+                    static_cast<int>(current_mode_),
+                    best_cmd.q_c[0], best_cmd.q_c[1], best_cmd.q_c[2],
+                    best_cmd.q_c[3], best_cmd.q_c[4], best_cmd.q_c[5]);
+            }
+
+            RobotState state = buildRobotState();
             ssize_t sent = sock.send_to(&state, sizeof(RobotState), addr);
             recordSuccess(sent == sizeof(RobotState));
 
-            received = false;  // 重置，等待下一个指令
+            received = false;
         }
 
         // ================================================================
