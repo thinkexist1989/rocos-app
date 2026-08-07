@@ -170,6 +170,11 @@ Result MoveServo::Stop() {
 // ============================================================================
 
 Result MoveServo::Update() {
+
+    if (stopped_.load(std::memory_order_relaxed)) {
+      return Result::PlanFinished;
+    }
+
     return Result::NoError;
 }
 
