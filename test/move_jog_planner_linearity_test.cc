@@ -236,12 +236,6 @@ bool runAxis(rocos::Model& model,
             return false;
         }
 
-        rc = jog.Update();
-        if (!isOk(rc)) {
-            std::cerr << "MoveJog Update failed for " << axis
-                      << " at t=" << t << ", rc=" << static_cast<int>(rc) << std::endl;
-            return false;
-        }
 
         rocos::Reference ref;
         rc = jog.GenerateRef(ref);

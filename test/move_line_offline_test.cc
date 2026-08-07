@@ -67,16 +67,13 @@ double pointToLineDistance(const KDL::Vector& p,
     return (p - proj).Norm();
 }
 
-/// 从 JntArray 通过 FK 提取笛卡尔位姿
+/// 从已有 JntArray 通过 FK 提取笛卡尔位姿
 CartesianPoint extractCartesian(int step,
                                 double time,
-                                rocos::MoveLineOffline& move,
+                                const rocos::JntArray& q,
                                 rocos::Model& model,
                                 const KDL::Vector& p_start,
                                 const KDL::Vector& p_goal) {
-    rocos::Reference ref;
-    move.GenerateRef(ref);
-    const auto& q = std::get<rocos::JntArray>(ref);
 
     KDL::Frame fk;
     model.ForwardKinematics(q, fk);
@@ -107,7 +104,6 @@ void writeCsv(const std::string& filename,
     }
 }
 
-/// 运行正常执行模式并收集数据
 void runNormal(rocos::MoveLineOffline& move,
                rocos::Model& model,
                const KDL::Vector& p_start,
@@ -119,13 +115,14 @@ void runNormal(rocos::MoveLineOffline& move,
     double time = 0.0;
 
     while (step < kMaxSteps) {
-        data.push_back(extractCartesian(step, time, move, model, p_start, p_goal));
-        rocos::Result r = move.Update();
+        rocos::Reference ref;
+        rocos::Result r = move.GenerateRef(ref);
+        const auto& q = std::get<rocos::JntArray>(ref);
+        data.push_back(extractCartesian(step, time, q, model, p_start, p_goal));
         if (r != rocos::Result::NoError) break;
         ++step;
         time += kDt;
     }
-    data.push_back(extractCartesian(step, time, move, model, p_start, p_goal));
     writeCsv(csv_name, data);
     MESSAGE(csv_name, " — ", data.size(), " data points");
 }
@@ -143,8 +140,10 @@ void runPauseResume(rocos::MoveLineOffline& move,
 
     // 阶段 1：运行到暂停点
     while (step < kPauseAtStep && step < kMaxSteps) {
-        data.push_back(extractCartesian(step, time, move, model, p_start, p_goal));
-        rocos::Result r = move.Update();
+        rocos::Reference ref;
+        rocos::Result r = move.GenerateRef(ref);
+        const auto& q = std::get<rocos::JntArray>(ref);
+        data.push_back(extractCartesian(step, time, q, model, p_start, p_goal));
         if (r != rocos::Result::NoError) break;
         ++step;
         time += kDt;
@@ -153,8 +152,10 @@ void runPauseResume(rocos::MoveLineOffline& move,
     // 阶段 2：Pause → Jacobian 积分减速到停
     move.Pause();
     while (step < kMaxSteps) {
-        data.push_back(extractCartesian(step, time, move, model, p_start, p_goal));
-        rocos::Result r = move.Update();
+        rocos::Reference ref;
+        rocos::Result r = move.GenerateRef(ref);
+        const auto& q = std::get<rocos::JntArray>(ref);
+        data.push_back(extractCartesian(step, time, q, model, p_start, p_goal));
         if (r == rocos::Result::PlanFinished) break;
         ++step;
         time += kDt;
@@ -165,13 +166,14 @@ void runPauseResume(rocos::MoveLineOffline& move,
     ++step;
     time += kDt;
     while (step < kMaxSteps) {
-        data.push_back(extractCartesian(step, time, move, model, p_start, p_goal));
-        rocos::Result r = move.Update();
+        rocos::Reference ref;
+        rocos::Result r = move.GenerateRef(ref);
+        const auto& q = std::get<rocos::JntArray>(ref);
+        data.push_back(extractCartesian(step, time, q, model, p_start, p_goal));
         if (r != rocos::Result::NoError) break;
         ++step;
         time += kDt;
     }
-    data.push_back(extractCartesian(step, time, move, model, p_start, p_goal));
     writeCsv(csv_name, data);
     MESSAGE(csv_name, " — ", data.size(), " data points");
 }
@@ -189,8 +191,10 @@ void runPauseStop(rocos::MoveLineOffline& move,
 
     // 阶段 1：运行到暂停点
     while (step < kPauseAtStep && step < kMaxSteps) {
-        data.push_back(extractCartesian(step, time, move, model, p_start, p_goal));
-        rocos::Result r = move.Update();
+        rocos::Reference ref;
+        rocos::Result r = move.GenerateRef(ref);
+        const auto& q = std::get<rocos::JntArray>(ref);
+        data.push_back(extractCartesian(step, time, q, model, p_start, p_goal));
         if (r != rocos::Result::NoError) break;
         ++step;
         time += kDt;
@@ -199,8 +203,10 @@ void runPauseStop(rocos::MoveLineOffline& move,
     // 阶段 2：Pause → Jacobian 积分减速到停
     move.Pause();
     while (step < kMaxSteps) {
-        data.push_back(extractCartesian(step, time, move, model, p_start, p_goal));
-        rocos::Result r = move.Update();
+        rocos::Reference ref;
+        rocos::Result r = move.GenerateRef(ref);
+        const auto& q = std::get<rocos::JntArray>(ref);
+        data.push_back(extractCartesian(step, time, q, model, p_start, p_goal));
         if (r == rocos::Result::PlanFinished) break;
         ++step;
         time += kDt;
@@ -209,8 +215,10 @@ void runPauseStop(rocos::MoveLineOffline& move,
     // 阶段 3：Stop 确认
     move.Stop();
     while (step < kMaxSteps) {
-        data.push_back(extractCartesian(step, time, move, model, p_start, p_goal));
-        rocos::Result r = move.Update();
+        rocos::Reference ref;
+        rocos::Result r = move.GenerateRef(ref);
+        const auto& q = std::get<rocos::JntArray>(ref);
+        data.push_back(extractCartesian(step, time, q, model, p_start, p_goal));
         if (r == rocos::Result::PlanFinished) break;
         ++step;
         time += kDt;

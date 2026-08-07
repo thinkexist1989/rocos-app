@@ -50,7 +50,6 @@ public:
     // ─── MotionInterface ───
     Result ValidateParameters() const override;
     Result Reset() override;
-    Result Update() override;
     Result GenerateRef(Reference& ref_out) override;
 
     bool CanPause()  const override { return false; }

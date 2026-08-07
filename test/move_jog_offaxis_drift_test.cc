@@ -93,11 +93,9 @@ int main(int argc, char* argv[]) {
             jog.FeedJog(dir_x, kJogSpeed);
         }
 
-        auto rc = jog.Update();
-        if (rc == rocos::Result::PlanFinished) break;
-
         rocos::Reference ref;
-        jog.GenerateRef(ref);
+        auto rc = jog.GenerateRef(ref);
+        if (rc == rocos::Result::PlanFinished) break;
         extractJointRef(ref, q_cur);
 
         if (step % record_every == 0) {

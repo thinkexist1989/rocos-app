@@ -55,10 +55,8 @@ rocos::Frame makeFrame(double x, double y, double z, double angle_z) {
     return rocos::Frame(KDL::Rotation::RotZ(angle_z), KDL::Vector(x, y, z));
 }
 
-/// 从 GenerateRef 提取位姿数据
-DataPoint extractData(int step, double time, rocos::MoveLine& move) {
-    rocos::Reference ref;
-    move.GenerateRef(ref);
+/// 从已有 Reference 提取位姿数据
+DataPoint extractData(int step, double time, const rocos::Reference& ref) {
     const auto& f = std::get<rocos::Frame>(ref);
 
     DataPoint dp{};
@@ -94,13 +92,13 @@ static void runNormal(rocos::MoveLine& move,
     double time = 0.0;
 
     while (step < kMaxSteps) {
-        data.push_back(extractData(step, time, move));
-        rocos::Result r = move.Update();
+        rocos::Reference ref;
+        rocos::Result r = move.GenerateRef(ref);
+        data.push_back(extractData(step, time, ref));
         if (r != rocos::Result::NoError) break;
         ++step;
         time += kDt;
     }
-    data.push_back(extractData(step, time, move));
     writeCsv(csv_name, data);
     MESSAGE(csv_name, " — ", data.size(), " data points");
 }
@@ -114,8 +112,9 @@ static void runPauseResume(rocos::MoveLine& move,
 
     // 阶段 1：运行到暂停点
     while (step < kPauseAtStep && step < kMaxSteps) {
-        data.push_back(extractData(step, time, move));
-        rocos::Result r = move.Update();
+        rocos::Reference ref;
+        rocos::Result r = move.GenerateRef(ref);
+        data.push_back(extractData(step, time, ref));
         if (r != rocos::Result::NoError) break;
         ++step;
         time += kDt;
@@ -124,8 +123,9 @@ static void runPauseResume(rocos::MoveLine& move,
     // 阶段 2：Pause → 减速到停
     move.Pause();
     while (step < kMaxSteps) {
-        data.push_back(extractData(step, time, move));
-        rocos::Result r = move.Update();
+        rocos::Reference ref;
+        rocos::Result r = move.GenerateRef(ref);
+        data.push_back(extractData(step, time, ref));
         if (r == rocos::Result::PlanFinished) break;
         ++step;
         time += kDt;
@@ -136,13 +136,13 @@ static void runPauseResume(rocos::MoveLine& move,
     ++step;
     time += kDt;
     while (step < kMaxSteps) {
-        data.push_back(extractData(step, time, move));
-        rocos::Result r = move.Update();
+        rocos::Reference ref;
+        rocos::Result r = move.GenerateRef(ref);
+        data.push_back(extractData(step, time, ref));
         if (r != rocos::Result::NoError) break;
         ++step;
         time += kDt;
     }
-    data.push_back(extractData(step, time, move));
     writeCsv(csv_name, data);
     MESSAGE(csv_name, " — ", data.size(), " data points");
 }
@@ -156,8 +156,9 @@ static void runPauseStop(rocos::MoveLine& move,
 
     // 阶段 1：运行到暂停点
     while (step < kPauseAtStep && step < kMaxSteps) {
-        data.push_back(extractData(step, time, move));
-        rocos::Result r = move.Update();
+        rocos::Reference ref;
+        rocos::Result r = move.GenerateRef(ref);
+        data.push_back(extractData(step, time, ref));
         if (r != rocos::Result::NoError) break;
         ++step;
         time += kDt;
@@ -166,8 +167,9 @@ static void runPauseStop(rocos::MoveLine& move,
     // 阶段 2：Pause → 减速到停
     move.Pause();
     while (step < kMaxSteps) {
-        data.push_back(extractData(step, time, move));
-        rocos::Result r = move.Update();
+        rocos::Reference ref;
+        rocos::Result r = move.GenerateRef(ref);
+        data.push_back(extractData(step, time, ref));
         if (r == rocos::Result::PlanFinished) break;
         ++step;
         time += kDt;
@@ -176,8 +178,9 @@ static void runPauseStop(rocos::MoveLine& move,
     // 阶段 3：Stop 确认
     move.Stop();
     while (step < kMaxSteps) {
-        data.push_back(extractData(step, time, move));
-        rocos::Result r = move.Update();
+        rocos::Reference ref;
+        rocos::Result r = move.GenerateRef(ref);
+        data.push_back(extractData(step, time, ref));
         if (r == rocos::Result::PlanFinished) break;
         ++step;
         time += kDt;

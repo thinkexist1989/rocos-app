@@ -184,12 +184,6 @@ int runTest() {
             return 1;
         }
 
-        rc = svd_jog.Update();
-        if (!isOk(rc) && rc != rocos::Result::PlanFinished) {
-            std::cerr << "Update failed at t=" << t
-                      << ", rc=" << static_cast<int>(rc) << std::endl;
-            return 1;
-        }
 
         rocos::Reference ref;
         rc = svd_jog.GenerateRef(ref);

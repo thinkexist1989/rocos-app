@@ -261,25 +261,17 @@ Result MoveCircle::Reset() {
 }
 
 // ============================================================================
-// 单步推进
+// 笛卡尔参考输出（内含 OTG 单步推进）
 // ============================================================================
 
-Result MoveCircle::Update() {
+Result MoveCircle::GenerateRef(Reference& ref_out) {
     if (!has_motion_) return Result::PlanFinished;
 
     const int rc = profile_.Update();
     if (rc < 0) return Result::PlanError;
-    if (rc == 0) return Result::PlanFinished;
-    return Result::NoError;
-}
 
-// ============================================================================
-// 笛卡尔参考输出
-// ============================================================================
-
-Result MoveCircle::GenerateRef(Reference& ref_out) {
     ref_out = interpolateCircular(profile_.position());
-    return Result::NoError;
+    return (rc == 0) ? Result::PlanFinished : Result::NoError;
 }
 
 // ============================================================================

@@ -179,34 +179,22 @@ Result MoveLine::Reset() {
 }
 
 // ============================================================================
-// 单步推进
+// 生成当前周期的笛卡尔参考位姿（内含 OTG 单步推进）
 // ============================================================================
 
-Result MoveLine::Update() {
+Result MoveLine::GenerateRef(Reference& ref_out) {
     if (!has_motion_) {
         return Result::PlanFinished;
     }
 
     const int rc = profile_.Update();
-
     if (rc < 0) {
         return Result::PlanError;
     }
-    if (rc == 0) {
-        return Result::PlanFinished;
-    }
 
-    return Result::NoError;
-}
-
-// ============================================================================
-// 生成当前周期的笛卡尔参考位姿
-// ============================================================================
-
-Result MoveLine::GenerateRef(Reference& ref_out) {
     const double s = profile_.position();
     ref_out = interpolatePose(s);
-    return Result::NoError;
+    return (rc == 0) ? Result::PlanFinished : Result::NoError;
 }
 
 // ============================================================================

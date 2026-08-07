@@ -76,12 +76,9 @@ public:
     /// @return NoError=成功启动, PlanFinished=已到位无需运动, <0=错误码
     Result Reset() override;
 
-    /// @brief 生成当前周期的关节参考位置
+    /// @brief 生成当前周期的关节参考位置（内含 OTG 推进）
     Result GenerateRef(Reference& ref_out) override;
 
-    /// @brief 推进 OTG 一步
-    /// @return NoError=仍在运行, PlanFinished=完成, <0=错误
-    Result Update() override;
 
     bool CanPause()  const override { return true; }
     bool CanResume() const override { return true; }

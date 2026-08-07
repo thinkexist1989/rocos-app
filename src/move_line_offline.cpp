@@ -317,60 +317,10 @@ Result MoveLineOffline::Reset() {
 }
 
 // ============================================================================
-// 单步推进
+// 生成当前周期参考值（内含单步推进）
 //
-// Normal:    索引 +1
-// Integrate: profile_.Update() → Jacobian 积分
-// ============================================================================
-
-Result MoveLineOffline::Update() {
-    if (!has_motion_) {
-        return Result::PlanFinished;
-    }
-
-    if (mode_ == Mode::Normal) {
-        // 轨迹回放：直接推进索引
-        index_++;
-        if (index_ >= trajectory_.size()) {
-            return Result::PlanFinished;
-        }
-        return Result::NoError;
-    }
-
-    // ─── Mode::Integrate：Jacobian 积分模式 ───
-    const int rc = profile_.Update();
-
-    if (rc < 0) {
-        return Result::PlanError;
-    }
-
-    // 获取当前归一化状态
-    const double s     = profile_.position();
-    const double s_dot = profile_.velocity();
-
-    // s_dot → 笛卡尔 Twist
-    Twist twist = computeCartesianTwist(s_dot);
-
-    // J⁺ · twist → 关节速度
-    JntArray q_dot(n_joints_);
-    if (!solveJointVelocity(q_current_, twist, q_dot)) {
-        return Result::PlanError;
-    }
-
-    // 积分：q += q_dot * dt
-    q_current_.data += q_dot.data * dt_;
-
-    if (rc == 0) {
-        return Result::PlanFinished;
-    }
-    return Result::NoError;
-}
-
-// ============================================================================
-// 生成当前周期参考值
-//
-// Normal:     输出预存关节位置
-// Integrate:  输出 Jacobian 积分关节位置
+// Normal:     索引 +1，输出预存关节位置
+// Integrate:  profile_.Update() → Jacobian 积分 → 输出关节位置
 // ============================================================================
 
 Result MoveLineOffline::GenerateRef(Reference& ref_out) {
@@ -379,17 +329,33 @@ Result MoveLineOffline::GenerateRef(Reference& ref_out) {
     }
 
     if (mode_ == Mode::Normal) {
-        // index_ 越界保护：clamp 到最后一个有效点
+        index_++;
         if (index_ >= trajectory_.size()) {
             ref_out = trajectory_.back().q;
-        } else {
-            ref_out = trajectory_[index_].q;
+            return Result::PlanFinished;
         }
-    } else {
-        ref_out = q_current_;
+        ref_out = trajectory_[index_].q;
+        return Result::NoError;
     }
 
-    return Result::NoError;
+    // ─── Mode::Integrate：Jacobian 积分模式 ───
+    const int rc = profile_.Update();
+    if (rc < 0) {
+        return Result::PlanError;
+    }
+
+    const double s_dot = profile_.velocity();
+    Twist twist = computeCartesianTwist(s_dot);
+
+    JntArray q_dot(n_joints_);
+    if (!solveJointVelocity(q_current_, twist, q_dot)) {
+        return Result::PlanError;
+    }
+
+    q_current_.data += q_dot.data * dt_;
+    ref_out = q_current_;
+
+    return (rc == 0) ? Result::PlanFinished : Result::NoError;
 }
 
 // ============================================================================

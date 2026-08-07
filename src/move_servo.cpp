@@ -165,18 +165,6 @@ Result MoveServo::Stop() {
     return Result::NoError;
 }
 
-// ============================================================================
-// Update —— 控制线程每周期调用，仅检查停止标志
-// ============================================================================
-
-Result MoveServo::Update() {
-
-    if (stopped_.load(std::memory_order_relaxed)) {
-      return Result::PlanFinished;
-    }
-
-    return Result::NoError;
-}
 
 // ============================================================================
 // GenerateRef —— 将最新收到的指令转为 Reference

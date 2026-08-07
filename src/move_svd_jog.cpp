@@ -136,9 +136,19 @@ void MoveSvdJog::reconfigureSpeedOtg(double target_speed) {
     speed_input_.max_jerk          = {j_max_};
 }
 
-Result MoveSvdJog::Update() {
-    if (state_.load() == State::Stopped) return Result::PlanFinished;
-    if (!has_started_.load()) return Result::NoError;
+// ============================================================================
+// GenerateRef（内含看门狗 + OTG 单步推进）
+// ============================================================================
+
+Result MoveSvdJog::GenerateRef(Reference& ref_out) {
+    if (state_.load() == State::Stopped) {
+        ref_out = q_integral_;
+        return Result::PlanFinished;
+    }
+    if (!has_started_.load()) {
+        ref_out = q_integral_;
+        return Result::NoError;
+    }
 
     double target;
     {
@@ -162,13 +172,18 @@ Result MoveSvdJog::Update() {
     speed_otg_current_ = speed_output_.new_velocity[0];
     speed_output_.pass_to_input(speed_input_);
 
-    if (state_.load() == State::Decelerating &&
-        std::abs(speed_otg_current_) < kSpeedEpsilon) {
+    const bool plan_finished = (state_.load() == State::Decelerating &&
+                                std::abs(speed_otg_current_) < kSpeedEpsilon);
+    if (plan_finished) {
         state_.store(State::Stopped);
-        return Result::PlanFinished;
     }
 
-    return Result::NoError;
+    JntArray q_dot = computeJointVelocity();
+    for (unsigned int i = 0; i < q_integral_.rows(); ++i)
+        q_integral_(i) += q_dot(i) * dt_;
+
+    ref_out = q_integral_;
+    return plan_finished ? Result::PlanFinished : Result::NoError;
 }
 
 // ============================================================================
@@ -261,24 +276,6 @@ JntArray MoveSvdJog::computeJointVelocity() {
     return q_dot;
 }
 
-// ============================================================================
-// GenerateRef
-// ============================================================================
-
-Result MoveSvdJog::GenerateRef(Reference& ref_out) {
-    if (!has_started_.load()) {
-        ref_out = q_integral_;
-        return Result::NoError;
-    }
-
-    JntArray q_dot = computeJointVelocity();
-
-    for (unsigned int i = 0; i < q_integral_.rows(); ++i)
-        q_integral_(i) += q_dot(i) * dt_;
-
-    ref_out = q_integral_;
-    return Result::NoError;
-}
 
 Result MoveSvdJog::Pause()  { return Result::PlanError; }
 Result MoveSvdJog::Resume() { return Result::PlanError; }

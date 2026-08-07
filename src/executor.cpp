@@ -49,8 +49,7 @@ Result Executor::Update() {
   // ① Motion → 当前参考位姿
   profiler_->MeasureStart(kMotionMeasurement);
   Reference ref;
-  res = motion_->Update(); //TODO: Update要删除，逻辑合并到GenerateRef中
-  motion_->GenerateRef(ref);
+  res = motion_->GenerateRef(ref);
 
   profiler_->MeasureEnd(kMotionMeasurement);
 

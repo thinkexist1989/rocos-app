@@ -206,12 +206,18 @@ void MoveJogK::reconfigureSpeedOtg(double target_speed) {
 }
 
 // ============================================================================
-// Update — 控制线程每周期调用
+// GenerateRef — 控制线程每周期调用（内含看门狗 + OTG 单步推进）
 // ============================================================================
 
-Result MoveJogK::Update() {
-    if (state_.load() == State::Stopped) return Result::PlanFinished;
-    if (!has_started_.load()) return Result::NoError;
+Result MoveJogK::GenerateRef(Reference& ref_out) {
+    if (state_.load() == State::Stopped) {
+        ref_out = q_integral_;
+        return Result::PlanFinished;
+    }
+    if (!has_started_.load()) {
+        ref_out = q_integral_;
+        return Result::NoError;
+    }
 
     // ── 看门狗：超时触发减速 ──
     double target;
@@ -238,18 +244,19 @@ Result MoveJogK::Update() {
     speed_output_.pass_to_input(speed_input_);
 
     // ── 减速完成 → 停车 ──
-    if (state_.load() == State::Decelerating &&
-        std::abs(speed_otg_current_) < kSpeedEpsilon) {
+    const bool plan_finished = (state_.load() == State::Decelerating &&
+                                std::abs(speed_otg_current_) < kSpeedEpsilon);
+    if (plan_finished) {
         state_.store(State::Stopped);
-        return Result::PlanFinished;
     }
 
-    return Result::NoError;
-}
+    JntArray q_dot = computeJointVelocity();
+    for (unsigned int i = 0; i < q_integral_.rows(); ++i)
+        q_integral_(i) += q_dot(i) * dt_;
 
-// ============================================================================
-// computeJointVelocity — 从速度×方向计算关节速度向量
-// ============================================================================
+    ref_out = q_integral_;
+    return plan_finished ? Result::PlanFinished : Result::NoError;
+}
 
 JntArray MoveJogK::computeJointVelocity() {
     std::lock_guard<std::mutex> lock(mtx_);
@@ -325,24 +332,6 @@ JntArray MoveJogK::computeJointVelocity() {
     return q_dot;
 }
 
-// ============================================================================
-// GenerateRef — 控制线程每周期调用
-// ============================================================================
-
-Result MoveJogK::GenerateRef(Reference& ref_out) {
-    if (!has_started_.load()) {
-        ref_out = q_integral_;
-        return Result::NoError;
-    }
-
-    JntArray q_dot = computeJointVelocity();
-
-    for (unsigned int i = 0; i < q_integral_.rows(); ++i)
-        q_integral_(i) += q_dot(i) * dt_;
-
-    ref_out = q_integral_;
-    return Result::NoError;
-}
 
 // ============================================================================
 // Pause / Resume / Stop

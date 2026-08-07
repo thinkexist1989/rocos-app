@@ -359,15 +359,19 @@ Result MoveCircleOffline::Reset() {
 }
 
 // ============================================================================
-// 单步推进
+// 生成当前周期参考值（内含单步推进）
 // ============================================================================
 
-Result MoveCircleOffline::Update() {
-    if (!has_motion_) return Result::PlanFinished;
+Result MoveCircleOffline::GenerateRef(Reference& ref_out) {
+    if (!has_motion_ || trajectory_.empty()) return Result::PlanError;
 
     if (mode_ == Mode::Normal) {
         index_++;
-        if (index_ >= trajectory_.size()) return Result::PlanFinished;
+        if (index_ >= trajectory_.size()) {
+            ref_out = trajectory_.back().q;
+            return Result::PlanFinished;
+        }
+        ref_out = trajectory_[index_].q;
         return Result::NoError;
     }
 
@@ -376,7 +380,6 @@ Result MoveCircleOffline::Update() {
     if (rc < 0) return Result::PlanError;
 
     const double s_dot = profile_.velocity();
-
     Twist twist = computeCartesianTwist(s_dot);
 
     JntArray q_dot(n_joints_);
@@ -385,29 +388,9 @@ Result MoveCircleOffline::Update() {
     }
 
     q_current_.data += q_dot.data * dt_;
+    ref_out = q_current_;
 
-    if (rc == 0) return Result::PlanFinished;
-    return Result::NoError;
-}
-
-// ============================================================================
-// 生成当前周期参考值
-// ============================================================================
-
-Result MoveCircleOffline::GenerateRef(Reference& ref_out) {
-    if (!has_motion_ || trajectory_.empty()) return Result::PlanError;
-
-    if (mode_ == Mode::Normal) {
-        if (index_ >= trajectory_.size()) {
-            ref_out = trajectory_.back().q;
-        } else {
-            ref_out = trajectory_[index_].q;
-        }
-    } else {
-        ref_out = q_current_;
-    }
-
-    return Result::NoError;
+    return (rc == 0) ? Result::PlanFinished : Result::NoError;
 }
 
 // ============================================================================

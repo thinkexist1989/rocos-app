@@ -90,11 +90,9 @@ PhaseResult runPhase(rocos::Model& model,
             (void)rc;
         }
 
-        auto rc = jog.Update();
-        if (rc == rocos::Result::PlanFinished) break;
-
         rocos::Reference ref;
-        rc = jog.GenerateRef(ref);
+        auto rc = jog.GenerateRef(ref);
+        if (rc == rocos::Result::PlanFinished) break;
         extractJointRef(ref, q_cur);
         ++step;
     }
@@ -106,10 +104,9 @@ PhaseResult runPhase(rocos::Model& model,
     int decel_steps = 0;
     const int max_decel = static_cast<int>(2.0 / kDt);  // 最多 2 秒减速
     while (decel_steps < max_decel) {
-        auto rc = jog.Update();
-        if (rc == rocos::Result::PlanFinished) break;
         rocos::Reference ref;
-        jog.GenerateRef(ref);
+        auto rc = jog.GenerateRef(ref);
+        if (rc == rocos::Result::PlanFinished) break;
         extractJointRef(ref, q_cur);
         ++decel_steps;
     }

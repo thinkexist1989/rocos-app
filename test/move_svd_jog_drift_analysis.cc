@@ -125,7 +125,6 @@ int main(int argc, char* argv[]) {
     for (int step = 1; step <= steps; ++step) {
         const double t = step * kDt;
         svd.FeedSvdJog({speed});
-        svd.Update();
         rocos::Reference ref;
         svd.GenerateRef(ref);
         extractJointRef(ref, q_cur);

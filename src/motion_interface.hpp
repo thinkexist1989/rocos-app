@@ -44,7 +44,6 @@ class MotionInterface {
   virtual Result Pause() = 0;
   virtual Result Resume() = 0;
   virtual Result Stop() = 0;
-  virtual Result Update() = 0;
 
  protected:
   ModelInterface* model_{nullptr};

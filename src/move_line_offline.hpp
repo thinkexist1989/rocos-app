@@ -79,7 +79,6 @@ public:
     Result ValidateParameters() const override;
     Result Reset() override;
     Result GenerateRef(Reference& ref_out) override;
-    Result Update() override;
 
     bool CanPause()  const override { return true; }
     bool CanResume() const override { return true; }

@@ -60,9 +60,7 @@ rocos::Frame makeStartPose(double x, double y, double z) {
     return rocos::Frame(KDL::Rotation::Identity(), KDL::Vector(x, y, z));
 }
 
-DataPoint extractData(int step, double time, rocos::MoveCircle& move) {
-    rocos::Reference ref;
-    move.GenerateRef(ref);
+DataPoint extractData(int step, double time, const rocos::Reference& ref) {
     const auto& f = std::get<rocos::Frame>(ref);
 
     DataPoint dp{};
@@ -98,11 +96,12 @@ static void runNormal(rocos::MoveCircle& move,
     double time = 0.0;
 
     while (step < kMaxSteps) {
-        data.push_back(extractData(step, time, move));
-        if (move.Update() != rocos::Result::NoError) break;
+        rocos::Reference ref;
+        rocos::Result r = move.GenerateRef(ref);
+        data.push_back(extractData(step, time, ref));
+        if (r != rocos::Result::NoError) break;
         ++step; time += kDt;
     }
-    data.push_back(extractData(step, time, move));
     writeCsv(csv_name, data);
     MESSAGE(csv_name, " — ", data.size(), " data points");
 }
@@ -115,26 +114,31 @@ static void runPauseResume(rocos::MoveCircle& move,
     double time = 0.0;
 
     while (step < kPauseAtStep && step < kMaxSteps) {
-        data.push_back(extractData(step, time, move));
-        if (move.Update() != rocos::Result::NoError) break;
+        rocos::Reference ref;
+        rocos::Result r = move.GenerateRef(ref);
+        data.push_back(extractData(step, time, ref));
+        if (r != rocos::Result::NoError) break;
         ++step; time += kDt;
     }
 
     move.Pause();
     while (step < kMaxSteps) {
-        data.push_back(extractData(step, time, move));
-        if (move.Update() == rocos::Result::PlanFinished) break;
+        rocos::Reference ref;
+        rocos::Result r = move.GenerateRef(ref);
+        data.push_back(extractData(step, time, ref));
+        if (r == rocos::Result::PlanFinished) break;
         ++step; time += kDt;
     }
 
     move.Resume();
     ++step; time += kDt;
     while (step < kMaxSteps) {
-        data.push_back(extractData(step, time, move));
-        if (move.Update() != rocos::Result::NoError) break;
+        rocos::Reference ref;
+        rocos::Result r = move.GenerateRef(ref);
+        data.push_back(extractData(step, time, ref));
+        if (r != rocos::Result::NoError) break;
         ++step; time += kDt;
     }
-    data.push_back(extractData(step, time, move));
     writeCsv(csv_name, data);
     MESSAGE(csv_name, " — ", data.size(), " data points");
 }
@@ -147,22 +151,28 @@ static void runPauseStop(rocos::MoveCircle& move,
     double time = 0.0;
 
     while (step < kPauseAtStep && step < kMaxSteps) {
-        data.push_back(extractData(step, time, move));
-        if (move.Update() != rocos::Result::NoError) break;
+        rocos::Reference ref;
+        rocos::Result r = move.GenerateRef(ref);
+        data.push_back(extractData(step, time, ref));
+        if (r != rocos::Result::NoError) break;
         ++step; time += kDt;
     }
 
     move.Pause();
     while (step < kMaxSteps) {
-        data.push_back(extractData(step, time, move));
-        if (move.Update() == rocos::Result::PlanFinished) break;
+        rocos::Reference ref;
+        rocos::Result r = move.GenerateRef(ref);
+        data.push_back(extractData(step, time, ref));
+        if (r == rocos::Result::PlanFinished) break;
         ++step; time += kDt;
     }
 
     move.Stop();
     while (step < kMaxSteps) {
-        data.push_back(extractData(step, time, move));
-        if (move.Update() == rocos::Result::PlanFinished) break;
+        rocos::Reference ref;
+        rocos::Result r = move.GenerateRef(ref);
+        data.push_back(extractData(step, time, ref));
+        if (r == rocos::Result::PlanFinished) break;
         ++step; time += kDt;
     }
     writeCsv(csv_name, data);

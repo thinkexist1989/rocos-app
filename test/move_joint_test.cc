@@ -60,9 +60,7 @@ rocos::JntArray makeJntArray(const std::vector<double>& v) {
     return arr;
 }
 
-std::vector<double> extractJointPos(rocos::MoveJoint& move) {
-    rocos::Reference ref;
-    move.GenerateRef(ref);
+std::vector<double> extractJointPos(const rocos::Reference& ref) {
     const auto& q = std::get<rocos::JntArray>(ref);
     return {q(0), q(1), q(2)};
 }
@@ -91,19 +89,15 @@ static void runNormal(rocos::MoveJoint& move,
     double time = 0.0;
 
     while (step < kMaxSteps) {
-        auto q = extractJointPos(move);
+        rocos::Reference ref;
+        rocos::Result r = move.GenerateRef(ref);
+        auto q = extractJointPos(ref);
         data.push_back({step, time, q[0], q[1], q[2]});
-
-        rocos::Result r = move.Update();
         if (r != rocos::Result::NoError) break;
-
         ++step;
         time += kDt;
     }
 
-    // 最后一步记录终点
-    auto q = extractJointPos(move);
-    data.push_back({step, time, q[0], q[1], q[2]});
 
     writeCsv(csv_name, data);
     MESSAGE(csv_name, " — ", data.size(), " data points");
@@ -118,12 +112,11 @@ static void runPauseResume(rocos::MoveJoint& move,
 
     // 阶段 1：正常运行到暂停点
     while (step < kPauseAtStep && step < kMaxSteps) {
-        auto q = extractJointPos(move);
+        rocos::Reference ref;
+        rocos::Result r = move.GenerateRef(ref);
+        auto q = extractJointPos(ref);
         data.push_back({step, time, q[0], q[1], q[2]});
-
-        rocos::Result r = move.Update();
         if (r != rocos::Result::NoError) break;
-
         ++step;
         time += kDt;
     }
@@ -131,12 +124,11 @@ static void runPauseResume(rocos::MoveJoint& move,
     // 阶段 2：Pause → 减速到停
     move.Pause();
     while (step < kMaxSteps) {
-        auto q = extractJointPos(move);
+        rocos::Reference ref;
+        rocos::Result r = move.GenerateRef(ref);
+        auto q = extractJointPos(ref);
         data.push_back({step, time, q[0], q[1], q[2]});
-
-        rocos::Result r = move.Update();
         if (r == rocos::Result::PlanFinished) break;
-
         ++step;
         time += kDt;
     }
@@ -146,19 +138,15 @@ static void runPauseResume(rocos::MoveJoint& move,
     ++step;
     time += kDt;
     while (step < kMaxSteps) {
-        auto q = extractJointPos(move);
+        rocos::Reference ref;
+        rocos::Result r = move.GenerateRef(ref);
+        auto q = extractJointPos(ref);
         data.push_back({step, time, q[0], q[1], q[2]});
-
-        rocos::Result r = move.Update();
         if (r != rocos::Result::NoError) break;
-
         ++step;
         time += kDt;
     }
 
-    // 终点
-    auto q = extractJointPos(move);
-    data.push_back({step, time, q[0], q[1], q[2]});
 
     writeCsv(csv_name, data);
     MESSAGE(csv_name, " — ", data.size(), " data points");
@@ -173,12 +161,11 @@ static void runPauseStop(rocos::MoveJoint& move,
 
     // 阶段 1：正常运行到暂停点
     while (step < kPauseAtStep && step < kMaxSteps) {
-        auto q = extractJointPos(move);
+        rocos::Reference ref;
+        rocos::Result r = move.GenerateRef(ref);
+        auto q = extractJointPos(ref);
         data.push_back({step, time, q[0], q[1], q[2]});
-
-        rocos::Result r = move.Update();
         if (r != rocos::Result::NoError) break;
-
         ++step;
         time += kDt;
     }
@@ -186,24 +173,22 @@ static void runPauseStop(rocos::MoveJoint& move,
     // 阶段 2：Pause → 减速到停
     move.Pause();
     while (step < kMaxSteps) {
-        auto q = extractJointPos(move);
+        rocos::Reference ref;
+        rocos::Result r = move.GenerateRef(ref);
+        auto q = extractJointPos(ref);
         data.push_back({step, time, q[0], q[1], q[2]});
-
-        rocos::Result r = move.Update();
         if (r == rocos::Result::PlanFinished) break;
-
         ++step;
         time += kDt;
     }
 
     // 阶段 3：Stop 确认终止
     move.Stop();
-    // Stop 后可能还需几步减速
     while (step < kMaxSteps) {
-        auto q = extractJointPos(move);
+        rocos::Reference ref;
+        rocos::Result r = move.GenerateRef(ref);
+        auto q = extractJointPos(ref);
         data.push_back({step, time, q[0], q[1], q[2]});
-
-        rocos::Result r = move.Update();
         if (r == rocos::Result::PlanFinished) break;
 
         ++step;
@@ -226,10 +211,9 @@ TEST_CASE("MoveJoint 正向 — 正常执行") {
     std::vector<DataPoint> data;
     runNormal(move, data, "forward_normal.csv");
 
-    auto q = extractJointPos(move);
-    CHECK(q[0] == doctest::Approx(1.0).epsilon(1e-3));
-    CHECK(q[1] == doctest::Approx(2.0).epsilon(1e-3));
-    CHECK(q[2] == doctest::Approx(4.0).epsilon(1e-3));
+    CHECK(data.back().q0 == doctest::Approx(1.0).epsilon(1e-3));
+    CHECK(data.back().q1 == doctest::Approx(2.0).epsilon(1e-3));
+    CHECK(data.back().q2 == doctest::Approx(4.0).epsilon(1e-3));
 }
 
 TEST_CASE("MoveJoint 正向 — 暂停继续") {
@@ -240,10 +224,9 @@ TEST_CASE("MoveJoint 正向 — 暂停继续") {
     std::vector<DataPoint> data;
     runPauseResume(move, data, "forward_pause_resume.csv");
 
-    auto q = extractJointPos(move);
-    CHECK(q[0] == doctest::Approx(1.0).epsilon(1e-3));
-    CHECK(q[1] == doctest::Approx(2.0).epsilon(1e-3));
-    CHECK(q[2] == doctest::Approx(4.0).epsilon(1e-3));
+    CHECK(data.back().q0 == doctest::Approx(1.0).epsilon(1e-3));
+    CHECK(data.back().q1 == doctest::Approx(2.0).epsilon(1e-3));
+    CHECK(data.back().q2 == doctest::Approx(4.0).epsilon(1e-3));
 }
 
 TEST_CASE("MoveJoint 正向 — 暂停后Stop") {
@@ -255,8 +238,7 @@ TEST_CASE("MoveJoint 正向 — 暂停后Stop") {
     runPauseStop(move, data, "forward_pause_stop.csv");
 
     // 暂停后 stop，位置应停在中间，未到达目标
-    auto q = extractJointPos(move);
-    CHECK(q[2] < 4.0);
+    CHECK(data.back().q2 < 4.0);
 }
 
 // ==========================================================================
@@ -271,10 +253,9 @@ TEST_CASE("MoveJoint 反向 — 正常执行") {
     std::vector<DataPoint> data;
     runNormal(move, data, "reverse_normal.csv");
 
-    auto q = extractJointPos(move);
-    CHECK(q[0] == doctest::Approx(0.0).epsilon(1e-3));
-    CHECK(q[1] == doctest::Approx(1.0).epsilon(1e-3));
-    CHECK(q[2] == doctest::Approx(2.0).epsilon(1e-3));
+    CHECK(data.back().q0 == doctest::Approx(0.0).epsilon(1e-3));
+    CHECK(data.back().q1 == doctest::Approx(1.0).epsilon(1e-3));
+    CHECK(data.back().q2 == doctest::Approx(2.0).epsilon(1e-3));
 }
 
 TEST_CASE("MoveJoint 反向 — 暂停继续") {
@@ -285,10 +266,9 @@ TEST_CASE("MoveJoint 反向 — 暂停继续") {
     std::vector<DataPoint> data;
     runPauseResume(move, data, "reverse_pause_resume.csv");
 
-    auto q = extractJointPos(move);
-    CHECK(q[0] == doctest::Approx(0.0).epsilon(1e-3));
-    CHECK(q[1] == doctest::Approx(1.0).epsilon(1e-3));
-    CHECK(q[2] == doctest::Approx(2.0).epsilon(1e-3));
+    CHECK(data.back().q0 == doctest::Approx(0.0).epsilon(1e-3));
+    CHECK(data.back().q1 == doctest::Approx(1.0).epsilon(1e-3));
+    CHECK(data.back().q2 == doctest::Approx(2.0).epsilon(1e-3));
 }
 
 TEST_CASE("MoveJoint 反向 — 暂停后Stop") {
@@ -299,6 +279,5 @@ TEST_CASE("MoveJoint 反向 — 暂停后Stop") {
     std::vector<DataPoint> data;
     runPauseStop(move, data, "reverse_pause_stop.csv");
 
-    auto q = extractJointPos(move);
-    CHECK(q[2] > 2.0);
+    CHECK(data.back().q2 > 2.0);
 }

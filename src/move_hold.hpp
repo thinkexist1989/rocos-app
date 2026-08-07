@@ -55,7 +55,6 @@ public:
     Result Resume() override { return Result::FunctionNotSupported; }
     Result Stop()   override { return Result::FunctionNotSupported; }
 
-    Result Update() override { return Result::NoError; }
 
 private:
     JntArray hold_pos_;

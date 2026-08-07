@@ -38,7 +38,7 @@ namespace rocos {
 /// 速度 OTG：ruckig::Ruckig<1> Velocity 模式平滑变速。
 /// 关节空间直接积分；笛卡尔通过 Jacobian 伪逆转关节速度再积分。
 ///
-/// 线程：FeedJog=HTTP 线程，Update/GenerateRef=控制线程，mtx_ 保护共享状态。
+/// 线程：FeedJog=HTTP 线程，GenerateRef=控制线程，mtx_ 保护共享状态。
 class MoveJogK : public MotionInterface {
 public:
     enum class State { Active, Decelerating, Stopped };
@@ -53,7 +53,6 @@ public:
     // ─── MotionInterface ───
     Result ValidateParameters() const override;
     Result Reset() override;
-    Result Update() override;
     Result GenerateRef(Reference& ref_out) override;
 
     bool CanPause()  const override { return false; }

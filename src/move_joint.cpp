@@ -154,31 +154,19 @@ Result MoveJoint::Reset() {
 }
 
 // ============================================================================
-// 单步推进
+// 生成当前周期的关节参考位置（内含 OTG 单步推进）
 // ============================================================================
 
-Result MoveJoint::Update() {
+Result MoveJoint::GenerateRef(Reference& ref_out) {
     if (!has_motion_) {
         return Result::PlanFinished;
     }
 
     const int rc = profile_.Update();
-
     if (rc < 0) {
         return Result::PlanError;
     }
-    if (rc == 0) {
-        return Result::PlanFinished;
-    }
 
-    return Result::NoError;
-}
-
-// ============================================================================
-// 生成当前周期的关节参考位置
-// ============================================================================
-
-Result MoveJoint::GenerateRef(Reference& ref_out) {
     const auto n = q_start_.rows();
     const double s = profile_.position();
 
@@ -188,7 +176,7 @@ Result MoveJoint::GenerateRef(Reference& ref_out) {
     }
 
     ref_out = std::move(q_out);
-    return Result::NoError;
+    return (rc == 0) ? Result::PlanFinished : Result::NoError;
 }
 
 // ============================================================================
