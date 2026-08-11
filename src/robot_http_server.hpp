@@ -21,6 +21,7 @@
 #include <httplib.h>
 
 #include <atomic>
+#include <chrono>
 #include <condition_variable>
 #include <json.hpp>
 #include <kdl/frames.hpp>
@@ -127,6 +128,12 @@ private:
     void handleScriptBreakpointRemove(const httplib::Request& req, httplib::Response& res);
     void handleScriptBreakpointClear(const httplib::Request& req, httplib::Response& res);
 
+    // ---- Control Rights (single-holder lock) ----
+    void handleControlAcquire(const httplib::Request& req, httplib::Response& res);
+    void handleControlRelease(const httplib::Request& req, httplib::Response& res);
+    void handleControlTakeover(const httplib::Request& req, httplib::Response& res);
+    void handleControlStatus(const httplib::Request& req, httplib::Response& res);
+
     // ---- Utility ----
     void sendJson(httplib::Response& res, bool success,
                   int businessCode, const std::string& message,
@@ -152,6 +159,16 @@ private:
     // ---- CORS & Preflight ----
     void setCorsHeaders(httplib::Response& res);
 
+    // ---- Control Rights internals ----
+    enum class AuthResult { OK, MissingToken, InvalidToken, Expired };
+    // 检查请求 token 并在成功时续期；不加锁调用需自行持有 control_mutex_。
+    AuthResult checkAndRenewToken(const httplib::Request& req);
+    // 写接口入口守卫：失败时已经写好响应，调用方应直接 return。
+    bool ensureControl(const httplib::Request& req, httplib::Response& res);
+    std::string generateControlToken();
+    nlohmann::json controlOwnerJson_locked() const;
+    void clearControl_locked(const char* reason);
+
     // ---- Thread Pool ----
     void submitTask(std::function<void()> func);
 
@@ -176,6 +193,17 @@ private:
 
     // Task TTL
     static const int TASK_TTL_SECONDS = 3600; // 1 hour
+
+    // ---- Control Rights state ----
+    mutable std::mutex control_mutex_;
+    std::string current_token_;        // 空串 = 无持有者
+    std::string current_owner_ip_;
+    std::string current_owner_name_;
+    std::string current_owner_agent_;
+    std::chrono::steady_clock::time_point acquired_at_{};
+    std::chrono::steady_clock::time_point last_seen_at_{};
+    static constexpr int CONTROL_TTL_SECONDS = 60;
+    static constexpr const char* CONTROL_TOKEN_HEADER = "X-Rocos-Control-Token";
 };
 
 } // namespace rocos

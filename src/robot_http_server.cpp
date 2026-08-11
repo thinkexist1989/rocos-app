@@ -8,7 +8,9 @@
 #include <ctime>
 #include <filesystem>
 #include <fstream>
+#include <iomanip>
 #include <kdl_parser/kdl_parser.hpp>
+#include <random>
 #include <sstream>
 
 #include "lua_script_engine.hpp"
@@ -318,6 +320,12 @@ void RobotHttpServer::registerRoutes() {
     server_->Post("/api/script/breakpoint/remove", [this](auto& req, auto& res) { handleScriptBreakpointRemove(req, res); });
     server_->Post("/api/script/breakpoint/clear", [this](auto& req, auto& res) { handleScriptBreakpointClear(req, res); });
 
+    // Control rights (single-holder lock)
+    server_->Post("/api/control/acquire", [this](auto& req, auto& res) { handleControlAcquire(req, res); });
+    server_->Post("/api/control/release", [this](auto& req, auto& res) { handleControlRelease(req, res); });
+    server_->Post("/api/control/takeover", [this](auto& req, auto& res) { handleControlTakeover(req, res); });
+    server_->Get("/api/control/status", [this](auto& req, auto& res) { handleControlStatus(req, res); });
+
     
 	    // 修改后：去掉 ".*",
 	    server_->set_post_routing_handler([](const httplib::Request&, httplib::Response& res) {
@@ -336,7 +344,8 @@ void RobotHttpServer::registerRoutes() {
 void RobotHttpServer::setCorsHeaders(httplib::Response& res) {
     res.set_header("Access-Control-Allow-Origin", "*");
     res.set_header("Access-Control-Allow-Methods", "GET, POST, DELETE, OPTIONS");
-    res.set_header("Access-Control-Allow-Headers", "Content-Type");
+    res.set_header("Access-Control-Allow-Headers", "Content-Type, X-Rocos-Control-Token");
+    res.set_header("Access-Control-Expose-Headers", "X-Rocos-Control-Token");
 }
 
 // ============================================================================
@@ -385,6 +394,226 @@ nlohmann::json RobotHttpServer::scriptStatusToJson() const {
             {"error", status.error},
             {"motion_active", status.motion_active},
             {"breakpoints", std::move(breakpoints)}};
+}
+
+// ============================================================================
+// Utility: Control Rights (single-holder lock)
+// ============================================================================
+
+std::string RobotHttpServer::generateControlToken() {
+    // 生成 UUID v4 字符串。使用 random_device + mt19937_64 提供足够的熵。
+    static thread_local std::mt19937_64 rng(
+        std::random_device{}() ^
+        static_cast<uint64_t>(
+            std::chrono::steady_clock::now().time_since_epoch().count()));
+    std::uniform_int_distribution<uint64_t> dist;
+    const uint64_t a = dist(rng);
+    const uint64_t b = dist(rng);
+
+    unsigned char bytes[16];
+    for (int i = 0; i < 8; ++i) bytes[i]     = static_cast<unsigned char>((a >> (8 * i)) & 0xFF);
+    for (int i = 0; i < 8; ++i) bytes[i + 8] = static_cast<unsigned char>((b >> (8 * i)) & 0xFF);
+    bytes[6] = static_cast<unsigned char>((bytes[6] & 0x0F) | 0x40);  // version 4
+    bytes[8] = static_cast<unsigned char>((bytes[8] & 0x3F) | 0x80);  // variant RFC4122
+
+    std::ostringstream oss;
+    oss << std::hex << std::setfill('0');
+    for (int i = 0; i < 16; ++i) {
+        oss << std::setw(2) << static_cast<int>(bytes[i]);
+        if (i == 3 || i == 5 || i == 7 || i == 9) oss << '-';
+    }
+    return oss.str();
+}
+
+RobotHttpServer::AuthResult
+RobotHttpServer::checkAndRenewToken(const httplib::Request& req) {
+    if (!req.has_header(CONTROL_TOKEN_HEADER)) return AuthResult::MissingToken;
+    const std::string token = req.get_header_value(CONTROL_TOKEN_HEADER);
+
+    std::lock_guard<std::mutex> lock(control_mutex_);
+    if (current_token_.empty()) return AuthResult::InvalidToken;
+
+    const auto now = std::chrono::steady_clock::now();
+    if (std::chrono::duration_cast<std::chrono::seconds>(now - last_seen_at_).count()
+            > CONTROL_TTL_SECONDS) {
+        clearControl_locked("ttl expired");
+        return AuthResult::Expired;
+    }
+    if (token != current_token_) return AuthResult::InvalidToken;
+
+    last_seen_at_ = now;
+    return AuthResult::OK;
+}
+
+bool RobotHttpServer::ensureControl(const httplib::Request& req,
+                                    httplib::Response& res) {
+    switch (checkAndRenewToken(req)) {
+        case AuthResult::OK:
+            return true;
+        case AuthResult::MissingToken:
+            sendJson(res, false, 3006,
+                     "no control right, call POST /api/control/acquire first");
+            return false;
+        case AuthResult::InvalidToken:
+            sendJson(res, false, 3007, "control token invalid");
+            return false;
+        case AuthResult::Expired:
+            sendJson(res, false, 3007, "control token expired");
+            return false;
+    }
+    return false;
+}
+
+void RobotHttpServer::clearControl_locked(const char* reason) {
+    if (!current_token_.empty()) {
+        log_ptr_->info("Control released (owner={}@{}, reason={})",
+                       current_owner_name_, current_owner_ip_, reason);
+    }
+    current_token_.clear();
+    current_owner_ip_.clear();
+    current_owner_name_.clear();
+    current_owner_agent_.clear();
+    acquired_at_ = {};
+    last_seen_at_ = {};
+}
+
+nlohmann::json RobotHttpServer::controlOwnerJson_locked() const {
+    nlohmann::json data;
+    const bool has_owner = !current_token_.empty();
+    data["has_owner"] = has_owner;
+    data["owner_ip"] = current_owner_ip_;
+    data["owner_name"] = current_owner_name_;
+    data["owner_agent"] = current_owner_agent_;
+
+    if (has_owner) {
+        const auto now = std::chrono::steady_clock::now();
+        const auto age = std::chrono::duration_cast<std::chrono::seconds>(now - acquired_at_).count();
+        const auto idle = std::chrono::duration_cast<std::chrono::seconds>(now - last_seen_at_).count();
+        const long long expires_in = CONTROL_TTL_SECONDS - idle;
+        data["held_for_seconds"] = age;
+        data["idle_seconds"] = idle;
+        data["expires_in_seconds"] = expires_in > 0 ? expires_in : 0;
+    } else {
+        data["held_for_seconds"] = 0;
+        data["idle_seconds"] = 0;
+        data["expires_in_seconds"] = 0;
+    }
+    data["ttl_seconds"] = CONTROL_TTL_SECONDS;
+    return data;
+}
+
+void RobotHttpServer::handleControlAcquire(const httplib::Request& req,
+                                           httplib::Response& res) {
+    log_ptr_->info("POST /api/control/acquire from {}", req.remote_addr);
+
+    const nlohmann::json body = nlohmann::json::parse(req.body, nullptr, false);
+    std::string client_name;
+    if (!body.is_discarded() && body.contains("client_name") &&
+        body["client_name"].is_string()) {
+        client_name = body["client_name"].get<std::string>();
+    }
+    const std::string user_agent = req.has_header("User-Agent")
+        ? req.get_header_value("User-Agent") : std::string{};
+
+    std::lock_guard<std::mutex> lock(control_mutex_);
+
+    // 若已有持有者但已过期则先清空
+    if (!current_token_.empty()) {
+        const auto now = std::chrono::steady_clock::now();
+        if (std::chrono::duration_cast<std::chrono::seconds>(now - last_seen_at_).count()
+                > CONTROL_TTL_SECONDS) {
+            clearControl_locked("ttl expired on acquire");
+        }
+    }
+
+    if (!current_token_.empty()) {
+        nlohmann::json data = controlOwnerJson_locked();
+        sendJson(res, false, 3008, "control already held by another client", data);
+        return;
+    }
+
+    current_token_ = generateControlToken();
+    current_owner_ip_ = req.remote_addr;
+    current_owner_name_ = client_name;
+    current_owner_agent_ = user_agent;
+    const auto now = std::chrono::steady_clock::now();
+    acquired_at_ = now;
+    last_seen_at_ = now;
+
+    log_ptr_->info("Control acquired by {}@{} ({})",
+                   current_owner_name_, current_owner_ip_, current_owner_agent_);
+
+    nlohmann::json data = controlOwnerJson_locked();
+    data["token"] = current_token_;
+    sendJson(res, true, 0, "control acquired", data);
+}
+
+void RobotHttpServer::handleControlRelease(const httplib::Request& req,
+                                           httplib::Response& res) {
+    log_ptr_->info("POST /api/control/release from {}", req.remote_addr);
+
+    if (!req.has_header(CONTROL_TOKEN_HEADER)) {
+        sendJson(res, false, 3006,
+                 "no control right, cannot release without token");
+        return;
+    }
+    const std::string token = req.get_header_value(CONTROL_TOKEN_HEADER);
+
+    std::lock_guard<std::mutex> lock(control_mutex_);
+    if (current_token_.empty() || token != current_token_) {
+        sendJson(res, false, 3007, "control token invalid");
+        return;
+    }
+    clearControl_locked("released by owner");
+    sendJson(res, true, 0, "control released", controlOwnerJson_locked());
+}
+
+void RobotHttpServer::handleControlTakeover(const httplib::Request& req,
+                                            httplib::Response& res) {
+    log_ptr_->info("POST /api/control/takeover from {}", req.remote_addr);
+
+    const nlohmann::json body = nlohmann::json::parse(req.body, nullptr, false);
+    std::string client_name;
+    if (!body.is_discarded() && body.contains("client_name") &&
+        body["client_name"].is_string()) {
+        client_name = body["client_name"].get<std::string>();
+    }
+    const std::string user_agent = req.has_header("User-Agent")
+        ? req.get_header_value("User-Agent") : std::string{};
+
+    std::lock_guard<std::mutex> lock(control_mutex_);
+    if (!current_token_.empty()) {
+        log_ptr_->warn("Control taken over: previous owner {}@{} forcibly evicted by {}@{}",
+                       current_owner_name_, current_owner_ip_,
+                       client_name, req.remote_addr);
+        clearControl_locked("takeover");
+    }
+
+    current_token_ = generateControlToken();
+    current_owner_ip_ = req.remote_addr;
+    current_owner_name_ = client_name;
+    current_owner_agent_ = user_agent;
+    const auto now = std::chrono::steady_clock::now();
+    acquired_at_ = now;
+    last_seen_at_ = now;
+
+    nlohmann::json data = controlOwnerJson_locked();
+    data["token"] = current_token_;
+    sendJson(res, true, 0, "control taken over", data);
+}
+
+void RobotHttpServer::handleControlStatus(const httplib::Request&,
+                                          httplib::Response& res) {
+    std::lock_guard<std::mutex> lock(control_mutex_);
+    // 顺手做一次懒清理：读接口发现已过期则视为无持有者
+    if (!current_token_.empty()) {
+        const auto now = std::chrono::steady_clock::now();
+        if (std::chrono::duration_cast<std::chrono::seconds>(now - last_seen_at_).count()
+                > CONTROL_TTL_SECONDS) {
+            clearControl_locked("ttl expired on status query");
+        }
+    }
+    sendJson(res, true, 0, "ok", controlOwnerJson_locked());
 }
 
 // ============================================================================
@@ -693,6 +922,7 @@ void RobotHttpServer::handleGetLinkMesh(const httplib::Request& req, httplib::Re
 
 void RobotHttpServer::handleEnable(const httplib::Request& req, httplib::Response& res) {
     log_ptr_->info("POST /api/robot/enable");
+    if (!ensureControl(req, res)) return;
     const Result result = robot_->SetEnabled();
     nlohmann::json data;
     data["robot_state"] = robot_->GetStateString();
@@ -704,6 +934,7 @@ void RobotHttpServer::handleEnable(const httplib::Request& req, httplib::Respons
 
 void RobotHttpServer::handleDisable(const httplib::Request& req, httplib::Response& res) {
     log_ptr_->info("POST /api/robot/disable");
+    if (!ensureControl(req, res)) return;
     const Result result = robot_->SetDisabled();
     nlohmann::json data;
     data["robot_state"] = robot_->GetStateString();
@@ -715,6 +946,7 @@ void RobotHttpServer::handleDisable(const httplib::Request& req, httplib::Respon
 
 void RobotHttpServer::handleReset(const httplib::Request& req, httplib::Response& res) {
     log_ptr_->info("POST /api/robot/reset");
+    if (!ensureControl(req, res)) return;
     const Result result = robot_->ResetFault();
     nlohmann::json data;
     data["robot_state"] = robot_->GetStateString();
@@ -735,6 +967,7 @@ void RobotHttpServer::handleIsEnabled(const httplib::Request& req, httplib::Resp
 
 void RobotHttpServer::handleSetWorkMode(const httplib::Request& req, httplib::Response& res) {
     log_ptr_->info("POST /api/robot/workmode");
+    if (!ensureControl(req, res)) return;
 
     nlohmann::json body = nlohmann::json::parse(req.body, nullptr, false);
     if (body.is_discarded() || !body.contains("mode") || !body["mode"].is_string()) {
@@ -762,6 +995,7 @@ void RobotHttpServer::handleSetWorkMode(const httplib::Request& req, httplib::Re
 
 void RobotHttpServer::handleServoStart(const httplib::Request& req, httplib::Response& res) {
     log_ptr_->info("POST /api/robot/servo/start");
+    if (!ensureControl(req, res)) return;
 
     nlohmann::json body = nlohmann::json::parse(req.body, nullptr, false);
     uint16_t port = 8081;
@@ -786,6 +1020,7 @@ void RobotHttpServer::handleServoStart(const httplib::Request& req, httplib::Res
 
 void RobotHttpServer::handleServoStop(const httplib::Request& req, httplib::Response& res) {
     log_ptr_->info("POST /api/robot/servo/stop");
+    if (!ensureControl(req, res)) return;
 
     const Result result = robot_->StopMotion();
     nlohmann::json data;
@@ -800,6 +1035,7 @@ void RobotHttpServer::handleServoStop(const httplib::Request& req, httplib::Resp
 
 void RobotHttpServer::handleServoMode(const httplib::Request& req, httplib::Response& res) {
     log_ptr_->info("POST /api/robot/servo/mode");
+    if (!ensureControl(req, res)) return;
 
     nlohmann::json body = nlohmann::json::parse(req.body, nullptr, false);
     if (body.is_discarded() || !body.contains("mode") || !body["mode"].is_string()) {
@@ -827,6 +1063,7 @@ void RobotHttpServer::handleServoMode(const httplib::Request& req, httplib::Resp
 
 void RobotHttpServer::handleMoveJ(const httplib::Request& req, httplib::Response& res) {
     log_ptr_->info("POST /api/robot/movej");
+    if (!ensureControl(req, res)) return;
 
     nlohmann::json body = nlohmann::json::parse(req.body, nullptr, false);
     if (body.is_discarded() || !body.contains("joints") ||
@@ -877,6 +1114,7 @@ void RobotHttpServer::handleMoveJ(const httplib::Request& req, httplib::Response
 
 void RobotHttpServer::handleMoveJ_IK(const httplib::Request& req, httplib::Response& res) {
     log_ptr_->info("POST /api/robot/movej_ik");
+    if (!ensureControl(req, res)) return;
 
     nlohmann::json body = nlohmann::json::parse(req.body, nullptr, false);
     if (body.is_discarded() || !body.contains("pose") ||
@@ -912,6 +1150,7 @@ void RobotHttpServer::handleMoveJ_IK(const httplib::Request& req, httplib::Respo
 
 void RobotHttpServer::handleMoveL(const httplib::Request& req, httplib::Response& res) {
     log_ptr_->info("POST /api/robot/movel");
+    if (!ensureControl(req, res)) return;
 
     nlohmann::json body = nlohmann::json::parse(req.body, nullptr, false);
     if (body.is_discarded() || !body.contains("pose") ||
@@ -949,6 +1188,7 @@ void RobotHttpServer::handleMoveL(const httplib::Request& req, httplib::Response
 
 void RobotHttpServer::handleMoveL_FK(const httplib::Request& req, httplib::Response& res) {
     log_ptr_->info("POST /api/robot/movel_fk");
+    if (!ensureControl(req, res)) return;
 
     nlohmann::json body = nlohmann::json::parse(req.body, nullptr, false);
     if (body.is_discarded() || !body.contains("joints") ||
@@ -999,6 +1239,7 @@ void RobotHttpServer::handleMoveL_FK(const httplib::Request& req, httplib::Respo
 
 void RobotHttpServer::handleMoveC(const httplib::Request& req, httplib::Response& res) {
     log_ptr_->info("POST /api/robot/movec");
+    if (!ensureControl(req, res)) return;
 
     nlohmann::json body = nlohmann::json::parse(req.body, nullptr, false);
     if (body.is_discarded()) {
@@ -1059,6 +1300,7 @@ void RobotHttpServer::handleMoveC(const httplib::Request& req, httplib::Response
 
 void RobotHttpServer::handleStop(const httplib::Request& req, httplib::Response& res) {
     log_ptr_->info("POST /api/robot/stop");
+    if (!ensureControl(req, res)) return;
 
     const Result result = robot_->StopMotion();
     nlohmann::json data;
@@ -1071,6 +1313,7 @@ void RobotHttpServer::handleStop(const httplib::Request& req, httplib::Response&
 
 void RobotHttpServer::handlePause(const httplib::Request& req, httplib::Response& res) {
     log_ptr_->info("POST /api/robot/pause");
+    if (!ensureControl(req, res)) return;
 
     const Result result = robot_->PauseMotion();
     nlohmann::json data;
@@ -1083,6 +1326,7 @@ void RobotHttpServer::handlePause(const httplib::Request& req, httplib::Response
 
 void RobotHttpServer::handleResume(const httplib::Request& req, httplib::Response& res) {
   log_ptr_->info("POST /api/robot/resume");
+    if (!ensureControl(req, res)) return;
 
     const Result result = robot_->ResumeMotion();
     nlohmann::json data;
@@ -1095,6 +1339,7 @@ void RobotHttpServer::handleResume(const httplib::Request& req, httplib::Respons
 
 void RobotHttpServer::handleWaitMove(const httplib::Request& req, httplib::Response& res) {
     log_ptr_->info("POST /api/robot/wait_move");
+    if (!ensureControl(req, res)) return;
 
     const Result result = robot_->WaitMove();
     nlohmann::json data;
@@ -1131,6 +1376,7 @@ void RobotHttpServer::handleMoveStatus(const httplib::Request& req, httplib::Res
 
 void RobotHttpServer::handleScriptUpload(const httplib::Request& req,
                                          httplib::Response& res) {
+    if (!ensureControl(req, res)) return;
     if (script_engine_ == nullptr) {
         sendJson(res, false, resultCode(Result::FunctionNotSupported),
                  "Lua script engine is unavailable");
@@ -1151,8 +1397,9 @@ void RobotHttpServer::handleScriptUpload(const httplib::Request& req,
     sendScriptResult(res, result, "script uploaded");
 }
 
-void RobotHttpServer::handleScriptRun(const httplib::Request&,
+void RobotHttpServer::handleScriptRun(const httplib::Request& req,
                                       httplib::Response& res) {
+    if (!ensureControl(req, res)) return;
     if (script_engine_ == nullptr) {
         sendJson(res, false, resultCode(Result::FunctionNotSupported),
                  "Lua script engine is unavailable");
@@ -1161,8 +1408,9 @@ void RobotHttpServer::handleScriptRun(const httplib::Request&,
     sendScriptResult(res, script_engine_->Run(), "script started");
 }
 
-void RobotHttpServer::handleScriptPause(const httplib::Request&,
+void RobotHttpServer::handleScriptPause(const httplib::Request& req,
                                         httplib::Response& res) {
+    if (!ensureControl(req, res)) return;
     if (script_engine_ == nullptr) {
         sendJson(res, false, resultCode(Result::FunctionNotSupported),
                  "Lua script engine is unavailable");
@@ -1171,8 +1419,9 @@ void RobotHttpServer::handleScriptPause(const httplib::Request&,
     sendScriptResult(res, script_engine_->Pause(), "script pause requested");
 }
 
-void RobotHttpServer::handleScriptResume(const httplib::Request&,
+void RobotHttpServer::handleScriptResume(const httplib::Request& req,
                                          httplib::Response& res) {
+    if (!ensureControl(req, res)) return;
     if (script_engine_ == nullptr) {
         sendJson(res, false, resultCode(Result::FunctionNotSupported),
                  "Lua script engine is unavailable");
@@ -1181,8 +1430,9 @@ void RobotHttpServer::handleScriptResume(const httplib::Request&,
     sendScriptResult(res, script_engine_->Resume(), "script resumed");
 }
 
-void RobotHttpServer::handleScriptStop(const httplib::Request&,
+void RobotHttpServer::handleScriptStop(const httplib::Request& req,
                                        httplib::Response& res) {
+    if (!ensureControl(req, res)) return;
     if (script_engine_ == nullptr) {
         sendJson(res, false, resultCode(Result::FunctionNotSupported),
                  "Lua script engine is unavailable");
@@ -1191,8 +1441,9 @@ void RobotHttpServer::handleScriptStop(const httplib::Request&,
     sendScriptResult(res, script_engine_->Stop(), "script stop requested");
 }
 
-void RobotHttpServer::handleScriptStep(const httplib::Request&,
+void RobotHttpServer::handleScriptStep(const httplib::Request& req,
                                        httplib::Response& res) {
+    if (!ensureControl(req, res)) return;
     if (script_engine_ == nullptr) {
         sendJson(res, false, resultCode(Result::FunctionNotSupported),
                  "Lua script engine is unavailable");
@@ -1213,6 +1464,7 @@ void RobotHttpServer::handleScriptStatus(const httplib::Request&,
 
 void RobotHttpServer::handleScriptBreakpointAdd(const httplib::Request& req,
                                                 httplib::Response& res) {
+    if (!ensureControl(req, res)) return;
     if (script_engine_ == nullptr) {
         sendJson(res, false, resultCode(Result::FunctionNotSupported),
                  "Lua script engine is unavailable");
@@ -1235,6 +1487,7 @@ void RobotHttpServer::handleScriptBreakpointAdd(const httplib::Request& req,
 
 void RobotHttpServer::handleScriptBreakpointRemove(const httplib::Request& req,
                                                    httplib::Response& res) {
+    if (!ensureControl(req, res)) return;
     if (script_engine_ == nullptr) {
         sendJson(res, false, resultCode(Result::FunctionNotSupported),
                  "Lua script engine is unavailable");
@@ -1255,8 +1508,9 @@ void RobotHttpServer::handleScriptBreakpointRemove(const httplib::Request& req,
     sendScriptResult(res, result, "breakpoint removed");
 }
 
-void RobotHttpServer::handleScriptBreakpointClear(const httplib::Request&,
+void RobotHttpServer::handleScriptBreakpointClear(const httplib::Request& req,
                                                   httplib::Response& res) {
+    if (!ensureControl(req, res)) return;
     if (script_engine_ == nullptr) {
         sendJson(res, false, resultCode(Result::FunctionNotSupported),
                  "Lua script engine is unavailable");
@@ -1273,6 +1527,7 @@ void RobotHttpServer::handleScriptBreakpointClear(const httplib::Request&,
 
 void RobotHttpServer::handleJogCompat(const httplib::Request& req, httplib::Response& res) {
     log_ptr_->info("POST /api/robot/jog (compat flag mode)");
+    if (!ensureControl(req, res)) return;
 
     nlohmann::json body = nlohmann::json::parse(req.body, nullptr, false);
     if (body.is_discarded() || !body.contains("flag") || !body["flag"].is_string() ||
@@ -1370,6 +1625,7 @@ void RobotHttpServer::handleJogCompat(const httplib::Request& req, httplib::Resp
 
 void RobotHttpServer::handleJogJoint(const httplib::Request& req, httplib::Response& res) {
     log_ptr_->info("POST /api/robot/jog/joint");
+    if (!ensureControl(req, res)) return;
 
     nlohmann::json body = nlohmann::json::parse(req.body, nullptr, false);
     if (body.is_discarded() || !body.contains("joints") || !body["joints"].is_array()) {
@@ -1432,6 +1688,7 @@ void RobotHttpServer::handleJogJoint(const httplib::Request& req, httplib::Respo
 
 void RobotHttpServer::handleJogCartesian(const httplib::Request& req, httplib::Response& res) {
     log_ptr_->info("POST /api/robot/jog/cartesian");
+    if (!ensureControl(req, res)) return;
 
     nlohmann::json body = nlohmann::json::parse(req.body, nullptr, false);
     if (body.is_discarded() || !body.contains("twist") || !body["twist"].is_array()) {
@@ -1505,6 +1762,7 @@ void RobotHttpServer::handleJogCartesian(const httplib::Request& req, httplib::R
 
 void RobotHttpServer::handleJogNullspace(const httplib::Request& req, httplib::Response& res) {
     log_ptr_->info("POST /api/robot/jog/nullspace");
+    if (!ensureControl(req, res)) return;
 
     nlohmann::json body = nlohmann::json::parse(req.body, nullptr, false);
     if (body.is_discarded()) {
@@ -1567,6 +1825,7 @@ void RobotHttpServer::handleJogNullspace(const httplib::Request& req, httplib::R
 
 void RobotHttpServer::handleJogSvd(const httplib::Request& req, httplib::Response& res) {
     log_ptr_->info("POST /api/robot/jog/svd");
+    if (!ensureControl(req, res)) return;
 
     nlohmann::json body = nlohmann::json::parse(req.body, nullptr, false);
     if (body.is_discarded()) {
@@ -1613,6 +1872,7 @@ void RobotHttpServer::handleJogSvd(const httplib::Request& req, httplib::Respons
 
 void RobotHttpServer::handleJogStop(const httplib::Request& req, httplib::Response& res) {
     log_ptr_->info("POST /api/robot/jog/stop");
+    if (!ensureControl(req, res)) return;
 
     if (!robot_->IsMotionBusy()) {
         nlohmann::json data;
@@ -1693,11 +1953,13 @@ void RobotHttpServer::handleGetObjectFrame(const httplib::Request& req, httplib:
 
 void RobotHttpServer::handleSetPoseFrame(const httplib::Request& req, httplib::Response& res) {
     log_ptr_->info("POST /api/calibration/pose");
+    if (!ensureControl(req, res)) return;
     sendJson(res, false, 1004, "Pose frame calibration endpoint is not implemented");
 }
 
 void RobotHttpServer::handleSetToolFrame(const httplib::Request& req, httplib::Response& res) {
     log_ptr_->info("POST /api/robot/tool_frame");
+    if (!ensureControl(req, res)) return;
 
     nlohmann::json body = nlohmann::json::parse(req.body, nullptr, false);
     std::string name;
@@ -1718,6 +1980,7 @@ void RobotHttpServer::handleSetToolFrame(const httplib::Request& req, httplib::R
 
 void RobotHttpServer::handleSetObjectFrame(const httplib::Request& req, httplib::Response& res) {
     log_ptr_->info("POST /api/robot/object_frame");
+    if (!ensureControl(req, res)) return;
 
     nlohmann::json body = nlohmann::json::parse(req.body, nullptr, false);
     std::string name;
@@ -1739,6 +2002,7 @@ void RobotHttpServer::handleSetObjectFrame(const httplib::Request& req, httplib:
 void RobotHttpServer::handleRemoveToolFrame(const httplib::Request& req, httplib::Response& res) {
     const std::string name = req.get_param_value("name");
     log_ptr_->info("DELETE /api/robot/tool_frame name={}", name);
+    if (!ensureControl(req, res)) return;
     if (name.empty()) {
         sendJson(res, false, 1001, "Missing 'name' query parameter");
         return;
@@ -1756,6 +2020,7 @@ void RobotHttpServer::handleRemoveToolFrame(const httplib::Request& req, httplib
 void RobotHttpServer::handleRemoveObjectFrame(const httplib::Request& req, httplib::Response& res) {
     const std::string name = req.get_param_value("name");
     log_ptr_->info("DELETE /api/robot/object_frame name={}", name);
+    if (!ensureControl(req, res)) return;
     if (name.empty()) {
         sendJson(res, false, 1001, "Missing 'name' query parameter");
         return;
@@ -1772,6 +2037,7 @@ void RobotHttpServer::handleRemoveObjectFrame(const httplib::Request& req, httpl
 
 void RobotHttpServer::handleSetActiveToolFrame(const httplib::Request& req, httplib::Response& res) {
     log_ptr_->info("POST /api/robot/active_tool_frame");
+    if (!ensureControl(req, res)) return;
 
     nlohmann::json body = nlohmann::json::parse(req.body, nullptr, false);
     if (body.is_discarded() || !body.contains("name") || !body["name"].is_string()) {
@@ -1790,6 +2056,7 @@ void RobotHttpServer::handleSetActiveToolFrame(const httplib::Request& req, http
 
 void RobotHttpServer::handleSetActiveObjectFrame(const httplib::Request& req, httplib::Response& res) {
     log_ptr_->info("POST /api/robot/active_object_frame");
+    if (!ensureControl(req, res)) return;
 
     nlohmann::json body = nlohmann::json::parse(req.body, nullptr, false);
     if (body.is_discarded() || !body.contains("name") || !body["name"].is_string()) {
@@ -1808,6 +2075,7 @@ void RobotHttpServer::handleSetActiveObjectFrame(const httplib::Request& req, ht
 
 void RobotHttpServer::handleLoadFrames(const httplib::Request& req, httplib::Response& res) {
     log_ptr_->info("POST /api/robot/frames/load");
+    if (!ensureControl(req, res)) return;
 
     nlohmann::json body = nlohmann::json::parse(req.body, nullptr, false);
     if (body.is_discarded() || !body.contains("path") || !body["path"].is_string()) {
@@ -1830,6 +2098,7 @@ void RobotHttpServer::handleLoadFrames(const httplib::Request& req, httplib::Res
 
 void RobotHttpServer::handleSaveFrames(const httplib::Request& req, httplib::Response& res) {
     log_ptr_->info("POST /api/robot/frames/save");
+    if (!ensureControl(req, res)) return;
 
     nlohmann::json body = nlohmann::json::parse(req.body, nullptr, false);
     if (body.is_discarded() || !body.contains("path") || !body["path"].is_string()) {
@@ -1856,6 +2125,7 @@ void RobotHttpServer::handleSaveFrames(const httplib::Request& req, httplib::Res
 
 void RobotHttpServer::handleCalibrationRun(const httplib::Request& req, httplib::Response& res) {
     log_ptr_->info("POST /api/calibration/run");
+    if (!ensureControl(req, res)) return;
     sendJson(res, false, 1004, "Calibration run endpoint is not implemented");
 }
 

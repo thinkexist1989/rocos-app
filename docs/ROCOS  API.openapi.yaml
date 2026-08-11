@@ -12,6 +12,7 @@ tags:
   - name: 坐标系管理 (Frame)
   - name: 标定
   - name: Lua 脚本
+  - name: 控制权 (Control)
 paths:
   /api/robot/state:
     get:
@@ -137,7 +138,8 @@ paths:
               schema:
                 $ref: '#/components/schemas/StandardResponse'
           headers: {}
-      security: []
+      security:
+        - ControlToken: []
   /api/robot/disable:
     post:
       summary: 全局下电 / 关闭使能
@@ -154,7 +156,8 @@ paths:
               schema:
                 $ref: '#/components/schemas/StandardResponse'
           headers: {}
-      security: []
+      security:
+        - ControlToken: []
   /api/robot/reset:
     post:
       summary: 清除机器人报警并复位到 STOPPED
@@ -186,7 +189,8 @@ paths:
                           enabled:
                             type: boolean
           headers: {}
-      security: []
+      security:
+        - ControlToken: []
   /api/robot/workmode:
     post:
       summary: 设置工作模式
@@ -216,7 +220,8 @@ paths:
         '200':
           description: 模式切换成功
           headers: {}
-      security: []
+      security:
+        - ControlToken: []
   /api/robot/servo/start:
     post:
       summary: 启动 UDP 伺服运动模式
@@ -246,7 +251,8 @@ paths:
               schema:
                 $ref: '#/components/schemas/MotionResponse'
           headers: {}
-      security: []
+      security:
+        - ControlToken: []
   /api/robot/servo/stop:
     post:
       summary: 停止 UDP 伺服运动模式
@@ -263,7 +269,8 @@ paths:
               schema:
                 $ref: '#/components/schemas/MotionResponse'
           headers: {}
-      security: []
+      security:
+        - ControlToken: []
   /api/robot/servo/mode:
     post:
       summary: 设置伺服运动模式
@@ -295,7 +302,8 @@ paths:
               schema:
                 $ref: '#/components/schemas/MotionResponse'
           headers: {}
-      security: []
+      security:
+        - ControlToken: []
   /api/robot/movej:
     post:
       summary: 关节空间运动 (MoveJ)
@@ -336,7 +344,8 @@ paths:
               schema:
                 $ref: '#/components/schemas/MotionResponse'
           headers: {}
-      security: []
+      security:
+        - ControlToken: []
   /api/robot/movej_ik:
     post:
       summary: 笛卡尔位姿逆解运动 (MoveJ_IK)
@@ -373,7 +382,8 @@ paths:
               schema:
                 $ref: '#/components/schemas/MotionResponse'
           headers: {}
-      security: []
+      security:
+        - ControlToken: []
   /api/robot/movel:
     post:
       summary: 笛卡尔直线运动 (MoveL)
@@ -413,7 +423,8 @@ paths:
               schema:
                 $ref: '#/components/schemas/MotionResponse'
           headers: {}
-      security: []
+      security:
+        - ControlToken: []
   /api/robot/movel_fk:
     post:
       summary: 关节空间直线运动 (MoveL_FK)
@@ -456,7 +467,8 @@ paths:
               schema:
                 $ref: '#/components/schemas/MotionResponse'
           headers: {}
-      security: []
+      security:
+        - ControlToken: []
   /api/robot/movec:
     post:
       summary: 笛卡尔圆弧运动 (MoveC)
@@ -509,7 +521,8 @@ paths:
               schema:
                 $ref: '#/components/schemas/MotionResponse'
           headers: {}
-      security: []
+      security:
+        - ControlToken: []
   /api/robot/pause:
     post:
       summary: 暂停运动
@@ -526,7 +539,8 @@ paths:
               schema:
                 $ref: '#/components/schemas/MotionResponse'
           headers: {}
-      security: []
+      security:
+        - ControlToken: []
   /api/robot/resume:
     post:
       summary: 继续运动
@@ -543,7 +557,8 @@ paths:
               schema:
                 $ref: '#/components/schemas/MotionResponse'
           headers: {}
-      security: []
+      security:
+        - ControlToken: []
   /api/robot/stop:
     post:
       summary: 停止运动
@@ -560,7 +575,8 @@ paths:
               schema:
                 $ref: '#/components/schemas/MotionResponse'
           headers: {}
-      security: []
+      security:
+        - ControlToken: []
   /api/robot/wait_move:
     post:
       summary: 等待当前运动结束（阻塞）
@@ -577,7 +593,8 @@ paths:
               schema:
                 $ref: '#/components/schemas/MotionResponse'
           headers: {}
-      security: []
+      security:
+        - ControlToken: []
   /api/robot/move_status:
     get:
       summary: 查询运动/任务状态
@@ -653,7 +670,8 @@ paths:
               schema:
                 $ref: '#/components/schemas/MotionResponse'
           headers: {}
-      security: []
+      security:
+        - ControlToken: []
   /api/robot/jog/cartesian:
     post:
       summary: 笛卡尔点动
@@ -714,7 +732,8 @@ paths:
               schema:
                 $ref: '#/components/schemas/MotionResponse'
           headers: {}
-      security: []
+      security:
+        - ControlToken: []
   /api/robot/jog/nullspace:
     post:
       summary: 零空间点动
@@ -760,7 +779,8 @@ paths:
               schema:
                 $ref: '#/components/schemas/MotionResponse'
           headers: {}
-      security: []
+      security:
+        - ControlToken: []
   /api/robot/jog/svd:
     post:
       summary: SVD 维度速度点动
@@ -797,7 +817,8 @@ paths:
               schema:
                 $ref: '#/components/schemas/MotionResponse'
           headers: {}
-      security: []
+      security:
+        - ControlToken: []
   /api/robot/jog/stop:
     post:
       summary: 停止点动
@@ -814,7 +835,8 @@ paths:
               schema:
                 $ref: '#/components/schemas/MotionResponse'
           headers: {}
-      security: []
+      security:
+        - ControlToken: []
   /api/robot/tool_frames:
     get:
       summary: 获取所有工具坐标系名称列表
@@ -926,7 +948,8 @@ paths:
                       data:
                         $ref: '#/components/schemas/NamedFrame'
           headers: {}
-      security: []
+      security:
+        - ControlToken: []
     delete:
       summary: 删除指定工具坐标系
       deprecated: false
@@ -949,7 +972,8 @@ paths:
               schema:
                 $ref: '#/components/schemas/StandardResponse'
           headers: {}
-      security: []
+      security:
+        - ControlToken: []
   /api/robot/object_frame:
     get:
       summary: 查询指定工件坐标系
@@ -1015,7 +1039,8 @@ paths:
                       data:
                         $ref: '#/components/schemas/NamedFrame'
           headers: {}
-      security: []
+      security:
+        - ControlToken: []
     delete:
       summary: 删除指定工件坐标系
       deprecated: false
@@ -1038,7 +1063,8 @@ paths:
               schema:
                 $ref: '#/components/schemas/StandardResponse'
           headers: {}
-      security: []
+      security:
+        - ControlToken: []
   /api/robot/active_tool_frame:
     post:
       summary: 激活指定工具坐标系
@@ -1066,7 +1092,8 @@ paths:
               schema:
                 $ref: '#/components/schemas/StandardResponse'
           headers: {}
-      security: []
+      security:
+        - ControlToken: []
   /api/robot/active_object_frame:
     post:
       summary: 激活指定工件坐标系
@@ -1094,7 +1121,8 @@ paths:
               schema:
                 $ref: '#/components/schemas/StandardResponse'
           headers: {}
-      security: []
+      security:
+        - ControlToken: []
   /api/robot/frames/load:
     post:
       summary: 从 YAML 文件加载坐标系
@@ -1128,7 +1156,8 @@ paths:
                       data:
                         $ref: '#/components/schemas/FramesSnapshot'
           headers: {}
-      security: []
+      security:
+        - ControlToken: []
   /api/robot/frames/save:
     post:
       summary: 保存坐标系到 YAML 文件
@@ -1161,7 +1190,8 @@ paths:
                       data:
                         $ref: '#/components/schemas/FramesSnapshot'
           headers: {}
-      security: []
+      security:
+        - ControlToken: []
   /api/calibration/pose:
     post:
       summary: 设置标定点位
@@ -1178,7 +1208,8 @@ paths:
               schema:
                 $ref: '#/components/schemas/StandardResponse'
           headers: {}
-      security: []
+      security:
+        - ControlToken: []
   /api/calibration/tool:
     post:
       summary: 设置工具坐标系（等同 POST /api/robot/tool_frame）
@@ -1211,7 +1242,8 @@ paths:
               schema:
                 $ref: '#/components/schemas/StandardResponse'
           headers: {}
-      security: []
+      security:
+        - ControlToken: []
   /api/calibration/object:
     post:
       summary: 设置工件坐标系（等同 POST /api/robot/object_frame）
@@ -1244,7 +1276,8 @@ paths:
               schema:
                 $ref: '#/components/schemas/StandardResponse'
           headers: {}
-      security: []
+      security:
+        - ControlToken: []
   /api/calibration/run:
     post:
       summary: 执行标定计算
@@ -1261,7 +1294,8 @@ paths:
               schema:
                 $ref: '#/components/schemas/StandardResponse'
           headers: {}
-      security: []
+      security:
+        - ControlToken: []
   /api/calibration/result:
     get:
       summary: 获取标定结果
@@ -1301,7 +1335,8 @@ paths:
               schema:
                 $ref: '#/components/schemas/ScriptResponse'
           headers: {}
-      security: []
+      security:
+        - ControlToken: []
   /api/script/run:
     post:
       summary: 异步执行已加载的 Lua 脚本
@@ -1318,7 +1353,8 @@ paths:
               schema:
                 $ref: '#/components/schemas/ScriptResponse'
           headers: {}
-      security: []
+      security:
+        - ControlToken: []
   /api/script/pause:
     post:
       summary: 暂停 Lua 脚本
@@ -1335,7 +1371,8 @@ paths:
               schema:
                 $ref: '#/components/schemas/ScriptResponse'
           headers: {}
-      security: []
+      security:
+        - ControlToken: []
   /api/script/resume:
     post:
       summary: 继续 Lua 脚本
@@ -1352,7 +1389,8 @@ paths:
               schema:
                 $ref: '#/components/schemas/ScriptResponse'
           headers: {}
-      security: []
+      security:
+        - ControlToken: []
   /api/script/stop:
     post:
       summary: 停止 Lua 脚本
@@ -1369,7 +1407,8 @@ paths:
               schema:
                 $ref: '#/components/schemas/ScriptResponse'
           headers: {}
-      security: []
+      security:
+        - ControlToken: []
   /api/script/step:
     post:
       summary: 单步执行 Lua 脚本
@@ -1386,7 +1425,8 @@ paths:
               schema:
                 $ref: '#/components/schemas/ScriptResponse'
           headers: {}
-      security: []
+      security:
+        - ControlToken: []
   /api/script/status:
     get:
       summary: 获取 Lua 脚本状态
@@ -1426,7 +1466,8 @@ paths:
               schema:
                 $ref: '#/components/schemas/ScriptResponse'
           headers: {}
-      security: []
+      security:
+        - ControlToken: []
   /api/script/breakpoint/remove:
     post:
       summary: 删除断点
@@ -1449,7 +1490,8 @@ paths:
               schema:
                 $ref: '#/components/schemas/ScriptResponse'
           headers: {}
-      security: []
+      security:
+        - ControlToken: []
   /api/script/breakpoint/clear:
     post:
       summary: 清空所有断点
@@ -1466,6 +1508,104 @@ paths:
               schema:
                 $ref: '#/components/schemas/ScriptResponse'
           headers: {}
+      security:
+        - ControlToken: []
+  /api/control/acquire:
+    post:
+      summary: 申请机器人控制权
+      description: >
+        无持有者时颁发新 UUID token 并返回。若已有持有者且未过期，返回 `code=3008`。
+        携带此 token（`X-Rocos-Control-Token` header）方可调用写接口。TTL 60s，任何调用自动续期。
+      tags:
+        - 控制权 (Control)
+      parameters: []
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                client_name:
+                  type: string
+                  description: 客户端自报名称，写入日志与 /status 供审计
+        required: false
+      responses:
+        '200':
+          description: 申请结果
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/StandardResponse'
+                  - type: object
+                    properties:
+                      data:
+                        $ref: '#/components/schemas/ControlOwnerData'
+      security: []
+  /api/control/release:
+    post:
+      summary: 释放机器人控制权
+      description: 必须携带匹配当前持有者的 `X-Rocos-Control-Token`。
+      tags:
+        - 控制权 (Control)
+      parameters: []
+      responses:
+        '200':
+          description: 释放结果
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/StandardResponse'
+      security:
+        - ControlToken: []
+  /api/control/takeover:
+    post:
+      summary: 强制抢占控制权
+      description: 无条件覆盖当前持有者，颁发新 token；原 token 立即失效。日志中记录被抢占的原持有者信息。
+      tags:
+        - 控制权 (Control)
+      parameters: []
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                client_name:
+                  type: string
+        required: false
+      responses:
+        '200':
+          description: 抢占结果
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/StandardResponse'
+                  - type: object
+                    properties:
+                      data:
+                        $ref: '#/components/schemas/ControlOwnerData'
+      security: []
+  /api/control/status:
+    get:
+      summary: 查询控制权状态
+      description: 无需鉴权。返回当前持有者信息与剩余 TTL；若 token 已过期会先做懒清理。
+      tags:
+        - 控制权 (Control)
+      parameters: []
+      responses:
+        '200':
+          description: 状态快照
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/StandardResponse'
+                  - type: object
+                    properties:
+                      data:
+                        $ref: '#/components/schemas/ControlOwnerData'
       security: []
 components:
   schemas:
@@ -1763,7 +1903,41 @@ components:
           properties:
             data:
               $ref: '#/components/schemas/ScriptStatusData'
+    ControlOwnerData:
+      type: object
+      properties:
+        token:
+          type: string
+          description: 仅在 acquire/takeover 成功响应中返回；status/release 中不返回
+        has_owner:
+          type: boolean
+        owner_ip:
+          type: string
+        owner_name:
+          type: string
+        owner_agent:
+          type: string
+          description: 客户端 User-Agent
+        held_for_seconds:
+          type: integer
+          description: 自 acquire 起已持有的秒数
+        idle_seconds:
+          type: integer
+          description: 自上次续期起的空闲秒数
+        expires_in_seconds:
+          type: integer
+          description: 距离 TTL 到期的剩余秒数
+        ttl_seconds:
+          type: integer
+          description: 常量 60
   responses: {}
-  securitySchemes: {}
+  securitySchemes:
+    ControlToken:
+      type: apiKey
+      in: header
+      name: X-Rocos-Control-Token
+      description: >
+        单持有者控制权令牌。通过 POST /api/control/acquire 或 /api/control/takeover 获取。
+        所有写接口必须携带；缺失返回 3006，无效/过期返回 3007。详见 docs/http_api_control_rights.md。
 servers: []
 security: []
