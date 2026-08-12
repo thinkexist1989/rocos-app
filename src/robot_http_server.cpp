@@ -454,6 +454,16 @@ RobotHttpServer::checkAndRenewToken(const httplib::Request& req) {
     if (!req.has_header(CONTROL_TOKEN_HEADER)) return AuthResult::MissingToken;
     const std::string token = req.get_header_value(CONTROL_TOKEN_HEADER);
 
+    // 调试旁路：使用预设 DEBUG_TOKEN + DEBUG_CLIENT_ID 可直接控制机器人，无需 acquire。
+    // 仅用于 curl/脚本调试，生产环境可注释掉此段以禁用。
+    if (token == DEBUG_TOKEN) {
+        const std::string req_client_id = extractClientId(req);
+        if (req_client_id == DEBUG_CLIENT_ID) {
+            log_ptr_->info("Debug bypass: token accepted (client_id={})", req_client_id);
+            return AuthResult::OK;
+        }
+    }
+
     std::lock_guard<std::mutex> lock(control_mutex_);
     if (current_token_.empty()) return AuthResult::InvalidToken;
 

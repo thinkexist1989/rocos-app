@@ -209,7 +209,30 @@ curl -s http://localhost:8080/api/control/status | jq
 # 4. 释放
 curl -s -X POST http://localhost:8080/api/control/release \
   -H "X-Rocos-Control-Token: $TOKEN"
+
+# 5. 调试旁路：使用预设 debug token + client_id，无需 acquire 即可控制（见 §10.1）
+curl -s -X POST http://localhost:8080/api/robot/movej \
+  -H "X-Rocos-Control-Token: debug-token" \
+  -H "X-Rocos-Client-Id: debug-client" \
+  -H 'Content-Type: application/json' \
+  -d '{"joints":[0,0,0,0,0,0]}'
 ```
+
+### 10.1 调试旁路（Debug Bypass）
+
+为方便 curl / 脚本调试，`checkAndRenewToken` 内置一组硬编码的调试凭证：
+
+| 头 | 值 |
+|---|---|
+| `X-Rocos-Control-Token` | `debug-token` |
+| `X-Rocos-Client-Id` | `debug-client` |
+
+使用这组凭证调用**任何写接口**均无需先执行 `POST /api/control/acquire`，直接绕过控制权检查。
+
+**约束与注意事项：**
+- 调试旁路**不占用**控制权——它不影响正常 `acquire`/`takeover` 流程，`current_token_` 不会被设置为 `debug-token`。
+- 仅用于开发调试，**生产环境建议注释掉** `checkAndRenewToken` 中对应的旁路代码段（已用中文注释标注）。
+- 常量定义于 `src/robot_http_server.hpp`：`DEBUG_TOKEN` / `DEBUG_CLIENT_ID`。`
 
 ## 11. 前端集成建议
 
@@ -285,5 +308,6 @@ window.addEventListener('beforeunload', () => {
 
 ---
 **变更日志**  
+- 2026-08-12b：新增调试旁路：`checkAndRenewToken` 接受预设 `debug-token` + `debug-client` 凭证，无需 acquire 即可直接调用写接口，便于 curl/脚本调试（§10.1）。
 - 2026-08-12：引入 `X-Rocos-Client-Id` 头校验，token 与 client_id 双重绑定，防止同源标签页通过共享 `localStorage` 窃取 token 绕过控制权检查。`checkAndRenewToken` 增加 client_id 匹配验证；`acquire`/`takeover` 自动生成 client_id 并在响应中返回。
 - 2026-08-11：初版，新增 `/api/control/{acquire,release,takeover,status}` 四条接口与业务码 `3006/3007/3008`。

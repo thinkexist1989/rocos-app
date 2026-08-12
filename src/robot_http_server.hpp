@@ -211,6 +211,11 @@ private:
     static constexpr int CONTROL_TTL_SECONDS = 300;
     static constexpr const char* CONTROL_TOKEN_HEADER = "X-Rocos-Control-Token";
     static constexpr const char* CONTROL_CLIENT_ID_HEADER = "X-Rocos-Client-Id";
+
+    // 调试旁路：使用预设 token + client_id 可绕过 acquire 流程直接控制机器人
+    // curl 示例: curl -X POST ... -H "X-Rocos-Control-Token: debug-token" -H "X-Rocos-Client-Id: debug-client"
+    static constexpr const char* DEBUG_TOKEN = "debug-token";
+    static constexpr const char* DEBUG_CLIENT_ID = "debug-client";
 };
 
 } // namespace rocos
