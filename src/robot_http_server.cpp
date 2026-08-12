@@ -344,8 +344,10 @@ void RobotHttpServer::registerRoutes() {
 void RobotHttpServer::setCorsHeaders(httplib::Response& res) {
     res.set_header("Access-Control-Allow-Origin", "*");
     res.set_header("Access-Control-Allow-Methods", "GET, POST, DELETE, OPTIONS");
-    res.set_header("Access-Control-Allow-Headers", "Content-Type, X-Rocos-Control-Token");
-    res.set_header("Access-Control-Expose-Headers", "X-Rocos-Control-Token");
+    res.set_header("Access-Control-Allow-Headers",
+                   "Content-Type, X-Rocos-Control-Token, X-Rocos-Client-Id");
+    res.set_header("Access-Control-Expose-Headers",
+                   "X-Rocos-Control-Token, X-Rocos-Client-Id");
 }
 
 // ============================================================================
@@ -400,6 +402,28 @@ nlohmann::json RobotHttpServer::scriptStatusToJson() const {
 // Utility: Control Rights (single-holder lock)
 // ============================================================================
 
+std::string RobotHttpServer::makeConnectionKey(const std::string& remote_addr, int remote_port) {
+    if (remote_addr.empty()) {
+        return "unknown:" + std::to_string(remote_port);
+    }
+    return remote_addr + ":" + std::to_string(remote_port);
+}
+
+std::string RobotHttpServer::makeConnectionKey(const httplib::Request& req) {
+    return makeConnectionKey(req.remote_addr, req.remote_port);
+}
+
+std::string RobotHttpServer::extractClientId(const httplib::Request& req) {
+    if (req.has_header(CONTROL_CLIENT_ID_HEADER)) {
+        return req.get_header_value(CONTROL_CLIENT_ID_HEADER);
+    }
+    const nlohmann::json body = nlohmann::json::parse(req.body, nullptr, false);
+    if (!body.is_discarded() && body.contains("client_id") && body["client_id"].is_string()) {
+        return body["client_id"].get<std::string>();
+    }
+    return std::string{};
+}
+
 std::string RobotHttpServer::generateControlToken() {
     // 生成 UUID v4 字符串。使用 random_device + mt19937_64 提供足够的熵。
     static thread_local std::mt19937_64 rng(
@@ -441,6 +465,25 @@ RobotHttpServer::checkAndRenewToken(const httplib::Request& req) {
     }
     if (token != current_token_) return AuthResult::InvalidToken;
 
+    // 验证 client_id：若 acquire 时记录了 client_id，后续请求必须携带相同的 client_id。
+    // 这防止同一浏览器不同标签页通过共享 localStorage 窃取 token 绕过控制权检查。
+    if (!current_owner_client_id_.empty()) {
+        const std::string req_client_id = extractClientId(req);
+        if (req_client_id.empty()) {
+            log_ptr_->warn(
+                "Control token valid but request missing X-Rocos-Client-Id "
+                "(owner client_id={})", current_owner_client_id_);
+            return AuthResult::InvalidToken;
+        }
+        if (req_client_id != current_owner_client_id_) {
+            log_ptr_->warn(
+                "Control token valid but client_id mismatch "
+                "(expected={}, got={})",
+                current_owner_client_id_, req_client_id);
+            return AuthResult::InvalidToken;
+        }
+    }
+
     last_seen_at_ = now;
     return AuthResult::OK;
 }
@@ -466,11 +509,14 @@ bool RobotHttpServer::ensureControl(const httplib::Request& req,
 
 void RobotHttpServer::clearControl_locked(const char* reason) {
     if (!current_token_.empty()) {
-        log_ptr_->info("Control released (owner={}@{}, reason={})",
-                       current_owner_name_, current_owner_ip_, reason);
+        log_ptr_->info("Control released (owner={}@{}:{}, reason={})",
+                       current_owner_name_, current_owner_ip_, current_owner_port_, reason);
     }
     current_token_.clear();
     current_owner_ip_.clear();
+    current_owner_port_ = -1;
+    current_owner_connection_.clear();
+    current_owner_client_id_.clear();
     current_owner_name_.clear();
     current_owner_agent_.clear();
     acquired_at_ = {};
@@ -482,6 +528,9 @@ nlohmann::json RobotHttpServer::controlOwnerJson_locked() const {
     const bool has_owner = !current_token_.empty();
     data["has_owner"] = has_owner;
     data["owner_ip"] = current_owner_ip_;
+    data["owner_port"] = current_owner_port_;
+    data["owner_connection"] = current_owner_connection_;
+    data["owner_client_id"] = current_owner_client_id_;
     data["owner_name"] = current_owner_name_;
     data["owner_agent"] = current_owner_agent_;
 
@@ -512,6 +561,17 @@ void RobotHttpServer::handleControlAcquire(const httplib::Request& req,
         body["client_name"].is_string()) {
         client_name = body["client_name"].get<std::string>();
     }
+    std::string client_id = extractClientId(req);
+    if (client_id.empty() && !body.is_discarded() && body.contains("client_id") &&
+        body["client_id"].is_string()) {
+        client_id = body["client_id"].get<std::string>();
+    }
+    // 若客户端未提供 client_id，服务端自动生成一个，
+    // 确保每个 token 都有绑定的 client_id，防止同源标签页 token 窃取。
+    const bool client_id_auto_generated = client_id.empty();
+    if (client_id_auto_generated) {
+        client_id = generateControlToken();  // UUID v4 作为 client_id
+    }
     const std::string user_agent = req.has_header("User-Agent")
         ? req.get_header_value("User-Agent") : std::string{};
 
@@ -534,17 +594,26 @@ void RobotHttpServer::handleControlAcquire(const httplib::Request& req,
 
     current_token_ = generateControlToken();
     current_owner_ip_ = req.remote_addr;
+    current_owner_port_ = req.remote_port;
+    current_owner_connection_ = makeConnectionKey(req);
+    current_owner_client_id_ = client_id;
     current_owner_name_ = client_name;
     current_owner_agent_ = user_agent;
     const auto now = std::chrono::steady_clock::now();
     acquired_at_ = now;
     last_seen_at_ = now;
 
-    log_ptr_->info("Control acquired by {}@{} ({})",
-                   current_owner_name_, current_owner_ip_, current_owner_agent_);
+    log_ptr_->info("Control acquired by {}@{}:{} ({}) client_id={} auto={}",
+                   current_owner_name_, current_owner_ip_, current_owner_port_,
+                   current_owner_agent_, current_owner_client_id_, client_id_auto_generated);
 
     nlohmann::json data = controlOwnerJson_locked();
     data["token"] = current_token_;
+    // 返回 client_id，前端必须存储并在后续请求中通过 X-Rocos-Client-Id 头回传
+    data["client_id"] = current_owner_client_id_;
+    if (client_id_auto_generated) {
+        data["client_id_auto"] = true;  // 提示前端这是服务端生成的
+    }
     sendJson(res, true, 0, "control acquired", data);
 }
 
@@ -564,6 +633,14 @@ void RobotHttpServer::handleControlRelease(const httplib::Request& req,
         sendJson(res, false, 3007, "control token invalid");
         return;
     }
+    // 释放时也校验 client_id，防止窃取 token 的标签页恶意释放控制权
+    if (!current_owner_client_id_.empty()) {
+        const std::string req_client_id = extractClientId(req);
+        if (req_client_id != current_owner_client_id_) {
+            sendJson(res, false, 3007, "control token invalid");
+            return;
+        }
+    }
     clearControl_locked("released by owner");
     sendJson(res, true, 0, "control released", controlOwnerJson_locked());
 }
@@ -578,19 +655,31 @@ void RobotHttpServer::handleControlTakeover(const httplib::Request& req,
         body["client_name"].is_string()) {
         client_name = body["client_name"].get<std::string>();
     }
+    std::string client_id = extractClientId(req);
+    if (client_id.empty() && !body.is_discarded() && body.contains("client_id") &&
+        body["client_id"].is_string()) {
+        client_id = body["client_id"].get<std::string>();
+    }
+    const bool client_id_auto_generated = client_id.empty();
+    if (client_id_auto_generated) {
+        client_id = generateControlToken();
+    }
     const std::string user_agent = req.has_header("User-Agent")
         ? req.get_header_value("User-Agent") : std::string{};
 
     std::lock_guard<std::mutex> lock(control_mutex_);
     if (!current_token_.empty()) {
-        log_ptr_->warn("Control taken over: previous owner {}@{} forcibly evicted by {}@{}",
-                       current_owner_name_, current_owner_ip_,
-                       client_name, req.remote_addr);
+        log_ptr_->warn("Control taken over: previous owner {}@{}:{} forcibly evicted by {}@{}:{}",
+                       current_owner_name_, current_owner_ip_, current_owner_port_,
+                       client_name, req.remote_addr, req.remote_port);
         clearControl_locked("takeover");
     }
 
     current_token_ = generateControlToken();
     current_owner_ip_ = req.remote_addr;
+    current_owner_port_ = req.remote_port;
+    current_owner_connection_ = makeConnectionKey(req);
+    current_owner_client_id_ = client_id;
     current_owner_name_ = client_name;
     current_owner_agent_ = user_agent;
     const auto now = std::chrono::steady_clock::now();
@@ -599,6 +688,10 @@ void RobotHttpServer::handleControlTakeover(const httplib::Request& req,
 
     nlohmann::json data = controlOwnerJson_locked();
     data["token"] = current_token_;
+    data["client_id"] = current_owner_client_id_;
+    if (client_id_auto_generated) {
+        data["client_id_auto"] = true;
+    }
     sendJson(res, true, 0, "control taken over", data);
 }
 
