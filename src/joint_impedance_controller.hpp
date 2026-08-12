@@ -48,6 +48,11 @@ public:
     /// @brief 设置关节阻尼系数 K_d [Nm·s/rad]
     Result SetDamping(const JntArray& D);
 
+    /// @brief 获取关节刚度系数 K_p [Nm/rad]
+    [[nodiscard]] const JntArray& GetStiffness() const { return K_p_; }
+    /// @brief 获取关节阻尼系数 K_d [Nm·s/rad]
+    [[nodiscard]] const JntArray& GetDamping() const { return K_d_; }
+
     /// @brief 设置导纳虚拟惯量 M [kg·m²]（导纳模式参数）
     Result SetInertia(const JntArray& M);
     /// @brief 设置关节力矩零飘 τ_offset [Nm]（导纳模式参数）

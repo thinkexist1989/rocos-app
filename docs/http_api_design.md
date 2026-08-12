@@ -169,6 +169,7 @@ int main(int argc, char* argv[]) {
 |------|------|------|
 | `GET` | `/api/robot/state` | 获取机器人完整状态（关节状态 + 笛卡尔位姿 + 硬件状态） |
 | `GET` | `/api/robot/info` | 获取机器人信息（关节参数、单位等） |
+| `GET` | `/api/robot/impedance` | 获取当前阻抗控制参数（关节/笛卡尔空间刚度与阻尼） |
 | `GET` | `/api/robot/model` | 获取机器人 URDF 模型信息（连杆、关节类型、mesh） |
 | `GET` | `/api/robot/model/mesh?path=<link_name>` | 获取连杆 mesh 文件（二进制） |
 

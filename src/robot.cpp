@@ -935,6 +935,49 @@ namespace rocos {
         return Result::NoError;
     }
 
+    nlohmann::json Robot::GetImpedanceParams() const {
+        nlohmann::json result;
+        result["work_mode"] = work_mode_;
+
+        // 关节空间参数
+        nlohmann::json joint;
+        joint["valid"] = false;
+        if (work_mode_ == "jnt_imp") {
+            auto* jnt_ctrl = dynamic_cast<JointImpedanceController*>(controller.get());
+            if (jnt_ctrl != nullptr) {
+                const auto& K = jnt_ctrl->GetStiffness();
+                const auto& D = jnt_ctrl->GetDamping();
+                nlohmann::json stiffness = nlohmann::json::array();
+                nlohmann::json damping   = nlohmann::json::array();
+                for (unsigned int i = 0; i < K.rows(); ++i) {
+                    stiffness.push_back(K(i));
+                    damping.push_back(D(i));
+                }
+                joint["stiffness"] = stiffness;
+                joint["damping"]   = damping;
+                joint["valid"]     = true;
+            }
+        }
+        result["joint_space"] = joint;
+
+        // 笛卡尔空间参数
+        nlohmann::json cart;
+        cart["valid"] = false;
+        if (work_mode_ == "cart_imp") {
+            auto* cart_ctrl = dynamic_cast<CartesianImpedanceController*>(controller.get());
+            if (cart_ctrl != nullptr) {
+                cart["translational_stiffness"] = cart_ctrl->GetTranslationalStiffness();
+                cart["rotational_stiffness"]    = cart_ctrl->GetRotationalStiffness();
+                cart["translational_damping"]   = cart_ctrl->GetTranslationalDamping();
+                cart["rotational_damping"]      = cart_ctrl->GetRotationalDamping();
+                cart["valid"] = true;
+            }
+        }
+        result["cartesian_space"] = cart;
+
+        return result;
+    }
+
 
     bool Robot::IsEnabled() const {
         if (hardware == nullptr) {

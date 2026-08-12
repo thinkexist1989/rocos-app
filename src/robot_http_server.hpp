@@ -61,6 +61,7 @@ private:
     void handleGetRobotInfo(const httplib::Request& req, httplib::Response& res);
     void handleGetRobotModel(const httplib::Request& req, httplib::Response& res);
     void handleGetLinkMesh(const httplib::Request& req, httplib::Response& res);
+    void handleGetImpedance(const httplib::Request& req, httplib::Response& res);
 
     // ---- Robot Control ----
     void handleEnable(const httplib::Request& req, httplib::Response& res);

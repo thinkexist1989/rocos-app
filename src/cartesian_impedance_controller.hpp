@@ -54,14 +54,19 @@ public:
     Result UpdateCmd(const JntArray& q_cmd) override;
 
     // ---- 笛卡尔阻抗参数 ----
-    /// @brief 设置笛卡尔平动刚度 [N/m]，默认 500
+    /// @brief 设置笛卡尔平动刚度 [N/m]
     Result SetTranslationalStiffness(double K);
-    /// @brief 设置笛卡尔转动刚度 [Nm/rad]，默认 50
+    /// @brief 设置笛卡尔转动刚度 [Nm/rad]
     Result SetRotationalStiffness(double K);
-    /// @brief 设置笛卡尔平动阻尼 [N·s/m]，默认 100
+    /// @brief 设置笛卡尔平动阻尼 [N·s/m]
     Result SetTranslationalDamping(double D);
-    /// @brief 设置笛卡尔转动阻尼 [Nm·s/rad]，默认 10
+    /// @brief 设置笛卡尔转动阻尼 [Nm·s/rad]
     Result SetRotationalDamping(double D);
+
+    [[nodiscard]] double GetTranslationalStiffness()  const { return K_p_lin_; }
+    [[nodiscard]] double GetRotationalStiffness()      const { return K_p_ang_; }
+    [[nodiscard]] double GetTranslationalDamping()     const { return K_d_lin_; }
+    [[nodiscard]] double GetRotationalDamping()        const { return K_d_ang_; }
 
     // ---- 力矩安全参数 ----
     /// @brief 设置力矩变化率限制 [Nm/s]，0 表示不限制，默认 0

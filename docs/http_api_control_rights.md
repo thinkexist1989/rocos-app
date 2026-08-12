@@ -142,7 +142,7 @@ CORS：`Access-Control-Allow-Headers` 已声明 `X-Rocos-Control-Token, X-Rocos-
 ## 8. 接口权限矩阵
 
 **只读（无需 token）**：
-- `GET /api/robot/state` `/info` `/urdf` `/urdf/mesh` `/enabled` `/move_status` `/tool_frames` `/object_frames` `/tool_frame` `/object_frame`
+- `GET /api/robot/state` `/info` `/impedance` `/urdf` `/urdf/mesh` `/enabled` `/move_status` `/tool_frames` `/object_frames` `/tool_frame` `/object_frame`
 - `GET /api/script/status`
 - `GET /api/control/status`
 - `GET /api/calibration/result`

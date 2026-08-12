@@ -58,6 +58,32 @@ paths:
                         $ref: '#/components/schemas/RobotInfoData'
           headers: {}
       security: []
+  /api/robot/impedance:
+    get:
+      summary: 获取当前阻抗控制参数（关节空间 + 笛卡尔空间）
+      deprecated: false
+      description: |
+        返回当前工作模式下的阻抗参数（刚度与阻尼）。
+        - 关节阻抗模式 (jnt_imp): 返回每关节的刚度 [Nm/rad] 和阻尼 [Nm·s/rad]
+        - 笛卡尔阻抗模式 (cart_imp): 返回平动/转动刚度 [N/m, Nm/rad] 和阻尼 [N·s/m, Nm·s/rad]
+        - 其他模式: joint_space.valid 和 cartesian_space.valid 均为 false
+      tags:
+        - 机器人状态与信息
+      parameters: []
+      responses:
+        '200':
+          description: 成功
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/StandardResponse'
+                  - type: object
+                    properties:
+                      data:
+                        $ref: '#/components/schemas/ImpedanceData'
+          headers: {}
+      security: []
   /api/robot/urdf:
     get:
       summary: 获取机器人 URDF 模型 XML
@@ -1766,6 +1792,47 @@ components:
                 type: string
               zero_offset:
                 type: integer
+    ImpedanceData:
+      type: object
+      properties:
+        work_mode:
+          type: string
+          description: 当前工作模式 (position | jnt_imp | jnt_admit_teach | cart_imp)
+          example: jnt_imp
+        joint_space:
+          type: object
+          properties:
+            valid:
+              type: boolean
+              description: 关节空间参数是否有效（仅 jnt_imp 模式为 true）
+            stiffness:
+              type: array
+              items:
+                type: number
+              description: 关节刚度系数 [Nm/rad]
+            damping:
+              type: array
+              items:
+                type: number
+              description: 关节阻尼系数 [Nm·s/rad]
+        cartesian_space:
+          type: object
+          properties:
+            valid:
+              type: boolean
+              description: 笛卡尔空间参数是否有效（仅 cart_imp 模式为 true）
+            translational_stiffness:
+              type: number
+              description: 平动刚度 [N/m]
+            rotational_stiffness:
+              type: number
+              description: 转动刚度 [Nm/rad]
+            translational_damping:
+              type: number
+              description: 平动阻尼 [N·s/m]
+            rotational_damping:
+              type: number
+              description: 转动阻尼 [Nm·s/rad]
     RobotEnabledData:
       type: object
       properties:

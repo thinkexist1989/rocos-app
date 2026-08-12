@@ -255,6 +255,7 @@ void RobotHttpServer::registerRoutes() {
     // Robot state
     server_->Get("/api/robot/state", [this](auto& req, auto& res) { handleGetRobotState(req, res); });
     server_->Get("/api/robot/info", [this](auto& req, auto& res) { handleGetRobotInfo(req, res); });
+    server_->Get("/api/robot/impedance", [this](auto& req, auto& res) { handleGetImpedance(req, res); });
     server_->Get("/api/robot/urdf", [this](auto& req, auto& res) { handleGetRobotModel(req, res); });
     server_->Get("/api/robot/urdf/mesh", [this](auto& req, auto& res) { handleGetLinkMesh(req, res); });
     server_->Get("/api/robot/enabled", [this](auto& req, auto& res) { handleIsEnabled(req, res); });
@@ -926,6 +927,13 @@ void RobotHttpServer::handleGetRobotModel(const httplib::Request& req, httplib::
 
     setCorsHeaders(res);
     res.set_content(content, "text/xml");
+}
+
+void RobotHttpServer::handleGetImpedance(const httplib::Request& /*req*/,
+                                          httplib::Response& res) {
+    log_ptr_->info("GET /api/robot/impedance");
+    const nlohmann::json data = robot_->GetImpedanceParams();
+    sendJson(res, true, 0, "ok", data);
 }
 
 void RobotHttpServer::handleGetLinkMesh(const httplib::Request& req, httplib::Response& res) {

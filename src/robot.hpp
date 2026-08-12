@@ -25,6 +25,8 @@
 #include <functional>
 #include <atomic>
 
+#include <json.hpp>
+
 #include "types.hpp"
 #include "result.hpp"
 #include "servo_type.hpp"
@@ -152,10 +154,10 @@ class Robot {
   // ✓ GetRobotStateSnapshot(): 对应 GET /api/robot/state，已实现。
   // - GetMotionStatus()/GetCurrentTaskInfo(): 对应 GET /api/robot/move_status，封装当前任务状态而不是 HTTP 自己拼。
   //
-  // TODO(legacy API): 旧 HTTP 里还有 workmode / calibration 相关接口，后续如果恢复，需要先在 Robot 层补：
-  // - SetWorkMode()/GetWorkMode()
-  // - StartTcpCalibration()/AddTcpCalibrationPoint()/ComputeTcpCalibration()
-  // - StartPayloadCalibration()/AddPayloadCalibrationPoint()/ComputePayloadCalibration()
+  /// @brief 获取当前阻抗控制参数（关节空间 + 笛卡尔空间）
+  /// @return JSON 含 work_mode、joint_space、cartesian_space 三个字段；
+  ///         仅当前控制器类型对应的空间有效，另一个空间标记 valid:false
+  [[nodiscard]] nlohmann::json GetImpedanceParams() const;
 
   /// @brief 控制循环主函数，每周期调用 (1000Hz)
   void RunCycle();
