@@ -19,7 +19,7 @@ ROCOS-App 当前使用 gRPC 作为唯一的外部通信接口（端口 30001）�
 
 ### 1.3 控制权（Control Rights）
 
-自 2026-08-11 起，`RobotHttpServer` 引入**单持有者控制权**机制，避免多路并发下发写指令造成的状态机竞态。所有 GET 接口保持开放；所有写接口（POST/DELETE）必须携带 `X-Rocos-Control-Token` header。控制权通过 `POST /api/control/acquire` 申请、`POST /api/control/takeover` 强制抢占、`POST /api/control/release` 释放，TTL 60s 自动续期。详见 [`http_api_control_rights.md`](http_api_control_rights.md)。
+自 2026-08-11 起，`RobotHttpServer` 引入**单持有者控制权**机制，避免多路并发下发写指令造成的状态机竞态。控制权按连接绑定：服务器记录 `remote_addr:remote_port` 连接键，确保同一台电脑中的不同连接视为不同 owner，即使 IP 相同也必须使用同一 socket 的 token。所有 GET 接口保持开放；所有写接口（POST/DELETE）必须携带 `X-Rocos-Control-Token` header。控制权通过 `POST /api/control/acquire` 申请、`POST /api/control/takeover` 强制抢占、`POST /api/control/release` 释放，TTL 60s 自动续期。详见 [`http_api_control_rights.md`](http_api_control_rights.md)。
 
 ---
 

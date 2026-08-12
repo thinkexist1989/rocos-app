@@ -1515,6 +1515,7 @@ paths:
       summary: 申请机器人控制权
       description: >
         无持有者时颁发新 UUID token 并返回。若已有持有者且未过期，返回 `code=3008`。
+        该 token 仅绑定到当前连接的 `remote_addr:remote_port`；同一台机器上的不同连接即使 IP 相同也必须重新申请。
         携带此 token（`X-Rocos-Control-Token` header）方可调用写接口。TTL 60s，任何调用自动续期。
       tags:
         - 控制权 (Control)
@@ -1528,6 +1529,9 @@ paths:
                 client_name:
                   type: string
                   description: 客户端自报名称，写入日志与 /status 供审计
+                client_id:
+                  type: string
+                  description: 稳定的客户端会话 ID；浏览器端口变化时可保持同一用户/会话持有 token
         required: false
       responses:
         '200':
@@ -1913,6 +1917,15 @@ components:
           type: boolean
         owner_ip:
           type: string
+        owner_port:
+          type: integer
+          description: 当前控制权持有连接的远端端口，区分同一 IP 的不同连接
+        owner_connection:
+          type: string
+          description: 连网键 `remote_addr:remote_port`，同 IP 但不同 socket 会被视作不同 owner
+        owner_client_id:
+          type: string
+          description: 稳定客户端会话 ID；浏览器端口变更时仍可保证同一前端会话继续持有 token
         owner_name:
           type: string
         owner_agent:
@@ -1938,6 +1951,8 @@ components:
       name: X-Rocos-Control-Token
       description: >
         单持有者控制权令牌。通过 POST /api/control/acquire 或 /api/control/takeover 获取。
+        若客户端带上稳定的 `X-Rocos-Client-Id`，同一浏览器会话在端口变化时可继续持有同一个 token；
+        若来自不同 `client_id` 且不是同一连接，则返回 3007。
         所有写接口必须携带；缺失返回 3006，无效/过期返回 3007。详见 docs/http_api_control_rights.md。
 servers: []
 security: []

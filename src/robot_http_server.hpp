@@ -161,6 +161,9 @@ private:
 
     // ---- Control Rights internals ----
     enum class AuthResult { OK, MissingToken, InvalidToken, Expired };
+    static std::string makeConnectionKey(const std::string& remote_addr, int remote_port);
+    static std::string makeConnectionKey(const httplib::Request& req);
+    static std::string extractClientId(const httplib::Request& req);
     // 检查请求 token 并在成功时续期；不加锁调用需自行持有 control_mutex_。
     AuthResult checkAndRenewToken(const httplib::Request& req);
     // 写接口入口守卫：失败时已经写好响应，调用方应直接 return。
@@ -198,12 +201,16 @@ private:
     mutable std::mutex control_mutex_;
     std::string current_token_;        // 空串 = 无持有者
     std::string current_owner_ip_;
+    int current_owner_port_ = -1;
+    std::string current_owner_connection_;
+    std::string current_owner_client_id_;
     std::string current_owner_name_;
     std::string current_owner_agent_;
     std::chrono::steady_clock::time_point acquired_at_{};
     std::chrono::steady_clock::time_point last_seen_at_{};
-    static constexpr int CONTROL_TTL_SECONDS = 60;
+    static constexpr int CONTROL_TTL_SECONDS = 300;
     static constexpr const char* CONTROL_TOKEN_HEADER = "X-Rocos-Control-Token";
+    static constexpr const char* CONTROL_CLIENT_ID_HEADER = "X-Rocos-Client-Id";
 };
 
 } // namespace rocos
