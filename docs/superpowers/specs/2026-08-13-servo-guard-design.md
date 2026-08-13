@@ -197,7 +197,7 @@ Guard 应检查:
 - `q_ready` 维度等于 model joint count。
 - `q_ready` 全部有限。
 - `q_ready` 在软限位内。
-- `q_ready` 与再次读取的当前反馈差值小于 `ready_position_tolerance`。
+- 按本周期速度检查 `abs(q_ready[i] - q_actual[i]) / dt <= limits[i].vel`。
 
 力矩类 `SetReady()` 的保护:
 
@@ -211,7 +211,7 @@ Guard 应检查:
 - `state == JntState::ENABLED`。
 - `tau_ready` 维度等于 model joint count。
 - `tau_ready` 全部有限。
-- `abs(tau_ready[i]) <= effort_limit[i] * ready_effort_scale`。
+- `abs(tau_ready[i]) <= limits[i].effort`。
 - 当前 `q_actual` / `q_dot_actual` 有限，并在软限位与速度限制内。
 
 `SetMode()` 的保护:
@@ -358,19 +358,16 @@ uint32_t dt_us = inner_->GetDt();
 
 - `q_cmd.rows() == limits.size()`
 - `q_cmd` 全部有限
-- `q_cmd[i]` 在 `[lower + margin, upper - margin]`
-- `abs(q_cmd[i] - q_actual[i]) <= max_position_error`
-- 本周期要求速度 `abs(q_cmd[i] - q_actual[i]) / dt <= vel_limit[i] * velocity_scale`
-- `abs(q_cmd[i] - q_last_cmd[i]) / dt <= vel_limit`
-- `abs(v_cmd[i] - v_last_cmd[i]) / dt <= acc_limit`
-- 跟随误差 `abs(q_last_cmd[i] - q_actual[i]) <= max_following_error`
+- `q_cmd[i]` 在 `[limits[i].lower, limits[i].upper]`
+- 本周期要求速度 `abs(q_cmd[i] - q_actual[i]) / dt <= limits[i].vel`
+- 命令序列速度 `abs(q_cmd[i] - q_last_cmd[i]) / dt <= limits[i].vel`
+- 命令序列加速度 `abs(v_cmd[i] - v_last_cmd[i]) / dt <= limits[i].acc`
 
 处理策略:
 
 - NaN/Inf、维度不匹配、严重超限: fault。
 - `abs(q_cmd[i] - q_actual[i]) / dt` 超过速度限制: fault，拒绝下发到底层硬件。
 - 命令序列速度/加速度连续性超限: fault，拒绝下发到底层硬件。
-- 跟随误差超限: fault，进入 `ERROR_STATE` 或受控停止。
 
 位置模式第一阶段以“当前反馈到本次命令”的速度检查为主:
 
@@ -378,7 +375,7 @@ uint32_t dt_us = inner_->GetDt();
 dt = inner_->GetDt() / 1e6
 required_velocity[i] = (q_cmd[i] - q_actual[i]) / dt
 
-if abs(required_velocity[i]) > limits[i].vel * velocity_scale:
+if abs(required_velocity[i]) > limits[i].vel:
   fault
   do not call inner_->SetPosition(q_cmd)
 ```
@@ -565,33 +562,20 @@ per-joint hard/soft limits:
 
 model order limits:
   Robot::jointBinding() 后按 model_index -> drive_id 重排
-
-guard policy constants:
-  ServoGuard 代码内默认常量
 ```
 
-建议第一阶段只保留少量代码默认常量:
-
-```cpp
-struct ServoGuardPolicy {
-    double position_limit_margin{0.0};
-    double velocity_scale{1.0};
-    double acceleration_scale{1.0};
-    double effort_scale{1.0};
-    double ready_position_tolerance{1e-4};
-};
-```
-
-这些常量不应覆盖硬件 limit，只能作为保守缩放或数值容差:
+第一阶段不引入 `ServoGuardPolicy` 这类策略结构体。Guard 直接使用硬件 limit:
 
 ```text
-position lower/upper = Drive::Limit.lower/upper +/- position_limit_margin
-velocity limit       = Drive::Limit.vel * velocity_scale
-acceleration limit   = Drive::Limit.acc * acceleration_scale
-effort limit         = Drive::Limit.effort * effort_scale
+position lower/upper = Drive::Limit.lower/upper
+velocity limit       = Drive::Limit.vel
+acceleration limit   = Drive::Limit.acc
+effort limit         = Drive::Limit.effort
 ```
 
-如果后续出现多机器人、多工况、现场调参需求，再考虑把 `ServoGuardPolicy` 暴露到已有硬件配置或独立配置文件中。第一阶段不做。
+实现中只允许使用不可配置的数值 epsilon 来处理浮点比较，例如 `1e-9` 级别的有限性和边界比较容差。不要引入 `velocity_scale`、`effort_scale`、`position_margin` 这类未被明确需求驱动的可调参数。
+
+如果后续出现多机器人、多工况、现场调参需求，再根据真实需求把策略项加入已有硬件配置。第一阶段不做。
 
 ## 15. 第一阶段最小实现清单
 
