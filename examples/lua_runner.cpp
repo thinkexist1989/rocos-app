@@ -9,10 +9,12 @@
  * 等待脚本运行完毕后打印状态，最后安全退出。
  */
 
+#include <chrono>
 #include <csignal>
 #include <cstdlib>
 #include <iostream>
 #include <string>
+#include <thread>
 
 #include "../src/lua_script_engine.hpp"
 #include "src/robot.hpp"
