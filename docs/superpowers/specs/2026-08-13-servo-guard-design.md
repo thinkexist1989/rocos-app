@@ -277,7 +277,57 @@ UpdateCmd()
 
 `SetReady()` 只负责准备 ready 命令，不再直接 `SetMode()`，也不再绕过 `UpdateCmd()` 写运动目标。
 
-## 8. Hardware limit 的角色
+## 8. 析构函数收尾
+
+当前多个 controller 析构函数中存在兜底写入:
+
+```text
+SetPosition(GetPosition())
+SetMode(CSP)
+```
+
+这条路径也会绕过 `UpdateCmd()`，因此第一阶段需要同步处理。
+
+推荐规则:
+
+```text
+controller 析构函数不直接调用 SetPosition() / SetTorque() / SetMode()
+如果 hardware_ 为空，直接返回
+如果硬件未 ENABLED，不写目标命令，避免驱动缓存目标
+如果硬件已 ENABLED，读取 q_hold = hardware_->GetPosition()
+调用本 controller 的 UpdateCmd(q_hold)
+析构函数只记录 UpdateCmd() 的错误，不抛异常
+```
+
+伪代码:
+
+```text
+~Controller()
+  if hardware_ == nullptr:
+    return
+  if hardware_->GetState() != ENABLED:
+    return
+
+  q_hold = hardware_->GetPosition()
+  rc = UpdateCmd(q_hold)
+  if rc != Result::NoError:
+    log error
+```
+
+这使析构收尾、Ready 阶段和运动周期统一走:
+
+```text
+UpdateCmd()
+  -> Validate...
+  -> SetMode(CSP/CST) if needed
+  -> SetPosition() / SetTorque()
+```
+
+注意: 析构函数不能返回 `Result`，也不适合承担主要状态机切换职责。更理想的长期做法是在 `Robot::SetWorkMode()` 销毁旧 controller 前显式调用一个可返回错误的收尾函数，例如 `PrepareForSwitch()`。第一阶段为了少改接口，先让析构函数走 `UpdateCmd(q_hold)` 并记录错误。
+
+力矩类 controller 析构时同样传入 `q_hold`，不要直接写 `SetTorque(gravity_compensation)`。`UpdateCmd(q_hold)` 内部会按该 controller 的语义生成 `tau_cmd`，再经过 `ValidateTorqueCommand(tau_cmd)`。
+
+## 9. Hardware limit 的角色
 
 `hardware_talon_config.yaml` / `hardware_driver_config.yaml` 中的 `Drive::Limit` 继续保留，但第一阶段不作为 controller 每周期校验的直接来源。
 
@@ -316,7 +366,7 @@ URDF limit
 hardware limit
 ```
 
-## 9. 错误处理
+## 10. 错误处理
 
 验证函数返回 `Result`。
 
@@ -344,7 +394,7 @@ return Result::NoError
 
 `Executor::Update()` 已经会接收 controller 的返回值。返回负值后，`Robot::RunCycle()` 复用现有 FSM 错误路径进入错误处理。
 
-## 10. 第一阶段实现清单
+## 11. 第一阶段实现清单
 
 1. `Model` 解析 URDF joint limit 的 `velocity` 和 `effort`。
 2. `ModelInterface` / `Model` 暴露 `GetVelocityLimit()` 和 `GetEffortLimit()`。
@@ -354,9 +404,10 @@ return Result::NoError
 6. `CartesianImpedanceController` 增加或复用 `ValidateTorqueCommand(tau_cmd)`。
 7. `Robot` 初始化阶段增加 URDF limit 与 hardware limit 的一致性检查。
 8. `SetReady()` 要求硬件已 `ENABLED`，并通过 `UpdateCmd()` 完成 ready 目标下发。
-9. 添加单元测试覆盖 Model limit 解析和 controller 下发前拒绝逻辑。
+9. controller 析构函数移除直接硬件写入，改为已使能时调用 `UpdateCmd(q_hold)`，未使能时不写目标。
+10. 添加单元测试覆盖 Model limit 解析和 controller 下发前拒绝逻辑。
 
-## 11. 测试重点
+## 12. 测试重点
 
 Model 测试:
 
@@ -373,6 +424,8 @@ Model 测试:
 - `(q_cmd - q_actual) / dt` 超过速度限制，拒绝下发。
 - 正常命令通过并调用 `SetPosition()`。
 - `SetReady()` 调用 `UpdateCmd(q_ready)`，不直接调用 `SetPosition()`。
+- 析构函数在已使能时调用 `UpdateCmd(q_hold)`，不直接调用 `SetPosition()` / `SetMode()`。
+- 析构函数在未使能时不写目标命令。
 
 力矩控制器测试:
 
@@ -382,13 +435,15 @@ Model 测试:
 - 当前 `q_dot_actual` 超过 velocity，拒绝下发。
 - 正常命令通过并调用 `SetTorque()`。
 - `SetReady()` 调用 `UpdateCmd(q_hold)`，不直接调用 `SetTorque()`。
+- 析构函数在已使能时调用 `UpdateCmd(q_hold)`，不直接调用 `SetTorque()` / `SetMode()`。
+- 析构函数在未使能时不写目标命令。
 
 启动一致性测试:
 
 - URDF limit 比 hardware limit 更宽时，初始化失败或返回明确错误。
 - joint binding 后，检查使用正确的 `model_index -> drive_id` 对应关系。
 
-## 12. 后续演进
+## 13. 后续演进
 
 如果后续 controller 数量明显增加，或者出现 controller 之外直接写 hardware 的路径，可以再升级为统一的 `ServoGuard` 写入包装层。
 
