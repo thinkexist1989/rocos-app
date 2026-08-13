@@ -24,10 +24,9 @@
 
 #include "src/model.hpp"
 
-// talon URDF 的限位在自定义 <hardware>/<limit> 标签内，不是标准 URDF <limit>，
-// 因此 urdf::parseURDF 解析不到，所有关节应退回默认 [-PI, PI]
+// talon URDF 的限位在自定义 <hardware>/<limit> 标签内。
 TEST_CASE("Model - ParseUrdf with talon robot") {
-    const std::string urdf_path = "talon/robot.urdf"; //TODO： 将talon文件夹复制到bin目录下
+    const std::string urdf_path = "config/models/talon/robot.urdf";
     const std::string base_link = "base_link";
     const std::string tip_link  = "link_7";
 
@@ -37,14 +36,23 @@ TEST_CASE("Model - ParseUrdf with talon robot") {
         CHECK(model.GetChain().getNrOfJoints() == 7u);
     }
 
-    SUBCASE("未提供标准 limit 时，关节限位默认为 [-PI, PI]") {
+    SUBCASE("按 model joint order 暴露 URDF hardware limit") {
         const auto& q_min = model.GetPosLowerLimit();
         const auto& q_max = model.GetPosUpperLimit();
+        const auto& q_vel = model.GetVelocityLimit();
+        const auto& q_effort = model.GetEffortLimit();
         REQUIRE(q_min.rows() == 7u);
         REQUIRE(q_max.rows() == 7u);
+        REQUIRE(q_vel.rows() == 7u);
+        REQUIRE(q_effort.rows() == 7u);
+
+        const double expected_lower[] = {-2.84, -2.22, -2.84, -2.23, -2.71, -2.11, -2.84};
+        const double expected_upper[] = { 2.84,  2.22,  2.84,  2.23,  2.71,  2.11,  3.14};
         for (unsigned int i = 0; i < 7u; ++i) {
-            CHECK(q_min(i) == doctest::Approx(-KDL::PI).epsilon(1e-9));
-            CHECK(q_max(i) == doctest::Approx( KDL::PI).epsilon(1e-9));
+            CHECK(q_min(i) == doctest::Approx(expected_lower[i]).epsilon(1e-9));
+            CHECK(q_max(i) == doctest::Approx(expected_upper[i]).epsilon(1e-9));
+            CHECK(q_vel(i) == doctest::Approx(3.0).epsilon(1e-9));
+            CHECK(q_effort(i) == doctest::Approx(30.0).epsilon(1e-9));
         }
     }
 

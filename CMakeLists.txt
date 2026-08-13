@@ -294,7 +294,7 @@ target_link_libraries(model_test
         PRIVATE
         robot
         )
-add_test(NAME model_test COMMAND unit_test)
+add_test(NAME model_test COMMAND model_test)
 set_tests_properties(model_test PROPERTIES
         WORKING_DIRECTORY ${CMAKE_SOURCE_DIR})
 

@@ -296,7 +296,7 @@ controller 析构函数不直接调用 SetPosition() / SetTorque() / SetMode()
 不判断硬件是否 ENABLED
 读取 q_hold = hardware_->GetPosition()
 调用本 controller 的 UpdateCmd(q_hold)
-析构函数只记录 UpdateCmd() 的错误，不抛异常
+析构函数忽略 UpdateCmd() 的返回值，不抛异常
 ```
 
 伪代码:
@@ -307,9 +307,7 @@ controller 析构函数不直接调用 SetPosition() / SetTorque() / SetMode()
     return
 
   q_hold = hardware_->GetPosition()
-  rc = UpdateCmd(q_hold)
-  if rc != Result::NoError:
-    log error
+  (void)UpdateCmd(q_hold)
 ```
 
 这使析构收尾、Ready 阶段和运动周期统一走:
@@ -321,7 +319,7 @@ UpdateCmd()
   -> SetPosition() / SetTorque()
 ```
 
-注意: 析构函数不能返回 `Result`，也不适合承担主要状态机切换职责。是否允许销毁 controller、是否处于可写目标的状态，由 `Robot::SetWorkMode()` 和 Robot FSM 保证。更理想的长期做法是在 `Robot::SetWorkMode()` 销毁旧 controller 前显式调用一个可返回错误的收尾函数，例如 `PrepareForSwitch()`。第一阶段为了少改接口，先让析构函数走 `UpdateCmd(q_hold)` 并记录错误。
+注意: 析构函数不能返回 `Result`，也不适合承担主要状态机切换职责。是否允许销毁 controller、是否处于可写目标的状态，由 `Robot::SetWorkMode()` 和 Robot FSM 保证。更理想的长期做法是在 `Robot::SetWorkMode()` 销毁旧 controller 前显式调用一个可返回错误的收尾函数，例如 `PrepareForSwitch()`。第一阶段为了少改接口，先让析构函数 best-effort 调用 `UpdateCmd(q_hold)`，并忽略返回值。
 
 力矩类 controller 析构时同样传入 `q_hold`，不要直接写 `SetTorque(gravity_compensation)`。`UpdateCmd(q_hold)` 内部会按该 controller 的语义生成 `tau_cmd`，再经过 `ValidateTorqueCommand(tau_cmd)`。
 

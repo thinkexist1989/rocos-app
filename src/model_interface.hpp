@@ -48,5 +48,25 @@ class ModelInterface {
   /// @brief 获取 URDF/KDL chain 中可动关节的名称列表，顺序与 KDL joint array 一致
   virtual std::vector<std::string> GetJointNames() const = 0;
 
+  virtual const JntArray& GetPosLowerLimit() const {
+    static const JntArray empty;
+    return empty;
+  }
+
+  virtual const JntArray& GetPosUpperLimit() const {
+    static const JntArray empty;
+    return empty;
+  }
+
+  virtual const JntArray& GetVelocityLimit() const {
+    static const JntArray empty;
+    return empty;
+  }
+
+  virtual const JntArray& GetEffortLimit() const {
+    static const JntArray empty;
+    return empty;
+  }
+
 };
 }  // namespace rocos

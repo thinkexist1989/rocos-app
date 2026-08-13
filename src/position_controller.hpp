@@ -35,6 +35,8 @@ public:
     Result UpdateCmd(const JntArray& q_cmd) override;
 
 private:
+    Result ValidatePositionCommand(const JntArray& q_cmd);
+
     HardwareInterface* hardware_{nullptr};
     ModelInterface* model_{nullptr};
     bool mode_set_{false};  // 确保 CSP 模式只设置一次

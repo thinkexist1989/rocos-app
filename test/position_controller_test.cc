@@ -44,6 +44,9 @@ public:
     rocos::JntArray last_set_position_; // 最后一次 SetPosition 的入参
     int8_t last_set_mode_{-1};          // 最后一次 SetMode 的入参
     int set_mode_count_{0};             // SetMode 被调用次数
+    int set_position_count_{0};         // SetPosition 被调用次数
+    int wait_for_signal_count_{0};      // WaitForSignal 被调用次数
+    uint32_t dt_us_{1000};              // 控制周期 [us]
     rocos::JntState GetState() override { return rocos::JntState::ENABLED; }
 
     rocos::JntState GetJointState(int32_t id) override { return rocos::JntState::ENABLED; }
@@ -55,7 +58,10 @@ public:
     rocos::JntArray GetVelocity() override { return {}; }
     rocos::JntArray GetTorque() override { return {}; }
     rocos::JntArray GetLoadTorque() override { return {}; }
-    void SetPosition(const rocos::JntArray& q) override { last_set_position_ = q; }
+    void SetPosition(const rocos::JntArray& q) override {
+        last_set_position_ = q;
+        ++set_position_count_;
+    }
     void SetVelocity(const rocos::JntArray&) override {}
     void SetTorque(const rocos::JntArray&) override {}
     void SetMode(int8_t mode) override {
@@ -89,7 +95,8 @@ public:
 
     // ========== HardwareInterface ==========
     bool Reset() override { return true; }
-    void WaitForSignal() override {}
+    void WaitForSignal() override { ++wait_for_signal_count_; }
+    uint32_t GetDt() const override { return dt_us_; }
 };
 
 /// @brief FakeModel: 实现 ModelInterface，IK 将种子直接作为输出返回（透传），
@@ -102,6 +109,9 @@ public:
 
     bool ik_should_fail_{false};   // InverseKinematics 返回 IkCalcFail
     bool ik_output_nan_{false};    // InverseKinematics 输出第一个元素为 NaN
+    rocos::JntArray lower_limit_;
+    rocos::JntArray upper_limit_;
+    rocos::JntArray velocity_limit_;
 
     rocos::Result ForwardKinematics(const rocos::JntArray&,
                                     rocos::Frame&) override {
@@ -137,8 +147,25 @@ public:
         return rocos::Result::NoError;
     }
 
-    int GetJointNum() const override { return 7; }
+    int GetJointNum() const override {
+        return lower_limit_.rows() > 0 ? static_cast<int>(lower_limit_.rows()) : 7;
+    }
     std::vector<std::string> GetJointNames() const override { return {}; }
+
+    const rocos::JntArray& GetPosLowerLimit() const override { return lower_limit_; }
+    const rocos::JntArray& GetPosUpperLimit() const override { return upper_limit_; }
+    const rocos::JntArray& GetVelocityLimit() const override { return velocity_limit_; }
+
+    void SetLimits(unsigned int n, double lower, double upper, double velocity) {
+        lower_limit_.resize(n);
+        upper_limit_.resize(n);
+        velocity_limit_.resize(n);
+        for (unsigned int i = 0; i < n; ++i) {
+            lower_limit_(i) = lower;
+            upper_limit_(i) = upper;
+            velocity_limit_(i) = velocity;
+        }
+    }
 };
 
 /// @brief 创建一个指定大小的 JntArray 并填充递增的值: [1.0, 2.0, ...]
@@ -157,8 +184,8 @@ rocos::JntArray makeJntArray(unsigned int n) {
 // ==========================================================================
 
 TEST_CASE("PositionController - SetHardware") {
-    rocos::PositionController ctrl;
     FakeHardware hw;
+    rocos::PositionController ctrl;
 
     SUBCASE("传入 nullptr 返回 ParameterPointerEqualsNullptr") {
         CHECK(ctrl.SetHardware(nullptr) == rocos::Result::ParameterPointerEqualsNullptr);
@@ -191,13 +218,80 @@ TEST_CASE("PositionController - Reset") {
     CHECK(ctrl.Reset() == true);
 }
 
+TEST_CASE("PositionController - SetReady routes through UpdateCmd") {
+    FakeHardware hw;
+    FakeModel model;
+    rocos::PositionController ctrl;
+
+    SUBCASE("未设置 model 时返回错误且不直接写硬件") {
+        ctrl.SetHardware(&hw);
+        hw.fake_position_ = makeJntArray(3);
+
+        auto res = ctrl.SetReady();
+
+        CHECK(res == rocos::Result::ParameterPointerEqualsNullptr);
+        CHECK(hw.wait_for_signal_count_ == 1);
+        CHECK(hw.set_mode_count_ == 0);
+        CHECK(hw.set_position_count_ == 0);
+    }
+
+    SUBCASE("ready 目标通过 UpdateCmd 下发当前位置") {
+        ctrl.SetHardware(&hw);
+        ctrl.SetModel(&model);
+        hw.fake_position_ = makeJntArray(3);
+        model.SetLimits(3, -10.0, 10.0, 1000.0);
+
+        auto res = ctrl.SetReady();
+
+        CHECK(res == rocos::Result::NoError);
+        CHECK(hw.wait_for_signal_count_ == 1);
+        CHECK(hw.set_mode_count_ == 1);
+        CHECK(hw.set_position_count_ == 1);
+        REQUIRE(hw.last_set_position_.rows() == 3u);
+        CHECK(hw.last_set_position_(0) == doctest::Approx(hw.fake_position_(0)));
+    }
+}
+
+TEST_CASE("PositionController - destructor routes through UpdateCmd") {
+    SUBCASE("未设置 model 时不直接写硬件") {
+        FakeHardware hw;
+        hw.fake_position_ = makeJntArray(3);
+        {
+            rocos::PositionController ctrl;
+            ctrl.SetHardware(&hw);
+        }
+
+        CHECK(hw.wait_for_signal_count_ == 1);
+        CHECK(hw.set_mode_count_ == 0);
+        CHECK(hw.set_position_count_ == 0);
+    }
+
+    SUBCASE("析构收尾通过 UpdateCmd 下发当前位置") {
+        FakeHardware hw;
+        FakeModel model;
+        hw.fake_position_ = makeJntArray(3);
+        model.SetLimits(3, -10.0, 10.0, 1000.0);
+        {
+            rocos::PositionController ctrl;
+            ctrl.SetHardware(&hw);
+            ctrl.SetModel(&model);
+        }
+
+        CHECK(hw.wait_for_signal_count_ == 1);
+        CHECK(hw.set_mode_count_ == 1);
+        CHECK(hw.set_position_count_ == 1);
+        REQUIRE(hw.last_set_position_.rows() == 3u);
+        CHECK(hw.last_set_position_(0) == doctest::Approx(hw.fake_position_(0)));
+    }
+}
+
 // ==========================================================================
 // 3. GenerateCmd — JntArray（关节空间透传）
 // ==========================================================================
 
 TEST_CASE("PositionController - GenerateCmd with JntArray") {
-    rocos::PositionController ctrl;
     FakeHardware hw;
+    rocos::PositionController ctrl;
     hw.fake_position_ = makeJntArray(3);
     ctrl.SetHardware(&hw);
 
@@ -275,9 +369,9 @@ TEST_CASE("PositionController - GenerateCmd with JntArray") {
 // ==========================================================================
 
 TEST_CASE("PositionController - GenerateCmd with Frame") {
-    rocos::PositionController ctrl;
     FakeHardware hw;
     FakeModel model;
+    rocos::PositionController ctrl;
 
     SUBCASE("未设置 hardware 返回 ParameterPointerEqualsNullptr") {
         ctrl.SetModel(&model);
@@ -365,8 +459,9 @@ TEST_CASE("PositionController - GenerateCmd with Frame") {
 // ==========================================================================
 
 TEST_CASE("PositionController - UpdateCmd") {
-    rocos::PositionController ctrl;
     FakeHardware hw;
+    FakeModel model;
+    rocos::PositionController ctrl;
 
     SUBCASE("未设置 hardware 返回 ParameterPointerEqualsNullptr") {
         rocos::JntArray q(3);
@@ -374,9 +469,24 @@ TEST_CASE("PositionController - UpdateCmd") {
         CHECK(res == rocos::Result::ParameterPointerEqualsNullptr);
     }
 
+    SUBCASE("未设置 model 返回 ParameterPointerEqualsNullptr 且不下发") {
+        ctrl.SetHardware(&hw);
+        hw.fake_position_ = makeJntArray(3);
+        rocos::JntArray q = makeJntArray(3);
+
+        auto res = ctrl.UpdateCmd(q);
+
+        CHECK(res == rocos::Result::ParameterPointerEqualsNullptr);
+        CHECK(hw.set_mode_count_ == 0);
+        CHECK(hw.set_position_count_ == 0);
+    }
+
     SUBCASE("首次调用设置 CSP 模式并写入位置") {
         ctrl.SetHardware(&hw);
+        ctrl.SetModel(&model);
         rocos::JntArray q = makeJntArray(3);
+        hw.fake_position_ = q;
+        model.SetLimits(3, -10.0, 10.0, 1000.0);
 
         auto res = ctrl.UpdateCmd(q);
         CHECK(res == rocos::Result::NoError);
@@ -388,14 +498,68 @@ TEST_CASE("PositionController - UpdateCmd") {
         CHECK(hw.last_set_position_(0) == doctest::Approx(1.0));
     }
 
+    SUBCASE("目标位置超过上限返回 PosLimit 且不下发") {
+        ctrl.SetHardware(&hw);
+        ctrl.SetModel(&model);
+        hw.fake_position_.resize(1);
+        hw.fake_position_(0) = 0.0;
+        model.SetLimits(1, -1.0, 1.0, 1000.0);
+        rocos::JntArray q(1);
+        q(0) = 2.0;
+
+        auto res = ctrl.UpdateCmd(q);
+
+        CHECK(res == rocos::Result::PosLimit);
+        CHECK(hw.set_mode_count_ == 0);
+        CHECK(hw.set_position_count_ == 0);
+    }
+
+    SUBCASE("目标位置低于下限返回 PosLimit 且不下发") {
+        ctrl.SetHardware(&hw);
+        ctrl.SetModel(&model);
+        hw.fake_position_.resize(1);
+        hw.fake_position_(0) = 0.0;
+        model.SetLimits(1, -1.0, 1.0, 1000.0);
+        rocos::JntArray q(1);
+        q(0) = -2.0;
+
+        auto res = ctrl.UpdateCmd(q);
+
+        CHECK(res == rocos::Result::PosLimit);
+        CHECK(hw.set_mode_count_ == 0);
+        CHECK(hw.set_position_count_ == 0);
+    }
+
+    SUBCASE("当前位置到目标位置所需速度超限返回 SpeedLimit 且不下发") {
+        ctrl.SetHardware(&hw);
+        ctrl.SetModel(&model);
+        hw.dt_us_ = 1000;
+        hw.fake_position_.resize(1);
+        hw.fake_position_(0) = 0.0;
+        model.SetLimits(1, -10.0, 10.0, 5.0);
+        rocos::JntArray q(1);
+        q(0) = 0.01;  // 0.01 / 0.001 = 10 rad/s
+
+        auto res = ctrl.UpdateCmd(q);
+
+        CHECK(res == rocos::Result::SpeedLimit);
+        CHECK(hw.set_mode_count_ == 0);
+        CHECK(hw.set_position_count_ == 0);
+    }
+
     SUBCASE("第二次调用不再重复设置模式") {
         ctrl.SetHardware(&hw);
+        ctrl.SetModel(&model);
 
         rocos::JntArray q1 = makeJntArray(3);
+        hw.fake_position_ = q1;
+        model.SetLimits(3, -10.0, 10.0, 1000.0);
         ctrl.UpdateCmd(q1);
         CHECK(hw.set_mode_count_ == 1);
 
         rocos::JntArray q2 = makeJntArray(4);
+        hw.fake_position_ = q2;
+        model.SetLimits(4, -10.0, 10.0, 1000.0);
         ctrl.UpdateCmd(q2);
         CHECK(hw.set_mode_count_ == 1);             // 模式只设一次
         // 但位置应该更新
@@ -404,12 +568,16 @@ TEST_CASE("PositionController - UpdateCmd") {
 
     SUBCASE("Reset 后重新设置模式") {
         ctrl.SetHardware(&hw);
+        ctrl.SetModel(&model);
+        rocos::JntArray q = makeJntArray(3);
+        hw.fake_position_ = q;
+        model.SetLimits(3, -10.0, 10.0, 1000.0);
 
-        ctrl.UpdateCmd(makeJntArray(3));
+        ctrl.UpdateCmd(q);
         CHECK(hw.set_mode_count_ == 1);
 
         ctrl.Reset();
-        ctrl.UpdateCmd(makeJntArray(3));
+        ctrl.UpdateCmd(q);
         CHECK(hw.set_mode_count_ == 2);             // Reset 后重新设模式
     }
 }
@@ -422,6 +590,7 @@ TEST_CASE("PositionController - 完整调用链") {
     FakeHardware hw;
     hw.fake_position_ = makeJntArray(6);
     FakeModel model;
+    model.SetLimits(6, -10.0, 10.0, 1000.0);
 
     rocos::PositionController ctrl;
     ctrl.SetHardware(&hw);

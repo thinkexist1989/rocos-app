@@ -5,9 +5,70 @@
 #include <kdl/chainidsolver_recursive_newton_euler.hpp>
 #include <trac_ik/trac_ik.hpp>
 #include <kdl_parser/kdl_parser.hpp>
+#include <tinyxml2.h>
 #include <urdf_parser/urdf_parser.h>
 
+#include <limits>
+#include <string>
+#include <unordered_map>
+
 namespace rocos {
+
+namespace {
+
+struct ParsedJointLimit {
+  bool has_lower{false};
+  bool has_upper{false};
+  bool has_velocity{false};
+  bool has_effort{false};
+  double lower{0.0};
+  double upper{0.0};
+  double velocity{0.0};
+  double effort{0.0};
+};
+
+std::unordered_map<std::string, ParsedJointLimit> ParseHardwareLimits(
+    const std::string& urdf_string) {
+  std::unordered_map<std::string, ParsedJointLimit> limits;
+
+  tinyxml2::XMLDocument doc;
+  if (doc.Parse(urdf_string.c_str()) != tinyxml2::XML_SUCCESS) {
+    return limits;
+  }
+
+  const auto* robot = doc.FirstChildElement("robot");
+  if (robot == nullptr) {
+    return limits;
+  }
+
+  for (const auto* joint = robot->FirstChildElement("joint");
+       joint != nullptr; joint = joint->NextSiblingElement("joint")) {
+    const char* joint_name = joint->Attribute("name");
+    if (joint_name == nullptr) {
+      continue;
+    }
+
+    const auto* hardware = joint->FirstChildElement("hardware");
+    const auto* limit = hardware != nullptr ? hardware->FirstChildElement("limit") : nullptr;
+    if (limit == nullptr) {
+      continue;
+    }
+
+    ParsedJointLimit parsed;
+    parsed.has_lower = limit->QueryDoubleAttribute("lower", &parsed.lower) == tinyxml2::XML_SUCCESS;
+    parsed.has_upper = limit->QueryDoubleAttribute("upper", &parsed.upper) == tinyxml2::XML_SUCCESS;
+    parsed.has_velocity =
+        limit->QueryDoubleAttribute("velocity", &parsed.velocity) == tinyxml2::XML_SUCCESS ||
+        limit->QueryDoubleAttribute("vel", &parsed.velocity) == tinyxml2::XML_SUCCESS;
+    parsed.has_effort = limit->QueryDoubleAttribute("effort", &parsed.effort) == tinyxml2::XML_SUCCESS;
+
+    limits[joint_name] = parsed;
+  }
+
+  return limits;
+}
+
+}  // namespace
 
 Model::Model(const std::string& urdf_file_path,
              const std::string& base_link,
@@ -105,6 +166,8 @@ bool Model::SetChain(const Tree& tree, const std::string& base_link,
 
   q_min_.resize(chain_.getNrOfJoints());
   q_max_.resize(chain_.getNrOfJoints());
+  q_vel_.resize(chain_.getNrOfJoints());
+  q_effort_.resize(chain_.getNrOfJoints());
 
   return true;
 }
@@ -135,6 +198,8 @@ bool Model::ParseUrdf(const std::string& urdf_string,
                       const std::string& base_link, const std::string& tip) {
   static const double kDefaultLowerLimit = -KDL::PI;  // -180 deg
   static const double kDefaultUpperLimit = KDL::PI;   //  180 deg
+  static const double kDefaultVelocityLimit = std::numeric_limits<double>::infinity();
+  static const double kDefaultEffortLimit = std::numeric_limits<double>::infinity();
 
   const auto model = urdf::parseURDF(urdf_string);
   if (model == nullptr) {
@@ -154,6 +219,8 @@ bool Model::ParseUrdf(const std::string& urdf_string,
     return false;
   }
 
+  const auto hardware_limits = ParseHardwareLimits(urdf_string);
+
   // 按 Chain 中的关节顺序逐段解析 URDF limit 约束
   unsigned int joint_index = 0;
   for (unsigned int i = 0; i < chain_.getNrOfSegments(); ++i) {
@@ -165,11 +232,24 @@ bool Model::ParseUrdf(const std::string& urdf_string,
     // 先写默认值，再尝试从 URDF 覆盖
     q_min_(joint_index) = kDefaultLowerLimit;
     q_max_(joint_index) = kDefaultUpperLimit;
+    q_vel_(joint_index) = kDefaultVelocityLimit;
+    q_effort_(joint_index) = kDefaultEffortLimit;
 
     const auto urdf_joint = model->getJoint(kdl_joint.getName());
     if (urdf_joint != nullptr && urdf_joint->limits != nullptr) {
       q_min_(joint_index) = urdf_joint->limits->lower;
       q_max_(joint_index) = urdf_joint->limits->upper;
+      q_vel_(joint_index) = urdf_joint->limits->velocity;
+      q_effort_(joint_index) = urdf_joint->limits->effort;
+    }
+
+    const auto hardware_limit = hardware_limits.find(kdl_joint.getName());
+    if (hardware_limit != hardware_limits.end()) {
+      const auto& limit = hardware_limit->second;
+      if (limit.has_lower) q_min_(joint_index) = limit.lower;
+      if (limit.has_upper) q_max_(joint_index) = limit.upper;
+      if (limit.has_velocity) q_vel_(joint_index) = limit.velocity;
+      if (limit.has_effort) q_effort_(joint_index) = limit.effort;
     }
 
     ++joint_index;
