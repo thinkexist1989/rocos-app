@@ -360,6 +360,7 @@ uint32_t dt_us = inner_->GetDt();
 - `q_cmd` 全部有限
 - `q_cmd[i]` 在 `[lower + margin, upper - margin]`
 - `abs(q_cmd[i] - q_actual[i]) <= max_position_error`
+- 本周期要求速度 `abs(q_cmd[i] - q_actual[i]) / dt <= vel_limit[i] * velocity_scale`
 - `abs(q_cmd[i] - q_last_cmd[i]) / dt <= vel_limit`
 - `abs(v_cmd[i] - v_last_cmd[i]) / dt <= acc_limit`
 - 跟随误差 `abs(q_last_cmd[i] - q_actual[i]) <= max_following_error`
@@ -367,8 +368,22 @@ uint32_t dt_us = inner_->GetDt();
 处理策略:
 
 - NaN/Inf、维度不匹配、严重超限: fault。
-- 单周期轻微速度超限: 可选 clamp 或 fault。第一阶段建议 fault，避免隐式改轨迹。
+- `abs(q_cmd[i] - q_actual[i]) / dt` 超过速度限制: fault，拒绝下发到底层硬件。
+- 命令序列速度/加速度连续性超限: fault，拒绝下发到底层硬件。
 - 跟随误差超限: fault，进入 `ERROR_STATE` 或受控停止。
+
+位置模式第一阶段以“当前反馈到本次命令”的速度检查为主:
+
+```text
+dt = inner_->GetDt() / 1e6
+required_velocity[i] = (q_cmd[i] - q_actual[i]) / dt
+
+if abs(required_velocity[i]) > limits[i].vel * velocity_scale:
+  fault
+  do not call inner_->SetPosition(q_cmd)
+```
+
+原因是 `q_cmd - q_actual` 描述的是“如果本周期接受这个目标，驱动需要从当前位置追到目标的瞬时要求”。它能直接拦截位置跳变、UDP Servo 突然给远点、控制器内部积分飘远等危险情况。`q_cmd - q_last_cmd` 和加速度检查作为第二层连续性保护，用于发现命令序列自身的突变。
 
 ### 9.3 TorqueCommandGuard
 
