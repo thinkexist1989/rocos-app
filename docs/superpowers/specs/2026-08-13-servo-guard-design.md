@@ -239,12 +239,12 @@ UpdateCmd(q_hold)
 第一阶段规则:
 
 ```text
-SetReady() 必须在硬件已经 ENABLED 后调用
 Ready 目标写入必须经过 UpdateCmd()
 UpdateCmd() 内部统一调用 ValidatePositionCommand() / ValidateTorqueCommand()
+是否允许进入 SetReady() 由 Robot FSM 保证，controller 内不重复判断使能状态
 ```
 
-原因是如果在未使能状态写目标位置或目标力矩，驱动可能缓存目标值，并在后续上使能瞬间产生非预期运动。
+原因是使能、未使能、故障恢复等状态切换属于 Robot FSM 的职责。controller 层只负责命令合法性校验和下发入口统一，不在 `SetReady()` 中判断 `hardware_->GetState()`。
 
 Ready 阶段的位置写入通常是:
 
@@ -293,8 +293,8 @@ SetMode(CSP)
 ```text
 controller 析构函数不直接调用 SetPosition() / SetTorque() / SetMode()
 如果 hardware_ 为空，直接返回
-如果硬件未 ENABLED，不写目标命令，避免驱动缓存目标
-如果硬件已 ENABLED，读取 q_hold = hardware_->GetPosition()
+不判断硬件是否 ENABLED
+读取 q_hold = hardware_->GetPosition()
 调用本 controller 的 UpdateCmd(q_hold)
 析构函数只记录 UpdateCmd() 的错误，不抛异常
 ```
@@ -304,8 +304,6 @@ controller 析构函数不直接调用 SetPosition() / SetTorque() / SetMode()
 ```text
 ~Controller()
   if hardware_ == nullptr:
-    return
-  if hardware_->GetState() != ENABLED:
     return
 
   q_hold = hardware_->GetPosition()
@@ -323,7 +321,7 @@ UpdateCmd()
   -> SetPosition() / SetTorque()
 ```
 
-注意: 析构函数不能返回 `Result`，也不适合承担主要状态机切换职责。更理想的长期做法是在 `Robot::SetWorkMode()` 销毁旧 controller 前显式调用一个可返回错误的收尾函数，例如 `PrepareForSwitch()`。第一阶段为了少改接口，先让析构函数走 `UpdateCmd(q_hold)` 并记录错误。
+注意: 析构函数不能返回 `Result`，也不适合承担主要状态机切换职责。是否允许销毁 controller、是否处于可写目标的状态，由 `Robot::SetWorkMode()` 和 Robot FSM 保证。更理想的长期做法是在 `Robot::SetWorkMode()` 销毁旧 controller 前显式调用一个可返回错误的收尾函数，例如 `PrepareForSwitch()`。第一阶段为了少改接口，先让析构函数走 `UpdateCmd(q_hold)` 并记录错误。
 
 力矩类 controller 析构时同样传入 `q_hold`，不要直接写 `SetTorque(gravity_compensation)`。`UpdateCmd(q_hold)` 内部会按该 controller 的语义生成 `tau_cmd`，再经过 `ValidateTorqueCommand(tau_cmd)`。
 
@@ -403,8 +401,8 @@ return Result::NoError
 5. `JointImpedanceController` 增加 `ValidateTorqueCommand(tau_cmd)`。
 6. `CartesianImpedanceController` 增加或复用 `ValidateTorqueCommand(tau_cmd)`。
 7. `Robot` 初始化阶段增加 URDF limit 与 hardware limit 的一致性检查。
-8. `SetReady()` 要求硬件已 `ENABLED`，并通过 `UpdateCmd()` 完成 ready 目标下发。
-9. controller 析构函数移除直接硬件写入，改为已使能时调用 `UpdateCmd(q_hold)`，未使能时不写目标。
+8. `SetReady()` 通过 `UpdateCmd()` 完成 ready 目标下发，controller 内不判断使能状态。
+9. controller 析构函数移除直接硬件写入，改为调用 `UpdateCmd(q_hold)`，controller 内不判断使能状态。
 10. 添加单元测试覆盖 Model limit 解析和 controller 下发前拒绝逻辑。
 
 ## 12. 测试重点
@@ -424,8 +422,8 @@ Model 测试:
 - `(q_cmd - q_actual) / dt` 超过速度限制，拒绝下发。
 - 正常命令通过并调用 `SetPosition()`。
 - `SetReady()` 调用 `UpdateCmd(q_ready)`，不直接调用 `SetPosition()`。
-- 析构函数在已使能时调用 `UpdateCmd(q_hold)`，不直接调用 `SetPosition()` / `SetMode()`。
-- 析构函数在未使能时不写目标命令。
+- 析构函数调用 `UpdateCmd(q_hold)`，不直接调用 `SetPosition()` / `SetMode()`。
+- 析构函数不判断使能状态，调用时机由 Robot FSM 保证。
 
 力矩控制器测试:
 
@@ -435,8 +433,8 @@ Model 测试:
 - 当前 `q_dot_actual` 超过 velocity，拒绝下发。
 - 正常命令通过并调用 `SetTorque()`。
 - `SetReady()` 调用 `UpdateCmd(q_hold)`，不直接调用 `SetTorque()`。
-- 析构函数在已使能时调用 `UpdateCmd(q_hold)`，不直接调用 `SetTorque()` / `SetMode()`。
-- 析构函数在未使能时不写目标命令。
+- 析构函数调用 `UpdateCmd(q_hold)`，不直接调用 `SetTorque()` / `SetMode()`。
+- 析构函数不判断使能状态，调用时机由 Robot FSM 保证。
 
 启动一致性测试:
 
