@@ -26,10 +26,9 @@ namespace rocos {
 
 JointAdmittanceController::~JointAdmittanceController() {
     if (hardware_ != nullptr) {
-        // 安全兜底：先同步硬件，再将目标位置设为当前位置，切换到 CSP 模式，防止析构时飞车
         hardware_->WaitForSignal();
-        hardware_->SetPosition(hardware_->GetPosition());
-        hardware_->SetMode(8);
+        adm_initialized_ = false;
+        static_cast<void>(UpdateCmd(hardware_->GetPosition()));
     }
 }
 
@@ -37,14 +36,9 @@ Result JointAdmittanceController::SetReady() {
     if (hardware_ == nullptr) {
         return Result::ParameterPointerEqualsNullptr;
     }
-    // 导纳控制器就绪：同步硬件后锁定当前位置为指令，切换到 CSP 模式
     hardware_->WaitForSignal();
-    hardware_->SetPosition(hardware_->GetPosition());
-    hardware_->SetMode(CSP_MODE);
-    mode_set_ = true;
-    // 重置导纳积分状态，避免上一轮残留
     adm_initialized_ = false;
-    return Result::NoError;
+    return UpdateCmd(hardware_->GetPosition());
 }
 
 // ==========================================================================
@@ -151,6 +145,9 @@ Result JointAdmittanceController::UpdateCmd(const JntArray& q_des) {
     if (hardware_ == nullptr) {
         return Result::ParameterPointerEqualsNullptr;
     }
+    if (model_ == nullptr) {
+        return Result::ParameterPointerEqualsNullptr;
+    }
 
     const unsigned int n = q_des.rows();
     if (n == 0) {
@@ -252,6 +249,11 @@ Result JointAdmittanceController::UpdateCmd(const JntArray& q_des) {
         }
     }
 
+    const Result valid = ValidatePositionCommand(q_out);
+    if (valid != Result::NoError) {
+        return valid;
+    }
+
     // ---- 下发位置指令（CSP 模式） ----
     if (!mode_set_) {
         hardware_->SetMode(CSP_MODE);
@@ -259,6 +261,50 @@ Result JointAdmittanceController::UpdateCmd(const JntArray& q_des) {
     }
 
     hardware_->SetPosition(q_out);
+    return Result::NoError;
+}
+
+Result JointAdmittanceController::ValidatePositionCommand(const JntArray& q_cmd) {
+    if (hardware_ == nullptr || model_ == nullptr) {
+        return Result::ParameterPointerEqualsNullptr;
+    }
+
+    const JntArray q_actual = hardware_->GetPosition();
+    const auto& q_lower = model_->GetPosLowerLimit();
+    const auto& q_upper = model_->GetPosUpperLimit();
+    const auto& q_vel_limit = model_->GetVelocityLimit();
+    const unsigned int joint_num = static_cast<unsigned int>(model_->GetJointNum());
+
+    if (joint_num == 0 || q_cmd.rows() != joint_num || q_actual.rows() != joint_num ||
+        q_lower.rows() != joint_num || q_upper.rows() != joint_num ||
+        q_vel_limit.rows() != joint_num) {
+        return Result::UnmatchedJointsNumber;
+    }
+
+    const uint32_t dt_us = hardware_->GetDt();
+    if (dt_us == 0) {
+        return Result::IllegalParameter;
+    }
+    const double dt = static_cast<double>(dt_us) / 1'000'000.0;
+
+    for (unsigned int i = 0; i < joint_num; ++i) {
+        if (!std::isfinite(q_cmd(i)) || !std::isfinite(q_actual(i)) ||
+            !std::isfinite(q_lower(i)) || !std::isfinite(q_upper(i)) ||
+            !std::isfinite(q_vel_limit(i))) {
+            return Result::ParameterNanOrInf;
+        }
+        if (q_cmd(i) < q_lower(i) || q_cmd(i) > q_upper(i)) {
+            return Result::PosLimit;
+        }
+        if (q_vel_limit(i) < 0.0) {
+            return Result::IllegalParameter;
+        }
+        const double required_velocity = std::abs(q_cmd(i) - q_actual(i)) / dt;
+        if (required_velocity > q_vel_limit(i)) {
+            return Result::SpeedLimit;
+        }
+    }
+
     return Result::NoError;
 }
 

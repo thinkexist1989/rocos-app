@@ -54,6 +54,8 @@ public:
     Result SetDt(double dt);
 
 private:
+    Result ValidatePositionCommand(const JntArray& q_cmd);
+
     HardwareInterface* hardware_{nullptr};
     ModelInterface* model_{nullptr};
     bool mode_set_{false};

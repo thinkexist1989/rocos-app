@@ -26,10 +26,8 @@ namespace rocos {
 
 JointImpedanceController::~JointImpedanceController() {
     if (hardware_ != nullptr) {
-        // 安全兜底：先同步硬件，再将目标位置设为当前位置，切换到 CSP 模式，防止析构时飞车
         hardware_->WaitForSignal();
-        hardware_->SetPosition(hardware_->GetPosition());
-        hardware_->SetMode(8);
+        static_cast<void>(UpdateCmd(hardware_->GetPosition()));
     }
 }
 
@@ -39,32 +37,7 @@ Result JointImpedanceController::SetReady() {
     }
 
     hardware_->WaitForSignal();
-
-    // 计算重力补偿力矩 τ_grav = InverseDynamics(q_act, 0, 0, ∅)
-    const JntArray q_act = hardware_->GetPosition();
-    const unsigned int n = q_act.rows();
-    JntArray tau_grav(n);
-    if (model_ != nullptr) {
-        JntArray zero(n);
-        for (unsigned int i = 0; i < n; ++i) {
-            zero(i) = 0.0;
-        }
-        Wrenches f_ext;
-        Result res = model_->InverseDynamics(q_act, zero, zero, f_ext, tau_grav);
-        if (res != Result::NoError) {
-            return res;
-        }
-    } else {
-        for (unsigned int i = 0; i < n; ++i) {
-            tau_grav(i) = 0.0;
-        }
-    }
-
-    // 下发重力补偿力矩作为初始指令，切换到 CST 模式
-    hardware_->SetTorque(tau_grav);
-    hardware_->SetMode(CST_MODE);
-    mode_set_ = true;
-    return Result::NoError;
+    return UpdateCmd(hardware_->GetPosition());
 }
 
 // ==========================================================================
@@ -172,6 +145,9 @@ Result JointImpedanceController::UpdateCmd(const JntArray& q_des) {
     if (n == 0) {
         return Result::MoveInput;
     }
+    if (model_ == nullptr) {
+        return Result::ParameterPointerEqualsNullptr;
+    }
 
     // ---- 增益懒初始化 ----
     // 先检查已显式设置的增益维度是否与 q_des 一致
@@ -202,25 +178,16 @@ Result JointImpedanceController::UpdateCmd(const JntArray& q_des) {
     }
 
     // ---- 重力补偿: τ_grav = InverseDynamics(q, 0, 0, ∅) ----
-    JntArray tau_grav;
-    if (model_ != nullptr) {
-        tau_grav.resize(n);
-        JntArray zero(n);
-        for (unsigned int i = 0; i < n; ++i) {
-            zero(i) = 0.0;
-        }
-        Wrenches f_ext;
+    JntArray tau_grav(n);
+    JntArray zero(n);
+    for (unsigned int i = 0; i < n; ++i) {
+        zero(i) = 0.0;
+    }
+    Wrenches f_ext;
 
-        Result id_res = model_->InverseDynamics(q_act, zero, zero, f_ext, tau_grav);
-        if (id_res != Result::NoError) {
-            return id_res;
-        }
-    } else {
-        // 无模型时 τ_grav = 0
-        tau_grav.resize(n);
-        for (unsigned int i = 0; i < n; ++i) {
-            tau_grav(i) = 0.0;
-        }
+    Result id_res = model_->InverseDynamics(q_act, zero, zero, f_ext, tau_grav);
+    if (id_res != Result::NoError) {
+        return id_res;
     }
 
     // ---- 阻抗控制律: τ = K_p·(q_des - q_act) - K_d·q̇_act + τ_grav ----
@@ -231,6 +198,11 @@ Result JointImpedanceController::UpdateCmd(const JntArray& q_des) {
         tau(i) = K_p_(i) * pos_err - vel_damp + tau_grav(i);
     }
 
+    const Result valid = ValidateTorqueCommand(tau);
+    if (valid != Result::NoError) {
+        return valid;
+    }
+
     // ---- 下发力矩指令（CST 模式） ----
     if (!mode_set_) {
         hardware_->SetMode(CST_MODE);
@@ -238,6 +210,54 @@ Result JointImpedanceController::UpdateCmd(const JntArray& q_des) {
     }
 
     hardware_->SetTorque(tau);
+    return Result::NoError;
+}
+
+Result JointImpedanceController::ValidateTorqueCommand(const JntArray& tau_cmd) {
+    if (hardware_ == nullptr || model_ == nullptr) {
+        return Result::ParameterPointerEqualsNullptr;
+    }
+
+    const JntArray q_actual = hardware_->GetPosition();
+    const JntArray q_dot_actual = hardware_->GetVelocity();
+    const auto& q_lower = model_->GetPosLowerLimit();
+    const auto& q_upper = model_->GetPosUpperLimit();
+    const auto& q_vel_limit = model_->GetVelocityLimit();
+    const auto& q_effort_limit = model_->GetEffortLimit();
+    const unsigned int joint_num = static_cast<unsigned int>(model_->GetJointNum());
+
+    if (joint_num == 0 || tau_cmd.rows() != joint_num || q_actual.rows() != joint_num ||
+        q_lower.rows() != joint_num || q_upper.rows() != joint_num ||
+        q_vel_limit.rows() != joint_num || q_effort_limit.rows() != joint_num) {
+        return Result::UnmatchedJointsNumber;
+    }
+
+    const bool has_velocity = (q_dot_actual.rows() == joint_num);
+    if (q_dot_actual.rows() != 0 && !has_velocity) {
+        return Result::UnmatchedJointsNumber;
+    }
+
+    for (unsigned int i = 0; i < joint_num; ++i) {
+        if (!std::isfinite(tau_cmd(i)) || !std::isfinite(q_actual(i)) ||
+            !std::isfinite(q_lower(i)) || !std::isfinite(q_upper(i)) ||
+            !std::isfinite(q_vel_limit(i)) || !std::isfinite(q_effort_limit(i)) ||
+            (has_velocity && !std::isfinite(q_dot_actual(i)))) {
+            return Result::ParameterNanOrInf;
+        }
+        if (q_actual(i) < q_lower(i) || q_actual(i) > q_upper(i)) {
+            return Result::PosLimit;
+        }
+        if (q_vel_limit(i) < 0.0 || q_effort_limit(i) < 0.0) {
+            return Result::IllegalParameter;
+        }
+        if (has_velocity && std::abs(q_dot_actual(i)) > q_vel_limit(i)) {
+            return Result::SpeedLimit;
+        }
+        if (std::abs(tau_cmd(i)) > q_effort_limit(i)) {
+            return Result::ForceLimit;
+        }
+    }
+
     return Result::NoError;
 }
 

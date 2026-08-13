@@ -48,6 +48,8 @@ public:
     rocos::JntArray last_set_torque_;
     int8_t last_set_mode_{-1};
     int set_mode_count_{0};
+    int set_torque_count_{0};
+    int wait_for_signal_count_{0};
 
     // DriveInterface — batch
     rocos::JntArray GetPosition() override { return fake_position_; }
@@ -56,7 +58,10 @@ public:
     rocos::JntArray GetLoadTorque() override { return {}; }
     void SetPosition(const rocos::JntArray&) override {}
     void SetVelocity(const rocos::JntArray&) override {}
-    void SetTorque(const rocos::JntArray& tau) override { last_set_torque_ = tau; }
+    void SetTorque(const rocos::JntArray& tau) override {
+        last_set_torque_ = tau;
+        ++set_torque_count_;
+    }
     void SetMode(int8_t mode) override {
         last_set_mode_ = mode;
         ++set_mode_count_;
@@ -88,14 +93,20 @@ public:
 
     // HardwareInterface
     bool Reset() override { return true; }
-    void WaitForSignal() override {}
+    void WaitForSignal() override { ++wait_for_signal_count_; }
 };
 
 /// @brief FakeModel: IK 透传种子; ID 返回预设的重力力矩
 class FakeModel : public rocos::ModelInterface {
 public:
+    FakeModel() { SetLimits(3, -10.0, 10.0, 10000.0, 10000.0); }
+
     bool ik_should_fail_{false};
     bool id_should_fail_{false};
+    rocos::JntArray lower_limit_;
+    rocos::JntArray upper_limit_;
+    rocos::JntArray velocity_limit_;
+    rocos::JntArray effort_limit_;
 
     rocos::Result GetJacobian(const rocos::JntArray &q, rocos::Jacobian &J_out) override {
         return rocos::Result::NoError;
@@ -136,8 +147,27 @@ public:
         return rocos::Result::NoError;
     }
 
-    int GetJointNum() const override { return 7; }
+    int GetJointNum() const override { return static_cast<int>(lower_limit_.rows()); }
     std::vector<std::string> GetJointNames() const override { return {}; }
+
+    const rocos::JntArray& GetPosLowerLimit() const override { return lower_limit_; }
+    const rocos::JntArray& GetPosUpperLimit() const override { return upper_limit_; }
+    const rocos::JntArray& GetVelocityLimit() const override { return velocity_limit_; }
+    const rocos::JntArray& GetEffortLimit() const override { return effort_limit_; }
+
+    void SetLimits(unsigned int n, double lower, double upper,
+                   double velocity, double effort) {
+        lower_limit_.resize(n);
+        upper_limit_.resize(n);
+        velocity_limit_.resize(n);
+        effort_limit_.resize(n);
+        for (unsigned int i = 0; i < n; ++i) {
+            lower_limit_(i) = lower;
+            upper_limit_(i) = upper;
+            velocity_limit_(i) = velocity;
+            effort_limit_(i) = effort;
+        }
+    }
 };
 
 rocos::JntArray makeJntArray(unsigned int n, double start = 1.0) {
@@ -286,11 +316,25 @@ TEST_CASE("JointImpedanceController - UpdateCmd 力矩计算") {
         CHECK(ctrl.UpdateCmd(rocos::JntArray{}) == rocos::Result::MoveInput);
     }
 
-    SUBCASE("静止 + 无重力补偿 → 纯比例力矩") {
-        // 不设 model → τ_grav = 0
+    SUBCASE("缺少 model 时拒绝下发") {
         hw.fake_position_ = makeConstJntArray(3, 0.0);
         hw.fake_velocity_ = makeConstJntArray(3, 0.0);
         ctrl.SetHardware(&hw);
+
+        auto q_des = makeConstJntArray(3, 1.0);
+        auto res = ctrl.UpdateCmd(q_des);
+        CHECK(res == rocos::Result::ParameterPointerEqualsNullptr);
+        CHECK(hw.set_mode_count_ == 0);
+        CHECK(hw.set_torque_count_ == 0);
+    }
+
+    SUBCASE("静止 + 零重力补偿 → 纯比例力矩") {
+        model.grav_torque_ = 0.0;
+        hw.fake_position_ = makeConstJntArray(3, 0.0);
+        hw.fake_velocity_ = makeConstJntArray(3, 0.0);
+        ctrl.SetHardware(&hw);
+        ctrl.SetModel(&model);
+        ctrl.SetStiffness(makeConstJntArray(3, 100.0));
 
         auto q_des = makeConstJntArray(3, 1.0);   // q_des = [1,1,1]
         auto res = ctrl.UpdateCmd(q_des);
@@ -351,8 +395,106 @@ TEST_CASE("JointImpedanceController - UpdateCmd 力矩计算") {
         ctrl.SetStiffness(makeConstJntArray(5, 100.0));
         ctrl.SetDamping(makeConstJntArray(5, 20.0));
         ctrl.SetHardware(&hw);
+        ctrl.SetModel(&model);
         CHECK(ctrl.UpdateCmd(makeJntArray(3)) == rocos::Result::UnmatchedJointsNumber);
     }
+}
+
+TEST_CASE("JointImpedanceController - Servo validation") {
+    FakeHardware hw;
+    FakeModel model;
+    hw.fake_position_ = makeConstJntArray(3, 0.0);
+    hw.fake_velocity_ = makeConstJntArray(3, 0.0);
+    model.grav_torque_ = 0.0;
+
+    SUBCASE("当前位置超过 URDF 上限时拒绝下发") {
+        hw.fake_position_ = makeConstJntArray(3, 2.0);
+        model.SetLimits(3, -1.0, 1.0, 10000.0, 10000.0);
+
+        rocos::JointImpedanceController ctrl;
+        ctrl.SetHardware(&hw);
+        ctrl.SetModel(&model);
+
+        CHECK(ctrl.UpdateCmd(makeConstJntArray(3, 2.0)) == rocos::Result::PosLimit);
+        CHECK(hw.set_mode_count_ == 0);
+        CHECK(hw.set_torque_count_ == 0);
+    }
+
+    SUBCASE("当前速度超过 URDF velocity 时拒绝下发") {
+        hw.fake_velocity_ = makeConstJntArray(3, 2.0);
+        model.SetLimits(3, -10.0, 10.0, 1.0, 10000.0);
+
+        rocos::JointImpedanceController ctrl;
+        ctrl.SetHardware(&hw);
+        ctrl.SetModel(&model);
+
+        CHECK(ctrl.UpdateCmd(makeConstJntArray(3, 0.0)) == rocos::Result::SpeedLimit);
+        CHECK(hw.set_mode_count_ == 0);
+        CHECK(hw.set_torque_count_ == 0);
+    }
+
+    SUBCASE("最终力矩超过 URDF effort 时拒绝下发") {
+        model.SetLimits(3, -10.0, 10.0, 10000.0, 2.0);
+        model.grav_torque_ = 5.0;
+
+        rocos::JointImpedanceController ctrl;
+        ctrl.SetHardware(&hw);
+        ctrl.SetModel(&model);
+
+        CHECK(ctrl.UpdateCmd(makeConstJntArray(3, 0.0)) == rocos::Result::ForceLimit);
+        CHECK(hw.set_mode_count_ == 0);
+        CHECK(hw.set_torque_count_ == 0);
+    }
+}
+
+TEST_CASE("JointImpedanceController - SetReady routes through UpdateCmd") {
+    FakeHardware hw;
+    FakeModel model;
+    hw.fake_position_ = makeConstJntArray(3, 0.25);
+    hw.fake_velocity_ = makeConstJntArray(3, 0.0);
+    model.grav_torque_ = 5.0;
+
+    SUBCASE("缺少 model 时不直接写硬件") {
+        rocos::JointImpedanceController ctrl;
+        ctrl.SetHardware(&hw);
+
+        CHECK(ctrl.SetReady() == rocos::Result::ParameterPointerEqualsNullptr);
+        CHECK(hw.wait_for_signal_count_ == 1);
+        CHECK(hw.set_mode_count_ == 0);
+        CHECK(hw.set_torque_count_ == 0);
+    }
+
+    SUBCASE("ready 通过 UpdateCmd 下发重力补偿") {
+        rocos::JointImpedanceController ctrl;
+        ctrl.SetHardware(&hw);
+        ctrl.SetModel(&model);
+
+        CHECK(ctrl.SetReady() == rocos::Result::NoError);
+        CHECK(hw.wait_for_signal_count_ == 1);
+        CHECK(hw.set_mode_count_ == 1);
+        CHECK(hw.set_torque_count_ == 1);
+        CHECK(hw.last_set_torque_(0) == doctest::Approx(5.0));
+    }
+}
+
+TEST_CASE("JointImpedanceController - destructor routes through UpdateCmd") {
+    FakeHardware hw;
+    FakeModel model;
+    hw.fake_position_ = makeConstJntArray(3, 0.25);
+    hw.fake_velocity_ = makeConstJntArray(3, 0.0);
+    model.grav_torque_ = 5.0;
+
+    {
+        rocos::JointImpedanceController ctrl;
+        ctrl.SetHardware(&hw);
+        ctrl.SetModel(&model);
+    }
+
+    CHECK(hw.wait_for_signal_count_ == 1);
+    CHECK(hw.set_mode_count_ == 1);
+    REQUIRE(hw.set_torque_count_ == 1);
+    REQUIRE(hw.last_set_torque_.rows() == 3u);
+    CHECK(hw.last_set_torque_(0) == doctest::Approx(5.0));
 }
 
 // ==========================================================================
@@ -411,6 +553,7 @@ TEST_CASE("JointImpedanceController - 异常路径") {
         hw.fake_position_ = makeConstJntArray(7, 0.0);   // 7 轴，q_des 只有 3
         rocos::JointImpedanceController ctrl;
         ctrl.SetHardware(&hw);
+        ctrl.SetModel(&model);
         CHECK(ctrl.UpdateCmd(makeJntArray(3)) == rocos::Result::JointStateError);
     }
 
@@ -419,31 +562,31 @@ TEST_CASE("JointImpedanceController - 异常路径") {
         hw.fake_velocity_ = rocos::JntArray{};            // 0 维
         rocos::JointImpedanceController ctrl;
         ctrl.SetHardware(&hw);
-        // 不设 model，τ_grav = 0
+        ctrl.SetModel(&model);
+        model.grav_torque_ = 0.0;
         auto q_des = makeConstJntArray(3, 1.0);
         auto res = ctrl.UpdateCmd(q_des);
         CHECK(res == rocos::Result::NoError);
-        // τ = 100*(1-0) - 0 + 0 = 100  (速度维度不足时阻尼项为 0)
-        CHECK(hw.last_set_torque_(0) == doctest::Approx(100.0));
+        // τ = 500*(1-0) - 0 + 0 = 500  (速度维度不足时阻尼项为 0)
+        CHECK(hw.last_set_torque_(0) == doctest::Approx(500.0));
     }
 }
 
 // ==========================================================================
-// 7. 无模型时重力为 0
+// 7. 缺少 model
 // ==========================================================================
 
-TEST_CASE("JointImpedanceController - 无模型重力为零") {
+TEST_CASE("JointImpedanceController - 缺少 model 时拒绝下发") {
     FakeHardware hw;
     hw.fake_position_ = makeConstJntArray(3, 0.0);
     hw.fake_velocity_ = makeConstJntArray(3, 0.0);
 
     rocos::JointImpedanceController ctrl;
     ctrl.SetHardware(&hw);
-    // 不设 model
 
     auto q_des = makeConstJntArray(3, 0.0);              // Δq = 0
     auto res = ctrl.UpdateCmd(q_des);
-    CHECK(res == rocos::Result::NoError);
-    // τ = 100*0 - 20*0 + 0 = 0
-    CHECK(hw.last_set_torque_(0) == doctest::Approx(0.0));
+    CHECK(res == rocos::Result::ParameterPointerEqualsNullptr);
+    CHECK(hw.set_mode_count_ == 0);
+    CHECK(hw.set_torque_count_ == 0);
 }

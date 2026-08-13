@@ -44,6 +44,9 @@ public:
     rocos::JntArray last_set_position_;
     int8_t last_set_mode_{-1};
     int set_mode_count_{0};
+    int set_position_count_{0};
+    int wait_for_signal_count_{0};
+    uint32_t dt_us_{1000};
 
     rocos::JntState GetState() override { return rocos::JntState::ENABLED; }
 
@@ -56,7 +59,10 @@ public:
     rocos::JntArray GetVelocity() override { return fake_velocity_; }
     rocos::JntArray GetTorque() override { return fake_torque_; }
     rocos::JntArray GetLoadTorque() override { return {}; }
-    void SetPosition(const rocos::JntArray& q) override { last_set_position_ = q; }
+    void SetPosition(const rocos::JntArray& q) override {
+        last_set_position_ = q;
+        ++set_position_count_;
+    }
     void SetVelocity(const rocos::JntArray&) override {}
     void SetTorque(const rocos::JntArray& tau) override { last_set_torque_ = tau; }
     void SetMode(int8_t mode) override {
@@ -90,15 +96,22 @@ public:
 
     // HardwareInterface
     bool Reset() override { return true; }
-    void WaitForSignal() override {}
+    void WaitForSignal() override { ++wait_for_signal_count_; }
+    uint32_t GetDt() const override { return dt_us_; }
 };
 
 /// @brief FakeModel: IK 透传种子; ID 返回预设重力力矩
 class FakeModel : public rocos::ModelInterface {
 public:
+    FakeModel() { SetLimits(3, -10.0, 10.0, 10000.0, 1000.0); }
+
     bool ik_should_fail_{false};
     bool id_should_fail_{false};
     double grav_torque_{5.0};
+    rocos::JntArray lower_limit_;
+    rocos::JntArray upper_limit_;
+    rocos::JntArray velocity_limit_;
+    rocos::JntArray effort_limit_;
 
     rocos::Result GetJacobian(const rocos::JntArray &q, rocos::Jacobian &J_out) override {
         return rocos::Result::NoError;
@@ -137,8 +150,27 @@ public:
         return rocos::Result::NoError;
     }
 
-    int GetJointNum() const override { return 7; }
+    int GetJointNum() const override { return static_cast<int>(lower_limit_.rows()); }
     std::vector<std::string> GetJointNames() const override { return {}; }
+
+    const rocos::JntArray& GetPosLowerLimit() const override { return lower_limit_; }
+    const rocos::JntArray& GetPosUpperLimit() const override { return upper_limit_; }
+    const rocos::JntArray& GetVelocityLimit() const override { return velocity_limit_; }
+    const rocos::JntArray& GetEffortLimit() const override { return effort_limit_; }
+
+    void SetLimits(unsigned int n, double lower, double upper,
+                   double velocity, double effort) {
+        lower_limit_.resize(n);
+        upper_limit_.resize(n);
+        velocity_limit_.resize(n);
+        effort_limit_.resize(n);
+        for (unsigned int i = 0; i < n; ++i) {
+            lower_limit_(i) = lower;
+            upper_limit_(i) = upper;
+            velocity_limit_(i) = velocity;
+            effort_limit_(i) = effort;
+        }
+    }
 };
 
 rocos::JntArray makeJntArray(unsigned int n, double start = 1.0) {
@@ -276,20 +308,49 @@ TEST_CASE("JointAdmittanceController - UpdateCmd 导纳输出") {
         CHECK(hw.last_set_position_(0) > 0.0);
     }
 
-    SUBCASE("无模型时 τ_grav = 0") {
+    SUBCASE("缺少 model 时拒绝下发") {
         hw.fake_position_ = makeConstJntArray(3, 0.0);
         hw.fake_velocity_ = makeConstJntArray(3, 0.0);
         hw.fake_torque_    = makeConstJntArray(3, 0.0);
 
         rocos::JointAdmittanceController ctrl;
         ctrl.SetHardware(&hw);
-        // 不设 model → τ_grav = 0，τ_offset = 0
 
         auto q_des = makeConstJntArray(3, 1.0);
-        CHECK(ctrl.UpdateCmd(q_des) == rocos::Result::NoError);
+        CHECK(ctrl.UpdateCmd(q_des) == rocos::Result::ParameterPointerEqualsNullptr);
+        CHECK(hw.set_mode_count_ == 0);
+        CHECK(hw.set_position_count_ == 0);
+    }
 
-        // τ_ext = 0，q_out = q_des
-        CHECK(hw.last_set_position_(0) == doctest::Approx(1.0));
+    SUBCASE("输出位置超过 URDF 上限时拒绝下发") {
+        hw.fake_position_ = makeConstJntArray(3, 0.0);
+        hw.fake_velocity_ = makeConstJntArray(3, 0.0);
+        hw.fake_torque_    = makeConstJntArray(3, 5.0);
+        model.SetLimits(3, -1.0, 1.0, 10000.0, 1000.0);
+
+        rocos::JointAdmittanceController ctrl;
+        ctrl.SetHardware(&hw);
+        ctrl.SetModel(&model);
+
+        CHECK(ctrl.UpdateCmd(makeConstJntArray(3, 2.0)) == rocos::Result::PosLimit);
+        CHECK(hw.set_mode_count_ == 0);
+        CHECK(hw.set_position_count_ == 0);
+    }
+
+    SUBCASE("当前位置到输出位置所需速度超过 URDF velocity 时拒绝下发") {
+        hw.fake_position_ = makeConstJntArray(3, 0.0);
+        hw.fake_velocity_ = makeConstJntArray(3, 0.0);
+        hw.fake_torque_    = makeConstJntArray(3, 5.0);
+        hw.dt_us_ = 1000;
+        model.SetLimits(3, -10.0, 10.0, 0.5, 1000.0);
+
+        rocos::JointAdmittanceController ctrl;
+        ctrl.SetHardware(&hw);
+        ctrl.SetModel(&model);
+
+        CHECK(ctrl.UpdateCmd(makeConstJntArray(3, 1.0)) == rocos::Result::SpeedLimit);
+        CHECK(hw.set_mode_count_ == 0);
+        CHECK(hw.set_position_count_ == 0);
     }
 
     SUBCASE("显式增益") {
@@ -321,6 +382,8 @@ TEST_CASE("JointAdmittanceController - CSP 模式管理") {
 
     rocos::JointAdmittanceController ctrl;
     ctrl.SetHardware(&hw);
+    FakeModel model;
+    ctrl.SetModel(&model);
 
     SUBCASE("首次 UpdateCmd 设置 CSP 模式") {
         ctrl.UpdateCmd(makeJntArray(3));
@@ -340,6 +403,55 @@ TEST_CASE("JointAdmittanceController - CSP 模式管理") {
         ctrl.UpdateCmd(makeJntArray(3));
         CHECK(hw.set_mode_count_ == 2);
     }
+}
+
+TEST_CASE("JointAdmittanceController - SetReady routes through UpdateCmd") {
+    FakeHardware hw;
+    FakeModel model;
+    hw.fake_position_ = makeConstJntArray(3, 0.25);
+    hw.fake_velocity_ = makeConstJntArray(3, 0.0);
+    hw.fake_torque_ = makeConstJntArray(3, 5.0);
+
+    SUBCASE("缺少 model 时不直接写硬件") {
+        rocos::JointAdmittanceController ctrl;
+        ctrl.SetHardware(&hw);
+
+        CHECK(ctrl.SetReady() == rocos::Result::ParameterPointerEqualsNullptr);
+        CHECK(hw.wait_for_signal_count_ == 1);
+        CHECK(hw.set_mode_count_ == 0);
+        CHECK(hw.set_position_count_ == 0);
+    }
+
+    SUBCASE("ready 通过 UpdateCmd 锁定当前位置") {
+        rocos::JointAdmittanceController ctrl;
+        ctrl.SetHardware(&hw);
+        ctrl.SetModel(&model);
+
+        CHECK(ctrl.SetReady() == rocos::Result::NoError);
+        CHECK(hw.wait_for_signal_count_ == 1);
+        CHECK(hw.set_mode_count_ == 1);
+        CHECK(hw.set_position_count_ == 1);
+        CHECK(hw.last_set_position_(0) == doctest::Approx(0.25));
+    }
+}
+
+TEST_CASE("JointAdmittanceController - destructor routes through UpdateCmd") {
+    FakeHardware hw;
+    FakeModel model;
+    hw.fake_position_ = makeConstJntArray(3, 0.25);
+    hw.fake_velocity_ = makeConstJntArray(3, 0.0);
+    hw.fake_torque_ = makeConstJntArray(3, 5.0);
+
+    {
+        rocos::JointAdmittanceController ctrl;
+        ctrl.SetHardware(&hw);
+        ctrl.SetModel(&model);
+    }
+
+    CHECK(hw.wait_for_signal_count_ == 1);
+    CHECK(hw.set_mode_count_ == 1);
+    CHECK(hw.set_position_count_ == 1);
+    CHECK(hw.last_set_position_(0) == doctest::Approx(0.25));
 }
 
 // ==========================================================================
@@ -364,6 +476,7 @@ TEST_CASE("JointAdmittanceController - 异常路径") {
     SUBCASE("q_des 维度与增益不匹配") {
         rocos::JointAdmittanceController ctrl;
         ctrl.SetHardware(&hw);
+        ctrl.SetModel(&model);
         ctrl.SetInertia(makeConstJntArray(5, 1.0));
         ctrl.SetDamping(makeConstJntArray(5, 20.0));
         CHECK(ctrl.UpdateCmd(makeJntArray(3)) == rocos::Result::UnmatchedJointsNumber);
@@ -373,6 +486,7 @@ TEST_CASE("JointAdmittanceController - 异常路径") {
         hw.fake_position_ = rocos::JntArray{};
         rocos::JointAdmittanceController ctrl;
         ctrl.SetHardware(&hw);
+        ctrl.SetModel(&model);
         CHECK(ctrl.UpdateCmd(makeJntArray(3)) == rocos::Result::JointStateError);
     }
 }

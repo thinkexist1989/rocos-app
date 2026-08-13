@@ -40,8 +40,12 @@ public:
     rocos::JntArray fake_position_;
     rocos::JntArray fake_velocity_;
     rocos::JntArray last_set_torque_;
+    rocos::JntArray last_set_position_;
     int8_t last_set_mode_{-1};
     int set_mode_count_{0};
+    int set_torque_count_{0};
+    int set_position_count_{0};
+    int wait_for_signal_count_{0};
 
     rocos::JntState GetState() override { return rocos::JntState::ENABLED; }
     rocos::JntState GetJointState(int32_t) override { return rocos::JntState::ENABLED; }
@@ -52,9 +56,15 @@ public:
     rocos::JntArray GetVelocity() override { return fake_velocity_; }
     rocos::JntArray GetTorque() override { return {}; }
     rocos::JntArray GetLoadTorque() override { return {}; }
-    void SetPosition(const rocos::JntArray&) override {}
+    void SetPosition(const rocos::JntArray& q) override {
+        last_set_position_ = q;
+        ++set_position_count_;
+    }
     void SetVelocity(const rocos::JntArray&) override {}
-    void SetTorque(const rocos::JntArray& tau) override { last_set_torque_ = tau; }
+    void SetTorque(const rocos::JntArray& tau) override {
+        last_set_torque_ = tau;
+        ++set_torque_count_;
+    }
     void SetMode(int8_t mode) override {
         last_set_mode_ = mode;
         ++set_mode_count_;
@@ -86,7 +96,7 @@ public:
 
     // HardwareInterface
     bool Reset() override { return true; }
-    void WaitForSignal() override {}
+    void WaitForSignal() override { ++wait_for_signal_count_; }
 };
 
 /// @brief FakeModel: 提供可预测的 FK、Jacobian、InverseDynamics 返回值
@@ -96,10 +106,16 @@ public:
 /// ID:    每个关节返回常数重力力矩
 class FakeModel : public rocos::ModelInterface {
 public:
+    FakeModel() { SetLimits(7, -10.0, 10.0, 10000.0, 10000.0); }
+
     bool fk_should_fail_{false};
     bool jac_should_fail_{false};
     bool id_should_fail_{false};
     double grav_torque_{5.0};   // 每个关节的模拟重力力矩 [Nm]
+    rocos::JntArray lower_limit_;
+    rocos::JntArray upper_limit_;
+    rocos::JntArray velocity_limit_;
+    rocos::JntArray effort_limit_;
 
     rocos::Result ForwardKinematics(const rocos::JntArray& q_in,
                                     rocos::Frame& p_out) override {
@@ -181,8 +197,27 @@ public:
         return rocos::Result::NoError;
     }
 
-    int GetJointNum() const override { return 7; }
+    int GetJointNum() const override { return static_cast<int>(lower_limit_.rows()); }
     std::vector<std::string> GetJointNames() const override { return {}; }
+
+    const rocos::JntArray& GetPosLowerLimit() const override { return lower_limit_; }
+    const rocos::JntArray& GetPosUpperLimit() const override { return upper_limit_; }
+    const rocos::JntArray& GetVelocityLimit() const override { return velocity_limit_; }
+    const rocos::JntArray& GetEffortLimit() const override { return effort_limit_; }
+
+    void SetLimits(unsigned int n, double lower, double upper,
+                   double velocity, double effort) {
+        lower_limit_.resize(n);
+        upper_limit_.resize(n);
+        velocity_limit_.resize(n);
+        effort_limit_.resize(n);
+        for (unsigned int i = 0; i < n; ++i) {
+            lower_limit_(i) = lower;
+            upper_limit_(i) = upper;
+            velocity_limit_(i) = velocity;
+            effort_limit_(i) = effort;
+        }
+    }
 };
 
 // ---- 工具函数 ----
@@ -716,7 +751,84 @@ TEST_CASE("CartesianImpedance - 异常路径") {
 }
 
 // ==========================================================================
-// §11. SetReady 初始化
+// §11. 每周期 Servo validation
+// ==========================================================================
+
+TEST_CASE("CartesianImpedance - Servo validation details") {
+    FakeHardware hw;
+    FakeModel model;
+    model.grav_torque_ = 0.0;
+    hw.fake_position_ = makeConstJntArray(7, 0.0);
+    hw.fake_velocity_ = makeConstJntArray(7, 0.0);
+
+    SUBCASE("缺少 model 时拒绝且不写力矩") {
+        rocos::CartesianImpedanceController ctrl;
+        ctrl.SetHardware(&hw);
+        ctrl.GenerateCmd(rocos::Reference{makeFrame(0.0, 0.0, 0.0)}, dummy_q_cmd);
+
+        CHECK(ctrl.UpdateCmd(makeConstJntArray(7)) == rocos::Result::ParameterPointerEqualsNullptr);
+        CHECK(hw.set_mode_count_ == 0);
+        CHECK(hw.set_torque_count_ == 0);
+    }
+
+    SUBCASE("当前位置超过 URDF 上限时返回 PosLimit") {
+        hw.fake_position_ = makeConstJntArray(7, 2.0);
+        model.SetLimits(7, -1.0, 1.0, 10000.0, 10000.0);
+
+        rocos::CartesianImpedanceController ctrl;
+        ctrl.SetHardware(&hw);
+        ctrl.SetModel(&model);
+        ctrl.GenerateCmd(rocos::Reference{makeFrame(2.0, 2.0, 2.0)}, dummy_q_cmd);
+
+        CHECK(ctrl.UpdateCmd(makeConstJntArray(7)) == rocos::Result::PosLimit);
+        CHECK(hw.set_mode_count_ == 0);
+        CHECK(hw.set_torque_count_ == 0);
+    }
+
+    SUBCASE("当前速度超过 URDF velocity 时返回 SpeedLimit") {
+        hw.fake_velocity_ = makeConstJntArray(7, 2.0);
+        model.SetLimits(7, -10.0, 10.0, 1.0, 10000.0);
+
+        rocos::CartesianImpedanceController ctrl;
+        ctrl.SetHardware(&hw);
+        ctrl.SetModel(&model);
+        ctrl.GenerateCmd(rocos::Reference{makeFrame(0.0, 0.0, 0.0)}, dummy_q_cmd);
+
+        CHECK(ctrl.UpdateCmd(makeConstJntArray(7)) == rocos::Result::SpeedLimit);
+        CHECK(hw.set_mode_count_ == 0);
+        CHECK(hw.set_torque_count_ == 0);
+    }
+
+    SUBCASE("最终力矩超过 URDF effort 时返回 ForceLimit") {
+        model.SetLimits(7, -10.0, 10.0, 10000.0, 10.0);
+
+        rocos::CartesianImpedanceController ctrl;
+        ctrl.SetHardware(&hw);
+        ctrl.SetModel(&model);
+        ctrl.SetTorqueRateLimit(0.0);
+        ctrl.GenerateCmd(rocos::Reference{makeFrame(1.0, 0.0, 0.0)}, dummy_q_cmd);
+
+        CHECK(ctrl.UpdateCmd(makeConstJntArray(7)) == rocos::Result::ForceLimit);
+        CHECK(hw.set_mode_count_ == 0);
+        CHECK(hw.set_torque_count_ == 0);
+    }
+
+    SUBCASE("最终力矩非有限值时返回 ParameterNanOrInf") {
+        model.grav_torque_ = std::numeric_limits<double>::quiet_NaN();
+
+        rocos::CartesianImpedanceController ctrl;
+        ctrl.SetHardware(&hw);
+        ctrl.SetModel(&model);
+        ctrl.GenerateCmd(rocos::Reference{makeFrame(0.0, 0.0, 0.0)}, dummy_q_cmd);
+
+        CHECK(ctrl.UpdateCmd(makeConstJntArray(7)) == rocos::Result::ParameterNanOrInf);
+        CHECK(hw.set_mode_count_ == 0);
+        CHECK(hw.set_torque_count_ == 0);
+    }
+}
+
+// ==========================================================================
+// §12. SetReady 初始化
 // ==========================================================================
 
 TEST_CASE("CartesianImpedance - SetReady") {
@@ -732,6 +844,25 @@ TEST_CASE("CartesianImpedance - SetReady") {
     SUBCASE("SetReady 无 hardware → ParameterPointerEqualsNullptr") {
         rocos::CartesianImpedanceController ctrl2;
         CHECK(ctrl2.SetReady() == rocos::Result::ParameterPointerEqualsNullptr);
+    }
+
+    SUBCASE("SetReady 缺少 model 时不直接写力矩") {
+        rocos::CartesianImpedanceController ctrl2;
+        ctrl2.SetHardware(&hw);
+
+        CHECK(ctrl2.SetReady() == rocos::Result::ParameterPointerEqualsNullptr);
+        CHECK(hw.wait_for_signal_count_ == 1);
+        CHECK(hw.set_mode_count_ == 0);
+        CHECK(hw.set_torque_count_ == 0);
+    }
+
+    SUBCASE("SetReady 通过 UpdateCmd 执行 effort 保护") {
+        model.SetLimits(7, -10.0, 10.0, 10000.0, 2.0);
+
+        CHECK(ctrl.SetReady() == rocos::Result::ForceLimit);
+        CHECK(hw.wait_for_signal_count_ == 1);
+        CHECK(hw.set_mode_count_ == 0);
+        CHECK(hw.set_torque_count_ == 0);
     }
 
     SUBCASE("SetReady 成功后 CST 模式和初始力矩") {
@@ -754,10 +885,62 @@ TEST_CASE("CartesianImpedance - SetReady") {
         // 无位置误差 → τ_imp = 0 → τ = τ_grav = 7
         CHECK(hw.last_set_torque_(0) == doctest::Approx(7.0).epsilon(0.01));
     }
+
+    SUBCASE("SetReady 覆盖之前的 Frame 目标并锁定当前位置") {
+        ctrl.SetTorqueRateLimit(0.0);
+        ctrl.GenerateCmd(rocos::Reference{makeFrame(1.0, 0.0, 0.0)}, dummy_q_cmd);
+
+        CHECK(ctrl.SetReady() == rocos::Result::NoError);
+        CHECK(hw.last_set_torque_(0) == doctest::Approx(7.0).epsilon(0.01));
+        CHECK(hw.set_torque_count_ == 1);
+    }
+}
+
+TEST_CASE("CartesianImpedance - destructor routes through UpdateCmd") {
+    SUBCASE("effort 保护失败时析构不直接写位置或模式") {
+        FakeHardware hw;
+        FakeModel model;
+        model.grav_torque_ = 7.0;
+        model.SetLimits(7, -10.0, 10.0, 10000.0, 2.0);
+        hw.fake_position_ = makeConstJntArray(7, 0.0);
+        hw.fake_velocity_ = makeConstJntArray(7, 0.0);
+
+        {
+            rocos::CartesianImpedanceController ctrl;
+            ctrl.SetHardware(&hw);
+            ctrl.SetModel(&model);
+        }
+
+        CHECK(hw.wait_for_signal_count_ == 1);
+        CHECK(hw.set_position_count_ == 0);
+        CHECK(hw.set_mode_count_ == 0);
+        CHECK(hw.set_torque_count_ == 0);
+    }
+
+    SUBCASE("析构成功路径通过 UpdateCmd 下发力矩而不是位置") {
+        FakeHardware hw;
+        FakeModel model;
+        model.grav_torque_ = 7.0;
+        hw.fake_position_ = makeConstJntArray(7, 0.0);
+        hw.fake_velocity_ = makeConstJntArray(7, 0.0);
+
+        {
+            rocos::CartesianImpedanceController ctrl;
+            ctrl.SetHardware(&hw);
+            ctrl.SetModel(&model);
+        }
+
+        CHECK(hw.wait_for_signal_count_ == 1);
+        CHECK(hw.set_position_count_ == 0);
+        CHECK(hw.set_mode_count_ == 1);
+        REQUIRE(hw.set_torque_count_ == 1);
+        REQUIRE(hw.last_set_torque_.rows() == 7u);
+        CHECK(hw.last_set_torque_(0) == doctest::Approx(7.0).epsilon(0.01));
+    }
 }
 
 // ==========================================================================
-// §12. 综合场景
+// §13. 综合场景
 // ==========================================================================
 
 TEST_CASE("CartesianImpedance - 综合：刚度 + 阻尼 + 重力") {
@@ -796,14 +979,20 @@ TEST_CASE("CartesianImpedance - 综合：刚度 + 阻尼 + 重力") {
 }
 
 // ==========================================================================
-// §13. 非零末端姿态 — 验证坐标系变换正确性
+// §14. 非零末端姿态 — 验证坐标系变换正确性
 // ==========================================================================
 
 /// @brief FakeModel 变体: FK 返回绕 Z 轴旋转 90° 的姿态
 class FakeModelRotated : public rocos::ModelInterface {
 public:
+    FakeModelRotated() { SetLimits(7, -10.0, 10.0, 10000.0, 10000.0); }
+
     bool fk_should_fail_{false};
     double grav_torque_{0.0};
+    rocos::JntArray lower_limit_;
+    rocos::JntArray upper_limit_;
+    rocos::JntArray velocity_limit_;
+    rocos::JntArray effort_limit_;
 
     rocos::Result ForwardKinematics(const rocos::JntArray& q_in,
                                     rocos::Frame& p_out) override {
@@ -867,8 +1056,27 @@ public:
         return rocos::Result::NoError;
     }
 
-    int GetJointNum() const override { return 7; }
+    int GetJointNum() const override { return static_cast<int>(lower_limit_.rows()); }
     std::vector<std::string> GetJointNames() const override { return {}; }
+
+    const rocos::JntArray& GetPosLowerLimit() const override { return lower_limit_; }
+    const rocos::JntArray& GetPosUpperLimit() const override { return upper_limit_; }
+    const rocos::JntArray& GetVelocityLimit() const override { return velocity_limit_; }
+    const rocos::JntArray& GetEffortLimit() const override { return effort_limit_; }
+
+    void SetLimits(unsigned int n, double lower, double upper,
+                   double velocity, double effort) {
+        lower_limit_.resize(n);
+        upper_limit_.resize(n);
+        velocity_limit_.resize(n);
+        effort_limit_.resize(n);
+        for (unsigned int i = 0; i < n; ++i) {
+            lower_limit_(i) = lower;
+            upper_limit_(i) = upper;
+            velocity_limit_(i) = velocity;
+            effort_limit_(i) = effort;
+        }
+    }
 };
 
 TEST_CASE("CartesianImpedance - 非零姿态: 位置误差方向正确") {
@@ -987,7 +1195,7 @@ TEST_CASE("CartesianImpedance - 非零姿态: 合力大小不随姿态改变") {
 }
 
 // ==========================================================================
-// §14. x_des_ 保持行为 — 运动结束后不因 hold_position_ 而跳变
+// §15. x_des_ 保持行为 — 运动结束后不因 hold_position_ 而跳变
 // ==========================================================================
 
 TEST_CASE("CartesianImpedance - x_des_ 保持: JntArray 不覆盖已设置的 Frame") {

@@ -61,6 +61,8 @@ public:
     Result SetDt(double dt);
 
 private:
+    Result ValidateTorqueCommand(const JntArray& tau_cmd);
+
     HardwareInterface* hardware_{nullptr};
     ModelInterface* model_{nullptr};
     bool mode_set_{false};
