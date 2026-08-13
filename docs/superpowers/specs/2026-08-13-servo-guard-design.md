@@ -220,27 +220,28 @@ tau_rate_limit
 
 ## 7. Ready 阶段校验
 
-`SetReady()` 也会写硬件目标，因此仍需要基础校验。
+`SetReady()` 也会准备硬件目标，因此仍需要走同一套下发前校验。第一阶段要求 Ready 阶段的目标写入也通过 `UpdateCmd()`，不要在 `SetReady()` 中直接调用 `SetPosition()` / `SetTorque()`。
 
 位置类 controller:
 
 ```text
-SetPosition(GetPosition())
-SetMode(CSP)
+q_ready = GetPosition()
+UpdateCmd(q_ready)
 ```
 
 力矩类 controller:
 
 ```text
-SetTorque(gravity_compensation)
-SetMode(CST)
+q_hold = GetPosition()
+UpdateCmd(q_hold)
 ```
 
 第一阶段规则:
 
 ```text
 SetReady() 必须在硬件已经 ENABLED 后调用
-Ready 写入也必须经过对应验证函数
+Ready 目标写入必须经过 UpdateCmd()
+UpdateCmd() 内部统一调用 ValidatePositionCommand() / ValidateTorqueCommand()
 ```
 
 原因是如果在未使能状态写目标位置或目标力矩，驱动可能缓存目标值，并在后续上使能瞬间产生非预期运动。
@@ -249,17 +250,32 @@ Ready 阶段的位置写入通常是:
 
 ```text
 q_ready = hardware_->GetPosition()
-ValidatePositionCommand(q_ready)
-hardware_->SetPosition(q_ready)
+rc = UpdateCmd(q_ready)
+if rc != Result::NoError:
+  return rc
 ```
 
 Ready 阶段的力矩写入通常是:
 
 ```text
-tau_ready = gravity_compensation(q_actual)
-ValidateTorqueCommand(tau_ready)
-hardware_->SetTorque(tau_ready)
+q_hold = hardware_->GetPosition()
+rc = UpdateCmd(q_hold)
+if rc != Result::NoError:
+  return rc
 ```
+
+注意: 当前 `ControllerInterface::UpdateCmd(const JntArray&)` 对力矩类 controller 的参数语义仍是 `q_des`，不是 `tau_cmd`。因此 Ready 阶段不要把 `gravity_compensation` 当作参数传给 `UpdateCmd()`。力矩类 controller 应使用当前关节角作为保持目标，让 `UpdateCmd(q_hold)` 内部生成重力补偿或阻尼后的 `tau_cmd`，再执行 `ValidateTorqueCommand(tau_cmd)` 和 `SetTorque(tau_cmd)`。
+
+这样 `SetReady()`、运动周期和伺服周期都复用同一个下发入口:
+
+```text
+UpdateCmd()
+  -> Validate...
+  -> SetMode(CSP/CST) if needed
+  -> SetPosition() / SetTorque()
+```
+
+`SetReady()` 只负责准备 ready 命令，不再直接 `SetMode()`，也不再绕过 `UpdateCmd()` 写运动目标。
 
 ## 8. Hardware limit 的角色
 
@@ -337,7 +353,7 @@ return Result::NoError
 5. `JointImpedanceController` 增加 `ValidateTorqueCommand(tau_cmd)`。
 6. `CartesianImpedanceController` 增加或复用 `ValidateTorqueCommand(tau_cmd)`。
 7. `Robot` 初始化阶段增加 URDF limit 与 hardware limit 的一致性检查。
-8. `SetReady()` 要求硬件已 `ENABLED`，并让 ready 写入经过对应验证。
+8. `SetReady()` 要求硬件已 `ENABLED`，并通过 `UpdateCmd()` 完成 ready 目标下发。
 9. 添加单元测试覆盖 Model limit 解析和 controller 下发前拒绝逻辑。
 
 ## 11. 测试重点
@@ -356,6 +372,7 @@ Model 测试:
 - `q_cmd` 有 NaN/Inf，拒绝下发。
 - `(q_cmd - q_actual) / dt` 超过速度限制，拒绝下发。
 - 正常命令通过并调用 `SetPosition()`。
+- `SetReady()` 调用 `UpdateCmd(q_ready)`，不直接调用 `SetPosition()`。
 
 力矩控制器测试:
 
@@ -364,6 +381,7 @@ Model 测试:
 - 当前 `q_actual` 已越界，拒绝下发。
 - 当前 `q_dot_actual` 超过 velocity，拒绝下发。
 - 正常命令通过并调用 `SetTorque()`。
+- `SetReady()` 调用 `UpdateCmd(q_hold)`，不直接调用 `SetTorque()`。
 
 启动一致性测试:
 
