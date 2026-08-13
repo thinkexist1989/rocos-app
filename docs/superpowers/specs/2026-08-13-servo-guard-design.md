@@ -111,14 +111,14 @@ Robot::Robot()
 - 位置类控制器会 `SetPosition(current_position)` 并切 CSP。
 - 力矩类控制器会 `SetTorque(gravity_compensation)` 并切 CST。
 
-这些写入发生在工作模式切换或初始化阶段，不完全等同于运动中的每周期命令。如果 Guard 在此时强制要求 `JntState::ENABLED`，可能会阻断构造阶段或 IDLE 状态下的安全准备。
+这些写入发生在工作模式切换或初始化阶段，不完全等同于运动中的每周期命令。但它们仍然会改变驱动的目标位置、目标力矩和控制模式。如果这些写入发生在未使能状态，驱动可能缓存目标值，并在后续上使能瞬间产生非预期运动。因此第一阶段采用更保守的规则: `Ready` 阶段也必须要求硬件已经 `ENABLED`。
 
 因此 `ServoGuard` 需要区分保护阶段:
 
 ```cpp
 enum class GuardPhase {
-    Bypass,   // 初始化或故障恢复内部使用，只转发
-    Ready,    // SetReady 阶段，允许安全锁当前位置/重力补偿
+    Bypass,   // 内部恢复或明确旁路，默认不用于控制器写命令
+    Ready,    // 已使能后的 SetReady 阶段，允许安全锁当前位置/重力补偿
     Active,   // 控制周期下发阶段，执行完整保护
     Faulted   // 已触发 fault，拒绝继续下发运动命令
 };
@@ -127,10 +127,14 @@ enum class GuardPhase {
 推荐规则:
 
 ```text
-Robot 构造 / ResetFault 内部恢复:
-  GuardPhase::Bypass 或 Ready
+Robot 构造:
+  不调用 controller->SetReady()，或保持 GuardPhase::Bypass 且不写运动命令
+
+ResetFault 内部恢复:
+  清理 Guard fault，保持 Bypass/Ready，但不在未使能状态写目标命令
 
 SetWorkMode 调用 controller->SetReady():
+  必须先确认 hardware state == ENABLED
   GuardPhase::Ready
 
 机器人进入 RUNNING / SERVOING / PAUSING / RESUMING / STOPPING:
@@ -147,8 +151,9 @@ Guard 检查失败:
 - 命令值有限。
 - 位置准备命令应接近当前实际位置。
 - 力矩准备命令应在 effort 限制内。
+- `state == JntState::ENABLED`。
 
-但 `Ready` 阶段不要求 `state == ENABLED`，也不做跟随误差和速度/加速度命令连续性检查。
+`Ready` 阶段要求 `state == ENABLED`，但不做跟随误差和速度/加速度命令连续性检查，因为此时还不是轨迹执行中的连续命令。
 
 ### 6.1 现有安全写入调用点
 
@@ -160,7 +165,7 @@ Guard 检查失败:
 | 关节导纳控制器就绪 | `JointAdmittanceController::SetReady()` | `SetPosition(GetPosition())`, `SetMode(CSP)` | `Ready` |
 | 关节阻抗控制器就绪 | `JointImpedanceController::SetReady()` | `SetTorque(tau_grav)`, `SetMode(CST)` | `Ready` |
 | 笛卡尔阻抗控制器就绪 | `CartesianImpedanceController::SetReady()` | `SetTorque(tau_grav)`, `SetMode(CST)` | `Ready` |
-| 控制器析构兜底 | 各 controller 析构函数 | `SetPosition(GetPosition())`, `SetMode(CSP)` | `Ready` 或 `Bypass` |
+| 控制器析构兜底 | 各 controller 析构函数 | `SetPosition(GetPosition())`, `SetMode(CSP)` | `Ready`，若未使能则只允许无运动副作用的清理 |
 | 运动控制周期 | 各 controller `UpdateCmd()` | `SetPosition(q_cmd)` 或 `SetTorque(tau_cmd)` | `Active` |
 
 这些调用的入口在 `Robot::SetWorkMode()`:
@@ -173,7 +178,7 @@ new_controller->SetReady()
 executor->SwitchController(controller.get())
 ```
 
-因此 `Robot::SetWorkMode()` 应在调用 `SetReady()` 前临时把 Guard 切到 `Ready`，`SetReady()` 成功后再按当前 FSM 状态决定是否进入 `Active`。如果只是 `IDLE` / `STOPPED` 下切模式，保持 `Ready` 或 `Bypass` 均可，但进入 `RUNNING` / `SERVOING` 前必须切到 `Active`。
+因此 `Robot::SetWorkMode()` 应在调用 `SetReady()` 前确认机器人已经使能，并临时把 Guard 切到 `Ready`。`SetReady()` 成功后，如果只是 `STOPPED` 下切模式，可以保持 `Ready`；进入 `RUNNING` / `SERVOING` 前必须切到 `Active`。`IDLE` 未使能状态下不允许调用会写目标命令的 `SetReady()`。
 
 ### 6.2 Ready 阶段也需要保护
 
@@ -188,6 +193,7 @@ SetPosition(q_ready)
 
 Guard 应检查:
 
+- `state == JntState::ENABLED`。
 - `q_ready` 维度等于 model joint count。
 - `q_ready` 全部有限。
 - `q_ready` 在软限位内。
@@ -202,6 +208,7 @@ SetTorque(tau_ready)
 
 Guard 应检查:
 
+- `state == JntState::ENABLED`。
 - `tau_ready` 维度等于 model joint count。
 - `tau_ready` 全部有限。
 - `abs(tau_ready[i]) <= effort_limit[i] * ready_effort_scale`。
@@ -213,7 +220,7 @@ Guard 应检查:
 - `Active` 阶段原则上不应频繁切模式；若控制器首次 `UpdateCmd()` 因 `mode_set_ == false` 再次调用 `SetMode()`，Guard 可以允许同模式重复设置。
 - 不允许未知 mode 或与当前控制器类别不匹配的 mode。第一阶段如果无法识别控制器类别，可以只记录告警并转发 CSP/CST，拒绝其他 mode。
 
-控制器析构兜底写入是安全收尾动作，不能被 `Faulted` 状态粗暴阻断。建议在 `Robot::SetWorkMode()` 销毁旧控制器前临时进入 `Ready` 或 `Bypass`，允许旧控制器把目标位置锁到当前位置并切回 CSP。这个路径仍应检查 NaN/Inf 和维度，避免把坏反馈原样写回硬件。
+控制器析构兜底写入是安全收尾动作，但也不应在未使能状态下写入可能被驱动缓存的目标。建议在 `Robot::SetWorkMode()` 销毁旧控制器前，如果硬件仍处于 `ENABLED`，临时进入 `Ready`，允许旧控制器把目标位置锁到当前位置并切回 CSP；如果硬件未使能，则跳过会写目标位置/力矩的兜底命令，只做对象状态清理。这个路径仍应检查 NaN/Inf 和维度，避免把坏反馈原样写回硬件。
 
 ## 7. 关节顺序与映射规则
 
@@ -337,7 +344,7 @@ uint32_t dt_us = inner_->GetDt();
 
 第一阶段如果底层没有反馈时间戳，可以先只检查 `dt`、状态、反馈有限性和速度/位置边界。通信 stale 后续再通过硬件层暴露时间戳或周期计数。
 
-`GlobalStateGuard` 的完整检查只在 `GuardPhase::Active` 下启用。`Ready` 阶段使用较弱的基础检查，避免阻断控制器安全初始化。
+`GlobalStateGuard` 的完整检查在 `GuardPhase::Active` 下启用。`Ready` 阶段同样要求 `state == JntState::ENABLED`，但使用较弱的命令连续性检查，避免把安全锁当前位置和重力补偿初始化误判为轨迹跳变。
 
 ### 9.2 PositionCommandGuard
 
@@ -567,7 +574,7 @@ torque:
 4. `SetTorque()` 实现 Global + Torque 检查。
 5. `Robot` 初始化时在 joint binding 后构建 model order limit 表。
 6. `SetWorkMode()` 中把 `controller->SetHardware(hardware.get())` 改成 `controller->SetHardware(servo_guard.get())`。
-7. `SetWorkMode()` 调用 `SetReady()` 前后设置 `GuardPhase::Ready`，进入运动控制状态后设置 `GuardPhase::Active`。
+7. `SetWorkMode()` 调用 `SetReady()` 前确认 `IsEnabled()`，设置 `GuardPhase::Ready`，进入运动控制状态后设置 `GuardPhase::Active`。
 8. `Robot::RunCycle()` 在 `executor->Update()` 后检查 Guard fault。
 9. `ResetFault()` 清理 Guard fault。
 10. 添加单元测试覆盖:
@@ -577,7 +584,8 @@ torque:
    - 力矩超 effort 触发 fault。
    - 接近上限时正向力矩触发 fault。
    - 接近下限时负向力矩触发 fault。
-   - `Ready` 阶段允许当前位置锁定命令。
+   - `Ready` 阶段在已使能时允许当前位置锁定命令。
+   - `Ready` 阶段未使能时拒绝 `SetPosition()` / `SetTorque()` / `SetMode()`。
    - `Active` 阶段硬件未 enabled 触发 fault。
 
 ## 16. 后续重构方向
