@@ -389,19 +389,20 @@ if abs(required_velocity[i]) > limits[i].vel:
 - `JointImpedanceController`
 - `CartesianImpedanceController`
 
+力矩控制不能直接复用位置控制的 `q_cmd - q_actual` 检查。阻抗控制允许期望位置和实际位置存在误差，这个误差本身就是控制器生成力矩的来源。如果 Guard 把它当作位置跟随误差直接拦截，会误杀正常阻抗控制。
+
 检查项:
 
 - `tau_cmd.rows() == limits.size()`
 - `tau_cmd` 全部有限
-- `abs(tau_cmd[i]) <= effort_limit`
-- `abs(tau_cmd[i] - tau_last_cmd[i]) / dt <= tau_rate_limit`
-- `abs(q_dot_actual[i]) <= vel_limit`
+- `abs(tau_cmd[i]) <= limits[i].effort`
+- `q_actual[i]` 在 `[limits[i].lower, limits[i].upper]`
+- `abs(q_dot_actual[i]) <= limits[i].vel`
 - 靠近上限时禁止继续给正向外推力矩
 - 靠近下限时禁止继续给负向外推力矩
 - 高速接近限位时禁止继续加速
-- 可选: 机械功率 `tau_cmd[i] * q_dot_actual[i]` 超限保护
 
-力矩控制不能直接复用位置命令的 `q_cmd` 检查，因为阻抗控制允许 `q_des` 和 `q_actual` 存在误差。保护重点应放在:
+保护重点是:
 
 ```text
 实际状态是否安全
@@ -413,8 +414,36 @@ if abs(required_velocity[i]) > limits[i].vel:
 
 - NaN/Inf、维度不匹配、严重状态异常: fault。
 - 力矩绝对值超限: 第一阶段建议 fault，不建议静默饱和。
-- 力矩变化率超限: 可以配置为 clamp 或 fault。考虑 `CartesianImpedanceController` 内部已有变化率限制，统一 Guard 第一阶段建议 fault，后续再开放 clamp。
-- 接近限位外推: 可选择把外推分量置零或 fault。第一阶段建议 fault，更容易暴露控制器问题。
+- 当前关节位置或速度已经超限: fault。
+- 接近限位仍给外推力矩: fault。
+- 高速接近限位仍给加速方向力矩: fault。
+
+第一阶段不在 ServoGuard 中新增 `tau_rate_limit`、机械功率限制或力矩 clamp 策略，原因是这些阈值当前不是硬件配置里的现成字段。为了保持单一事实来源，ServoGuard 只使用 `Drive::Limit` 中已有的 `lower`、`upper`、`vel`、`acc`、`jerk`、`effort`。力矩变化率保护如果控制器内部已经存在，例如 `CartesianImpedanceController` 的局部力矩变化率限制，可以继续保留在控制器内部。Guard 第一阶段只做全局兜底，不把控制器局部策略搬进统一保护层。
+
+### 9.4 第一阶段保护清单
+
+第一阶段 ServoGuard 明确保护以下内容:
+
+| 类别 | 保护项 | 依据 |
+|------|--------|------|
+| 通用状态 | hardware 指针、`ENABLED` 状态、`dt_us > 0`、反馈维度、反馈有限性 | 当前硬件反馈 |
+| 当前关节状态 | `q_actual` 不越界、`q_dot_actual` 不超速 | `Drive::Limit.lower/upper/vel` |
+| 位置命令 | `q_cmd` 维度、有限性、目标位置限位 | `Drive::Limit.lower/upper` |
+| 位置跳变 | `(q_cmd - q_actual) / dt` 不超过速度限制 | `Drive::Limit.vel` |
+| 位置连续性 | `(q_cmd - q_last_cmd) / dt` 和命令加速度不超限 | `Drive::Limit.vel/acc` |
+| 力矩命令 | `tau_cmd` 维度、有限性、绝对力矩不超限 | `Drive::Limit.effort` |
+| 力矩方向 | 靠近限位时禁止继续向外推 | `q_actual`、`q_dot_actual`、`tau_cmd` 符号 |
+| Ready 阶段 | 已使能后才允许锁当前位置、重力补偿和 CSP/CST 切换 | `GuardPhase::Ready` |
+| Fault 后 | 一旦 Guard fault，拒绝继续下发运动命令 | `GuardPhase::Faulted` |
+
+第一阶段明确不做:
+
+- 不新增 `config/servo_guard.yaml`。
+- 不新增 `ServoGuardPolicy`。
+- 不新增 `tau_rate_limit`。
+- 不新增机械功率限制。
+- 不在 ServoGuard 中做力矩 clamp 或位置 clamp。
+- 不把阻抗控制的 `q_des - q_actual` 当作位置跟随误差检查。
 
 ## 10. 错误传播
 
@@ -525,9 +554,14 @@ SetTorque(tau_cmd)
 
 ### CartesianImpedanceController
 
-内部已有力矩变化率和饱和保护，但仍要经过 `TorqueCommandGuard`。内部保护属于控制器局部保护，Guard 是全局最后一道软件保护。
+内部已有力矩变化率和饱和保护，但仍要经过 `TorqueCommandGuard`。内部保护属于控制器局部策略，Guard 第一阶段只做来自硬件 limit 的全局兜底:
 
-第一阶段若两者重复，Guard 的代码默认阈值可以略宽于控制器内部限制，作为兜底。
+- `tau_cmd` 有限且不超过 `Drive::Limit.effort`。
+- 当前 `q_actual` 不超过 `Drive::Limit.lower/upper`。
+- 当前 `q_dot_actual` 不超过 `Drive::Limit.vel`。
+- 靠近限位时不允许继续给外推方向力矩。
+
+ServoGuard 不复制 `CartesianImpedanceController` 的力矩变化率策略，也不新增 Guard 自己的力矩变化率阈值。
 
 ## 13. 与 MoveServo 的关系
 
