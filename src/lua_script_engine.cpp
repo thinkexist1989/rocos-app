@@ -508,6 +508,18 @@ private:
             });
         robot_table_.set_function(
             "Sleep", [this](int milliseconds) { sleepInterruptibly(milliseconds); });
+        robot_table_.set_function(
+            "SetEnabled", [this]() {
+                requireSuccess(robot_.SetEnabled(), "SetEnabled");
+            });
+        robot_table_.set_function(
+            "SetDisabled", [this]() {
+                requireSuccess(robot_.SetDisabled(), "SetDisabled");
+            });
+        robot_table_.set_function(
+            "ResetFault", [this]() {
+                requireSuccess(robot_.ResetFault(), "ResetFault");
+            });
     }
 
     static void debugHook(lua_State* lua_state, lua_Debug* debug_info) {
@@ -705,6 +717,14 @@ private:
             throw sol::error(std::string(name) + " 必须大于 0");
         }
         return value;
+    }
+
+    // 将 Robot 控制接口的返回值统一转为 Lua 错误，与运动提交行为保持一致
+    static void requireSuccess(Result result, const char* operation) {
+        if (result != Result::NoError) {
+            throw sol::error(std::string(operation) + " 失败: " +
+                             to_string(result));
+        }
     }
 
     static double tableNumber(const sol::table& table, const char* key) {

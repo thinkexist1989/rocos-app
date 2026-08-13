@@ -29,14 +29,16 @@ bool waitForState(rocos::LuaScriptEngine& engine,
 
 }  // namespace
 
-TEST_CASE("LuaScriptEngine LoadFile 执行安全脚本") {
+TEST_CASE("LuaScriptEngine LoadFile 执行 example.lua 完整运动流程") {
     rocos::Robot robot_;
     rocos::LuaScriptEngine engine_(robot_, "scripts");
 
     REQUIRE(engine_.LoadFile("example.lua") == rocos::Result::NoError);
     REQUIRE(engine_.Run() == rocos::Result::NoError);
+    // example.lua 内含上使能 + MoveJ 运动 + 下使能，需更长的完成超时
     REQUIRE(waitForState(
-        engine_, rocos::LuaScriptEngine::State::Completed));
+        engine_, rocos::LuaScriptEngine::State::Completed,
+        std::chrono::seconds(30)));
     CHECK(engine_.GetStatus().error.empty());
 }
 
