@@ -530,7 +530,7 @@ SetTorque(tau_cmd)
 
 内部已有力矩变化率和饱和保护，但仍要经过 `TorqueCommandGuard`。内部保护属于控制器局部保护，Guard 是全局最后一道软件保护。
 
-第一阶段若两者重复，Guard 配置可以略宽于控制器内部限制，作为兜底。
+第一阶段若两者重复，Guard 的代码默认阈值可以略宽于控制器内部限制，作为兜底。
 
 ## 13. 与 MoveServo 的关系
 
@@ -546,40 +546,52 @@ SetTorque(tau_cmd)
 - 如果 `MoveServo` 能判断指令过期，应输出当前位置保持或 `PlanFinished`。
 - 如果底层反馈/控制周期异常，`ServoGuard` 触发 fault。
 
-## 14. 配置建议
+## 14. 配置来源与简洁原则
 
-新增配置文件可选:
+第一阶段不新增 `config/servo_guard.yaml`。
+
+原因:
+
+- 现有 `hardware_talon_config.yaml` 已经包含每轴 `lower`、`upper`、`vel`、`acc`、`jerk`、`effort`。
+- Guard 的核心保护应以这份硬件 limit 为单一事实来源。
+- 额外 YAML 会引入第二套 limit/scale/margin 配置，增加不一致风险。
+- 第一阶段目标是先把保护链路做短、做清楚，而不是增加运行时可调参数面。
+
+第一阶段配置来源:
 
 ```text
-config/servo_guard.yaml
+per-joint hard/soft limits:
+  hardware_talon_config.yaml -> Drive::Limit
+
+model order limits:
+  Robot::jointBinding() 后按 model_index -> drive_id 重排
+
+guard policy constants:
+  ServoGuard 代码内默认常量
 ```
 
-建议字段:
+建议第一阶段只保留少量代码默认常量:
 
-```yaml
-enabled: true
-
-global:
-  position_margin: 0.02
-  velocity_scale: 1.0
-  require_enabled: true
-
-position:
-  max_position_error: 0.2
-  max_following_error: 0.1
-  velocity_scale: 1.0
-  acceleration_scale: 1.0
-  fault_on_limit_violation: true
-
-torque:
-  effort_scale: 1.0
-  max_torque_rate: 200.0
-  limit_margin: 0.05
-  power_limit: 200.0
-  fault_on_limit_push: true
+```cpp
+struct ServoGuardPolicy {
+    double position_limit_margin{0.0};
+    double velocity_scale{1.0};
+    double acceleration_scale{1.0};
+    double effort_scale{1.0};
+    double ready_position_tolerance{1e-4};
+};
 ```
 
-每轴基础 limit 来自 `hardware_talon_config.yaml` 的 `Drive::Limit`，`servo_guard.yaml` 只提供全局缩放、margin 和策略开关。
+这些常量不应覆盖硬件 limit，只能作为保守缩放或数值容差:
+
+```text
+position lower/upper = Drive::Limit.lower/upper +/- position_limit_margin
+velocity limit       = Drive::Limit.vel * velocity_scale
+acceleration limit   = Drive::Limit.acc * acceleration_scale
+effort limit         = Drive::Limit.effort * effort_scale
+```
+
+如果后续出现多机器人、多工况、现场调参需求，再考虑把 `ServoGuardPolicy` 暴露到已有硬件配置或独立配置文件中。第一阶段不做。
 
 ## 15. 第一阶段最小实现清单
 
