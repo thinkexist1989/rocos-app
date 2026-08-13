@@ -150,6 +150,71 @@ Guard 检查失败:
 
 但 `Ready` 阶段不要求 `state == ENABLED`，也不做跟随误差和速度/加速度命令连续性检查。
 
+### 6.1 现有安全写入调用点
+
+当前代码中，初始化、切模式和控制器析构阶段也会写硬件。这些调用不是普通轨迹命令，但仍应经过 Guard 的基础保护。
+
+| 场景 | 调用函数 | 写入内容 | 建议 Guard 阶段 |
+|------|----------|----------|-----------------|
+| 位置控制器就绪 | `PositionController::SetReady()` | `SetPosition(GetPosition())`, `SetMode(CSP)` | `Ready` |
+| 关节导纳控制器就绪 | `JointAdmittanceController::SetReady()` | `SetPosition(GetPosition())`, `SetMode(CSP)` | `Ready` |
+| 关节阻抗控制器就绪 | `JointImpedanceController::SetReady()` | `SetTorque(tau_grav)`, `SetMode(CST)` | `Ready` |
+| 笛卡尔阻抗控制器就绪 | `CartesianImpedanceController::SetReady()` | `SetTorque(tau_grav)`, `SetMode(CST)` | `Ready` |
+| 控制器析构兜底 | 各 controller 析构函数 | `SetPosition(GetPosition())`, `SetMode(CSP)` | `Ready` 或 `Bypass` |
+| 运动控制周期 | 各 controller `UpdateCmd()` | `SetPosition(q_cmd)` 或 `SetTorque(tau_cmd)` | `Active` |
+
+这些调用的入口在 `Robot::SetWorkMode()`:
+
+```text
+new_controller->SetHardware(...)
+new_controller->SetModel(...)
+controller.reset()
+new_controller->SetReady()
+executor->SwitchController(controller.get())
+```
+
+因此 `Robot::SetWorkMode()` 应在调用 `SetReady()` 前临时把 Guard 切到 `Ready`，`SetReady()` 成功后再按当前 FSM 状态决定是否进入 `Active`。如果只是 `IDLE` / `STOPPED` 下切模式，保持 `Ready` 或 `Bypass` 均可，但进入 `RUNNING` / `SERVOING` 前必须切到 `Active`。
+
+### 6.2 Ready 阶段也需要保护
+
+`Ready` 不是完全无保护。它应允许“安全准备写入”，但拒绝明显危险值。
+
+位置类 `SetReady()` 的保护:
+
+```text
+q_ready = inner_->GetPosition()
+SetPosition(q_ready)
+```
+
+Guard 应检查:
+
+- `q_ready` 维度等于 model joint count。
+- `q_ready` 全部有限。
+- `q_ready` 在软限位内。
+- `q_ready` 与再次读取的当前反馈差值小于 `ready_position_tolerance`。
+
+力矩类 `SetReady()` 的保护:
+
+```text
+tau_ready = gravity_compensation(q_actual)
+SetTorque(tau_ready)
+```
+
+Guard 应检查:
+
+- `tau_ready` 维度等于 model joint count。
+- `tau_ready` 全部有限。
+- `abs(tau_ready[i]) <= effort_limit[i] * ready_effort_scale`。
+- 当前 `q_actual` / `q_dot_actual` 有限，并在软限位与速度限制内。
+
+`SetMode()` 的保护:
+
+- `Ready` 阶段允许切到当前控制器需要的 CSP/CST。
+- `Active` 阶段原则上不应频繁切模式；若控制器首次 `UpdateCmd()` 因 `mode_set_ == false` 再次调用 `SetMode()`，Guard 可以允许同模式重复设置。
+- 不允许未知 mode 或与当前控制器类别不匹配的 mode。第一阶段如果无法识别控制器类别，可以只记录告警并转发 CSP/CST，拒绝其他 mode。
+
+控制器析构兜底写入是安全收尾动作，不能被 `Faulted` 状态粗暴阻断。建议在 `Robot::SetWorkMode()` 销毁旧控制器前临时进入 `Ready` 或 `Bypass`，允许旧控制器把目标位置锁到当前位置并切回 CSP。这个路径仍应检查 NaN/Inf 和维度，避免把坏反馈原样写回硬件。
+
 ## 7. 关节顺序与映射规则
 
 这是本设计最重要的约束。
