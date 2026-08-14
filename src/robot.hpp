@@ -124,9 +124,30 @@ class Robot {
   Result ResetFault();
 
   /// @brief 切换工作模式（控制器）
-  /// @param mode 模式字符串: "position" | "jnt_imp" | "jnt_admit_teach" | "cart_imp" | "ee_admit_teach"
+  /// @param mode 模式字符串: "position" | "jnt_imp" | "jnt_admit_teach" | "cart_imp" | "zero_force_drag" | "ee_admit_teach"
   /// @note 仅允许在 IDLE 或 STOPPED 状态下调用
   Result SetWorkMode(const std::string& mode);
+
+  /// @brief 设置已知负载参数（质量 + 质心），供零力拖动控制器跳过辨识直接使用
+  /// @param mass 负载质量 [kg]，必须 >= 0（0 表示无负载）
+  /// @param com  负载质心（末端坐标系下）[m]
+  /// @note 切换到 "zero_force_drag" 模式前调用；若未设置则进入辨识流程
+  Result SetLoadParameters(double mass, const Vector& com);
+
+  /// @brief 从 YAML 文件加载已知负载参数（质量 + 质心）
+  /// @param path 配置文件路径，为空时使用默认路径 "payload.yaml"
+  Result LoadLoadParameters(const std::string& path = "payload.yaml");
+
+  /// @brief 将当前负载参数保存到 YAML 文件
+  /// @param path 配置文件路径，为空时使用默认路径 "payload.yaml"
+  Result SaveLoadParameters(const std::string& path = "payload.yaml") const;
+
+  /// @brief 查询当前是否已持有有效的负载参数（预置或辨识得到）
+  [[nodiscard]] bool HasLoadParameters() const { return load_params_valid_; }
+  /// @brief 查询当前负载质量 [kg]
+  [[nodiscard]] double GetLoadMass() const { return load_mass_; }
+  /// @brief 查询当前负载质心（末端坐标系下）[m]
+  [[nodiscard]] Vector GetLoadCom() const { return load_com_; }
 
 
   //! \brief 获取机器人当前是否上使能状态
@@ -380,7 +401,13 @@ class Robot {
   std::string active_tool_frame_name_;
   std::string active_object_frame_name_;
 
-  std::string work_mode_ {"position"};  // 当前工作模式字符串: "position" | "jnt_imp" | "jnt_admit_teach" | "cart_imp" | "ee_admit_teach"
+  std::string work_mode_ {"position"};  // 当前工作模式字符串: "position" | "jnt_imp" | "jnt_admit_teach" | "cart_imp" | "zero_force_drag" | "ee_admit_teach"
+
+  // 已知负载参数（供零力拖动控制器跳过辨识），由 SetLoadParameters() 设置
+  double load_mass_{0.0};
+  Vector load_com_;
+  bool load_params_valid_{false};
+  std::string load_params_path_{"payload.yaml"};  // 负载参数持久化文件
 
   MotionMode servo_mode_{MotionMode::kJointPosition};  // 伺服运动模式: kJointPosition | kCartesianPosition
 

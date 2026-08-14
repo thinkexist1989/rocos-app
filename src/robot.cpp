@@ -24,6 +24,7 @@
 #include <boost/sml.hpp>
 #include <cctype>
 #include <chrono>
+#include <cmath>
 #include <fstream>
 #include <kdl_parser/kdl_parser.hpp>  // 用于将urdf文件解析为KDL::Tree
 #include <sstream>
@@ -44,6 +45,7 @@
 #include "move_svd_jog.hpp"
 #include "move_servo.hpp"
 #include "position_controller.hpp"
+#include "zero_force_drag_controller.hpp"
 
 namespace {
     // 状态定义
@@ -667,6 +669,12 @@ namespace rocos {
 
         jointBinding();
 
+        // 尝试从配置文件加载已知负载参数（存在则跳过辨识）
+        const Result load_rc = LoadLoadParameters();
+        if (load_rc == Result::NoError) {
+            log_ptr_->info("已加载持久化负载参数，零力拖动将跳过辨识");
+        }
+
         dt_=hardware->GetDt()/1000000.0; // 将微秒转换为秒
 
         executor->SwitchHardware(hardware.get());
@@ -863,6 +871,22 @@ namespace rocos {
             new_controller = std::make_unique<JointAdmittanceController>();
         } else if (mode == "cart_imp") {
             new_controller = std::make_unique<CartesianImpedanceController>();
+        } else if (mode == "zero_force_drag") {
+            auto zfd = std::make_unique<ZeroForceDragController>();
+            // 若已预置负载参数，则跳过辨识直接进入拖动
+            if (load_params_valid_) {
+                zfd->SetLoadParameters(load_mass_, load_com_);
+            }
+
+            // 辨识完成后回写 Robot 层并落盘，供下次启动跳过辨识
+            zfd->SetLoadParamsCallback([this](double mass, const KDL::Vector& com) {
+                load_mass_ = mass;
+                load_com_ = com;
+                load_params_valid_ = true;
+                SaveLoadParameters();
+            });
+
+            new_controller = std::move(zfd);
         } else if (mode == "ee_admit_teach") {
             log_ptr_->error("SetWorkMode: 暂未实现 '{}'", mode);
             return Result::IllegalParameter;
@@ -976,6 +1000,101 @@ namespace rocos {
         result["cartesian_space"] = cart;
 
         return result;
+    }
+
+
+    Result Robot::SetLoadParameters(double mass, const Vector& com) {
+        // 非法参数拒绝，避免把错误负载补偿下发到硬件；mass=0 表示无负载（合法）
+        if (mass < 0.0 || !std::isfinite(mass) ||
+            !std::isfinite(com.x()) || !std::isfinite(com.y()) ||
+            !std::isfinite(com.z())) {
+            log_ptr_->error("SetLoadParameters: 非法负载参数 mass={}", mass);
+            return Result::ParameterNanOrInf;
+        }
+
+        load_mass_ = mass;
+        load_com_ = com;
+        load_params_valid_ = true;
+
+        log_ptr_->info("SetLoadParameters: mass={:.3f} kg, com=({:.3f}, {:.3f}, {:.3f}) m",
+                       mass, com.x(), com.y(), com.z());
+        return Result::NoError;
+    }
+
+    Result Robot::LoadLoadParameters(const std::string& path) {
+        const std::string file = path.empty() ? load_params_path_ : path;
+
+        // 文件不存在时静默返回，视为"尚未辨识过负载"，走辨识流程
+        std::ifstream in(file);
+        if (!in.is_open()) {
+            log_ptr_->info("LoadLoadParameters: 未找到负载参数文件 '{}'，将走辨识流程", file);
+            return Result::ResourceUnavailable;
+        }
+        in.close();
+
+        try {
+            YAML::Node root = YAML::LoadFile(file);
+            if (!root["mass"]) {
+                log_ptr_->error("LoadLoadParameters: 文件 '{}' 缺少 'mass' 字段", file);
+                return Result::IllegalParameter;
+            }
+            const double mass = root["mass"].as<double>();
+
+            Vector com = Vector::Zero();
+            if (root["com"]) {
+                const YAML::Node com_node = root["com"];
+                if (com_node.IsSequence() && com_node.size() >= 3) {
+                    com = Vector(com_node[0].as<double>(),
+                                 com_node[1].as<double>(),
+                                 com_node[2].as<double>());
+                } else {
+                    log_ptr_->error("LoadLoadParameters: 文件 '{}' 的 'com' 字段非法", file);
+                    return Result::IllegalParameter;
+                }
+            }
+
+            const Result rc = SetLoadParameters(mass, com);
+            if (rc != Result::NoError) {
+                return rc;
+            }
+            log_ptr_->info("LoadLoadParameters: 已从 '{}' 加载负载参数 mass={:.3f} kg", file, mass);
+            return Result::NoError;
+        } catch (const YAML::Exception& e) {
+            log_ptr_->error("LoadLoadParameters: YAML 解析失败 '{}': {}", file, e.what());
+            return Result::ResourceUnavailable;
+        }
+    }
+
+    Result Robot::SaveLoadParameters(const std::string& path) const {
+        const std::string file = path.empty() ? load_params_path_ : path;
+
+        if (!load_params_valid_) {
+            log_ptr_->error("SaveLoadParameters: 当前无有效负载参数可保存");
+            return Result::ResourceUnavailable;
+        }
+
+        YAML::Node root;
+        root["mass"] = load_mass_;
+        YAML::Node com;
+        com.push_back(load_com_.x());
+        com.push_back(load_com_.y());
+        com.push_back(load_com_.z());
+        root["com"] = com;
+
+        std::ofstream out(file);
+        if (!out.is_open()) {
+            log_ptr_->error("SaveLoadParameters: 无法打开文件 '{}'", file);
+            return Result::ResourceUnavailable;
+        }
+        out << root;
+        if (!out.good()) {
+            log_ptr_->error("SaveLoadParameters: 写入文件 '{}' 失败", file);
+            return Result::ResourceUnavailable;
+        }
+
+        log_ptr_->info("SaveLoadParameters: 负载参数已保存到 '{}' mass={:.3f} kg",
+                       file, load_mass_);
+        return Result::NoError;
     }
 
 

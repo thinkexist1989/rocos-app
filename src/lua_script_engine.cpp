@@ -24,7 +24,6 @@ namespace rocos {
 namespace {
 
 constexpr const char* SCRIPT_STOP_MARKER = "__ROCOS_SCRIPT_STOPPED__";
-constexpr auto MOTION_POLL_INTERVAL = std::chrono::milliseconds(2);
 
 std::string normalizeFilename(const std::string& filename) {
     return std::filesystem::path(filename).lexically_normal().generic_string();
@@ -104,7 +103,6 @@ struct LuaScriptEngine::Impl {
         step_mode_ = false;
         step_started_ = false;
         motion_active_ = false;
-        stop_command_sent_ = false;
 
         sol::load_result load_result_ =
             lua_->load(source_, "@" + filename_);
@@ -211,6 +209,8 @@ struct LuaScriptEngine::Impl {
                 }
                 return result_;
             }
+            std::lock_guard<std::mutex> lock(mutex_);
+            state_ = State::Paused;
         }
         return Result::NoError;
     }
@@ -266,7 +266,6 @@ struct LuaScriptEngine::Impl {
             previous_state_ = state_;
             state_ = State::Stopping;
             stop_requested_ = true;
-            stop_command_sent_ = motion_active_;
             this->pause_requested_ = false;
         }
         control_cv_.notify_all();
@@ -278,7 +277,6 @@ struct LuaScriptEngine::Impl {
                 std::lock_guard<std::mutex> lock(mutex_);
                 state_ = previous_state_;
                 stop_requested_ = false;
-                stop_command_sent_ = false;
                 this->pause_requested_ = pause_requested_;
                 return result_;
             }
@@ -510,6 +508,18 @@ private:
             });
         robot_table_.set_function(
             "Sleep", [this](int milliseconds) { sleepInterruptibly(milliseconds); });
+        robot_table_.set_function(
+            "SetEnabled", [this]() {
+                requireSuccess(robot_.SetEnabled(), "SetEnabled");
+            });
+        robot_table_.set_function(
+            "SetDisabled", [this]() {
+                requireSuccess(robot_.SetDisabled(), "SetDisabled");
+            });
+        robot_table_.set_function(
+            "ResetFault", [this]() {
+                requireSuccess(robot_.ResetFault(), "ResetFault");
+            });
     }
 
     static void debugHook(lua_State* lua_state, lua_Debug* debug_info) {
@@ -615,14 +625,15 @@ private:
             return;
         }
 
-        bool pause_requested_ = false;
+        bool pause_requested_local = false;
         {
             std::lock_guard<std::mutex> lock(mutex_);
             motion_active_ = true;
-            pause_requested_ = this->pause_requested_;
+            pause_requested_local = this->pause_requested_;
         }
 
-        if (pause_requested_) {
+        // 提交时若已有暂停请求（Pause 在 motion_active_ 置位前抢先），此处补发
+        if (pause_requested_local) {
             const Result pause_result_ = robot_.PauseMotion();
             if (pause_result_ != Result::NoError) {
                 std::lock_guard<std::mutex> lock(mutex_);
@@ -630,58 +641,31 @@ private:
                 throw sol::error(
                     "暂停机器人运动失败: " + to_string(pause_result_));
             }
+            std::lock_guard<std::mutex> lock(mutex_);
+            state_ = State::Paused;
         }
 
-        for (;;) {
-            bool should_stop_ = false;
-            bool stop_command_sent_ = false;
-            bool should_pause_ = false;
-            {
-                std::lock_guard<std::mutex> lock(mutex_);
-                should_stop_ = stop_requested_;
-                stop_command_sent_ = this->stop_command_sent_;
-                should_pause_ = pause_requested_;
-            }
+        const Result wait_result_ = robot_.WaitMove();
 
-            if (should_stop_ && !stop_command_sent_) {
-                const Result stop_result_ = robot_.StopMotion();
-                const bool already_stopped_ =
-                    robot_.GetStateString() == "STOPPED";
-                if (stop_result_ != Result::NoError && !already_stopped_) {
-                    std::lock_guard<std::mutex> lock(mutex_);
-                    stop_requested_ = false;
-                    motion_active_ = false;
-                    throw sol::error(
-                        "停止机器人运动失败: " + to_string(stop_result_));
-                }
-                std::lock_guard<std::mutex> lock(mutex_);
-                this->stop_command_sent_ = true;
-            }
+        {
+            std::lock_guard<std::mutex> lock(mutex_);
+            motion_active_ = false;
+        }
 
-            const std::string robot_state_ = robot_.GetStateString();
-            if (robot_state_ == "STOPPED") {
-                std::lock_guard<std::mutex> lock(mutex_);
-                motion_active_ = false;
-                if (should_stop_) {
-                    throw sol::error(SCRIPT_STOP_MARKER);
-                }
-                return;
-            }
-            if (robot_state_ == "PAUSED" && should_pause_) {
-                std::lock_guard<std::mutex> lock(mutex_);
-                state_ = State::Paused;
-            }
-            if (robot_state_ == "ERROR_STATE" ||
-                robot_state_ == "IDLE" ||
-                robot_state_ == "UNKNOWN_STATE") {
-                std::lock_guard<std::mutex> lock(mutex_);
-                motion_active_ = false;
-                throw sol::error(
-                    "机器人运动异常终止，状态: " + robot_state_);
-            }
+        if (wait_result_ == Result::Fatal) {
+            throw sol::error("机器人运动异常终止，状态: ERROR_STATE");
+        }
+        if (wait_result_ == Result::NotEnabled) {
+            throw sol::error("机器人运动异常终止，状态: IDLE");
+        }
 
-            std::unique_lock<std::mutex> lock(mutex_);
-            control_cv_.wait_for(lock, MOTION_POLL_INTERVAL);
+        bool should_stop_ = false;
+        {
+            std::lock_guard<std::mutex> lock(mutex_);
+            should_stop_ = stop_requested_;
+        }
+        if (should_stop_) {
+            throw sol::error(SCRIPT_STOP_MARKER);
         }
     }
 
@@ -733,6 +717,14 @@ private:
             throw sol::error(std::string(name) + " 必须大于 0");
         }
         return value;
+    }
+
+    // 将 Robot 控制接口的返回值统一转为 Lua 错误，与运动提交行为保持一致
+    static void requireSuccess(Result result, const char* operation) {
+        if (result != Result::NoError) {
+            throw sol::error(std::string(operation) + " 失败: " +
+                             to_string(result));
+        }
     }
 
     static double tableNumber(const sol::table& table, const char* key) {
@@ -799,7 +791,7 @@ private:
     bool step_mode_{false};
     bool step_started_{false};
     bool motion_active_{false};
-    bool stop_command_sent_{false};
+
 };
 
 LuaScriptEngine::LuaScriptEngine(
