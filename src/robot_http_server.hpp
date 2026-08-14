@@ -69,6 +69,9 @@ private:
     void handleReset(const httplib::Request& req, httplib::Response& res);
     void handleIsEnabled(const httplib::Request& req, httplib::Response& res);
     void handleSetWorkMode(const httplib::Request& req, httplib::Response& res);
+    void handleSetLoadParameters(const httplib::Request& req, httplib::Response& res);
+    void handleGetLoadParameters(const httplib::Request& req, httplib::Response& res);
+    void handleSaveLoadParameters(const httplib::Request& req, httplib::Response& res);
 
     // ---- Servo Control ----
     void handleServoStart(const httplib::Request& req, httplib::Response& res);

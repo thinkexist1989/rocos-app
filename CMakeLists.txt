@@ -162,6 +162,7 @@ add_library(robot
         src/joint_impedance_controller.cpp
         src/joint_admittance_controller.cpp
         src/cartesian_impedance_controller.cpp
+        src/zero_force_drag_controller.cpp
         src/unit_velocity_profile.cpp
 
         src/virtual_wall.cpp

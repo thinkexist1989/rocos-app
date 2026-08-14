@@ -263,6 +263,9 @@ void RobotHttpServer::registerRoutes() {
     server_->Post("/api/robot/disable", [this](auto& req, auto& res) { handleDisable(req, res); });
     server_->Post("/api/robot/reset", [this](auto& req, auto& res) { handleReset(req, res); });
     server_->Post("/api/robot/workmode", [this](auto& req, auto& res) { handleSetWorkMode(req, res); });
+    server_->Post("/api/robot/load_params", [this](auto& req, auto& res) { handleSetLoadParameters(req, res); });
+    server_->Get("/api/robot/load_params", [this](auto& req, auto& res) { handleGetLoadParameters(req, res); });
+    server_->Post("/api/robot/load_params/save", [this](auto& req, auto& res) { handleSaveLoadParameters(req, res); });
 
     // Robot servo control
     server_->Post("/api/robot/servo/start", [this](auto& req, auto& res) { handleServoStart(req, res); });
@@ -1097,6 +1100,86 @@ void RobotHttpServer::handleSetWorkMode(const httplib::Request& req, httplib::Re
              resultSucceeded(result)
                  ? "Work mode set to " + mode_str
                  : "Failed to set work mode",
+             data);
+}
+
+void RobotHttpServer::handleSetLoadParameters(const httplib::Request& req, httplib::Response& res) {
+    log_ptr_->info("POST /api/robot/load_params");
+    if (!ensureControl(req, res)) return;
+
+    nlohmann::json body = nlohmann::json::parse(req.body, nullptr, false);
+    if (body.is_discarded() || !body.contains("mass") || !body["mass"].is_number()) {
+        sendJson(res, false, 1001, "Invalid JSON or missing 'mass' field");
+        return;
+    }
+
+    const double mass = body["mass"].get<double>();
+
+    // com 可选，默认质心在法兰原点 [0,0,0]
+    KDL::Vector com(0.0, 0.0, 0.0);
+    if (body.contains("com")) {
+        const auto& com_json = body["com"];
+        if (!com_json.is_array() || com_json.size() != 3) {
+            sendJson(res, false, 1001, "'com' must be a 3-element array [x, y, z]");
+            return;
+        }
+        for (const auto& v : com_json) {
+            if (!v.is_number()) {
+                sendJson(res, false, 1001, "'com' elements must be numbers");
+                return;
+            }
+        }
+        com = KDL::Vector(com_json[0].get<double>(),
+                          com_json[1].get<double>(),
+                          com_json[2].get<double>());
+    }
+
+    const Result result = robot_->SetLoadParameters(mass, com);
+
+    nlohmann::json data;
+    data["mass"] = mass;
+    data["com"] = {com.x(), com.y(), com.z()};
+
+    sendJson(res, resultSucceeded(result), resultCode(result),
+             resultSucceeded(result)
+                 ? "Load parameters set"
+                 : "Failed to set load parameters",
+             data);
+}
+
+void RobotHttpServer::handleGetLoadParameters(const httplib::Request& req, httplib::Response& res) {
+    (void)req;
+    log_ptr_->info("GET /api/robot/load_params");
+
+    nlohmann::json data;
+    data["valid"] = robot_->HasLoadParameters();
+    data["mass"] = robot_->GetLoadMass();
+    const KDL::Vector com = robot_->GetLoadCom();
+    data["com"] = {com.x(), com.y(), com.z()};
+
+    sendJson(res, true, 0, "ok", data);
+}
+
+void RobotHttpServer::handleSaveLoadParameters(const httplib::Request& req, httplib::Response& res) {
+    log_ptr_->info("POST /api/robot/load_params/save");
+    if (!ensureControl(req, res)) return;
+
+    // 可选 path 参数；缺省用默认 payload.yaml
+    std::string path;
+    nlohmann::json body = nlohmann::json::parse(req.body, nullptr, false);
+    if (!body.is_discarded() && body.contains("path") && body["path"].is_string()) {
+        path = body["path"].get<std::string>();
+    }
+
+    const Result result = robot_->SaveLoadParameters(path);
+
+    nlohmann::json data;
+    data["path"] = path.empty() ? "payload.yaml" : path;
+
+    sendJson(res, resultSucceeded(result), resultCode(result),
+             resultSucceeded(result)
+                 ? "Load parameters saved"
+                 : "Failed to save load parameters",
              data);
 }
 
