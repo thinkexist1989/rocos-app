@@ -417,6 +417,9 @@ class Robot {
 
   Logger::logger_ptr log_ptr_ = nullptr;
 
+  // FSM 初始状态是 ERROR_STATE，构造时会进入一次；用它区分“初始进入”和“真正的错误进入”
+  bool fsm_error_entered_once_{false};
+
   //// 机器人状态机封装
   struct Impl;
   std::unique_ptr<Impl> impl_;

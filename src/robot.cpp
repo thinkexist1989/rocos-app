@@ -459,6 +459,12 @@ namespace rocos {
     }
 
     void Robot::on_fsm_error() {
+      if (!fsm_error_entered_once_) {
+        // FSM 的初始状态就是 ERROR_STATE，构造时 on_entry 会进入一次；
+        // 这不是真正的错误，只做标记，避免打印误导性的“机器人进入ERROR”。
+        fsm_error_entered_once_ = true;
+        return;
+      }
       log_ptr_->info("机器人进入ERROR");
       {
         std::lock_guard<std::mutex> lock(mtx_);
