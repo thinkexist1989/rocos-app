@@ -41,6 +41,7 @@ Result PositionController::SetReady() {
 
 bool PositionController::Reset() {
     mode_set_ = false;
+    has_last_cmd_ = false;  // 清除上一周期指令基线，下一次 UpdateCmd 重新建立
     return true;
 }
 
@@ -132,6 +133,10 @@ Result PositionController::UpdateCmd(const JntArray& q_cmd) {
         return valid;
     }
 
+    // 校验通过后记录本周期指令，作为下一周期指令速度校验的基线
+    q_last_cmd_ = q_cmd;
+    has_last_cmd_ = true;
+
     // 首次调用时切换伺服模式为 CSP (Cyclic Synchronous Position, mode=8)
     if (!mode_set_) {
         hardware_->SetMode(8);
@@ -165,6 +170,10 @@ Result PositionController::ValidatePositionCommand(const JntArray& q_cmd) {
     }
     const double dt = static_cast<double>(dt_us) / 1'000'000.0;
 
+    // 速度校验比较的是“指令步进”(q_cmd - q_last_cmd_)，而不是“指令 vs 反馈”
+    // (q_cmd - q_actual)。反馈位置天然滞后于指令（跟随误差），用它除以 dt 会误报 SpeedLimit。
+    const bool has_prev_cmd = has_last_cmd_ && q_last_cmd_.rows() == joint_num;
+
     for (unsigned int i = 0; i < joint_num; ++i) {
         if (!std::isfinite(q_cmd(i)) || !std::isfinite(q_actual(i)) ||
             !std::isfinite(q_lower(i)) || !std::isfinite(q_upper(i)) ||
@@ -177,9 +186,11 @@ Result PositionController::ValidatePositionCommand(const JntArray& q_cmd) {
         if (q_vel_limit(i) < 0.0) {
             return Result::IllegalParameter;
         }
-        const double required_velocity = std::abs(q_cmd(i) - q_actual(i)) / dt;
-        if (required_velocity > q_vel_limit(i)) {
-            return Result::SpeedLimit;
+        if (has_prev_cmd) {
+            const double cmd_velocity = std::abs(q_cmd(i) - q_last_cmd_(i)) / dt;
+            if (cmd_velocity > q_vel_limit(i)) {
+                return Result::SpeedLimit;
+            }
         }
     }
 

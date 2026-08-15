@@ -71,6 +71,10 @@ private:
     JntArray q_dot_adm_;    // 导纳速度
     bool adm_initialized_{false};
 
+    // 指令速度校验基线（上一周期成功下发的指令位置）
+    JntArray q_last_cmd_;
+    bool has_last_cmd_{false};
+
     // 默认值
     static constexpr double kDefaultInertia = 1.0;    // kg·m²
     static constexpr double kDefaultDamping = 20.0;   // Nm·s/rad

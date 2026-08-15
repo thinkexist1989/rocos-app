@@ -530,21 +530,45 @@ TEST_CASE("PositionController - UpdateCmd") {
         CHECK(hw.set_position_count_ == 0);
     }
 
-    SUBCASE("当前位置到目标位置所需速度超限返回 SpeedLimit 且不下发") {
+    SUBCASE("指令步进速度超限返回 SpeedLimit 且不下发") {
         ctrl.SetHardware(&hw);
         ctrl.SetModel(&model);
         hw.dt_us_ = 1000;
         hw.fake_position_.resize(1);
         hw.fake_position_(0) = 0.0;
         model.SetLimits(1, -10.0, 10.0, 5.0);
-        rocos::JntArray q(1);
-        q(0) = 0.01;  // 0.01 / 0.001 = 10 rad/s
 
-        auto res = ctrl.UpdateCmd(q);
+        rocos::JntArray q0(1);
+        q0(0) = 0.0;
+        CHECK(ctrl.UpdateCmd(q0) == rocos::Result::NoError);  // 建立上一周期指令基线
+
+        rocos::JntArray q1(1);
+        q1(0) = 0.01;  // (0.01 - 0.0) / 0.001 = 10 rad/s > 5.0
+        auto res = ctrl.UpdateCmd(q1);
 
         CHECK(res == rocos::Result::SpeedLimit);
-        CHECK(hw.set_mode_count_ == 0);
-        CHECK(hw.set_position_count_ == 0);
+        CHECK(hw.set_position_count_ == 1);  // 仅基线那次下发成功
+    }
+
+    SUBCASE("反馈位置滞后(跟随误差)不再误报 SpeedLimit") {
+        ctrl.SetHardware(&hw);
+        ctrl.SetModel(&model);
+        hw.dt_us_ = 1000;
+        hw.fake_position_.resize(1);
+        hw.fake_position_(0) = 0.0;          // 反馈停在 0，模拟伺服跟随误差
+        model.SetLimits(1, -10.0, 10.0, 5.0);
+
+        // 指令小步进前进（0.001 / 0.001 = 1 rad/s < 5.0），但反馈始终落后
+        rocos::JntArray q(1);
+        q(0) = 0.5;
+        CHECK(ctrl.UpdateCmd(q) == rocos::Result::NoError);  // 首次建立基线
+        q(0) = 0.501;
+        CHECK(ctrl.UpdateCmd(q) == rocos::Result::NoError);
+        q(0) = 0.502;
+        CHECK(ctrl.UpdateCmd(q) == rocos::Result::NoError);
+
+        // 反馈(0)与指令(0.502)已相差 0.502，旧逻辑 (q_cmd-q_actual)/dt 会误报 SpeedLimit
+        CHECK(hw.set_position_count_ == 3);
     }
 
     SUBCASE("第二次调用不再重复设置模式") {

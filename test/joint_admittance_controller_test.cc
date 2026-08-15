@@ -337,10 +337,10 @@ TEST_CASE("JointAdmittanceController - UpdateCmd 导纳输出") {
         CHECK(hw.set_position_count_ == 0);
     }
 
-    SUBCASE("当前位置到输出位置所需速度超过 URDF velocity 时拒绝下发") {
+    SUBCASE("输出位置指令步进速度超过 URDF velocity 时拒绝下发") {
         hw.fake_position_ = makeConstJntArray(3, 0.0);
         hw.fake_velocity_ = makeConstJntArray(3, 0.0);
-        hw.fake_torque_    = makeConstJntArray(3, 5.0);
+        hw.fake_torque_    = makeConstJntArray(3, 5.0);  // τ_ext = 0，q_adm 保持 0
         hw.dt_us_ = 1000;
         model.SetLimits(3, -10.0, 10.0, 0.5, 1000.0);
 
@@ -348,9 +348,12 @@ TEST_CASE("JointAdmittanceController - UpdateCmd 导纳输出") {
         ctrl.SetHardware(&hw);
         ctrl.SetModel(&model);
 
+        // 先以 0 目标建立指令基线
+        CHECK(ctrl.UpdateCmd(makeConstJntArray(3, 0.0)) == rocos::Result::NoError);
+
+        // 目标从 0 跳到 1.0，指令步进 1.0 / 0.001 = 1000 rad/s > 0.5
         CHECK(ctrl.UpdateCmd(makeConstJntArray(3, 1.0)) == rocos::Result::SpeedLimit);
-        CHECK(hw.set_mode_count_ == 0);
-        CHECK(hw.set_position_count_ == 0);
+        CHECK(hw.set_position_count_ == 1);  // 仅基线那次下发成功
     }
 
     SUBCASE("显式增益") {

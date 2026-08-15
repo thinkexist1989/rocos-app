@@ -40,6 +40,8 @@ private:
     HardwareInterface* hardware_{nullptr};
     ModelInterface* model_{nullptr};
     bool mode_set_{false};  // 确保 CSP 模式只设置一次
+    JntArray q_last_cmd_;        // 上一周期成功下发的指令位置（指令速度校验基线）
+    bool has_last_cmd_{false};   // 是否已有上一周期指令基线
 };
 
 } // namespace rocos

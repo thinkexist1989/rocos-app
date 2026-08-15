@@ -140,32 +140,34 @@ q_actual 维度 == joint_num
 q_cmd 全部有限
 q_actual 全部有限
 q_cmd[i] 在 [lower[i], upper[i]] 内
-abs(q_cmd[i] - q_actual[i]) / dt <= velocity_limit[i]
+abs(q_cmd[i] - q_last_cmd[i]) / dt <= velocity_limit[i]
 ```
 
-位置模式只保留一个速度约束:
+位置模式只保留一个指令速度约束:
 
 ```text
-required_velocity[i] = (q_cmd[i] - q_actual[i]) / dt
+cmd_velocity[i] = (q_cmd[i] - q_last_cmd[i]) / dt
 ```
 
 如果:
 
 ```text
-abs(required_velocity[i]) > velocity_limit[i]
+abs(cmd_velocity[i]) > velocity_limit[i]
 ```
 
 则直接返回 `Result::SpeedLimit`，不调用 `hardware_->SetPosition(q_cmd)`。
 
+`q_last_cmd[i]` 是上一周期成功下发的指令位置，由 `UpdateCmd()` 在每次校验通过后更新；首次调用（或 `Reset()` 之后）尚无基线，跳过速度校验，仅建立基线。若上一周期指令维度与本周期不一致（关节数变化），同样视为无基线。
+
 第一阶段不检查:
 
 ```text
-(q_cmd - q_last_cmd) / dt
+(q_cmd - q_actual) / dt   （跟随误差）
 命令加速度
 命令 jerk
 ```
 
-原因是 `q_cmd - q_actual` 已经直接描述“本周期如果接受这个目标，伺服从当前真实位置追到目标需要多快”。它能覆盖位置跳变、UDP 目标突变和导纳积分漂移这类核心风险。保留一个速度约束更容易理解、调试和验证。
+原因是速度校验要约束的是“指令本身的变化率”，而不是“伺服从当前位置追到目标需要多快”。反馈位置 `q_actual` 天然滞后于指令（跟随误差，约等于 速度 × 控制环路延迟），若用 `(q_cmd - q_actual) / dt` 当速度，正常跟随时也会误报 `SpeedLimit`。改为比对指令步进 `(q_cmd - q_last_cmd) / dt`，既能覆盖位置跳变、UDP 目标突变和导纳积分漂移，又不受伺服跟随误差影响。
 
 ## 6. 力矩类控制器校验
 
@@ -417,7 +419,8 @@ Model 测试:
 - `q_cmd` 超过位置上限，拒绝下发。
 - `q_cmd` 低于位置下限，拒绝下发。
 - `q_cmd` 有 NaN/Inf，拒绝下发。
-- `(q_cmd - q_actual) / dt` 超过速度限制，拒绝下发。
+- `(q_cmd - q_last_cmd) / dt` 超过速度限制，拒绝下发。
+- 反馈位置滞后（跟随误差大）但指令步进正常时，不误报 SpeedLimit。
 - 正常命令通过并调用 `SetPosition()`。
 - `SetReady()` 调用 `UpdateCmd(q_ready)`，不直接调用 `SetPosition()`。
 - 析构函数调用 `UpdateCmd(q_hold)`，不直接调用 `SetPosition()` / `SetMode()`。

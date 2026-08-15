@@ -49,7 +49,7 @@ Expected: test binary exits 0.
 
 - [x] **Step 1: Write failing tests**
 
-Add tests in `test/position_controller_test.cc` proving `UpdateCmd()` rejects commands with missing model, position limit violations, and `(q_cmd - q_actual) / dt` velocity violations without calling `SetPosition()`.
+Add tests in `test/position_controller_test.cc` proving `UpdateCmd()` rejects commands with missing model, position limit violations, and `(q_cmd - q_last_cmd) / dt` velocity violations without calling `SetPosition()`.
 
 - [x] **Step 2: Run red test**
 
@@ -102,7 +102,7 @@ Expected: test binary exits 0.
 
 - [x] **Step 1: Write failing tests**
 
-Add tests proving `UpdateCmd()` rejects missing model, q_out position limit violations, and `(q_out - q_actual) / dt` velocity violations without calling `SetMode()` or `SetPosition()`.
+Add tests proving `UpdateCmd()` rejects missing model, q_out position limit violations, and `(q_out - q_last_cmd) / dt` velocity violations without calling `SetMode()` or `SetPosition()`.
 
 - [x] **Step 2: Run red test**
 
