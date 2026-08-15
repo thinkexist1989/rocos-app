@@ -520,6 +520,12 @@ target_link_libraries(lua_runner
         robot
         )
 
+add_executable(lua_download examples/lua_download.cpp)
+target_link_libraries(lua_download
+        PRIVATE
+        robot
+        )
+
 add_executable(udp_example examples/udp_example.cpp)
 target_link_libraries(udp_example
         PRIVATE
