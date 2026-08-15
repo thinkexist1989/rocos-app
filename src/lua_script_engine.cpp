@@ -121,21 +121,32 @@ struct LuaScriptEngine::Impl {
         return Result::NoError;
     }
 
-    Result LoadFile(const std::filesystem::path& relative_path) {
+    // 将相对路径解析为 scripts_root_ 下的规范化绝对路径，并做穿越防护。
+    // 成功返回 true 并填充 resolved_path / display_path。
+    bool resolveScriptPath(const std::filesystem::path& relative_path,
+                           std::filesystem::path& resolved_path,
+                           std::filesystem::path& display_path) const {
         if (relative_path.empty() || relative_path.is_absolute()) {
-            return Result::LuaFileError;
+            return false;
         }
-
         std::error_code error_code_;
         const auto root_ =
             std::filesystem::weakly_canonical(scripts_root_, error_code_);
         if (error_code_) {
-            return Result::LuaFileError;
+            return false;
         }
+        resolved_path = std::filesystem::canonical(root_ / relative_path, error_code_);
+        if (error_code_ || !pathStartsWith(resolved_path, root_)) {
+            return false;
+        }
+        display_path = std::filesystem::relative(resolved_path, root_, error_code_);
+        return !static_cast<bool>(error_code_);
+    }
 
-        const auto script_path_ =
-            std::filesystem::canonical(root_ / relative_path, error_code_);
-        if (error_code_ || !pathStartsWith(script_path_, root_)) {
+    Result LoadFile(const std::filesystem::path& relative_path) {
+        std::filesystem::path script_path_;
+        std::filesystem::path display_path_;
+        if (!resolveScriptPath(relative_path, script_path_, display_path_)) {
             return Result::LuaFileError;
         }
 
@@ -151,13 +162,60 @@ struct LuaScriptEngine::Impl {
             log_ptr_->error("读取 Lua 脚本失败: {}", script_path_.string());
             return Result::LuaFileError;
         }
+        return LoadSource(buffer_.str(), display_path_.generic_string());
+    }
 
-        const auto display_path_ =
-            std::filesystem::relative(script_path_, root_, error_code_);
-        if (error_code_) {
+    // 只读脚本文件内容（不加载进 Lua VM），供脚本下载接口使用
+    Result ReadScriptFile(const std::filesystem::path& relative_path,
+                          std::string& source) const {
+        std::filesystem::path script_path_;
+        std::filesystem::path display_path_;
+        if (!resolveScriptPath(relative_path, script_path_, display_path_)) {
             return Result::LuaFileError;
         }
-        return LoadSource(buffer_.str(), display_path_.generic_string());
+
+        std::ifstream stream_(script_path_);
+        if (!stream_.is_open()) {
+            return Result::LuaFileError;
+        }
+
+        std::ostringstream buffer_;
+        buffer_ << stream_.rdbuf();
+        if (stream_.bad()) {
+            return Result::LuaFileError;
+        }
+        source = buffer_.str();
+        return Result::NoError;
+    }
+
+    // 列出 scripts_root_ 下所有 .lua 脚本（相对路径，按字典序）
+    std::vector<std::string> ListScripts() const {
+        std::vector<std::string> scripts;
+        std::error_code error_code_;
+        const auto root_ =
+            std::filesystem::weakly_canonical(scripts_root_, error_code_);
+        if (error_code_) {
+            return scripts;
+        }
+
+        std::filesystem::recursive_directory_iterator it(root_, error_code_);
+        const std::filesystem::recursive_directory_iterator end_;
+        for (; it != end_; it.increment(error_code_)) {
+            if (error_code_) {
+                break;
+            }
+            if (!it->is_regular_file(error_code_) ||
+                it->path().extension() != ".lua") {
+                continue;
+            }
+            const auto rel_ =
+                std::filesystem::relative(it->path(), root_, error_code_);
+            if (!error_code_) {
+                scripts.push_back(rel_.generic_string());
+            }
+        }
+        std::sort(scripts.begin(), scripts.end());
+        return scripts;
     }
 
     Result Run() {
@@ -1081,6 +1139,15 @@ Result LuaScriptEngine::LoadSource(
 Result LuaScriptEngine::LoadFile(
     const std::filesystem::path& relative_path) {
     return impl_->LoadFile(relative_path);
+}
+
+Result LuaScriptEngine::ReadScriptFile(
+    const std::filesystem::path& relative_path, std::string& source) const {
+    return impl_->ReadScriptFile(relative_path, source);
+}
+
+std::vector<std::string> LuaScriptEngine::ListScripts() const {
+    return impl_->ListScripts();
 }
 
 Result LuaScriptEngine::Run() {

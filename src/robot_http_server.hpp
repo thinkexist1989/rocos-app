@@ -128,6 +128,8 @@ private:
     void handleScriptStop(const httplib::Request& req, httplib::Response& res);
     void handleScriptStep(const httplib::Request& req, httplib::Response& res);
     void handleScriptStatus(const httplib::Request& req, httplib::Response& res);
+    void handleScriptList(const httplib::Request& req, httplib::Response& res);
+    void handleScriptDownload(const httplib::Request& req, httplib::Response& res);
     void handleScriptBreakpointAdd(const httplib::Request& req, httplib::Response& res);
     void handleScriptBreakpointRemove(const httplib::Request& req, httplib::Response& res);
     void handleScriptBreakpointClear(const httplib::Request& req, httplib::Response& res);

@@ -48,6 +48,11 @@ public:
 
     Result LoadSource(const std::string& source, const std::string& filename);
     Result LoadFile(const std::filesystem::path& relative_path);
+    /// @brief 只读脚本文件内容（不加载进 Lua VM），供脚本下载接口使用
+    Result ReadScriptFile(const std::filesystem::path& relative_path,
+                          std::string& source) const;
+    /// @brief 列出 scripts 根目录下可用的 Lua 脚本（相对路径）
+    [[nodiscard]] std::vector<std::string> ListScripts() const;
     Result Run();
     Result Pause();
     Result Resume();

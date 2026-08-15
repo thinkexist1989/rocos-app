@@ -1470,6 +1470,46 @@ paths:
                 $ref: '#/components/schemas/ScriptResponse'
           headers: {}
       security: []
+  /api/script/list:
+    get:
+      summary: 列出 scripts 目录下可用的 Lua 脚本
+      deprecated: false
+      description: 返回脚本相对路径列表，供客户端下载前枚举
+      tags:
+        - Lua 脚本
+      parameters: []
+      responses:
+        '200':
+          description: 脚本列表
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ScriptListResponse'
+          headers: {}
+      security: []
+  /api/script/download:
+    get:
+      summary: 下载单个 Lua 脚本源码
+      deprecated: false
+      description: 按相对路径下载 scripts 目录下的脚本，成功返回原始 Lua 源码
+      tags:
+        - Lua 脚本
+      parameters:
+        - name: filename
+          in: query
+          description: scripts 目录下的相对路径，如 example.lua
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Lua 脚本源码文本
+          content:
+            text/plain:
+              schema:
+                type: string
+          headers: {}
+      security: []
   /api/script/breakpoint/add:
     post:
       summary: 添加断点
@@ -1974,6 +2014,22 @@ components:
           properties:
             data:
               $ref: '#/components/schemas/ScriptStatusData'
+    ScriptListData:
+      type: object
+      required:
+        - scripts
+      properties:
+        scripts:
+          type: array
+          items:
+            type: string
+    ScriptListResponse:
+      allOf:
+        - $ref: '#/components/schemas/StandardResponse'
+        - type: object
+          properties:
+            data:
+              $ref: '#/components/schemas/ScriptListData'
     ControlOwnerData:
       type: object
       properties:

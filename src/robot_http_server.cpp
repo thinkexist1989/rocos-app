@@ -320,6 +320,8 @@ void RobotHttpServer::registerRoutes() {
     server_->Post("/api/script/stop", [this](auto& req, auto& res) { handleScriptStop(req, res); });
     server_->Post("/api/script/step", [this](auto& req, auto& res) { handleScriptStep(req, res); });
     server_->Get("/api/script/status", [this](auto& req, auto& res) { handleScriptStatus(req, res); });
+    server_->Get("/api/script/list", [this](auto& req, auto& res) { handleScriptList(req, res); });
+    server_->Get("/api/script/download", [this](auto& req, auto& res) { handleScriptDownload(req, res); });
     server_->Post("/api/script/breakpoint/add", [this](auto& req, auto& res) { handleScriptBreakpointAdd(req, res); });
     server_->Post("/api/script/breakpoint/remove", [this](auto& req, auto& res) { handleScriptBreakpointRemove(req, res); });
     server_->Post("/api/script/breakpoint/clear", [this](auto& req, auto& res) { handleScriptBreakpointClear(req, res); });
@@ -1654,6 +1656,43 @@ void RobotHttpServer::handleScriptStatus(const httplib::Request&,
         return;
     }
     sendJson(res, true, 0, "ok", scriptStatusToJson());
+}
+
+void RobotHttpServer::handleScriptList(const httplib::Request&,
+                                       httplib::Response& res) {
+    if (script_engine_ == nullptr) {
+        sendJson(res, false, resultCode(Result::FunctionNotSupported),
+                 "Lua script engine is unavailable");
+        return;
+    }
+    const std::vector<std::string> scripts = script_engine_->ListScripts();
+    sendJson(res, true, 0, "ok", nlohmann::json{{"scripts", scripts}});
+}
+
+void RobotHttpServer::handleScriptDownload(const httplib::Request& req,
+                                           httplib::Response& res) {
+    if (script_engine_ == nullptr) {
+        sendJson(res, false, resultCode(Result::FunctionNotSupported),
+                 "Lua script engine is unavailable");
+        return;
+    }
+
+    const std::string filename = req.get_param_value("filename");
+    if (filename.empty()) {
+        sendJson(res, false, 1001, "Missing 'filename' query parameter");
+        return;
+    }
+
+    std::string source;
+    const Result result = script_engine_->ReadScriptFile(filename, source);
+    if (result != Result::NoError) {
+        sendJson(res, false, resultCode(result),
+                 "script file unavailable: " + filename);
+        return;
+    }
+
+    setCorsHeaders(res);
+    res.set_content(source, "text/plain");
 }
 
 void RobotHttpServer::handleScriptBreakpointAdd(const httplib::Request& req,
