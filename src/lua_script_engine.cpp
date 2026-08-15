@@ -520,6 +520,212 @@ private:
             "ResetFault", [this]() {
                 requireSuccess(robot_.ResetFault(), "ResetFault");
             });
+
+        // ===== 状态查询 =====
+        robot_table_.set_function(
+            "IsDisabled", [this]() { return robot_.IsDisabled(); });
+        robot_table_.set_function(
+            "IsRunning", [this]() { return robot_.IsRunning(); });
+        robot_table_.set_function(
+            "IsControlActive", [this]() { return robot_.IsControlActive(); });
+        robot_table_.set_function(
+            "IsMotionBusy", [this]() { return robot_.IsMotionBusy(); });
+
+        // ===== 单轴状态（索引 1 基，与 GetJointPosition 一致） =====
+        robot_table_.set_function(
+            "GetJointVelocity", [this](int index) {
+                return robot_.getJointVelocity(checkedJointIndex(index));
+            });
+        robot_table_.set_function(
+            "GetJointTorque", [this](int index) {
+                return robot_.getJointTorque(checkedJointIndex(index));
+            });
+        robot_table_.set_function(
+            "GetJointLoadTorque", [this](int index) {
+                return robot_.getJointLoadTorque(checkedJointIndex(index));
+            });
+        robot_table_.set_function(
+            "GetJointTorqueFilter", [this](int index) {
+                return robot_.getJointTorqueFilter(checkedJointIndex(index));
+            });
+        robot_table_.set_function(
+            "GetJointName", [this](int index) {
+                return robot_.getJointName(checkedJointIndex(index));
+            });
+        robot_table_.set_function(
+            "GetJointStatus", [this](int index) {
+                return robot_.getJointStatus(checkedJointIndex(index));
+            });
+        robot_table_.set_function(
+            "GetFlange", [this]() { return frameToTable(robot_.getFlange()); });
+
+        // ===== 运动（阻塞，与 MoveJ/MoveL 一致） =====
+        robot_table_.set_function(
+            "MoveJ_IK",
+            [this](const sol::table& pose,
+                   sol::optional<double> velocity,
+                   sol::optional<double> acceleration,
+                   sol::optional<double> jerk) {
+                executeMotion(robot_.MoveJ_IK(
+                    toFrame(pose),
+                    requirePositive(velocity.value_or(1.0), "velocity"),
+                    requirePositive(acceleration.value_or(2.0), "acceleration"),
+                    requirePositive(jerk.value_or(10.0), "jerk")));
+            });
+        robot_table_.set_function(
+            "MoveL_FK",
+            [this](const sol::table& joints,
+                   sol::optional<std::string> tool_name,
+                   sol::optional<double> velocity,
+                   sol::optional<double> acceleration,
+                   sol::optional<double> jerk) {
+                const int joint_count_ = robot_.getJointNum();
+                if (joint_count_ <= 0 ||
+                    joints.size() != static_cast<std::size_t>(joint_count_)) {
+                    throw sol::error("MoveL_FK 关节数量与机器人不匹配");
+                }
+                executeMotion(robot_.MoveL_FK(
+                    toJntArray(joints, "MoveL_FK"),
+                    tool_name.value_or(""),
+                    requirePositive(velocity.value_or(1.0), "velocity"),
+                    requirePositive(acceleration.value_or(2.0), "acceleration"),
+                    requirePositive(jerk.value_or(10.0), "jerk")));
+            });
+
+        // ===== 运动控制（非阻塞，立即返回） =====
+        robot_table_.set_function(
+            "PauseMotion", [this]() {
+                requireSuccess(robot_.PauseMotion(), "PauseMotion");
+            });
+        robot_table_.set_function(
+            "StopMotion", [this]() {
+                requireSuccess(robot_.StopMotion(), "StopMotion");
+            });
+        robot_table_.set_function(
+            "ResumeMotion", [this]() {
+                requireSuccess(robot_.ResumeMotion(), "ResumeMotion");
+            });
+
+        // ===== 工作模式 / 伺服 =====
+        robot_table_.set_function(
+            "SetWorkMode", [this](const std::string& mode) {
+                requireSuccess(robot_.SetWorkMode(mode), "SetWorkMode");
+            });
+        robot_table_.set_function(
+            "SetServoMode", [this](const std::string& mode) {
+                requireSuccess(robot_.SetServoMode(mode), "SetServoMode");
+            });
+
+        // ===== 负载参数 =====
+        robot_table_.set_function(
+            "HasLoadParameters", [this]() { return robot_.HasLoadParameters(); });
+        robot_table_.set_function(
+            "GetLoadMass", [this]() { return robot_.GetLoadMass(); });
+        robot_table_.set_function(
+            "GetLoadCom", [this]() { return vectorToTable(robot_.GetLoadCom()); });
+        robot_table_.set_function(
+            "SetLoadParameters", [this](double mass, const sol::table& com) {
+                requireSuccess(robot_.SetLoadParameters(mass, toVector(com)),
+                               "SetLoadParameters");
+            });
+        robot_table_.set_function(
+            "LoadLoadParameters", [this](sol::optional<std::string> path) {
+                requireSuccess(robot_.LoadLoadParameters(
+                                   path.value_or("payload.yaml")),
+                               "LoadLoadParameters");
+            });
+        robot_table_.set_function(
+            "SaveLoadParameters", [this](sol::optional<std::string> path) {
+                requireSuccess(robot_.SaveLoadParameters(
+                                   path.value_or("payload.yaml")),
+                               "SaveLoadParameters");
+            });
+
+        // ===== 命名坐标系（工具系 / 工件系） =====
+        robot_table_.set_function(
+            "GetToolFrameNames", [this]() { return robot_.GetToolFrameNames(); });
+        robot_table_.set_function(
+            "GetObjectFrameNames", [this]() { return robot_.GetObjectFrameNames(); });
+        robot_table_.set_function(
+            "HasToolFrame", [this](const std::string& name) {
+                return robot_.HasToolFrame(name);
+            });
+        robot_table_.set_function(
+            "HasObjectFrame", [this](const std::string& name) {
+                return robot_.HasObjectFrame(name);
+            });
+        robot_table_.set_function(
+            "IsValidFrameName", [this](const std::string& name) {
+                return robot_.IsValidFrameName(name);
+            });
+        robot_table_.set_function(
+            "GetToolFrame", [this](const std::string& name) {
+                Frame frame_;
+                requireSuccess(robot_.GetToolFrame(name, frame_), "GetToolFrame");
+                return frameToTable(frame_);
+            });
+        robot_table_.set_function(
+            "GetObjectFrame", [this](const std::string& name) {
+                Frame frame_;
+                requireSuccess(robot_.GetObjectFrame(name, frame_), "GetObjectFrame");
+                return frameToTable(frame_);
+            });
+        robot_table_.set_function(
+            "SetToolFrame", [this](const std::string& name, const sol::table& pose) {
+                requireSuccess(robot_.SetToolFrame(name, toFrame(pose)),
+                               "SetToolFrame");
+            });
+        robot_table_.set_function(
+            "SetObjectFrame", [this](const std::string& name, const sol::table& pose) {
+                requireSuccess(robot_.SetObjectFrame(name, toFrame(pose)),
+                               "SetObjectFrame");
+            });
+        robot_table_.set_function(
+            "AddToolFrame", [this](const std::string& name, const sol::table& pose) {
+                requireSuccess(robot_.AddToolFrame(name, toFrame(pose)),
+                               "AddToolFrame");
+            });
+        robot_table_.set_function(
+            "AddObjectFrame", [this](const std::string& name, const sol::table& pose) {
+                requireSuccess(robot_.AddObjectFrame(name, toFrame(pose)),
+                               "AddObjectFrame");
+            });
+        robot_table_.set_function(
+            "RemoveToolFrame", [this](const std::string& name) {
+                requireSuccess(robot_.RemoveToolFrame(name), "RemoveToolFrame");
+            });
+        robot_table_.set_function(
+            "RemoveObjectFrame", [this](const std::string& name) {
+                requireSuccess(robot_.RemoveObjectFrame(name), "RemoveObjectFrame");
+            });
+        robot_table_.set_function(
+            "SetActiveToolFrame", [this](const std::string& name) {
+                requireSuccess(robot_.SetActiveToolFrame(name), "SetActiveToolFrame");
+            });
+        robot_table_.set_function(
+            "SetActiveObjectFrame", [this](const std::string& name) {
+                requireSuccess(robot_.SetActiveObjectFrame(name), "SetActiveObjectFrame");
+            });
+        robot_table_.set_function(
+            "GetActiveToolFrameName", [this]() { return robot_.GetActiveToolFrameName(); });
+        robot_table_.set_function(
+            "GetActiveObjectFrameName", [this]() { return robot_.GetActiveObjectFrameName(); });
+        robot_table_.set_function(
+            "GetActiveToolFrame", [this]() { return frameToTable(robot_.GetActiveToolFrame()); });
+        robot_table_.set_function(
+            "GetActiveObjectFrame", [this]() { return frameToTable(robot_.GetActiveObjectFrame()); });
+        robot_table_.set_function(
+            "LoadFrames", [this](const std::string& path) {
+                requireSuccess(robot_.LoadFrames(path), "LoadFrames");
+            });
+        robot_table_.set_function(
+            "SaveFrames", [this](const std::string& path) {
+                requireSuccess(robot_.SaveFrames(path), "SaveFrames");
+            });
+
+        // ===== 阻抗参数（返回 JSON 字符串） =====
+        robot_table_.set_function(
+            "GetImpedanceParams", [this]() { return robot_.GetImpedanceParams().dump(); });
     }
 
     static void debugHook(lua_State* lua_state, lua_Debug* debug_info) {
@@ -759,6 +965,72 @@ private:
                 pose_.qz / norm_,
                 pose_.qw / norm_),
             KDL::Vector(pose_.x, pose_.y, pose_.z));
+    }
+
+    // ---- Lua table ↔ C++ 类型转换辅助 ----
+
+    // 校验并返回 0 基关节索引（Lua 侧统一 1 基）
+    int checkedJointIndex(int index) const {
+        const int joint_count_ = robot_.getJointNum();
+        if (index <= 0 || index > joint_count_) {
+            throw sol::error("joint index 超出范围");
+        }
+        return index - 1;
+    }
+
+    // Lua 数组（1 基）→ JntArray
+    static JntArray toJntArray(const sol::table& joints, const char* name) {
+        const std::size_t count_ = joints.size();
+        if (count_ == 0) {
+            throw sol::error(std::string(name) + " 关节数组不能为空");
+        }
+        JntArray result_(static_cast<unsigned int>(count_));
+        for (std::size_t i = 0; i < count_; ++i) {
+            const sol::object value_ = joints[i + 1];
+            if (!value_.is<double>()) {
+                throw sol::error(std::string(name) + " 关节值必须为 number");
+            }
+            result_(static_cast<unsigned int>(i)) =
+                requireFinite(value_.as<double>(), name);
+        }
+        return result_;
+    }
+
+    // Lua 表 {x=, y=, z=} → Vector
+    static Vector toVector(const sol::table& table) {
+        const sol::object x_ = table["x"];
+        const sol::object y_ = table["y"];
+        const sol::object z_ = table["z"];
+        if (!x_.is<double>() || !y_.is<double>() || !z_.is<double>()) {
+            throw sol::error("向量必须包含 number 字段 x/y/z");
+        }
+        return Vector(requireFinite(x_.as<double>(), "x"),
+                      requireFinite(y_.as<double>(), "y"),
+                      requireFinite(z_.as<double>(), "z"));
+    }
+
+    // Frame → Lua 表 {x,y,z,qx,qy,qz,qw}
+    sol::table frameToTable(const Frame& frame) {
+        double qx = 0.0, qy = 0.0, qz = 0.0, qw = 1.0;
+        frame.M.GetQuaternion(qx, qy, qz, qw);
+        sol::table table_ = lua_->create_table();
+        table_["x"] = frame.p.x();
+        table_["y"] = frame.p.y();
+        table_["z"] = frame.p.z();
+        table_["qx"] = qx;
+        table_["qy"] = qy;
+        table_["qz"] = qz;
+        table_["qw"] = qw;
+        return table_;
+    }
+
+    // Vector → Lua 表 {x,y,z}
+    sol::table vectorToTable(const Vector& vec) {
+        sol::table table_ = lua_->create_table();
+        table_["x"] = vec.x();
+        table_["y"] = vec.y();
+        table_["z"] = vec.z();
+        return table_;
     }
 
     void joinWorker() {
