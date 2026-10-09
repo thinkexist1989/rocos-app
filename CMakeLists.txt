@@ -25,7 +25,6 @@ email: luoyang@sia.cn
 cmake_minimum_required(VERSION 3.10)
 project(rocos_app VERSION 1.0.5 DESCRIPTION "ROCOS Application Library")
 
-list(APPEND CMAKE_PREFIX_PATH "/opt/rocos/ecm")
 list(APPEND CMAKE_PREFIX_PATH "/opt/grpc")
 include(cmake/common.cmake) # gRPC
 
@@ -60,8 +59,6 @@ find_package(Threads REQUIRED)
 #find_package(Qt5 REQUIRED COMPONENTS Core)
 find_package(Eigen3 REQUIRED)
 find_package(OpenSSL REQUIRED)
-
-find_package(rocos_ecm REQUIRED)
 
 find_package(orocos_kdl REQUIRED)
 
@@ -130,7 +127,6 @@ target_link_libraries(hardware
         PUBLIC
         ${DEP_LIBS}
         Boost::thread
-        rocos::ecat_config
         )
 add_library(rocos::hardware ALIAS hardware)
 

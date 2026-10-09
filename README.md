@@ -29,6 +29,12 @@ ROCOS-App is the application of robotics, which is designed as the robot control
 - grpc
 - tinyFSM
 
+EtherCAT shared-memory access uses the header-only
+[SharedMemoryConfig](include/rocos_app/shared_memory_config.hpp); building and
+using the installed CMake package do not require `rocos_ecm`. At runtime, an
+EtherCAT master must create shared memory with the same layout before the
+application connects.
+
 
 
 ## Usage

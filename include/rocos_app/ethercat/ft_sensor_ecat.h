@@ -6,7 +6,7 @@
 #define ROCOS_APP_FT_SENSOR_ECAT_H
 
 #include <rocos_app/ft_sensor_interface.h>
-#include <rocos_ecm/ecat_config.h>
+#include <rocos_app/shared_memory_config.hpp>
 
 
 namespace rocos {
@@ -33,7 +33,7 @@ namespace rocos {
 
         void parseParamFormUrdf(const std::string &urdf_file_path);
 
-        EcatConfig* ecPtr_ {nullptr};
+        SharedMemoryConfig* ecPtr_ {nullptr};
 
         float* pFx_ {nullptr};
         float* pFy_ {nullptr};

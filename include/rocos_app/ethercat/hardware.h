@@ -26,7 +26,7 @@
 #include "status_word.h"
 #include "mode_of_operation.h"
 
-#include <rocos_ecm/ecat_config.h>
+#include <rocos_app/shared_memory_config.hpp>
 
 #include "../hardware_interface.h"
 
@@ -93,7 +93,7 @@ namespace rocos {
 
 
     protected:
-        EcatConfig* ecPtr_ {nullptr};
+        SharedMemoryConfig* ecPtr_ {nullptr};
 
         std::vector<int32_t *> pTargetPos_;    // Target Position
         std::vector<int32_t *> pTargetVel_;    // Target Velocity
