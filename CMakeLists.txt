@@ -283,7 +283,8 @@ add_library(rocos::rocos_app ALIAS rocos_app)
 add_executable(rocosAppMain
         src/rocosAppMain.cc
         )
-
+add_executable(demo_torque_7joint
+        src/demo_torque_7joint.cpp        )
 ## Specify libraries to link a library or executable target against
 target_link_libraries(rocosAppMain
         PRIVATE
@@ -294,7 +295,15 @@ target_link_libraries(rocosAppMain
         robot
         gflags::gflags
         )
-
+target_link_libraries(demo_torque_7joint
+        PRIVATE
+        hardware
+        drive
+        protocol
+        kinematics
+        robot
+        gflags::gflags
+        )
 
 configure_file(include/ver.h.in ver.h) # Version Definition
 

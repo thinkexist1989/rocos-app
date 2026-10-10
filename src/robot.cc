@@ -530,6 +530,7 @@ namespace rocos {
     }
 
     void Robot::motionThreadHandler() {
+        
         std::cout << "Motion thread is running on thread "
                   << boost::this_thread::get_id() << std::endl;
         //** vector 数组大小初始化 **//
@@ -586,6 +587,19 @@ namespace rocos {
                 }
             }
             updateCartesianInfo();
+
+
+
+            static bool PressedState=false;
+
+            bool press_now = isPressed();
+
+            if(press_now ^ PressedState)
+            {
+                PressedState = press_now;
+                press_now ? setWorkMode(WorkMode::JntAdmitTeach) : setWorkMode(WorkMode::Position);
+            }
+
 
             //     //! 屏蔽开始
             //    //!< Trajectory generating......

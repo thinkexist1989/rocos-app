@@ -249,7 +249,7 @@ namespace JC_helper
         external_forces = KDL::Wrenches(robot_ptr->kinematics_.getChain().getNrOfSegments(), KDL::Wrench::Zero());
 
         // 打印admittance_joint参数
-        
+        PLOG_INFO << "sensitivity = " << sensitivity[0] << " " << sensitivity[1] << " " << sensitivity[2] << " " << sensitivity[3] << " " << sensitivity[4] << " " << sensitivity[5] << " " << sensitivity[6];
         PLOG_INFO << "kesai = " << kesai[0] << " " << kesai[1] << " " << kesai[2] << " " << kesai[3] << " " << kesai[4] << " " << kesai[5] << " " << kesai[6];
         PLOG_INFO << "K = " << K[0] << " " << K[1] << " " << K[2] << " " << K[3] << " " << K[4] << " " << K[5] << " " << K[6];
         PLOG_INFO << "M = " << M[0] << " " << M[1] << " " << M[2] << " " << M[3] << " " << M[4] << " " << M[5] << " " << M[6];
@@ -303,7 +303,7 @@ namespace JC_helper
 
         for (int i = 0; i < joint_num; i++)
         {
-            torque[i] = (robot_ptr->getJointTorqueFilter(i)) *0.001/sensitivity[i]- ZeroOffset[i]- Theory_torques[i];
+            torque[i] = (robot_ptr->getJointTorqueFilter(i)-ZeroOffset[i]) *0.001/sensitivity[i]- Theory_torques[i];
             // PLOG_INFO << "Jnt " << i << "=> thr_tor: " <<Theory_torques[i] <<" act_tor: "<<robot_ptr-> getJointTorqueFilter(i) * a_sensor[i]
             //           << " ext_tor: " << robot_ptr->getJointTorqueFilter(i) * a_sensor[i] + b_sensor[i];
 
@@ -381,7 +381,7 @@ namespace JC_helper
             {
                 Actual_torques[i] = robot_ptr->getJointTorqueFilter(i);
 
-                fext[i] = Actual_torques[i] * 0.001 / sensitivity[i] -ZeroOffset[i] - Theory_torques[i];
+                fext[i] = (Actual_torques[i]-ZeroOffset[i]) * 0.001 / sensitivity[i]  - Theory_torques[i];
                 
                 com_fext[i] = set_K_sensor(fext[i], joint_K[i]);
 
@@ -423,7 +423,7 @@ namespace JC_helper
             }
             //打印理论力矩和真实力矩Actual_torques[i] * 0.001 / sensitivity[i]
             // PLOG_DEBUG.printf( "Theory_torques = %f %f %f %f %f %f %f", Theory_torques[ 0 ], Theory_torques[ 1 ], Theory_torques[ 2 ], Theory_torques[ 3 ], Theory_torques[ 4 ], Theory_torques[ 5 ], Theory_torques[ 6 ] );
-            // PLOG_DEBUG.printf( "Actual_torques = %f %f %f %f %f %f %f", Actual_torques[ 0 ]* 0.001 / sensitivity[0],Actual_torques[ 1 ]* 0.001 / sensitivity[1],Actual_torques[ 2 ]* 0.001 / sensitivity[2],Actual_torques[ 3 ]* 0.001 / sensitivity[3],Actual_torques[ 4 ]* 0.001 / sensitivity[4],Actual_torques[ 5 ]* 0.001 / sensitivity[5],Actual_torques[ 6 ]* 0.001 / sensitivity[6] );
+            // PLOG_DEBUG.printf( "Actual_torques = %f %f %f %f %f %f %f", Actual_torques[ 0 ]* 0.001 / sensitivity[0]-ZeroOffset[0]*0.001/sensitivity[0],Actual_torques[ 1 ]* 0.001 / sensitivity[1]-ZeroOffset[1]*0.001/sensitivity[1],Actual_torques[ 2 ]* 0.001 / sensitivity[2]-ZeroOffset[2]*0.001/sensitivity[2],Actual_torques[ 3 ]* 0.001 / sensitivity[3]-ZeroOffset[3]*0.001/sensitivity[3],Actual_torques[ 4 ]* 0.001 / sensitivity[4]-ZeroOffset[4]*0.001/sensitivity[4],Actual_torques[ 5 ]* 0.001 / sensitivity[5]-ZeroOffset[5]*0.001/sensitivity[5],Actual_torques[ 6 ]* 0.001 / sensitivity[6] -ZeroOffset[6]*0.001/sensitivity[6]);
             // PLOG_DEBUG.printf( "com_torques = %f %f %f %f %f %f %f", fext[ 0 ], fext[ 1 ], fext[ 2 ], fext[ 3 ], fext[ 4 ], fext[ 5 ], fext[ 6 ] );
             
             // usleep(1000000);

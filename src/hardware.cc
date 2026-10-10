@@ -216,12 +216,12 @@ namespace rocos {
                     pSecondaryVel_[id] = ecPtr_->findSlaveInputVarPtrByName<int32_t>(id, "Secondary velocity value");
                 }
 
-                auto digital_inputs = inputs->FirstChildElement("digital_inputs");
+                auto digital_inputs = inputs->FirstChildElement("Analog_input_2");
                 if(digital_inputs) {
                     
                     pDigitalInputs_[id] = ecPtr_->findSlaveInputVarPtrByName<int32_t>(id, digital_inputs->GetText());
                 } else {
-                    pDigitalInputs_[id] = ecPtr_->findSlaveInputVarPtrByName<int32_t>(id, "Digital Inputs");
+                    pDigitalInputs_[id] = ecPtr_->findSlaveInputVarPtrByName<int32_t>(id, "App Object");
                 }
                 
 

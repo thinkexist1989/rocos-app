@@ -82,6 +82,13 @@ int main(int argc, char *argv[]) {
     robot_ptr = &robot;
 
     auto robotService = RobotServiceImpl::getInstance(&robot);
+    // while(true)
+    // {
+    //     double input=robot_ptr->getDigitalInputsRaw(6);
+    //     std::cout<<"input"<<input<<std::endl;
+    //     std::this_thread::sleep_for(std::chrono::milliseconds(1000));
+
+    // }
 
     //------------------------wait----------------------------------
     robotService->runServer();

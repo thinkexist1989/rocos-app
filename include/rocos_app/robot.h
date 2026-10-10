@@ -151,7 +151,11 @@ namespace rocos
         // 获取滤波后的数据
         inline double getJointTorqueFilter(int id) { return joints_[id]->getSecondaryPositionInCnt(); }
         inline double getJointSecondaryPositionInCnt(int id) { return joints_[id]->getSecondaryPositionInCnt(); }
-
+        inline double getDigitalInputsRaw(int id){return joints_[id]->getDigitalInputsRaw();}
+        inline bool isPressed()
+        {
+            return getDigitalInputsRaw(6)>2500 ? true : false;
+        }
         inline void setJointPosition(int id, double pos)
         {
             joints_[id]->setPosition(pos);
