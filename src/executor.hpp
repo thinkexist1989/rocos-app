@@ -22,6 +22,7 @@
 
 #include "controller_interface.hpp"
 #include "hardware_interface.hpp"
+#include "logger.hpp"
 #include "motion_interface.hpp"
 #include "result.hpp"
 #include "types.hpp"
@@ -101,6 +102,7 @@ namespace rocos {
         const int kExecutorMeasurement = 3;
         const int kCycleMeasurement = 4;
         std::unique_ptr<PerformanceProfiler> profiler_{nullptr};
+        Logger::logger_ptr log_ptr_;
 
         // std::mutex mtx_;
     };

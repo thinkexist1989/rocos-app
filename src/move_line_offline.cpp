@@ -25,6 +25,8 @@
 #include <cmath>
 #include <limits>
 
+#include "logger.hpp"
+
 namespace rocos {
 
 // ============================================================================
@@ -244,14 +246,22 @@ bool MoveLineOffline::solveJointVelocity(const JntArray& q,
 // ============================================================================
 
 Result MoveLineOffline::Reset() {
+    const auto log_ptr = Logger::getInstance("MoveLineOffline");
+
     // 1. 参数校验
     const Result validation = ValidateParameters();
     if (validation != Result::NoError) {
+        log_ptr->error(
+            "MoveLineOffline 参数校验失败: result={}, dt={}, velocity={}, acceleration={}, jerk={}, model_ptr={}",
+            static_cast<int>(validation), dt_, v_limit_, a_limit_, j_limit_,
+            static_cast<const void*>(model_));
         return validation;
     }
 
     // 2. 归一化限制
     if (!computeNormalizedLimits()) {
+        log_ptr->error("MoveLineOffline 归一化限制计算失败: model_ptr={}",
+                       static_cast<const void*>(model_));
         return Result::PlanError;
     }
     if (!has_motion_) {
@@ -260,6 +270,7 @@ Result MoveLineOffline::Reset() {
 
     n_joints_ = model_->GetJointNum();
     if (n_joints_ <= 0) {
+        log_ptr->error("MoveLineOffline 规划失败: model 返回非法关节数={}", n_joints_);
         return Result::PlanError;
     }
 
@@ -267,6 +278,9 @@ Result MoveLineOffline::Reset() {
     trajectory_.clear();
     profile_.Reset(0.0, 0.0, 0.0);
     if (!profile_.Start(norm_v_, norm_a_, norm_j_)) {
+        log_ptr->error(
+            "MoveLineOffline 速度曲线启动失败: norm_velocity={}, norm_acceleration={}, norm_jerk={}, dt={}",
+            norm_v_, norm_a_, norm_j_, dt_);
         return Result::PlanError;
     }
 
@@ -274,6 +288,8 @@ Result MoveLineOffline::Reset() {
         const int rc = profile_.Update();
         if (rc < 0) {
             trajectory_.clear();
+            log_ptr->error("MoveLineOffline 速度曲线更新失败: profile_rc={}, trajectory_size={}",
+                           rc, trajectory_.size());
             return Result::PlanError;
         }
 
@@ -300,6 +316,11 @@ Result MoveLineOffline::Reset() {
 
         Result r = model_->InverseKinematics(q_prev, frame, q_out);
         if (r != Result::NoError) {
+            log_ptr->error(
+                "MoveLineOffline 轨迹 IK 失败: result={}, failed_s={}, trajectory_size={}, "
+                "q_init_rows={}, model_ptr={}",
+                static_cast<int>(r), pt.s, trajectory_.size(),
+                q_init_.rows(), static_cast<const void*>(model_));
             trajectory_.clear();
             return Result::PlanError;
         }

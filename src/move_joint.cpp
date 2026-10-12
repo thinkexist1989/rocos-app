@@ -23,6 +23,8 @@
 #include <cmath>
 #include <limits>
 
+#include "logger.hpp"
+
 namespace rocos {
 
 namespace {
@@ -129,14 +131,23 @@ bool MoveJoint::computeNormalizedLimits() {
 // ============================================================================
 
 Result MoveJoint::Reset() {
+    const auto log_ptr = Logger::getInstance("MoveJoint");
+
     // 1. 纯参数校验（维度、有限性、正值性）
     const Result validation = ValidateParameters();
     if (validation != Result::NoError) {
+        log_ptr->error(
+            "MoveJoint 参数校验失败: result={}, q_start_rows={}, q_goal_rows={}, "
+            "velocity={}, acceleration={}, jerk={}, dt={}",
+            static_cast<int>(validation), q_start_.rows(), q_goal_.rows(),
+            v_limit_, a_limit_, j_limit_, dt_);
         return validation;
     }
 
     // 2. 计算 delta_[i]、delta_max、归一化限制（唯一的 delta 计算入口）
     if (!computeNormalizedLimits()) {
+        log_ptr->error("MoveJoint 归一化限制计算失败: q_start_rows={}, q_goal_rows={}",
+                       q_start_.rows(), q_goal_.rows());
         return Result::PlanError;
     }
 
@@ -147,6 +158,9 @@ Result MoveJoint::Reset() {
 
     // 4. 启动 UnitVelocityProfile
     if (!profile_.Start(norm_v_, norm_a_, norm_j_)) {
+        log_ptr->error(
+            "MoveJoint 速度曲线启动失败: norm_velocity={}, norm_acceleration={}, norm_jerk={}, dt={}",
+            norm_v_, norm_a_, norm_j_, dt_);
         return Result::PlanError;
     }
 
@@ -164,6 +178,9 @@ Result MoveJoint::GenerateRef(Reference& ref_out) {
 
     const int rc = profile_.Update();
     if (rc < 0) {
+        Logger::getInstance("MoveJoint")->error(
+            "MoveJoint 速度曲线更新失败: profile_rc={}, position={}, velocity={}",
+            rc, profile_.position(), profile_.velocity());
         return Result::PlanError;
     }
 

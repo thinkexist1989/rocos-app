@@ -5,6 +5,8 @@ namespace rocos {
 Executor::Executor(MotionInterface* motion, ControllerInterface* controller,
                    HardwareInterface* hardware) {
 
+  log_ptr_ = Logger::getInstance("Executor");
+
   SwitchMotion(motion);
   SwitchController(controller);
   SwitchHardware(hardware);
@@ -41,7 +43,12 @@ Result Executor::Update() {
   Result res = Result::NoError;
   int sum = 0; //TODO:
 
-  // if (!motion_ || !controller_) return Result::PlanError;
+  if (motion_ == nullptr || controller_ == nullptr || hardware_ == nullptr) {
+    log_ptr_->error(
+        "Executor update has null dependency: motion={}, controller={}, hardware={}",
+        static_cast<const void*>(motion_), static_cast<const void*>(controller_),
+        static_cast<const void*>(hardware_));
+  }
 
   profiler_->MeasureEnd(kCycleMeasurement);
   profiler_->MeasureStart(kExecutorMeasurement);
@@ -53,8 +60,10 @@ Result Executor::Update() {
 
   profiler_->MeasureEnd(kMotionMeasurement);
 
-  if (static_cast<int>(res) < 0)
+  if (static_cast<int>(res) < 0) {
+    log_ptr_->error("Executor motion phase failed: result={}", static_cast<int>(res));
     return res;
+  }
 
   sum += static_cast<int>(res);
 
@@ -64,8 +73,11 @@ Result Executor::Update() {
   res = controller_->GenerateCmd(ref, q_cmd);
   profiler_->MeasureEnd(kControllerMeasurement);
 
-  if (static_cast<int>(res) < 0)
+  if (static_cast<int>(res) < 0) {
+    log_ptr_->error("Executor controller phase failed: result={}",
+                    static_cast<int>(res));
     return res;
+  }
 
   sum += static_cast<int>(res);
 
@@ -73,8 +85,11 @@ Result Executor::Update() {
   // ③ 下发硬件
   res = controller_->UpdateCmd(q_cmd);
 
-  if (static_cast<int>(res) < 0)
+  if (static_cast<int>(res) < 0) {
+    log_ptr_->error("Executor hardware command phase failed: result={}",
+                    static_cast<int>(res));
     return res;
+  }
 
   sum += static_cast<int>(res);
 

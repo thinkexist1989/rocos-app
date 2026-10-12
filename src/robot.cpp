@@ -391,7 +391,8 @@ namespace rocos {
                 return;
             }
 
-            log_ptr_->error("机器人启动失败，退回Stopped状态");
+            log_ptr_->error("机器人启动失败，退回Stopped状态: result={}, state={}, enabled={}",
+                            static_cast<int>(rc), GetStateString(), IsEnabled());
             impl_->process_event(EventStartFailedReq{});
 
 
@@ -418,7 +419,8 @@ namespace rocos {
         if (rc == Result::NoError) {
             log_ptr_->info("机器人停止成功，准备进入Stopped状态");
         } else {
-            log_ptr_->error("机器人停止失败，退回ERROR状态");
+            log_ptr_->error("机器人停止失败，退回ERROR状态: result={}, state={}",
+                            static_cast<int>(rc), GetStateString());
             impl_->process_event(EventErrorOccurred{});
         }
 
@@ -435,7 +437,8 @@ namespace rocos {
             log_ptr_->info("机器人暂停成功，准备进入PAUSED状态");
         } else {
             //TODO: 暂停失败  这块我感觉不允许失败 by think
-            log_ptr_->error("机器人暂停失败，退回RUNNING状态");
+            log_ptr_->error("机器人暂停失败，退回RUNNING状态: result={}, state={}",
+                            static_cast<int>(rc), GetStateString());
             impl_->process_event(EventPauseFailed{});
         }
 
@@ -451,6 +454,9 @@ namespace rocos {
         if (rc == Result::NoError) {
             log_ptr_->info("机器人继续成功，准备进入RUNNING状态");
             impl_->process_event(EventRunning{});
+        } else {
+            log_ptr_->error("机器人继续失败: result={}, state={}",
+                            static_cast<int>(rc), GetStateString());
         }
 
     }
@@ -465,7 +471,8 @@ namespace rocos {
         fsm_error_entered_once_ = true;
         return;
       }
-      log_ptr_->info("机器人进入ERROR");
+      log_ptr_->error("机器人进入ERROR: state={}, enabled={}, control_active={}",
+                      GetStateString(), IsEnabled(), IsControlActive());
       {
         std::lock_guard<std::mutex> lock(mtx_);
         if (motion) {
@@ -1212,7 +1219,9 @@ namespace rocos {
       }
 
       if (static_cast<int>(res) < 0) {
-        log_ptr_->error("机器人控制循环出现错误: {}", static_cast<int>(res));
+        log_ptr_->error(
+            "机器人控制循环出现错误: result={}, state={}, enabled={}, control_active={}",
+            static_cast<int>(res), GetStateString(), IsEnabled(), IsControlActive());
         impl_->process_event(EventErrorOccurred{});
       }
       else if (static_cast<int>(res) > 0) {
@@ -1239,7 +1248,12 @@ namespace rocos {
 
 
             Result rc = new_motion->Reset();
-            if (rc != Result::NoError) return rc;
+            if (rc != Result::NoError) {
+                log_ptr_->error(
+                    "MoveJ 规划失败: result={}, joints={}, velocity={}, acceleration={}, jerk={}, dt={}",
+                    static_cast<int>(rc), q_goal.rows(), v_limit, a_limit, j_limit, dt_);
+                return rc;
+            }
 
             {
                 std::lock_guard<std::mutex> lock(mtx_);
@@ -1252,6 +1266,8 @@ namespace rocos {
             // STOPPED → RUNNING
         } else {
             data_ready_callback_ = nullptr;  // 切换失败，清除无效回调
+            log_ptr_->error("MoveJ 请求被状态机拒绝: state={}, enabled={}, running={}",
+                            GetStateString(), IsEnabled(), IsRunning());
             if (impl_->is(sml::state<class IDLE>)) {
                 log_ptr_->error("机器人处于IDLE状态，无法执行MoveJ指令，请先上使能");
                 return Result::NotEnabled;
@@ -1286,12 +1302,24 @@ namespace rocos {
             for (int i = 0; i < n; ++i) q_current(i) = getJointPosition(i);
 
             Frame pose_flange;
-            if (model) model->ForwardKinematics(q_current, pose_flange);
+            if (model) {
+                const Result fk_result = model->ForwardKinematics(q_current, pose_flange);
+                if (fk_result != Result::NoError) {
+                    log_ptr_->error("MoveL 起点正解失败: result={}, joints={}, state={}",
+                                    static_cast<int>(fk_result), n, GetStateString());
+                }
+            } else {
+                log_ptr_->error("MoveL 起点正解失败: robot model pointer is null");
+            }
 
             Frame T_tool;
             if (!tool_name.empty()) {
                 Result rc = GetToolFrame(tool_name, T_tool);
-                if (rc != Result::NoError) return rc;
+                if (rc != Result::NoError) {
+                    log_ptr_->error("MoveL 工具坐标系读取失败: tool='{}', result={}",
+                                    tool_name, static_cast<int>(rc));
+                    return rc;
+                }
             }
 
             // v3.0 替换为离线规划版本：Reset 中全轨迹 IK 验证，
@@ -1310,7 +1338,12 @@ namespace rocos {
             //     pose_flange, pose_goal * T_tool.Inverse(),
             //     v_limit, a_limit, j_limit, dt_, model.get());
             // Result rc = new_motion->Reset();
-            if (rc != Result::NoError) return rc;
+            if (rc != Result::NoError) {
+                log_ptr_->error(
+                    "MoveL 规划失败: result={}, tool='{}', velocity={}, acceleration={}, jerk={}, dt={}",
+                    static_cast<int>(rc), tool_name, v_limit, a_limit, j_limit, dt_);
+                return rc;
+            }
 
             {
                 std::lock_guard<std::mutex> lock(mtx_);
@@ -1325,6 +1358,8 @@ namespace rocos {
 
         if (!impl_->process_event(EventStartReq{})) {
             data_ready_callback_ = nullptr;  // 切换失败，清除无效回调
+            log_ptr_->error("MoveL 请求被状态机拒绝: state={}, enabled={}, running={}, tool='{}'",
+                            GetStateString(), IsEnabled(), IsRunning(), tool_name);
             if (impl_->is(sml::state<class IDLE>)) return Result::NotEnabled;
             if (impl_->is(sml::state<class ERROR_STATE>)) return Result::Fatal;
             return Result::ConflictTaskRunning;
@@ -1345,7 +1380,11 @@ namespace rocos {
 
         JntArray q_goal(static_cast<unsigned int>(n));
         Result rc = model->InverseKinematics(q_current, pose_goal, q_goal);
-        if (rc != Result::NoError) return rc;
+        if (rc != Result::NoError) {
+            log_ptr_->error("MoveJ_IK 逆解失败: result={}, joints={}, state={}",
+                            static_cast<int>(rc), n, GetStateString());
+            return rc;
+        }
 
         return MoveJ(q_goal, v_limit, a_limit, j_limit);
     }
@@ -1590,7 +1629,12 @@ namespace rocos {
             new_motion->SetInitialJointPosition(q_current);
 
             Result rc = new_motion->Reset();
-            if (rc != Result::NoError) return rc;
+            if (rc != Result::NoError) {
+                log_ptr_->error(
+                    "MoveC(圆心角度) 规划失败: result={}, theta={}, velocity={}, acceleration={}, jerk={}, dt={}",
+                    static_cast<int>(rc), theta, v_limit, a_limit, j_limit, dt_);
+                return rc;
+            }
 
             {
                 std::lock_guard<std::mutex> lock(mtx_);
@@ -1602,6 +1646,8 @@ namespace rocos {
 
         if (!impl_->process_event(EventStartReq{})) {
             data_ready_callback_ = nullptr;  // 切换失败，清除无效回调
+            log_ptr_->error("MoveC(圆心角度) 请求被状态机拒绝: state={}, enabled={}, running={}",
+                            GetStateString(), IsEnabled(), IsRunning());
             if (impl_->is(sml::state<class IDLE>)) return Result::NotEnabled;
             if (impl_->is(sml::state<class ERROR_STATE>)) return Result::Fatal;
             return Result::ConflictTaskRunning;
@@ -1627,7 +1673,12 @@ namespace rocos {
             new_motion->SetInitialJointPosition(q_current);
 
             Result rc = new_motion->Reset();
-            if (rc != Result::NoError) return rc;
+            if (rc != Result::NoError) {
+                log_ptr_->error(
+                    "MoveC(三点) 规划失败: result={}, velocity={}, acceleration={}, jerk={}, dt={}",
+                    static_cast<int>(rc), v_limit, a_limit, j_limit, dt_);
+                return rc;
+            }
 
             {
                 std::lock_guard<std::mutex> lock(mtx_);
@@ -1639,6 +1690,8 @@ namespace rocos {
 
         if (!impl_->process_event(EventStartReq{})) {
             data_ready_callback_ = nullptr;  // 切换失败，清除无效回调
+            log_ptr_->error("MoveC(三点) 请求被状态机拒绝: state={}, enabled={}, running={}",
+                            GetStateString(), IsEnabled(), IsRunning());
             if (impl_->is(sml::state<class IDLE>)) return Result::NotEnabled;
             if (impl_->is(sml::state<class ERROR_STATE>)) return Result::Fatal;
             return Result::ConflictTaskRunning;
@@ -1651,12 +1704,14 @@ namespace rocos {
         {
             std::lock_guard<std::mutex> lock(mtx_);
             if (!executor->CanPause()) {
+                log_ptr_->error("暂停请求被拒绝: 当前 motion 不支持暂停, state={}, motion_ptr={}",
+                                GetStateString(), static_cast<const void*>(motion.get()));
                 return Result::FunctionNotSupported;
             }
         }
 
         if (!impl_->process_event(EventPauseReq{})) {
-            log_ptr_->error("当前状态无法执行暂停指令");
+            log_ptr_->error("当前状态无法执行暂停指令: state={}", GetStateString());
             return Result::Fatal;
         }
 
@@ -1668,12 +1723,14 @@ namespace rocos {
         {
             std::lock_guard<std::mutex> lock(mtx_);
             if (!executor->CanStop()) {
+                log_ptr_->error("停止请求被拒绝: 当前 motion 不支持停止, state={}, motion_ptr={}",
+                                GetStateString(), static_cast<const void*>(motion.get()));
                 return Result::FunctionNotSupported;
             }
         }
 
         if (!impl_->process_event(EventStopReq{})) {
-            log_ptr_->error("当前状态无法执行停止指令");
+            log_ptr_->error("当前状态无法执行停止指令: state={}", GetStateString());
             return Result::Fatal;
         }
         return Result::NoError;
@@ -1684,12 +1741,14 @@ namespace rocos {
         {
             std::lock_guard<std::mutex> lock(mtx_);
             if (!executor->CanResume()) {
+                log_ptr_->error("继续请求被拒绝: 当前 motion 不支持继续, state={}, motion_ptr={}",
+                                GetStateString(), static_cast<const void*>(motion.get()));
                 return Result::FunctionNotSupported;
             }
         }
 
         if (!impl_->process_event(EventResumeReq{})) {
-            log_ptr_->error("当前状态无法执行恢复指令");
+            log_ptr_->error("当前状态无法执行恢复指令: state={}", GetStateString());
             return Result::Fatal;
         }
         return Result::NoError;
