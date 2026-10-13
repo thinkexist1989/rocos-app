@@ -127,7 +127,8 @@ URDF，以避免不同模型存在同名网格。HTTP 关节状态使用
 从站数、法兰/工具/工件位姿和标定反馈；`torque` 字段用于力矩。
 
 MoveJ、MoveJ_IK、MoveL、MoveL_FK 和 MoveC 沿用旧核心的 `speed`（或
-`velocity`）、`acceleration`、`time`、`radius`、`asynchronous` 参数。
+`velocity`）、`acceleration`、`asynchronous` 参数。非零 `time` 返回
+`PlanInput`，`radius` 尚未实现轨迹过渡。
 MoveJ/MoveJ_IK 的 `jerk` 通过关节 jerk 限制生效。同步 HTTP 调用等待期间仍可
 由另一个请求停止运动。停止成功表示停止请求已提交；通过 `wait_move` 或
 `move_status` 确认减速结束后再发下一条动作。被停止的轨迹不会自动恢复。
@@ -152,7 +153,7 @@ MoveJ/MoveJ_IK 的 `jerk` 通过关节 jerk 限制生效。同步 HTTP 调用等
 验证命令（只运行 HTTP 和 HardwareSim 测试，不连接真实机器人）：
 
 ```sh
-ctest --test-dir build -R '^http_(server|robot_integration)_test$' --output-on-failure
+ctest --test-dir build -R '^(http_(server_test|robot_integration_test)|motion_result_test)$' --output-on-failure
 ```
 
 ## Related Projects
@@ -164,3 +165,7 @@ ctest --test-dir build -R '^http_(server|robot_integration)_test$' --output-on-f
 :bust_in_silhouette: **Yang Luo (luoyang@sia.cn)**
 
 :framed_picture: Icon Designed by :**Yuhan Ying (1027649507@qq.com)**
+
+运动失败使用 `result.hpp` 中的具体 Result 码，HTTP 提供 `error_name`、
+`data.error` 和 `motion_outcome`；同步及异步读取方式见
+[REST API 使用说明第 16 节](REST_API_USAGE.md#16-运动错误码与异步结果)。

@@ -23,6 +23,7 @@
 - [YAML 与实现的差异](#13-当前-yaml-与实现的差异清单)
 - [常见错误与排查](#14-常见错误与排查)
 - [项目验证与使用范围](#15-项目验证与使用范围)
+- [运动错误码与异步结果](#16-运动错误码与异步结果)
 
 ## 1. 支持情况总览
 
@@ -114,7 +115,7 @@ YAML 中共有 **61 个接口操作**，按照“HTTP 方法 + 路径”分别�
 | POST | `/api/script/breakpoint/remove` | 删除 Lua 断点 |
 | POST | `/api/script/breakpoint/clear` | 清空 Lua 断点 |
 
-这些写接口仍会先检查控制权。控制权有效时，未支持响应通常为 `success:false, code:3007`；没有控制权时可能先返回 3006。3007 也用于 token 无效或过期，需结合 `message` 区分。
+这些写接口仍会先检查控制权。控制权有效时，未支持响应通常为 `success:false, code:3007`；没有控制权时可能先返回 3006。3007 也用于 token 无效或过期；现在通过 `error_name` 区分未支持（`FunctionNotSupported`）与控制权错误（`ControlTokenInvalidOrExpired`）。
 
 ## 2. 启动服务与 curl 基本约定
 
@@ -272,7 +273,10 @@ curl -sS -G "$BASE/api/robot/urdf/mesh" \
 | `motion_busy` | 当前是否有运动或示教控制运行 |
 | `motion_type` | `none`、`axis`、`trajectory`、`dragging`、`teaching` |
 | `stop_requested` | 是否已提交停止请求 |
-| `result` | 最近一次底层运动结果；0 表示成功 |
+| `result` | 最近一次 ROCOS 运动结果码；0 表示成功，具体负数含义见第 16 节 |
+| `result_name` | 结果枚举名称，如 `NoError`、`IkCalcFail` |
+| `motion_outcome` | `idle`、`running`、`completed`、`stopped`、`failed` |
+| `error` | 运动错误详情；无错误时为 null |
 | `control_active` | 当前实现与 `motion_busy` 相同，不表示客户端持有控制权 |
 | `flange` / `tool` / `object` | 法兰、工具、工件位姿信息 |
 | `hw_state` | 硬件类型、周期、从站数等信息 |
@@ -329,7 +333,7 @@ curl -sS -X POST "$BASE/api/robot/workmode" \
 | `acceleration` | 加速度参数；默认 2.0 |
 | `jerk` | 仅 MoveJ、MoveJ_IK 支持；必须大于 0 且不超过各关节物理限制 |
 | `asynchronous` | 默认 `false`；为 `true` 时在启动运动后返回，仍需查询执行结果 |
-| `time` | HTTP 接收但旧核心没有一致的定时运动实现；MoveJ/MoveJ_IK 和 MoveC 拒绝非零值，CSP 的 MoveL 路径未用其控制时长；示例省略或设为 0 |
+| `time` | 当前统一拒绝非零值，返回 `PlanInput=-2316`；示例省略或设为 0 |
 | `radius` | HTTP 接收并传给旧核心，但当前执行路径没有实现轨迹间圆滑过渡；省略或设为 0，不依赖它实现连续轨迹 |
 
 位置使用米，关节角度使用弧度，时间使用秒。姿态使用四元数，推荐使用完整的嵌套格式并提供单位四元数：
@@ -761,6 +765,7 @@ curl -sS "$BASE/api/robot/impedance"
   "success": false,
   "code": 3007,
   "message": "Impedance parameter query is not supported by this Robot version",
+  "error_name": "FunctionNotSupported",
   "data": null
 }
 ```
@@ -811,7 +816,7 @@ YAML 未收录的负载接口同样未支持：
 | 标定 pose 请求体 | 未定义 | 实际必须传整数 id 和 pose |
 | 标定 run 请求体 | 未定义 | 实际必须传 frame: tool/object |
 | 命名坐标系 | 支持名称列表、增删、激活和持久化 | 当前只有 default 的查询和设置 |
-| time/radius | YAML 未完整描述旧版扩展参数 | time 没有一致有效实现，radius 未实现轨迹过渡；不要依赖非零值 |
+| time/radius | YAML 未完整描述旧版扩展参数 | time 非零返回 PlanInput；radius 未实现轨迹过渡，不依赖非零值 |
 | 单轴/多轴/旧格式点动 | 未收录 | 当前可用，见第 8、9.5 节 |
 | 负载管理 | 未收录 | 当前 3 个操作均未支持 |
 
@@ -823,8 +828,8 @@ YAML 未收录的负载接口同样未支持：
 | --- | --- | --- |
 | curl 连接失败 | HTTP 未启动、端口不一致或地址错误 | 检查控制程序启动日志、`--http_port` 和 BASE |
 | 3006 | 没有控制权 token | 先 acquire，再携带两个请求头 |
-| 3007，message 提示 token | token 无效、过期或 client_id 不匹配 | 查询控制权，重新申请或确认两个请求头 |
-| 3007，message 提示 not supported | 未支持的接口或参数 | 对照第 1、13 节，不重复重试相同参数 |
+| 3007，error_name 为 ControlTokenInvalidOrExpired | token 无效、过期或 client_id 不匹配 | 查询控制权，重新申请或确认两个请求头 |
+| 3007，error_name 为 FunctionNotSupported | 未支持的接口或参数 | 对照第 1、13 节，不重复重试相同参数 |
 | 3008 | 控制权已被其他客户端持有 | 原持有者 release，或按需要显式 takeover |
 | 3003 | 当前有另一种运动或正在停止 | 统一 stop，wait_move 完成后再发新运动 |
 | 3005 | 工作模式或驱动器状态不符合要求 | 切回 position，核对关节使能和 mode |
@@ -833,7 +838,7 @@ YAML 未收录的负载接口同样未支持：
 | 2001 | 零空间映射失败 | 当前构型不满足单维映射条件 |
 | 4001 / 4002 | 标定点不齐、共线、姿态约束不足或计算失败 | 核对点位编号、位置与姿态变化 |
 | 5002 | wait_move 等待超时 | 查询 motion_busy；等待超时本身不会停止运动 |
-| -1 或其他底层错误 | 逆解、限位或规划失败 | 查看控制程序日志；不是所有底层错误都映射为 YAML 中的四位业务码 |
+| 负数 Result 码 | 逆解、限位、规划或执行失败 | 通过 error_name 和 data.error 读取具体原因，见第 16 节 |
 | 点动请求成功但没有明显移动 | 单次请求很快触发心跳停止、方向被阈值过滤或速度较低 | 检查向量、dir_threshold，并按固定周期续发 |
 | 角度变了但 viz 模型不动 | 老进程仍返回硬件名称或模型与关节名不匹配 | 更新并重启控制程序，确认 name 对应 URDF 关节名，刷新 viz |
 
@@ -846,7 +851,7 @@ YAML 未收录的负载接口同样未支持：
 ```bash
 cmake -S . -B build
 cmake --build build -j2
-ctest --test-dir build -R '^http_(server_test|robot_integration_test)$' --output-on-failure
+ctest --test-dir build -R '^(http_(server_test|robot_integration_test)|motion_result_test)$' --output-on-failure
 ```
 
 集成测试自行启动临时端口的 HardwareSim，不连接真实硬件。本文完整接口清单来自源码对照；并非每种模型、每种姿态下的所有运动示例都经过执行验证。
@@ -854,3 +859,122 @@ ctest --test-dir build -R '^http_(server_test|robot_integration_test)$' --output
 整理本文时另用临时端口的 HardwareSim 实际验证了文档中的控制权申请/释放、整机使能、位置模式切换、MoveJ、单轴移动、等待、连续关节点动与停止、工件标定和未支持响应示例。其余 Shell 代码块做了语法检查，字面 JSON 请求体做了解析检查。
 
 当前服务提供 HTTP REST，未实现 WebSocket 状态推送；viz 使用 HTTP 轮询获取状态。对接客户端应以 `api_profile:legacy_robot` 和本文描述的实际字段为准。
+
+
+## 16. 运动错误码与异步结果
+
+运动检查、MoveJ/MoveJ_IK、MoveL/MoveL_FK/MoveC、Ruckig 在线轴及轨迹执行现在接入 `include/rocos_app/result.hpp`。错误在发生的分支记录，不依赖 HTTP 从一个 `-1` 猜测原因。现有 HTTP 参数、控制权、标定和等待超时的正数码保留。
+
+### 16.1 已接通的核心错误码
+
+| Result 枚举 | code | 触发原因 |
+| --- | ---: | --- |
+| `NoError` / `PlanFinished` | 0 | 成功；PlanFinished 的内部值 100 在 REST 中归一化为 0 |
+| `JointStateError` | -2017 | 当前关节模式不支持该运动，或执行中模式改变 |
+| `NotEnabled` | -2212 | 核心检查发现未使能，或执行过程中丢失使能 |
+| `ConflictTaskRunning` | -2215 | 原生运动调用发现另一个任务正在运行 |
+| `Fatal` | -2307 | 异步运动线程或在线规划发生未分类异常 |
+| `PosLimit` | -2308 | 目标或轨迹关节位置超过限制 |
+| `SpeedLimit` | -2310 | 速度限制或轨迹采样速度超限 |
+| `AccLimit` | -2311 | 加速度超过关节限制 |
+| `JerkLimit` | -2312 | 当前关节 jerk 限制非法或超过物理限制 |
+| `IkTrack` | -2314 | 轨迹中间点的位置逆运动学失败；保留最后一次重试原因 |
+| `PlanInput` | -2316 | 不支持的非零 time、无效重试次数，或 Ruckig 输入无效 |
+| `PlanMoveJ` | -2317 | MoveJ 的 DoubleS 轨迹不可行或时长非法 |
+| `PlanMoveL` | -2318 | 直线轨迹生成失败 |
+| `PlanMoveC` | -2319 | 圆弧轨迹生成失败，例如点位重合/共线 |
+| `MoveUnknown` | -2325 | 本次范围之外的旧接口仍返回未分类码时，HTTP 的明确兜底；原值放 native_code |
+| `UnmatchedJointsNumber` | -2332 | 原生调用的关节数组长度错误 |
+| `IkCalcFail` | -2349 | 目标位姿逆解失败 |
+| `FkCalcFail` | -2350 | 目标或当前位姿正运动学失败 |
+| `JacobianCalcFail` | -2353 | 速度模式的 Jacobian 逆解失败 |
+| `ParameterNanOrInf` | -2902 | 原生运动输入含 NaN/Inf |
+| `IllegalParameter` | -3006 | 原生运动输入不合法，例如速度非正 |
+| `ResourceUnavailable` | -3001 | 运动线程启动失败 |
+| `PlannerError` | -2305 | Ruckig 其他规划/时长/同步计算失败 |
+
+HTTP 入口的参数校验仍可能先返回 1001/1002/1003；HTTP 未使能和忙状态检查也保留 3001/3003。上表是到达核心后的具体返回码，不应认为所有校验都已经改成负数码。
+
+Ruckig 原始值不再直接充当业务码：`ErrorInvalidInput=-100` 映射为 `PlanInput=-2316`，位置限制错误映射为 `PosLimit=-2308`，其他规划错误映射为 `PlannerError=-2305`。原始值保存在 `native_code`，便于算法调试。
+
+### 16.2 同步失败的格式与 curl 示例
+
+不可达的目标位姿可以在仿真中触发逆解失败：
+
+```bash
+curl -sS -X POST "$BASE/api/robot/movej_ik" \
+  -H 'Content-Type: application/json' \
+  -H "X-Rocos-Control-Token: $TOKEN" \
+  -H "X-Rocos-Client-Id: $CLIENT_ID" \
+  -d '{"pose":{"position":{"x":100,"y":100,"z":100},"orientation":{"x":0,"y":0,"z":0,"w":1}},"velocity":0.2,"acceleration":0.6,"asynchronous":true}'
+```
+
+目标逆解发生在运动启动前，所以即使设置 asynchronous:true，该请求也会直接返回失败。示意响应（原始求解器码以实际返回为准）：
+
+```json
+{
+  "success": false,
+  "code": -2349,
+  "error_name": "IkCalcFail",
+  "message": "Target inverse kinematics calculation failed",
+  "data": {
+    "motion_busy": false,
+    "result": -2349,
+    "result_name": "IkCalcFail",
+    "motion_outcome": "failed",
+    "error": {
+      "code": -2349,
+      "error_name": "IkCalcFail",
+      "message": "Target inverse kinematics calculation failed",
+      "command": "movej_ik",
+      "stage": "ik"
+    }
+  }
+}
+```
+
+上例省略部分状态字段；实际求解器返回失败值时还包含 `data.error.native_code`。
+
+### 16.3 异步失败如何获取
+
+asynchronous:true 的启动成功只表示请求已经进入运动流程。运行中的规划、插补或失去使能导致的失败，记录在最近一次运动报告中。
+
+```bash
+curl -sS "$BASE/api/robot/move_status" | python3 -m json.tool
+```
+
+查询接口自身成功时，顶层 success:true/code:0；若运动失败，`data.result` 非零，`data.motion_outcome` 为 failed，`data.error` 包含原因。不能只检查该查询响应的顶层 success。
+
+```bash
+curl -sS -X POST "$BASE/api/robot/wait_move" \
+  -H 'Content-Type: application/json' \
+  -H "X-Rocos-Control-Token: $TOKEN" \
+  -H "X-Rocos-Client-Id: $CLIENT_ID" \
+  -d '{"timeout":10}'
+```
+
+wait_move 等待运动结束后，会把具体运动失败码放到顶层 code，并返回 success:false。等待自身超时则保持 5002，不覆盖实际运动报告。
+
+| 详情字段 | 含义 |
+| --- | --- |
+| `command` | movej、movej_ik、movel、movel_fk、movec、single_axis、multi_axis 等 |
+| `stage` | validation、fk、ik、planning、startup、execution、stopping 等失败阶段 |
+| `joint` | 关联关节编号，从 0 开始；能确定时才返回 |
+| `waypoint` | 关联轨迹点编号，从 0 开始；能确定时才返回 |
+| `native_code` | 第三方原始返回码；有真实原始值时才返回 |
+
+运动报告在 motion_busy 变为 false 之前保存完成，避免读到结束状态却丢掉失败原因。一次新运动启动时清除上一次错误；启动前的参数拒绝不会替代正在执行运动的结果。
+
+### 16.4 正常完成、主动停止与失败
+
+| motion_outcome | result | 含义 |
+| --- | --- | --- |
+| idle | 0 | 尚无运动结果 |
+| running | 0 | 正在规划或执行 |
+| completed | 0 | 正常完成 |
+| stopped | 0 | 接收停止请求后结束，不表示到达原始目标 |
+| failed | 非零 | 具体失败；查看 error |
+
+`motion_busy` 表示是否仍有控制流程运行。规划重试期间可能已记录最近一次失败原因而仍处于 busy，应等待终态再判断最终执行结果。成功启动、成功停止和成功到位是不同含义。
+
+成功不能用 code<1000 或 code>=0 判断，因为 Result 既有负数错误，也有正数 FunctionNotSupported=3007。当前显式识别 NoError、PlanFinished，REST 成功统一 code:0。

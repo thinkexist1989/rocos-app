@@ -510,6 +510,12 @@ target_link_libraries(http_server_test PRIVATE rocos::robot_http_server)
 add_test(NAME http_server_test COMMAND http_server_test)
 set_tests_properties(http_server_test PROPERTIES TIMEOUT 20)
 
+add_executable(motion_result_test test/motion_result_test.cc)
+target_link_libraries(motion_result_test PRIVATE rocos::robot_http_server)
+add_test(NAME motion_result_test COMMAND motion_result_test
+    ${CMAKE_CURRENT_SOURCE_DIR}/config/models/talon/robot.urdf)
+set_tests_properties(motion_result_test PROPERTIES TIMEOUT 30)
+
 find_program(ROCOS_PYTHON_EXECUTABLE python3)
 if(ROCOS_PYTHON_EXECUTABLE)
     add_test(NAME http_robot_integration_test

@@ -145,7 +145,8 @@ private:
     // ---- Utility ----
     void sendJson(httplib::Response& res, bool success,
                   int businessCode, const std::string& message,
-                  const nlohmann::json& data = nlohmann::json());
+                  const nlohmann::json& data = nlohmann::json(),
+                  const std::string& error_name = "");
     void sendUnsupported(httplib::Response& res, const std::string& feature);
     bool requireIdle(httplib::Response& res);
     nlohmann::json motionData() const;

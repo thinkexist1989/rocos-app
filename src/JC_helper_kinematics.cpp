@@ -4384,7 +4384,9 @@ namespace JC_helper
 
             if (res != ruckig::Result::Finished)
             {
-                //                PLOG_ERROR << "OTG 计算失败,停止运动";
+                robot_ptr->recordMotionError(res == ruckig::Result::ErrorInvalidInput
+                    ? rocos::Result::PlanInput : rocos::Result::PlannerError,
+                    "stopping", -1, -1, static_cast<int>(res), true);
                 for (int i = 0; i < jointNum; ++i)
                     robot_ptr->joints_[i]->setPosition(robot_ptr->pos_[i]);
             }
@@ -4396,12 +4398,14 @@ namespace JC_helper
         catch (const std::exception &e)
         {
             PLOG_ERROR << e.what();
+            robot_ptr->recordMotionError(rocos::Result::Fatal, "stopping");
             for (int i = 0; i < jointNum; ++i)
                 robot_ptr->joints_[i]->setPosition(robot_ptr->pos_[i]);
         }
         catch (...)
         {
             PLOG_ERROR << "未知错误";
+            robot_ptr->recordMotionError(rocos::Result::Fatal, "stopping");
             for (int i = 0; i < jointNum; ++i)
                 robot_ptr->joints_[i]->setPosition(robot_ptr->pos_[i]);
         }

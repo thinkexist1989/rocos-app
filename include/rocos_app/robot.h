@@ -24,6 +24,7 @@
 #include "hardware_interface.h"
 #include "interpolate.h"
 #include "kinematics.h"
+#include "result.hpp"
 #include "JC_helper_kinematics.hpp"
 #include "JC_helper_dynamics.hpp"
 #include <Eigen/StdVector> //!< Eigen官网说明 https://eigen.tuxfamily.org/dox/group__TopicStlContainers.html
@@ -31,6 +32,7 @@
 #include <vector>
 #include <atomic>
 #include <mutex>
+#include <functional>
 #include <stdexcept>
 #include "kdl_parser/kdl_parser.hpp" //!< 解析URDF文件
 #include "gripper.hpp"
@@ -105,7 +107,22 @@ namespace rocos
         bool isMotionBusy() const { return is_running_motion.load(); }
         bool motionStopRequested() const { return motion_stop_requested_.load(); }
         void requestMotionStop();
-        int getLastMotionResult() const { return last_motion_result_.load(); }
+        struct MotionReport {
+            int result = 0;
+            std::string command;
+            std::string stage = "idle";
+            std::string outcome = "idle";
+            int joint = -1;
+            int waypoint = -1;
+            int native_code = 0;
+            bool has_native_code = false;
+        };
+        MotionReport getMotionReport() const;
+        int getLastMotionResult() const { return getMotionReport().result; }
+        // 第三方原始错误仅作为详情保存，不能作为 ROCOS 业务码透传。
+        int recordMotionError(Result code, const std::string& stage,
+                              int joint = -1, int waypoint = -1,
+                              int native_code = 0, bool has_native_code = false);
 
         explicit Robot(HardwareInterface *hw,
                        const string &urdf_file_path = "robot.urdf",
@@ -1128,7 +1145,14 @@ namespace rocos
         std::atomic<bool> is_running_motion{false};
         std::atomic<MotionType> motion_type_{MotionType::None};
         std::atomic<bool> motion_stop_requested_{false};
-        std::atomic<int> last_motion_result_{0};
+        mutable std::mutex motion_report_mutex_;
+        MotionReport motion_report_;
+        void prepareMotionReport(const std::string& command);
+        void finishMotionReport();
+        int launchMoveJ(const std::string& command, JntArray q, double speed,
+                        double acceleration, double time, double radius, bool asynchronous);
+        void runMotionWorker(const std::function<void()>& worker);
+        int startTrajectoryWorker(const std::function<void()>& worker, bool asynchronous);
         std::atomic<unsigned int> calibration_pose_mask_{0};
         std::mutex axis_motion_mutex_;
         std::mutex work_mode_mutex_;

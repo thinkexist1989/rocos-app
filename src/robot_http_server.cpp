@@ -76,9 +76,6 @@ std::string workModeName(Robot* robot) {
     return "unknown";
 }
 
-int resultCode(int result) { return result; }
-bool resultSucceeded(int result) { return result == 0; }
-
 double jsonNumberOr(const nlohmann::json& body,
                     const char* primary_key,
                     const char* fallback_key,
@@ -497,7 +494,7 @@ void RobotHttpServer::setCorsHeaders(httplib::Response& res) {
 
 void RobotHttpServer::sendJson(httplib::Response& res, bool success,
                                int businessCode, const std::string& message,
-                               const nlohmann::json& data) {
+                               const nlohmann::json& data, const std::string& error_name) {
     setCorsHeaders(res);
     res.set_header("Content-Type", "application/json");
 
@@ -506,6 +503,31 @@ void RobotHttpServer::sendJson(httplib::Response& res, bool success,
     body["code"] = businessCode;
     body["message"] = message;
     body["data"] = data;
+    if (!success) {
+        std::string name = error_name;
+        if (name.empty()) {
+            switch (businessCode) {
+                case 1001: name = "InvalidParameter"; break;
+                case 1002: name = "InvalidJointId"; break;
+                case 1003: name = "InvalidVectorLength"; break;
+                case 1004: name = "RequestFailed"; break;
+                case 1006: name = "InvalidWorkMode"; break;
+                case 2001: name = "NullspaceMappingFailed"; break;
+                case 3001: name = "NotEnabled"; break;
+                case 3003: name = "MotionBusy"; break;
+                case 3005: name = "InvalidMotionMode"; break;
+                case 3006: name = "ControlTokenMissing"; break;
+                case 3007: name = "ControlTokenInvalidOrExpired"; break;
+                case 3008: name = "ControlAlreadyHeld"; break;
+                case 4001: name = "CalibrationPosesIncomplete"; break;
+                case 4002: name = "CalibrationFailed"; break;
+                case 4004: name = "InvalidCalibrationFrame"; break;
+                case 5002: name = "WaitMoveTimeout"; break;
+                default: name = rocos::to_string(static_cast<Result>(businessCode)); break;
+            }
+        }
+        body["error_name"] = name;
+    }
 
     res.set_content(body.dump(), "application/json");
 }
@@ -515,7 +537,8 @@ void RobotHttpServer::sendJson(httplib::Response& res, bool success,
 // ============================================================================
 
 void RobotHttpServer::sendUnsupported(httplib::Response& res, const std::string& feature) {
-    sendJson(res, false, 3007, feature + " is not supported by this Robot version");
+    sendJson(res, false, 3007, feature + " is not supported by this Robot version",
+             nullptr, "FunctionNotSupported");
 }
 
 bool RobotHttpServer::requireIdle(httplib::Response& res) {
@@ -528,23 +551,42 @@ bool RobotHttpServer::requireIdle(httplib::Response& res) {
 
 nlohmann::json RobotHttpServer::motionData() const {
     const auto type = robot_->getMotionType();
+    const bool busy = robot_->isMotionBusy();
+    const auto report = robot_->getMotionReport();
     const char* name = type == Robot::MotionType::Axis ? "axis"
         : type == Robot::MotionType::Trajectory ? "trajectory"
         : type == Robot::MotionType::Dragging ? "dragging"
         : type == Robot::MotionType::Teaching ? "teaching" : "none";
-    return {{"robot_state", robotState(robot_)}, {"control_active", robot_->isMotionBusy()},
-            {"motion_busy", robot_->isMotionBusy()}, {"motion_type", name},
+    nlohmann::json error = nullptr;
+    if (report.result != 0) {
+        error = {{"code", report.result}, {"error_name", rocos::to_string(static_cast<Result>(report.result))},
+                 {"message", resultMessage(static_cast<Result>(report.result))},
+                 {"command", report.command}, {"stage", report.stage}};
+        if (report.joint >= 0) error["joint"] = report.joint;
+        if (report.waypoint >= 0) error["waypoint"] = report.waypoint;
+        if (report.has_native_code) error["native_code"] = report.native_code;
+    }
+    return {{"robot_state", robotState(robot_)}, {"control_active", busy},
+            {"motion_busy", busy}, {"motion_type", name},
             {"stop_requested", robot_->motionStopRequested()},
-            {"result", robot_->getLastMotionResult()}};
+            {"result", report.result}, {"result_name", rocos::to_string(static_cast<Result>(report.result))},
+            {"motion_outcome", report.outcome}, {"error", error}};
 }
 
 void RobotHttpServer::sendMotionResult(httplib::Response& res, int result,
                                       const std::string& message, bool asynchronous) {
+    result = rocos::resultCode(static_cast<Result>(result));
     if (result == 0 && !asynchronous) {
         while (robot_->isMotionBusy()) std::this_thread::sleep_for(std::chrono::milliseconds(2));
         result = robot_->getLastMotionResult();
     }
-    sendJson(res, result == 0, result, result == 0 ? message : "Robot command failed", motionData());
+    // Older jogging/teaching paths can still return unclassified native codes.
+    if (result != 0 && rocos::to_string(static_cast<Result>(result)).find("Unknown(") == 0) {
+        result = robot_->recordMotionError(Result::MoveUnknown, "execution", -1, -1, result, true);
+    }
+    sendJson(res, result == 0, result,
+             result == 0 ? message : resultMessage(static_cast<Result>(result)), motionData(),
+             result == 0 ? "" : rocos::to_string(static_cast<Result>(result)));
 }
 
 void RobotHttpServer::jogWatchdog() {

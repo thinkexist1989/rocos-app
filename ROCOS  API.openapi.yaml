@@ -1692,13 +1692,69 @@ components:
           type: integer
           description: >
             业务状态码。0: 成功, 1xxx: 参数错误, 2xxx: 运动/规划错误, 3xxx: 状态错误, 4xxx: 标定错误,
-            5xxx: 异步任务错误, -6xxx: Lua 错误
+            5xxx: 等待/任务错误。运动核心失败使用 result.hpp 的 Result 负数码，
+            例如 -2349=IkCalcFail、-2314=IkTrack、-2317/-2318/-2319=MoveJ/MoveL/MoveC 规划失败。
+            HTTP 200 不保证 success=true；异步执行失败需读取 data.result 和 data.error。
         message:
           type: string
+        error_name:
+          type: string
+          description: 失败时返回稳定的符号名；3007 通过 FunctionNotSupported 或 ControlTokenInvalidOrExpired 区分原因。
         data:
           type: object
           properties: {}
           nullable: true
+    MotionError:
+      type: object
+      nullable: true
+      properties:
+        code:
+          type: integer
+        error_name:
+          type: string
+        message:
+          type: string
+        command:
+          type: string
+        stage:
+          type: string
+          description: validation/fk/ik/planning/startup/execution/stopping 等失败阶段
+        joint:
+          type: integer
+          minimum: 0
+          description: 关联关节编号，有具体编号时返回
+        waypoint:
+          type: integer
+          minimum: 0
+          description: 关联轨迹点编号，有具体编号时返回
+        native_code:
+          type: integer
+          description: 第三方原始错误码，不作为 ROCOS 业务码使用
+    MotionStatusData:
+      type: object
+      properties:
+        robot_state:
+          type: string
+        control_active:
+          type: boolean
+          description: 当前实现等同于 motion_busy，不表示持有控制权
+        motion_busy:
+          type: boolean
+        motion_type:
+          type: string
+          enum: [none, axis, trajectory, dragging, teaching]
+        stop_requested:
+          type: boolean
+        result:
+          type: integer
+          description: 最近一次运动结果，0 为成功，失败使用 Result 码
+        result_name:
+          type: string
+        motion_outcome:
+          type: string
+          enum: [idle, running, completed, stopped, failed]
+        error:
+          $ref: '#/components/schemas/MotionError'
     Pose:
       type: object
       properties:
@@ -1732,6 +1788,16 @@ components:
     RobotStateData:
       type: object
       properties:
+        result:
+          type: integer
+          description: 最近一次运动结果，查询本身成功不代表该结果为 0
+        result_name:
+          type: string
+        motion_outcome:
+          type: string
+          enum: [idle, running, completed, stopped, failed]
+        error:
+          $ref: '#/components/schemas/MotionError'
         robot_state:
           type: string
           enum:
@@ -1888,18 +1954,20 @@ components:
         - type: object
           properties:
             data:
-              type: object
-              properties:
-                robot_state:
-                  type: string
-                control_active:
-                  type: boolean
-                motion_busy:
-                  type: boolean
-                  description: WaitMove 专用
+              $ref: '#/components/schemas/MotionStatusData'
     MoveStatusData:
       type: object
       properties:
+        result:
+          type: integer
+          description: 最近一次运动结果，查询本身成功不代表该结果为 0
+        result_name:
+          type: string
+        motion_outcome:
+          type: string
+          enum: [idle, running, completed, stopped, failed]
+        error:
+          $ref: '#/components/schemas/MotionError'
         robot_state:
           type: string
         is_running:

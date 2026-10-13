@@ -49,6 +49,7 @@ int main() {
 
         auto denied = json(client.Post("/api/script/run", "{}", "application/json"));
         check(denied["success"] == false, "Write without control token accepted");
+        check(denied["error_name"] == "ControlTokenMissing", "Missing control error name");
         auto acquired = json(client.Post("/api/control/acquire",
             R"({"client_name":"http-test","client_id":"http-test"})", "application/json"));
         check(acquired["success"] == true, "Control acquisition failed");
@@ -61,6 +62,7 @@ int main() {
             auto response = json(client.Post(path, headers, "{}", "application/json"));
             check(response["success"] == false && response["code"] == 3007,
                   "Unsupported write did not report code 3007");
+            check(response["error_name"] == "FunctionNotSupported", "Unsupported error name is ambiguous");
         }
         auto unsupported = json(client.Get("/api/script/status"));
         check(unsupported["success"] == false && unsupported["code"] == 3007,

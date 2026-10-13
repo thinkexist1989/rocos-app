@@ -81,6 +81,28 @@ with tempfile.TemporaryDirectory(prefix='rocos-http-integration-') as tmp:
             assert state()['hw_state']['hw_type'] == 1
             assert 'current_cycle_time' in state()['hw_state']
             assert 'calibration_feedback' in state()
+            assert 'result_name' in state() and 'motion_outcome' in state() and 'error' in state()
+
+            # HTTP validation remains compatible; native failures use Result.
+            unreachable = request('/api/robot/movej_ik', {
+                'pose': {'position': {'x': 100, 'y': 100, 'z': 100}, 'orientation': {'w': 1}},
+                'velocity': .2, 'acceleration': .6, 'asynchronous': True})
+            assert not unreachable['success'] and unreachable['code'] == -2349
+            assert unreachable['error_name'] == 'IkCalcFail'
+            assert unreachable['data']['error']['command'] == 'movej_ik'
+            assert unreachable['data']['error']['stage'] == 'ik'
+            assert 'native_code' in unreachable['data']['error']
+
+            current = state()['flange']
+            circle = request('/api/robot/movec', {'pose_via': current, 'pose_goal': current,
+                                                'velocity': .02, 'acceleration': .1, 'asynchronous': True})
+            assert not circle['success'] and circle['code'] == -2319
+            assert circle['error_name'] == 'PlanMoveC' and not state()['motion_busy']
+
+            bad_position = request('/api/robot/movej', {'joints': [99] + [0]*6,
+                                                      'velocity': .2, 'acceleration': .6})
+            assert not bad_position['success'] and bad_position['code'] == -2308
+            assert bad_position['data']['error']['joint'] == 0
 
             # Work-mode selection is distinct from CSP/CSV/CST drive-mode changes.
             for mode in ['jnt_imp', 'cart_imp', 'position']:
@@ -103,6 +125,7 @@ with tempfile.TemporaryDirectory(prefix='rocos-http-integration-') as tmp:
             ok('/api/robot/single_axis/move', {'id': 0, 'pos': .08, 'max_vel': .2, 'max_acc': 1, 'max_jerk': 5})
             stopped()
             assert abs(positions()[0] - .08) < .0001, positions()
+            assert state()['motion_outcome'] == 'completed' and state()['error'] is None
             info = ok('/api/robot/info')['joint_infos']
             count = info[0]['cnt_per_unit']
             ok('/api/robot/single_axis/move', {'id': 0, 'pos': .04 * count, 'raw_data': True,
@@ -130,6 +153,7 @@ with tempfile.TemporaryDirectory(prefix='rocos-http-integration-') as tmp:
             time.sleep(.1)
             assert ok('/api/robot/stop', {})['stopped_motion_type'] == 'axis'
             stopped()
+            assert state()['motion_outcome'] == 'stopped'
 
             # Offline trajectories honor stop on the servo thread. A synchronous
             # HTTP MoveJ must leave a different HTTP worker free to stop it.
