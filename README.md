@@ -39,6 +39,9 @@ application connects.
 
 ## Usage
 
+REST 接口支持情况、参数限制及 curl 示例见
+[REST API 使用说明](REST_API_USAGE.md)。
+
 ### HTTP 模块构建
 
 ```sh
