@@ -343,7 +343,7 @@ namespace JC_helper
         }
         return y;
     }
-    void admittance_joint::Runteaching(rocos::Robot *robot_ptr, bool *flag_admittance_joint_turnoff)
+    void admittance_joint::Runteaching(rocos::Robot *robot_ptr, std::atomic<bool> *flag_admittance_joint_turnoff)
     {
         double com_fext[joint_num];
 
@@ -430,7 +430,8 @@ namespace JC_helper
             robot_ptr->servoJ(q_target);
         }
         robot_ptr->setRunState(rocos::Robot::RunState::Stopped);
-        delete this;
+        // The caller owns the controller context and keeps it alive until this
+        // worker returns. A controller must not delete itself here.
     }
 
 #pragma endregion
@@ -495,7 +496,7 @@ namespace JC_helper
     //     PLOG_INFO << "admittance  全部结束";
     // }
 
-    void admittance::Runteaching(rocos::Robot *robot_ptr, const KDL::Frame traj_target, bool *flag_turnoff)
+    void admittance::Runteaching(rocos::Robot *robot_ptr, const KDL::Frame traj_target, std::atomic<bool> *flag_turnoff)
     {
         //** 变量初始化 **//
         // std::unique_lock< std::mutex > lock_traj_joint( mutex_traj_joint, std::defer_lock );  //不上锁
@@ -596,7 +597,7 @@ namespace JC_helper
 
             _q_init = _q_target;
 
-            on_stop_trajectory = *flag_turnoff; // 由外界调用者决定什么时候停止
+            on_stop_trajectory = flag_turnoff->load(); // 由外界调用者决定什么时候停止
         }
 
         if (on_stop_trajectory)

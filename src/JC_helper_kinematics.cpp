@@ -1108,11 +1108,11 @@ namespace JC_helper
             }
 
             //** 50ms进行一次心跳检查,紧急停止时不需要检查 **//
-            if (((++count) > 200) && !on_stop_trajectory)
+            if (((++count) > 200 || robot_ptr->motionStopRequested()) && !on_stop_trajectory)
             {
                 count = 0;
 
-                if (_tick_count != robot_ptr->tick_count)
+                if (_tick_count != robot_ptr->tick_count && !robot_ptr->motionStopRequested())
                 {
                     _tick_count = robot_ptr->tick_count;
                 }
@@ -3107,10 +3107,10 @@ namespace JC_helper
             if (!flag_stop)
                 t_count++;
 
-            if (t_count > 100) // 50毫秒保持一次通信
+            if (t_count > 100 || robot_ptr->motionStopRequested()) // 50毫秒保持一次通信
             {
                 t_count = 0;
-                if (_tick_count != robot_ptr->tick_count)
+                if (_tick_count != robot_ptr->tick_count && !robot_ptr->motionStopRequested())
                     _tick_count = robot_ptr->tick_count;
                 else
                 {
@@ -3364,10 +3364,10 @@ namespace JC_helper
             if (!flag_stop)
                 t_count++;
 
-            if (t_count > 100) // 100毫秒保持一次通信
+            if (t_count > 100 || robot_ptr->motionStopRequested()) // 100毫秒保持一次通信
             {
                 t_count = 0;
-                if (_tick_count != robot_ptr->tick_count)
+                if (_tick_count != robot_ptr->tick_count && !robot_ptr->motionStopRequested())
                     _tick_count = robot_ptr->tick_count;
                 else
                 {

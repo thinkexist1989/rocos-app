@@ -104,7 +104,9 @@ namespace rocos {
 
         inline int getId() const { return id_; }
 
-        inline std::string getName() { return hw_interface_->getSlaveName(id_); }
+        inline std::string getName() {
+            return name_.empty() ? hw_interface_->getSlaveName(id_) : name_;
+        }
         inline void setName(const string& name) { name_ = name; } // 设置驱动器名称，在ecat_config.yaml的无所谓，
                                                                   // 目前是以urdf中的joint name为准，通过hardware id对应
 

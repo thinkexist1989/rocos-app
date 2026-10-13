@@ -29,6 +29,9 @@
 #include <Eigen/StdVector> //!< Eigen官网说明 https://eigen.tuxfamily.org/dox/group__TopicStlContainers.html
 #include <boost/smart_ptr.hpp>
 #include <vector>
+#include <atomic>
+#include <mutex>
+#include <stdexcept>
 #include "kdl_parser/kdl_parser.hpp" //!< 解析URDF文件
 #include "gripper.hpp"
 #include "DHParamsLoader.h"
@@ -97,6 +100,13 @@ namespace rocos
             Running = 2
         };
 
+        enum class MotionType { None, Axis, Trajectory, Dragging, Teaching };
+        MotionType getMotionType() const { return motion_type_.load(); }
+        bool isMotionBusy() const { return is_running_motion.load(); }
+        bool motionStopRequested() const { return motion_stop_requested_.load(); }
+        void requestMotionStop();
+        int getLastMotionResult() const { return last_motion_result_.load(); }
+
         explicit Robot(HardwareInterface *hw,
                        const string &urdf_file_path = "robot.urdf",
                        const string &base_link = "base_link",
@@ -132,6 +142,15 @@ namespace rocos
         }
 
         inline int getJointNum() const { return jnt_num_; }
+
+        const std::string& getUrdfFilePath() const { return urdf_file_path_; }
+        HardwareInterface* getHardwareInterface() const { return hw_interface_; }
+        ModeOfOperation getJointMode(int id) const { return joints_[id]->getMode(); }
+        double getJointMinPosition(int id) const { return joints_[id]->getMinPosLimit(); }
+        double getJointMaxPosition(int id) const { return joints_[id]->getMaxPosLimit(); }
+        double getJointMaxVelocity(int id) const { return joints_[id]->getMaxVel(); }
+        double getJointMaxAcceleration(int id) const { return joints_[id]->getMaxAcc(); }
+        double getJointMaxJerk(int id) const { return joints_[id]->getMaxJerk(); }
 
         inline std::string getJointName(int id) { return joints_[id]->getName(); }
 
@@ -382,8 +401,13 @@ namespace rocos
         /// \param sync 无同步、时间同步、相位同步
         inline void setSynchronization(Synchronization sync)
         {
+            std::lock_guard<std::mutex> lock(axis_motion_mutex_);
             sync_ = sync;
             need_plan_.resize(jnt_num_, true);
+        }
+        Synchronization getSynchronization() {
+            std::lock_guard<std::mutex> lock(axis_motion_mutex_);
+            return sync_;
         }
 
         inline Frame getFlange()
@@ -628,6 +652,7 @@ namespace rocos
 
         void set_pose_frame(int id, KDL::Frame &pose_frame)
         {
+            std::lock_guard<std::mutex> lock(mtx);
             // 根据id选择要赋值的pose变量
             if (id == 1)
             {
@@ -681,9 +706,14 @@ namespace rocos
                 // 处理无效的id
                 std::cerr << "Invalid id" << std::endl;
             }
+            if (id >= 1 && id <= 9) calibration_pose_mask_.fetch_or(1u << (id - 1));
+        }
+        bool hasCalibrationPose(int id) const {
+            return id >= 1 && id <= 9 && (calibration_pose_mask_.load() & (1u << (id - 1)));
         }
         Frame get_pose_frame(int id)
         {
+            std::lock_guard<std::mutex> lock(mtx);
             if (id == 1)
             {
                 return pose1;
@@ -723,7 +753,7 @@ namespace rocos
             else
             {
                 // 处理无效的id
-                std::cerr << "Invalid id" << std::endl;
+                throw std::out_of_range("Calibration pose id must be between 1 and 9");
             }
         }
         Frame getPose_out()
@@ -1096,6 +1126,14 @@ namespace rocos
         Synchronization sync_{SYNC_TIME};
 
         std::atomic<bool> is_running_motion{false};
+        std::atomic<MotionType> motion_type_{MotionType::None};
+        std::atomic<bool> motion_stop_requested_{false};
+        std::atomic<int> last_motion_result_{0};
+        std::atomic<unsigned int> calibration_pose_mask_{0};
+        std::mutex axis_motion_mutex_;
+        std::mutex work_mode_mutex_;
+        std::atomic<bool> axis_motion_active_{false};
+        std::vector<bool> axis_stopping_;
 
         std::vector<bool> need_plan_; // 是否需要重新规划标志
 
@@ -1133,8 +1171,8 @@ namespace rocos
         std::vector<KDL::JntArray> traj_;
         std::atomic<int> tick_count{0};
 
-        WorkMode work_mode_{WorkMode::Position};                        // 机器人当前模式，默认为位置模式
-        RunState run_state_{RunState::Disabled};                        // 机器人当前状态，默认为下使能
+        std::atomic<WorkMode> work_mode_{WorkMode::Position};
+        std::atomic<RunState> run_state_{RunState::Disabled};
         std::shared_ptr<rocos::Trapezoid> T_speed_scaling_ptr{nullptr}; // 速度缩放T型规划器
         std::atomic<double> current_speed_fraction = 1;                 // 当前的速度比例
         std::atomic<double> target_speed_fraction = 1;                  // 期望的速度比例
@@ -1169,8 +1207,8 @@ namespace rocos
 
     private:
         JC_helper::ft_sensor my_ft_sensor;         // 6维力传感器
-        bool flag_admittance_turnoff{false};       // 导纳开关
-        bool flag_admittance_joint_turnoff{false}; // 关节拖动开关
+        std::atomic<bool> flag_admittance_turnoff{false};       // 导纳开关
+        std::atomic<bool> flag_admittance_joint_turnoff{false}; // 关节拖动开关
         std::mutex mtx;                            // 互斥锁
         DHParamsLoader loader;
 
