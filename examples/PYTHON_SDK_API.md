@@ -4,6 +4,28 @@
 
 本手册面向使用 Python 控制机器人的应用开发者。普通调用使用 `Robot`、`Pose` 和运动方法即可；连接管理、控制权申请和心跳由 SDK 处理。需要对接其他接口时，可使用通用 JSON 方法。
 
+`Robot` 是 [rocos.py](rocos.py) 中的实际类，查询和运动函数都是它的实例方法。直接创建对象后调用即可：
+
+```python
+from rocos import Robot
+
+robot = Robot("192.168.1.117")
+try:
+    robot.enable()
+    joints = robot.getjointposition()     # 全部关节角度
+    first_joint = robot.getjointposition(0)
+    flange = robot.getflange()
+    robot.movej(joints)                   # 绝对关节目标，默认等到完成
+finally:
+    robot.close()
+```
+
+完整的“初始化类 → 调用类方法 → MoveJ / MoveL → 退出”程序见 [robot_class_demo.py](robot_class_demo.py)。它直接调用 `robot` 对象，不经过 `demo_*` 辅助函数。默认目标用于空闲七轴 Talon 仿真：
+
+```sh
+python3 robot_class_demo.py 192.168.1.117:8080
+```
+
 相关资料：[可运行示例](robot_sdk_demo.py)、[跨电脑连接与 curl](HTTP_CONTROL.md)、[REST 支持范围](../REST_API_USAGE.md)、[OpenAPI JSON](../ROCOS%20API.openapi.json)。
 
 ## 目录
@@ -63,7 +85,13 @@ with Robot("192.168.1.117", port=8080) as robot:
 ```sh
 python3 robot_sdk_demo.py --host 192.168.1.117 --port 8080 --read-only
 python3 robot_sdk_demo.py --host 192.168.1.117 --port 8080
+python3 robot_sdk_demo.py --host 192.168.1.117 --demo movel
+python3 robot_sdk_demo.py --host 192.168.1.117 --demo all
 ```
+
+`--demo read/movej/movel/all` 分别执行只读查询、关节往返、直线往返和全部示例。默认是 `movej`，原 `--read-only` 参数仍可使用。MoveL 示例先 MoveJ 到七轴 Talon 的预备关节姿态 `[0.2, -0.4, 0.3, -0.55, 0.2, 0.4, 0.1]`，再沿基坐标 Z 方向执行默认 `-0.005 m` 的法兰直线往返，最后恢复初始关节位置。其他模型通过 `--prepare-joints` 指定适合自己的预备姿态。
+
+`--joint`、`--joint-delta` 可调整 MoveJ 关节及角度；`--dz` 调整 MoveL 位移。示例没有通过降级或放宽限位绕过奇异姿态的规划错误。
 
 ### 1.3 只读程序
 
@@ -143,7 +171,7 @@ finally:
 | 关节位置 | rad，按控制器关节顺序排列；关节数由实际机器人决定 |
 | MoveJ、MoveJ_IK 速度 | rad/s |
 | MoveJ、MoveJ_IK 加速度 | rad/s² |
-| TCP 位置 | m |
+| 法兰 / TCP 位置 | m |
 | MoveL 速度 | m/s |
 | MoveL 加速度 | m/s² |
 | 姿态 | 四元数 `qx, qy, qz, qw`；不是欧拉角或旋转向量 |
@@ -157,8 +185,15 @@ finally:
 | 类别 | 方法 | 默认返回 |
 | --- | --- | --- |
 | 状态 | `get()` / `get_state()` / `state()` | 状态 `dict` |
-| 状态 | `get_joints()` | 关节位置 `list` |
-| 状态 | `get_pose()` | `Pose` |
+| 状态 | `get_joints()` / `getjoints()` / `get_joint_positions()` | 关节位置 `list` |
+| 状态 | `getjointposition(joint=None)` / `get_joint_position(...)` | 全部位置列表，或单个关节位置 |
+| 状态 | `get_joint_velocities()` / `get_joint_torques()` | 关节速度 / 力矩数据 `list` |
+| 状态 | `getjointvelocity(joint=None)` / `get_joint_velocity(...)` | 全部速度列表，或单个关节速度 |
+| 状态 | `getjointtorque(joint=None)` / `get_joint_torque(...)` | 全部力矩字段列表，或单个关节值 |
+| 状态 | `get_flange()` / `getflange()` | 法兰 `Pose`，不含工具偏置 |
+| 状态 | `get_pose()` / `getpose()` / `get_tool()` / `gettool()` | 当前 TCP `Pose` |
+| 状态 | `get_info()` | 机器人基本信息 `dict` |
+| 状态 | `is_moving()` | 是否正在运动，`bool` |
 | 状态 | `is_enabled()` | `bool` |
 | 基础控制 | `enable()`、`disable()` | 操作结果 `dict` |
 | 工作模式 | `set_work_mode(mode)` | 模式结果 `dict` |
@@ -173,7 +208,7 @@ finally:
 | 会话 | `close()` | `None` |
 | 诊断 | `start_heartbeat(owner)`、`stop_heartbeat()` | `None` |
 
-普通应用主要使用前八行；会话和心跳方法通常由 SDK 自动调用。
+普通应用主要使用状态查询和运动方法；会话和心跳方法通常由 SDK 自动调用。
 
 ## 4. 状态查询
 
@@ -216,10 +251,12 @@ GET 成功说明查询成功。即使 `error` 中保留上次运动失败，查�
 
 完整字段及服务版本差异参见 [REST 手册](../REST_API_USAGE.md)。
 
-### 4.2 `get_joints()`
+### 4.2 `get_joints()` / `getjoints()` / `get_joint_positions()`
 
 ```text
 get_joints() -> list
+getjoints() -> list
+get_joint_positions() -> list
 ```
 
 返回按关节顺序排列的当前位置，单位 rad。每次调用都会重新查询状态。
@@ -230,10 +267,30 @@ print("关节数：", len(joints))
 print("第一个关节：", joints[0])
 ```
 
-### 4.3 `get_pose()`
+也可以直接使用下面的单关节 / 全部关节方法：
+
+```text
+get_joint_position(joint=None) / getjointposition(joint=None)
+get_joint_velocity(joint=None) / getjointvelocity(joint=None)
+get_joint_torque(joint=None) / getjointtorque(joint=None)
+```
+
+省略 `joint` 或传入 `None` 返回全部关节的列表；传入从 0 开始的整数索引返回单个数值。越界（包括负索引）抛出 `IndexError`，非整数或布尔索引抛出 `TypeError`。位置单位 rad，速度 rad/s；力矩仍使用当前旧版控制器返回的原始计数。
+
+```python
+positions = robot.getjointposition()
+position_0 = robot.getjointposition(0)
+velocities = robot.getjointvelocity()
+torque_0 = robot.getjointtorque(0)
+```
+
+### 4.3 `get_pose()` / `getpose()` / `get_tool()` / `gettool()`
 
 ```text
 get_pose() -> Pose
+getpose() -> Pose
+get_tool() -> Pose
+gettool() -> Pose
 ```
 
 从当前状态中的 `tool` 字段构造 TCP 位姿对象。
@@ -253,6 +310,42 @@ is_enabled() -> bool
 ```
 
 返回状态中的 `is_enabled`。每次调用都会查询控制器。
+
+### 4.5 `get_flange()` / `getflange()`
+
+```text
+get_flange() -> Pose
+getflange() -> Pose
+```
+
+返回运动学基坐标系下的法兰位姿，直接来自控制器 `flange` 字段，不含工具偏置。与 TCP 的关系为 `T_base_tcp = T_base_flange × T_flange_tool`。
+
+```python
+flange = robot.getflange()
+tcp = robot.gettool()
+print("法兰：", flange)
+print("TCP：", tcp)
+```
+
+当前旧版控制器的 MoveL / MoveJ_IK 按法兰目标进行规划。生成这些运动目标应使用 `get_flange()`，尤其是在配置了非零工具偏置时；SDK 不隐式把 TCP 目标转换为法兰目标。
+
+### 4.6 `get_joint_velocities()` / `get_joint_torques()`
+
+```text
+get_joint_velocities() -> list
+get_joint_torques() -> list
+```
+
+按相同关节顺序返回当前 `velocity` / `torque` 字段。速度单位 rad/s。当前旧版 `Drive::getTorque()` 仍直接返回原始力矩计数，SDK 原样返回，不能将该列表直接当成 N·m。读这些数据不会申请控制权。
+
+### 4.7 `get_info()` / `is_moving()`
+
+```text
+get_info() -> dict
+is_moving() -> bool
+```
+
+`get_info()` 返回包含 `joint_infos`、`api_profile`、`capabilities` 等字段的基本信息。`is_moving()` 返回最新状态的 `motion_busy`。两者每次调用都查询控制器。
 
 ## 5. 使能与工作模式
 
@@ -381,7 +474,7 @@ Pose(x, y, z, qx=0.0, qy=0.0, qz=0.0, qw=1.0)
 
 | 字段 | 含义 | 单位 |
 | --- | --- | --- |
-| `x/y/z` | TCP 位置 | m |
+| `x/y/z` | 该位姿所描述参考点的位置；法兰或 TCP 由调用接口决定 | m |
 | `qx/qy/qz/qw` | 姿态四元数分量 | 无量纲 |
 
 ```python
@@ -393,6 +486,22 @@ pose.z -= 0.01
 ```
 
 建议使用单位四元数。`Pose.to_dict()` 检查全部分量有限且四元数不全为零，但不执行四元数归一化。
+
+#### `Pose.copy()` / `Pose.translated()`
+
+```text
+copy() -> Pose
+translated(dx=0.0, dy=0.0, dz=0.0) -> Pose
+```
+
+`copy()` 返回独立副本。`translated()` 返回沿当前参考坐标轴平移后的新位姿，单位 m，姿态保持不变，原对象不改变。它不沿工具自身坐标轴平移。
+
+```python
+start = robot.getflange()
+target = start.translated(dz=-0.005)
+another = start.copy()
+another.x += 0.01
+```
 
 #### `Pose.to_dict()`
 
@@ -425,21 +534,21 @@ movel(pose, velocity=0.05, acceleration=0.1, timeout=20, *, wait=True, **paramet
 
 | 参数 | 说明 |
 | --- | --- |
-| `pose` | `Pose` 对象或控制器支持的位姿字典 |
+| `pose` | `Pose` 对象或控制器支持的位姿字典；当前旧版控制器使用法兰目标 |
 | `velocity` | 默认 `0.05 m/s` |
 | `acceleration` | 默认 `0.1 m/s²` |
 | `timeout`、`wait` | 与 MoveJ 的等待语义相同 |
 | `parameters` | 当前可沿用 `time=0`、`radius=0`；不支持逐命令 `jerk` 或 `tool_name` |
 
 ```python
-target = robot.get_pose()
+target = robot.get_flange()
 target.z -= 0.01
 result = robot.movel(target, velocity=0.03, acceleration=0.1, timeout=30)
 ```
 
 机器人按控制器的直线规划执行。可达性、奇异性和途中逆解由控制器判定；读取当前位姿后增加任意偏移，并不保证新路径可规划。
 
-返回最终或受理时的运动状态 `dict`。同步 MoveL 检查终态，但 SDK 不另外实现 TCP 位置和姿态误差验证。
+返回最终或受理时的运动状态 `dict`。同步 MoveL 检查终态，但 SDK 不另外实现笛卡尔位置和姿态误差验证。运行可达性更明确的演示可使用 `--demo movel`，它会先进入指定的非奇异预备姿态。
 
 ### 7.3 `movej_ik()`
 
@@ -447,10 +556,10 @@ result = robot.movel(target, velocity=0.03, acceleration=0.1, timeout=30)
 movej_ik(pose, velocity=0.1, acceleration=0.3, timeout=20, *, wait=True, **parameters)
 ```
 
-先由控制器计算目标位姿的逆解，再执行关节空间运动。`pose` 可为 `Pose` 或位姿字典；速度和加速度单位分别为 rad/s、rad/s²。TCP 路径不保证是直线。
+先由控制器计算目标法兰位姿的逆解，再执行关节空间运动。`pose` 可为 `Pose` 或位姿字典；速度和加速度单位分别为 rad/s、rad/s²。TCP 路径不保证是直线。
 
 ```python
-target = robot.get_pose()
+target = robot.get_flange()
 target.z -= 0.01
 result = robot.movej_ik(target, velocity=0.1, acceleration=0.3)
 ```
@@ -880,7 +989,7 @@ RocosClient(base_url, timeout=5)
 
 ### 14.3 验证
 
-SDK 有 12 项测试，覆盖真实 HardwareSim 运动、心跳、会话占用、接管后的错误处理、同步 / 异步、停止、参数和传输失败。完整方法实现以 [rocos.py](rocos.py) 为准。
+SDK 有 16 项测试，覆盖真实 HardwareSim 运动、心跳、会话占用、接管后的错误处理、同步 / 异步、停止、参数和传输失败。也覆盖单关节 / 全部关节查询、非零工具偏置下区分法兰与 TCP、真实 MoveL 往返、模块化 demo 和直接类调用示例。完整方法实现以 [rocos.py](rocos.py) 为准。
 
 项目根目录执行：
 

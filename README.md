@@ -50,8 +50,16 @@ Python SDK 只需复制 [rocos.py](examples/rocos.py)，即可使用
 控制权和心跳由 SDK 自动处理。可运行 [robot_sdk_demo.py](examples/robot_sdk_demo.py)
 体验仿真往返运动。
 
+常用函数包括 `movej()`、`movel()`、`getflange()`、`gettool()`、`getjoints()`、
+`is_moving()` 和 `stop()`。demo 提供 `--demo read/movej/movel/all`，可分别运行
+查询、关节往返、法兰直线往返或全部流程。
+
 完整的方法签名、参数、返回值和异常说明见
 [Python SDK API 手册](examples/PYTHON_SDK_API.md)。
+
+[直接类调用示例](examples/robot_class_demo.py) 展示初始化 `robot = Robot(ip)` 后，
+调用 `robot.getjointposition()`、`robot.movej()`、`robot.movel()` 和
+`robot.getflange()`；`getjointposition(0)` 可读取单个关节。
 
 HTTP 控制权默认 300 秒超时，持有者每 5 秒调用
 `POST /api/control/heartbeat`，同时携带 token 和 client_id；GET 查询不续期。

@@ -2,6 +2,8 @@
 
 SDK 文件：[rocos.py](rocos.py)，最简可运行示例：[robot_sdk_demo.py](robot_sdk_demo.py)，原命令行诊断示例：[http_control.py](http_control.py)。使用 Python 3.7+ 标准库，无需安装 requests，也不需要安装 ROCOS、gRPC 或编译 C++。Windows 可将下面的 `python3` 替换为 `py -3`。
 
+希望直接“初始化 Robot 类，再调用类方法”时，使用 [robot_class_demo.py](robot_class_demo.py)：`robot = Robot(ip)` 后直接调用 `robot.getjointposition()`、`robot.movej()`、`robot.movel()`、`robot.getflange()`。
+
 方法参数、返回值、单位、异常和完整调用流程见 [Python SDK API 手册](PYTHON_SDK_API.md)。
 
 接口路径和 MoveJ 参数来自项目的 [ROCOS API.openapi.json](../ROCOS%20API.openapi.json)，鉴权细节按当前服务端实现处理。接口支持范围见 [REST_API_USAGE.md](../REST_API_USAGE.md)。
@@ -41,9 +43,13 @@ finally:
 ```sh
 python3 robot_sdk_demo.py --host 192.168.1.117 --port 8080 --read-only
 python3 robot_sdk_demo.py --host 192.168.1.117 --port 8080
+python3 robot_sdk_demo.py --host 192.168.1.117 --demo movel
+python3 robot_sdk_demo.py --host 192.168.1.117 --demo all
 ```
 
 第二条在空闲 HardwareSim 上让关节 0 增加 0.03 rad，再回到原位置；异常退出时尝试停止。SDK 本身也可以连接真实控制器，示例程序的往返动作仅允许在仿真上执行。
+
+demo 已按常用功能拆成 `demo_read(robot)`、`demo_movej(robot, ...)`、`demo_movel(robot, ...)`，可以直接导入使用。MoveL 示例先 MoveJ 到七轴 Talon 的非奇异预备姿态，再做 5 mm 法兰直线往返并恢复初始关节位置；其他模型需指定合适的 `--prepare-joints`。`--dz`、`--joint`、`--joint-delta` 分别调整直线位移、关节索引和角度。
 
 ### 0.1 常用方法
 
@@ -51,7 +57,14 @@ python3 robot_sdk_demo.py --host 192.168.1.117 --port 8080
 | --- | --- |
 | `robot.get()` / `robot.get_state()` | 读取完整状态，返回 Python 字典 |
 | `robot.get_joints()` | 当前关节角度列表，rad |
+| `robot.getjointposition()` / `robot.getjointposition(0)` | 全部关节位置 / 第 0 个关节位置；蛇形命名为 `get_joint_position()` |
+| `robot.getjoints()` / `robot.get_joint_positions()` | 与 `get_joints()` 等价 |
+| `robot.getflange()` / `robot.get_flange()` | 法兰位姿，不含工具偏置 |
 | `robot.get_pose()` | 当前 TCP 的 `Pose` 对象，位置为 m，姿态为四元数 |
+| `robot.gettool()` / `robot.get_tool()` / `robot.getpose()` | 与 `get_pose()` 等价 |
+| `robot.get_joint_velocities()` / `robot.get_joint_torques()` | 关节速度与力矩字段；当前力矩仍是底层原始计数 |
+| `robot.getjointvelocity(0)` / `robot.getjointtorque(0)` | 读取单个关节速度 / 力矩字段，省略索引时返回全部 |
+| `robot.get_info()` / `robot.is_moving()` | 基本信息 / 是否在运动 |
 | `robot.is_enabled()` | 查询是否已使能 |
 | `robot.enable()` / `robot.disable()` | 使能 / 下使能 |
 | `robot.movej(joints, velocity=..., acceleration=...)` | 关节运动，默认等待完成 |
@@ -67,8 +80,7 @@ MoveJ 速度单位 rad/s，加速度 rad/s²；MoveL 速度单位 m/s，加速�
 ```python
 from rocos import Pose
 
-pose = robot.get_pose()
-pose.z -= 0.01
+pose = robot.getflange().translated(dz=-0.01)
 robot.movel(pose, velocity=0.03, acceleration=0.1)
 
 # 也可以直接构造目标，qx/qy/qz/qw 为四元数，默认是单位姿态。
@@ -77,6 +89,8 @@ robot.movej_ik(target)
 ```
 
 这些目标须符合实际机器人的工作空间、关节限制和当前控制器能力。SDK 保留控制器的逆解、规划和限位错误信息。
+
+当前旧版控制器的 `movel/movej_ik` 接收法兰目标，`get_pose/gettool` 返回 TCP。存在非零工具偏置时，两者不能直接混用。`Pose.copy()` 和 `translated()` 返回独立的新位姿；`translated()` 沿基参考坐标轴平移，保持姿态不变。
 
 ### 0.2 异步运动
 
@@ -319,7 +333,7 @@ curl 交互超过 TTL 时，也应定时 POST `/api/control/heartbeat`，同时�
 
 ## 8. Python SDK 验证（2026-10-15）
 
-SDK 的 12 项测试覆盖只读查询不占控制权、首次控制自动连接、独立心跳、阻塞/异步 MoveJ、字典参数、JSON 扩展入口、位姿转换、运动中停止、自动准备 position 工作模式、异常退出释放、接管后停止控制及显式重新连接。传输测试覆盖 HTTP 400 中的业务码、连接中断不重发、拒绝重定向及非 JSON 响应。
+SDK 的 16 项测试覆盖只读查询不占控制权、首次控制自动连接、独立心跳、阻塞/异步 MoveJ、字典参数、JSON 扩展入口、位姿转换、运动中停止、自动准备 position 工作模式、异常退出释放、接管后停止控制及显式重新连接。新增常用查询、单关节索引校验、非零工具偏置下法兰 / TCP 区分、真实 MoveL 往返及直接类调用示例。传输测试覆盖 HTTP 400 中的业务码、连接中断不重发、拒绝重定向及非 JSON 响应。
 
 测试使用独立 HardwareSim，不占用用户正在运行的机器人。项目根目录执行：
 

@@ -17,7 +17,7 @@ import urllib.error
 import urllib.parse
 import urllib.request
 import uuid
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 
 TOKEN_HEADER = "X-Rocos-Control-Token"
 CLIENT_HEADER = "X-Rocos-Client-Id"
@@ -26,7 +26,7 @@ _log = logging.getLogger(__name__)
 
 @dataclass
 class Pose:
-    """TCP position in metres and quaternion orientation (qx, qy, qz, qw)."""
+    """Cartesian position in metres and quaternion orientation (qx, qy, qz, qw)."""
 
     x: float
     y: float
@@ -35,6 +35,16 @@ class Pose:
     qy: float = 0.0
     qz: float = 0.0
     qw: float = 1.0
+
+    def copy(self):
+        """Independent pose with the same position and orientation."""
+        return replace(self)
+
+    def translated(self, dx=0.0, dy=0.0, dz=0.0):
+        """New pose translated along the reference-frame axes, in metres."""
+        result = replace(self, x=self.x + dx, y=self.y + dy, z=self.z + dz)
+        result.to_dict()
+        return result
 
     @classmethod
     def from_dict(cls, value):
@@ -79,6 +89,8 @@ class _NoRedirect(urllib.request.HTTPRedirectHandler):
 
 
 class Robot:
+    """Robot object: construct once, then call motion and query methods directly."""
+
     def __init__(self, host="127.0.0.1", port=8080, *, timeout=5,
                  client_name="python-robot", client_id=None, auto_acquire=True):
         address = str(host).strip().rstrip("/")
@@ -204,8 +216,60 @@ class Robot:
     def get_joints(self):
         return [joint["position"] for joint in self.state()["joint_states"]]
 
+    getjoints = get_joints
+    get_joint_positions = get_joints
+
+    @staticmethod
+    def _select_joint(values, joint):
+        if joint is None:
+            return values
+        if isinstance(joint, bool) or not isinstance(joint, int):
+            raise TypeError("joint 必须是从 0 开始的整数索引")
+        if not 0 <= joint < len(values):
+            raise IndexError("joint 索引应在 0 到 {} 之间".format(len(values) - 1))
+        return values[joint]
+
+    def get_joint_position(self, joint=None):
+        """All joint positions, or one zero-based joint, in radians."""
+        return self._select_joint(self.get_joints(), joint)
+
+    getjointposition = get_joint_position
+
+    def get_joint_velocities(self):
+        return [joint["velocity"] for joint in self.state()["joint_states"]]
+
+    def get_joint_velocity(self, joint=None):
+        return self._select_joint(self.get_joint_velocities(), joint)
+
+    getjointvelocity = get_joint_velocity
+
+    def get_joint_torques(self):
+        return [joint["torque"] for joint in self.state()["joint_states"]]
+
+    def get_joint_torque(self, joint=None):
+        return self._select_joint(self.get_joint_torques(), joint)
+
+    getjointtorque = get_joint_torque
+
+    def get_flange(self):
+        """Flange pose from the controller's kinematic base, without tool offset."""
+        return Pose.from_dict(self.state()["flange"])
+
+    getflange = get_flange
+
     def get_pose(self):
+        """Current TCP pose, including the controller's configured tool offset."""
         return Pose.from_dict(self.state()["tool"])
+
+    getpose = get_pose
+    get_tool = get_pose
+    gettool = get_pose
+
+    def get_info(self):
+        return self.get("info")
+
+    def is_moving(self):
+        return self.state()["motion_busy"]
 
     def is_enabled(self):
         return self.state()["is_enabled"]
@@ -391,10 +455,12 @@ class Robot:
     movrj = movej  # Convenience alias for the spelling used in the original request.
 
     def movel(self, pose, velocity=0.05, acceleration=0.1, timeout=20, *, wait=True, **parameters):
+        """Straight-line flange target for the current legacy Robot controller."""
         value = pose.to_dict() if isinstance(pose, Pose) else pose
         return self._move("movel", {"pose": value}, velocity, acceleration, timeout, wait, parameters)
 
     def movej_ik(self, pose, velocity=0.1, acceleration=0.3, timeout=20, *, wait=True, **parameters):
+        """Joint move to a flange target via the controller's inverse kinematics."""
         value = pose.to_dict() if isinstance(pose, Pose) else pose
         return self._move("movej_ik", {"pose": value}, velocity, acceleration, timeout, wait, parameters)
 

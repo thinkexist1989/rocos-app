@@ -1,6 +1,7 @@
 """SDK transport errors and execution against an isolated HardwareSim controller."""
 import http.server
 import json
+import math
 import pathlib
 import socket
 import subprocess
@@ -257,6 +258,92 @@ class RobotTests(unittest.TestCase):
             self.assertFalse(robot.get()["motion_busy"])
             self.assertGreater(abs(robot.get_joints()[0] - target[0]), 0.01)
             robot.movej(original)
+        self.assert_no_owner()
+
+    def test_09_common_queries_and_pose_helpers(self):
+        robot = self.reader
+        state = robot.get()
+        self.assertEqual(robot.getjoints(), robot.get_joint_positions())
+        self.assertEqual(robot.getjointposition(), robot.get_joints())
+        self.assertEqual(robot.get_joint_position(0), robot.getjointposition(0))
+        self.assertEqual(robot.getjointposition(0), state["joint_states"][0]["position"])
+        self.assertEqual(robot.getjointvelocity(), robot.get_joint_velocities())
+        self.assertEqual(robot.get_joint_velocity(0), robot.getjointvelocity(0))
+        self.assertEqual(robot.getjointtorque(), robot.get_joint_torques())
+        self.assertEqual(robot.get_joint_torque(0), robot.getjointtorque(0))
+        with self.assertRaises(IndexError):
+            robot.getjointposition(-1)
+        with self.assertRaises(IndexError):
+            robot.getjointposition(7)
+        with self.assertRaises(TypeError):
+            robot.getjointposition(0.5)
+        self.assertEqual(robot.get_joint_velocities(), [j["velocity"] for j in state["joint_states"]])
+        self.assertEqual(robot.get_joint_torques(), [j["torque"] for j in state["joint_states"]])
+        self.assertEqual(robot.getflange().to_dict(), state["flange"])
+        self.assertEqual(robot.get_tool(), robot.gettool())
+        self.assertEqual(robot.get_pose(), robot.getpose())
+        self.assertEqual(len(robot.get_info()["joint_infos"]), 7)
+        self.assertFalse(robot.is_moving())
+        start = robot.get_flange()
+        copied = start.copy()
+        copied.x += 1
+        self.assertNotEqual(start.x, copied.x)
+        target = start.translated(dx=0.01, dz=-0.005)
+        self.assertAlmostEqual(target.z - start.z, -0.005)
+        self.assertEqual((target.qx, target.qy, target.qz, target.qw),
+                         (start.qx, start.qy, start.qz, start.qw))
+        self.assertEqual(robot.get_flange(), start)
+        self.assert_no_owner()
+
+    def test_10_flange_and_tcp_are_distinct_and_movel_targets_flange(self):
+        with Robot(self.url, timeout=15) as robot:
+            original = robot.get_joints()
+            original_tool = robot.get()["active_tool_frame"]
+            try:
+                robot.post("tool_frame", {"frame": Pose(0, 0, 0.1).to_dict()})
+                robot.movej([0.2, -0.4, 0.3, -0.55, 0.2, 0.4, 0.1], velocity=0.3, acceleration=0.6)
+                flange = robot.getflange()
+                tcp = robot.gettool()
+                distance = math.sqrt(sum((a - b) ** 2 for a, b in zip(
+                    (tcp.x, tcp.y, tcp.z), (flange.x, flange.y, flange.z))))
+                self.assertAlmostEqual(distance, 0.1, delta=1e-5)
+                target = flange.translated(dz=-0.005)
+                result = robot.movel(target, velocity=0.01, acceleration=0.05, timeout=30)
+                self.assertEqual(result["motion_outcome"], "completed")
+                reached = robot.getflange()
+                for name in ("x", "y", "z"):
+                    self.assertAlmostEqual(getattr(reached, name), getattr(target, name), delta=1e-4)
+                robot.movel(flange, velocity=0.01, acceleration=0.05, timeout=30)
+                robot.movej(original, velocity=0.3, acceleration=0.6)
+            finally:
+                robot.stop()
+                robot.post("tool_frame", {"frame": original_tool})
+        self.assert_no_owner()
+
+    def test_11_modular_demo_runs_read_movej_movel_and_restores_state(self):
+        original = self.reader.get_joints()
+        result = subprocess.run([sys.executable, str(root / "examples/robot_sdk_demo.py"),
+            "--host", self.url, "--demo", "all"], capture_output=True, text=True, timeout=40)
+        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+        self.assertIn("法兰位姿", result.stdout)
+        self.assertIn("MoveJ 已回位", result.stdout)
+        self.assertIn("MoveL 法兰已回位", result.stdout)
+        self.assertFalse(self.reader.is_moving())
+        for actual, expected in zip(self.reader.get_joints(), original):
+            self.assertAlmostEqual(actual, expected, delta=1e-4)
+        self.assert_no_owner()
+
+
+    def test_12_direct_robot_class_example(self):
+        original = self.reader.getjointposition()
+        result = subprocess.run([sys.executable, str(root / "examples/robot_class_demo.py"), self.url],
+            capture_output=True, text=True, timeout=40)
+        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+        self.assertIn("关节 0", result.stdout)
+        self.assertIn("已恢复关节位置", result.stdout)
+        for actual, expected in zip(self.reader.getjointposition(), original):
+            self.assertAlmostEqual(actual, expected, delta=1e-4)
+        self.assertFalse(self.reader.is_moving())
         self.assert_no_owner()
 
 
