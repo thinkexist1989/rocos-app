@@ -40,6 +40,7 @@ DEFINE_int32(id, 0, "hardware id, only work for real hardware");
 DEFINE_bool(http, true, "Start the HTTP API server");
 DEFINE_string(http_host, "0.0.0.0", "HTTP listening address");
 DEFINE_int32(http_port, 8080, "HTTP listening port");
+DEFINE_int32(http_control_ttl_seconds, 300, "HTTP control lease timeout in seconds");
 DEFINE_bool(grpc, true, "Start the gRPC API server");
 DEFINE_string(grpc_address, "0.0.0.0:30001", "gRPC listening address");
 
@@ -75,8 +76,9 @@ int main(int argc, char *argv[]) {
 
     gflags::ParseCommandLineFlags(&argc, &argv, true);
     if ((!FLAGS_http && !FLAGS_grpc) ||
-        (FLAGS_http && (FLAGS_http_port < 1 || FLAGS_http_port > 65535))) {
-        std::cerr << "Enable HTTP or gRPC and use an HTTP port between 1 and 65535.\n";
+        (FLAGS_http && (FLAGS_http_port < 1 || FLAGS_http_port > 65535 ||
+                        FLAGS_http_control_ttl_seconds <= 0))) {
+        std::cerr << "Enable HTTP or gRPC, use a valid HTTP port and a positive control TTL.\n";
         return EXIT_FAILURE;
     }
     if (!std::ifstream(FLAGS_urdf)) {
@@ -100,7 +102,7 @@ int main(int argc, char *argv[]) {
     try {
         std::unique_ptr<RobotHttpServer> httpServer;
         if (FLAGS_http) {
-            httpServer = std::make_unique<RobotHttpServer>(&robot);
+            httpServer = std::make_unique<RobotHttpServer>(&robot, nullptr, FLAGS_http_control_ttl_seconds);
             if (FLAGS_grpc) {
                 httpServer->runAsync(FLAGS_http_host, FLAGS_http_port);
             } else {

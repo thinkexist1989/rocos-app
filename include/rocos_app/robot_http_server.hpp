@@ -41,7 +41,8 @@ class Robot;
 
 class RobotHttpServer {
 public:
-    explicit RobotHttpServer(Robot* robot, LuaScriptEngine* script_engine = nullptr);
+    explicit RobotHttpServer(Robot* robot, LuaScriptEngine* script_engine = nullptr,
+                             int control_ttl_seconds = 300);
     ~RobotHttpServer();
 
     /// Start server (blocking)
@@ -141,6 +142,7 @@ private:
     void handleControlRelease(const httplib::Request& req, httplib::Response& res);
     void handleControlTakeover(const httplib::Request& req, httplib::Response& res);
     void handleControlStatus(const httplib::Request& req, httplib::Response& res);
+    void handleControlHeartbeat(const httplib::Request& req, httplib::Response& res);
 
     // ---- Utility ----
     void sendJson(httplib::Response& res, bool success,
@@ -180,10 +182,12 @@ private:
     static std::string makeConnectionKey(const std::string& remote_addr, int remote_port);
     static std::string makeConnectionKey(const httplib::Request& req);
     static std::string extractClientId(const httplib::Request& req);
-    // 检查请求 token 并在成功时续期；不加锁调用需自行持有 control_mutex_。
-    AuthResult checkAndRenewToken(const httplib::Request& req);
+    // Caller holds control_mutex_: identity validation and renewal are atomic.
+    AuthResult checkAndRenewToken_locked(const httplib::Request& req, bool allow_debug);
+    bool expireControl_locked();
     // 写接口入口守卫：失败时已经写好响应，调用方应直接 return。
-    bool ensureControl(const httplib::Request& req, httplib::Response& res);
+    bool ensureControl(const httplib::Request& req, httplib::Response& res,
+                       nlohmann::json* owner = nullptr, bool allow_debug = true);
     std::string generateControlToken();
     nlohmann::json controlOwnerJson_locked() const;
     void clearControl_locked(const char* reason);
@@ -230,7 +234,7 @@ private:
     std::string current_owner_agent_;
     std::chrono::steady_clock::time_point acquired_at_{};
     std::chrono::steady_clock::time_point last_seen_at_{};
-    static constexpr int CONTROL_TTL_SECONDS = 300;
+    const int control_ttl_seconds_;
     static constexpr const char* CONTROL_TOKEN_HEADER = "X-Rocos-Control-Token";
     static constexpr const char* CONTROL_CLIENT_ID_HEADER = "X-Rocos-Client-Id";
 

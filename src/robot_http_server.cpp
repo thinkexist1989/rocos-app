@@ -238,9 +238,13 @@ bool parseFrameJson(const nlohmann::json& j, KDL::Frame& frame) {
 // Construction / Destruction
 // ============================================================================
 
-RobotHttpServer::RobotHttpServer(Robot* robot, LuaScriptEngine* script_engine)
+RobotHttpServer::RobotHttpServer(Robot* robot, LuaScriptEngine* script_engine, int control_ttl_seconds)
     : robot_(robot), script_engine_(script_engine), server_(new httplib::Server()), taskCounter_(0),
-      poolShutdown_(false), activeWorkers_(0) {
+      poolShutdown_(false), activeWorkers_(0), control_ttl_seconds_(control_ttl_seconds) {
+
+    if (control_ttl_seconds_ <= 0) {
+        throw std::invalid_argument("Control TTL must be positive");
+    }
 
     log_ptr_ = spdlog::default_logger();
     // Allow restarting after TIME_WAIT, but keep a single controller per port.
@@ -463,6 +467,7 @@ void RobotHttpServer::registerRoutes() {
     server_->Post("/api/control/release", [this](auto& req, auto& res) { handleControlRelease(req, res); });
     server_->Post("/api/control/takeover", [this](auto& req, auto& res) { handleControlTakeover(req, res); });
     server_->Get("/api/control/status", [this](auto& req, auto& res) { handleControlStatus(req, res); });
+    server_->Post("/api/control/heartbeat", [this](auto& req, auto& res) { handleControlHeartbeat(req, res); });
 
     
 	    // 修改后：去掉 ".*",
@@ -689,13 +694,13 @@ std::string RobotHttpServer::generateControlToken() {
 }
 
 RobotHttpServer::AuthResult
-RobotHttpServer::checkAndRenewToken(const httplib::Request& req) {
+RobotHttpServer::checkAndRenewToken_locked(const httplib::Request& req, bool allow_debug) {
     if (!req.has_header(CONTROL_TOKEN_HEADER)) return AuthResult::MissingToken;
     const std::string token = req.get_header_value(CONTROL_TOKEN_HEADER);
 
     // 调试旁路：使用预设 DEBUG_TOKEN + DEBUG_CLIENT_ID 可直接控制机器人，无需 acquire。
     // 仅用于 curl/脚本调试，生产环境可注释掉此段以禁用。
-    if (token == DEBUG_TOKEN) {
+    if (allow_debug && token == DEBUG_TOKEN) {
         const std::string req_client_id = extractClientId(req);
         if (req_client_id == DEBUG_CLIENT_ID) {
             log_ptr_->info("Debug bypass: token accepted (client_id={})", req_client_id);
@@ -703,15 +708,8 @@ RobotHttpServer::checkAndRenewToken(const httplib::Request& req) {
         }
     }
 
-    std::lock_guard<std::mutex> lock(control_mutex_);
+    if (expireControl_locked()) return AuthResult::Expired;
     if (current_token_.empty()) return AuthResult::InvalidToken;
-
-    const auto now = std::chrono::steady_clock::now();
-    if (std::chrono::duration_cast<std::chrono::seconds>(now - last_seen_at_).count()
-            > CONTROL_TTL_SECONDS) {
-        clearControl_locked("ttl expired");
-        return AuthResult::Expired;
-    }
     if (token != current_token_) return AuthResult::InvalidToken;
 
     // 验证 client_id：若 acquire 时记录了 client_id，后续请求必须携带相同的 client_id。
@@ -733,14 +731,17 @@ RobotHttpServer::checkAndRenewToken(const httplib::Request& req) {
         }
     }
 
-    last_seen_at_ = now;
+    last_seen_at_ = std::chrono::steady_clock::now();
     return AuthResult::OK;
 }
 
 bool RobotHttpServer::ensureControl(const httplib::Request& req,
-                                    httplib::Response& res) {
-    switch (checkAndRenewToken(req)) {
+                                    httplib::Response& res, nlohmann::json* owner,
+                                    bool allow_debug) {
+    std::lock_guard<std::mutex> lock(control_mutex_);
+    switch (checkAndRenewToken_locked(req, allow_debug)) {
         case AuthResult::OK:
+            if (owner) *owner = controlOwnerJson_locked();
             return true;
         case AuthResult::MissingToken:
             sendJson(res, false, 3006,
@@ -754,6 +755,23 @@ bool RobotHttpServer::ensureControl(const httplib::Request& req,
             return false;
     }
     return false;
+}
+
+bool RobotHttpServer::expireControl_locked() {
+    if (!current_token_.empty() && std::chrono::steady_clock::now() - last_seen_at_
+            >= std::chrono::seconds(control_ttl_seconds_)) {
+        clearControl_locked("ttl expired");
+        return true;
+    }
+    return false;
+}
+
+void RobotHttpServer::handleControlHeartbeat(const httplib::Request& req,
+                                             httplib::Response& res) {
+    nlohmann::json owner;
+    // Heartbeats require an actual lease; legacy debug writes grant no lease.
+    if (!ensureControl(req, res, &owner, false)) return;
+    sendJson(res, true, 0, "control heartbeat accepted", owner);
 }
 
 void RobotHttpServer::clearControl_locked(const char* reason) {
@@ -787,7 +805,7 @@ nlohmann::json RobotHttpServer::controlOwnerJson_locked() const {
         const auto now = std::chrono::steady_clock::now();
         const auto age = std::chrono::duration_cast<std::chrono::seconds>(now - acquired_at_).count();
         const auto idle = std::chrono::duration_cast<std::chrono::seconds>(now - last_seen_at_).count();
-        const long long expires_in = CONTROL_TTL_SECONDS - idle;
+        const long long expires_in = control_ttl_seconds_ - idle;
         data["held_for_seconds"] = age;
         data["idle_seconds"] = idle;
         data["expires_in_seconds"] = expires_in > 0 ? expires_in : 0;
@@ -796,7 +814,8 @@ nlohmann::json RobotHttpServer::controlOwnerJson_locked() const {
         data["idle_seconds"] = 0;
         data["expires_in_seconds"] = 0;
     }
-    data["ttl_seconds"] = CONTROL_TTL_SECONDS;
+    data["ttl_seconds"] = control_ttl_seconds_;
+    data["heartbeat_interval_seconds"] = std::min(5.0, control_ttl_seconds_ / 3.0);
     return data;
 }
 
@@ -827,13 +846,7 @@ void RobotHttpServer::handleControlAcquire(const httplib::Request& req,
     std::lock_guard<std::mutex> lock(control_mutex_);
 
     // 若已有持有者但已过期则先清空
-    if (!current_token_.empty()) {
-        const auto now = std::chrono::steady_clock::now();
-        if (std::chrono::duration_cast<std::chrono::seconds>(now - last_seen_at_).count()
-                > CONTROL_TTL_SECONDS) {
-            clearControl_locked("ttl expired on acquire");
-        }
-    }
+    expireControl_locked();
 
     if (!current_token_.empty()) {
         nlohmann::json data = controlOwnerJson_locked();
@@ -878,6 +891,7 @@ void RobotHttpServer::handleControlRelease(const httplib::Request& req,
     const std::string token = req.get_header_value(CONTROL_TOKEN_HEADER);
 
     std::lock_guard<std::mutex> lock(control_mutex_);
+    expireControl_locked();
     if (current_token_.empty() || token != current_token_) {
         sendJson(res, false, 3007, "control token invalid");
         return;
@@ -948,13 +962,7 @@ void RobotHttpServer::handleControlStatus(const httplib::Request&,
                                           httplib::Response& res) {
     std::lock_guard<std::mutex> lock(control_mutex_);
     // 顺手做一次懒清理：读接口发现已过期则视为无持有者
-    if (!current_token_.empty()) {
-        const auto now = std::chrono::steady_clock::now();
-        if (std::chrono::duration_cast<std::chrono::seconds>(now - last_seen_at_).count()
-                > CONTROL_TTL_SECONDS) {
-            clearControl_locked("ttl expired on status query");
-        }
-    }
+    expireControl_locked();
     sendJson(res, true, 0, "ok", controlOwnerJson_locked());
 }
 

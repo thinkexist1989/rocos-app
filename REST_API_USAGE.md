@@ -27,11 +27,11 @@
 
 ## 1. 支持情况总览
 
-YAML 中共有 **61 个接口操作**，按照“HTTP 方法 + 路径”分别计数。同一路径的 GET、POST、DELETE 是不同操作。
+YAML 中共有 **62 个接口操作**，按照“HTTP 方法 + 路径”分别计数。同一路径的 GET、POST、DELETE 是不同操作。
 
 | 类别 | 数量 | 含义 |
 | --- | ---: | --- |
-| 功能可用 | 19 | 已接入当前 Robot；仍需满足使能、工作模式、运动限位等条件 |
+| 功能可用 | 20 | 已接入当前 Robot；仍需满足使能、工作模式、运动限位等条件 |
 | 部分支持 | 18 | 路由可调用，但参数、控制算法或行为有明确限制 |
 | 未支持 | 24 | 路由已注册，功能处理返回未支持 |
 
@@ -39,7 +39,7 @@ YAML 中共有 **61 个接口操作**，按照“HTTP 方法 + 路径”分别�
 
 当前 HTTP 实现另外提供了 YAML 未收录的 11 个可用操作：单轴 4 个、多轴 5 个、旧格式点动 2 个。还有 3 个 YAML 未收录的负载参数操作，当前均未支持。
 
-### 1.1 功能可用的 19 个操作
+### 1.1 功能可用的 20 个操作
 
 | 方法 | 路径 | 功能及条件 |
 | --- | --- | --- |
@@ -62,6 +62,7 @@ YAML 中共有 **61 个接口操作**，按照“HTTP 方法 + 路径”分别�
 | POST | `/api/control/release` | 释放控制权 |
 | POST | `/api/control/takeover` | 抢占控制权，原 token 立即失效 |
 | GET | `/api/control/status` | 查询当前控制权状态 |
+| POST | `/api/control/heartbeat` | 校验 token 和 client_id 后续期，不改变运动状态 |
 
 ### 1.2 部分支持的 18 个操作
 
@@ -199,7 +200,19 @@ CLIENT_ID=$(printf '%s' "$CONTROL_REPLY" | python3 -c \
 
 ### 3.2 有效期与查询
 
-当前有效期为 **300 秒**，与 YAML 中的 60 秒不同。通过控制权检查的请求会续期；普通 GET 状态查询以及 `/api/control/status` 不会续期。
+默认有效期为 **300 秒**，启动参数 `--http_control_ttl_seconds=30` 可调整为 30 秒。以响应中的 `ttl_seconds` 为准。持有者应按响应 `heartbeat_interval_seconds` 定时发送心跳（默认每 5 秒）：
+
+```bash
+curl -sS -X POST "$BASE/api/control/heartbeat" \
+  -H 'Content-Type: application/json' \
+  -H "X-Rocos-Control-Token: $TOKEN" \
+  -H "X-Rocos-Client-Id: $CLIENT_ID" \
+  -d '{}'
+```
+
+心跳和通过控制权检查的写请求会续期；普通 GET 状态查询以及 `/api/control/status` 不会续期。无效或过期 token、错误 client_id 的心跳返回 3007，不会续期或恢复旧控制权。仅保持 TCP 连接不能保持控制权。
+
+viz 和 Python 控制示例会独立发送心跳，因此不操作机器人也可持续持有。心跳中断达到超时后，其他客户端才能普通申请；主动 takeover 则立即替换持有者。控制权超时释放本身不会停止或改变机器人的运动。
 
 ```bash
 curl -sS "$BASE/api/control/status"
@@ -796,11 +809,11 @@ YAML 未收录的负载接口同样未支持：
 
 | 项目 | YAML 声明 | 当前实现 / 客户端处理方式 |
 | --- | --- | --- |
-| 功能范围 | 列出全部 61 个操作 | 24 个未支持，18 个部分支持；按第 1 节选择接口 |
-| 控制权有效期 | acquire 描述为 60 秒 | 实际 300 秒；参考响应中的 `ttl_seconds` |
-| 控制权绑定 | 描述强调 remote_addr:remote_port | 实际检查 token 和 client_id，不因 curl 新连接端口变化而必然失效 |
-| 写接口请求头 | security 主要描述 ControlToken | 还必须携带匹配的 `X-Rocos-Client-Id` |
-| 续期 | 描述为任何调用续期 | 通过控制权检查的请求续期；普通 GET 不续期 |
+| 功能范围 | 列出全部 62 个操作 | 24 个未支持，18 个部分支持；按第 1 节选择接口 |
+| 控制权有效期 | 默认 300 秒，可配置 | 参考响应中的 `ttl_seconds` |
+| 控制权绑定 | token 和 client_id | TCP 源端口仅供审计，换连接不影响有效凭据 |
+| 写接口请求头 | ControlToken 与 ClientId 同时提供 | 对应两个 `X-Rocos-*` 请求头 |
+| 续期 | 心跳和通过鉴权的写请求续期 | 普通 GET 不续期；心跳不改变运动状态 |
 | 关节 status | integer | 实际为字符串 ENABLED/DISABLED/FAULT/UNKNOWN |
 | robot_state | 声明完整新版 FSM 状态集合 | 当前主要返回 DISABLED/STOPPED/RUNNING/FAULT/UNKNOWN，不提供完整新版状态机 |
 | timestamp | epoch seconds | 实际 epoch 毫秒；需要秒时除以 1000 |

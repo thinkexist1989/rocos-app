@@ -42,12 +42,20 @@ application connects.
 REST 接口支持情况、参数限制及 curl 示例见
 [REST API 使用说明](REST_API_USAGE.md)。
 
+从另一台电脑申请控制权、验证鉴权及控制仿真的 Python/curl 示例见
+[跨电脑 HTTP 控制示例](examples/HTTP_CONTROL.md)，Python 示例无需安装第三方包。
+
+HTTP 控制权默认 300 秒超时，持有者每 5 秒调用
+`POST /api/control/heartbeat`，同时携带 token 和 client_id；GET 查询不续期。
+viz 与 Python 示例已支持独立心跳。可通过 `--http_control_ttl_seconds=30`
+将失联超时调整为 30 秒，实际 TTL 和建议心跳间隔由控制权响应返回。
+
 ### HTTP 模块构建
 
 ```sh
 cmake -S . -B build
 cmake --build build -j2
-ctest --test-dir build -R '^http_server_test$' --output-on-failure
+ctest --test-dir build -R '^http_(server|control_heartbeat)_test$' --output-on-failure
 ```
 
 HTTP 服务使用 C++17，构建目标为 `robot_http_server`（别名

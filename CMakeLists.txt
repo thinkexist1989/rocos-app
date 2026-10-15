@@ -510,6 +510,11 @@ target_link_libraries(http_server_test PRIVATE rocos::robot_http_server)
 add_test(NAME http_server_test COMMAND http_server_test)
 set_tests_properties(http_server_test PROPERTIES TIMEOUT 20)
 
+add_executable(http_control_heartbeat_test test/http_control_heartbeat_test.cc)
+target_link_libraries(http_control_heartbeat_test PRIVATE rocos::robot_http_server)
+add_test(NAME http_control_heartbeat_test COMMAND http_control_heartbeat_test)
+set_tests_properties(http_control_heartbeat_test PROPERTIES TIMEOUT 20)
+
 add_executable(motion_result_test test/motion_result_test.cc)
 target_link_libraries(motion_result_test PRIVATE rocos::robot_http_server)
 add_test(NAME motion_result_test COMMAND motion_result_test
