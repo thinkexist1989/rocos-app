@@ -1,8 +1,127 @@
 # 从另一台电脑通过 HTTP 控制 ROCOS
 
-示例文件：[http_control.py](http_control.py)。使用 Python 3 标准库，无需安装 requests，也不需要安装 ROCOS、gRPC 或编译 C++。Windows 可将下面的 `python3` 替换为 `py -3`。
+SDK 文件：[rocos.py](rocos.py)，最简可运行示例：[robot_sdk_demo.py](robot_sdk_demo.py)，原命令行诊断示例：[http_control.py](http_control.py)。使用 Python 3.7+ 标准库，无需安装 requests，也不需要安装 ROCOS、gRPC 或编译 C++。Windows 可将下面的 `python3` 替换为 `py -3`。
+
+方法参数、返回值、单位、异常和完整调用流程见 [Python SDK API 手册](PYTHON_SDK_API.md)。
 
 接口路径和 MoveJ 参数来自项目的 [ROCOS API.openapi.json](../ROCOS%20API.openapi.json)，鉴权细节按当前服务端实现处理。接口支持范围见 [REST_API_USAGE.md](../REST_API_USAGE.md)。
+
+## 0. 像机器人 SDK 一样使用
+
+把 `rocos.py` 和自己的 Python 程序放在同一目录即可。用户不需要自己处理 HTTP、token、client_id 或心跳：
+
+```python
+from rocos import Robot
+
+with Robot("192.168.1.117", port=8080) as robot:
+    robot.enable()
+    joints = robot.get_joints()              # 读取当前关节角度，rad
+    joints[0] += 0.03
+    robot.movej(joints, velocity=0.1, acceleration=0.3)
+    print(robot.get_joints())                # movej 默认等到运动完成
+    print(robot.get())                       # 完整机器人状态
+```
+
+`Robot` 在首次控制操作时自动申请控制权；进入 `with` 时也会提前申请，退出时停止心跳并释放。仅构造对象、查询状态不会申请控制权。客户端没有自动抢占行为，其他端正在控制时会抛出 `ApiError`。运动方法自动准备 position 工作模式；机器人未使能时提示先调用 `enable()`，不切换 CSP/CSV/CST。
+
+也可以使用普通对象，程序结束时调用 `close()`：
+
+```python
+robot = Robot("http://192.168.1.117:8080")
+try:
+    print(robot.get_joints())
+    robot.enable()                          # 内部自动申请控制权并维持心跳
+    robot.movej([0, 0, 0, 0, 0, 0, 0])      # 绝对目标角度，关节数须匹配
+finally:
+    robot.close()
+```
+
+上面的绝对零位目标仅用于说明调用方式。可直接运行带仿真检查和回位的示例：
+
+```sh
+python3 robot_sdk_demo.py --host 192.168.1.117 --port 8080 --read-only
+python3 robot_sdk_demo.py --host 192.168.1.117 --port 8080
+```
+
+第二条在空闲 HardwareSim 上让关节 0 增加 0.03 rad，再回到原位置；异常退出时尝试停止。SDK 本身也可以连接真实控制器，示例程序的往返动作仅允许在仿真上执行。
+
+### 0.1 常用方法
+
+| 方法 | 用途 |
+| --- | --- |
+| `robot.get()` / `robot.get_state()` | 读取完整状态，返回 Python 字典 |
+| `robot.get_joints()` | 当前关节角度列表，rad |
+| `robot.get_pose()` | 当前 TCP 的 `Pose` 对象，位置为 m，姿态为四元数 |
+| `robot.is_enabled()` | 查询是否已使能 |
+| `robot.enable()` / `robot.disable()` | 使能 / 下使能 |
+| `robot.movej(joints, velocity=..., acceleration=...)` | 关节运动，默认等待完成 |
+| `robot.movel(pose, velocity=..., acceleration=...)` | 笛卡尔直线运动，默认等待完成 |
+| `robot.movej_ik(pose, ...)` | 通过逆解进行关节运动 |
+| `robot.stop()` | 请求停止，并等待运动结束 |
+| `robot.close()` | 停止心跳并释放控制权 |
+
+MoveJ 速度单位 rad/s，加速度 rad/s²；MoveL 速度单位 m/s，加速度 m/s²。你提到的拼写 `robot.movrj(...)` 也作为 `movej` 的别名保留。
+
+位姿使用方式：
+
+```python
+from rocos import Pose
+
+pose = robot.get_pose()
+pose.z -= 0.01
+robot.movel(pose, velocity=0.03, acceleration=0.1)
+
+# 也可以直接构造目标，qx/qy/qz/qw 为四元数，默认是单位姿态。
+target = Pose(x=0.3, y=0.0, z=0.5, qx=0, qy=0, qz=0, qw=1)
+robot.movej_ik(target)
+```
+
+这些目标须符合实际机器人的工作空间、关节限制和当前控制器能力。SDK 保留控制器的逆解、规划和限位错误信息。
+
+### 0.2 异步运动
+
+```python
+robot.movej(joints, velocity=0.1, acceleration=0.3, wait=False)
+print(robot.get())
+robot.wait_move(timeout=30)
+```
+
+异步运动请在退出 `with` 前等待完成或调用 `stop()`；`close()` 负责释放控制权，不替代运动停止。默认的 `wait=True` 会查询最终运动结果，MoveJ 还会核对实际关节位置。
+
+### 0.3 可选的 JSON 扩展入口
+
+正常使用 SDK 不需要 API 路径；遇到尚未封装成方法的接口，可以用 `get/post`，请求头和心跳仍由 SDK 处理：
+
+```python
+state = robot.get("state")
+state = robot.get("/api/robot/state")        # 与上面等价
+info = robot.get("robot/info")
+state = robot.get("state", params={"raw_data": False})
+
+payload = {"joints": joints, "velocity": 0.1, "acceleration": 0.3}
+robot.movej(payload)                        # 也接受完整的 MoveJ 参数字典
+
+robot.post("movej", {**payload, "asynchronous": True})
+robot.wait_move()
+```
+
+`get/post` 默认返回标准响应中的 `data`。`raw=True` 返回完整的 `success/code/message/data`；`checked=False` 返回完整响应且不对业务错误抛异常，适合诊断。原 `request(...)` 保留为低层兼容接口，返回完整响应、不会自动申请控制权。模型 XML / 网格二进制下载不使用此 JSON 入口。
+
+### 0.4 错误处理
+
+```python
+from rocos import ApiError, TransportError
+
+try:
+    robot.movej(joints)
+except ApiError as error:
+    print(error.code, error.error_name, error.message)
+    print(error.data)                       # 保留控制器返回的错误详情
+except TransportError as error:
+    print(error)                            # 网络失败或响应格式错误
+```
+
+控制权被接管后，SDK 停止心跳并拒绝后续控制，不会自动夺回或重发运动。网络失败也不会自动重发控制指令；需要根据实际状态决定下一步。`with` 中发生业务异常时会释放控制权，并保留原异常。
 
 ## 1. 连接地址
 
@@ -14,7 +133,7 @@
 
 已有仿真在运行时无需重复启动。当前核对到控制电脑的局域网 IPv4 地址是 **192.168.1.117**；IP 改变后替换示例地址。
 
-将 `http_control.py` 复制到另一台电脑，该电脑应能访问控制电脑的 TCP 8080 端口。在另一台电脑执行：
+将 `rocos.py` 和需要运行的示例脚本复制到另一台电脑，该电脑应能访问控制电脑的 TCP 8080 端口。使用命令行诊断时还需复制 `http_control.py`；在另一台电脑执行：
 
 ```sh
 curl http://192.168.1.117:8080/api/robot/state
@@ -197,3 +316,16 @@ curl 交互超过 TTL 时，也应定时 POST `/api/control/heartbeat`，同时�
 - app 构建、4 项 CTest、viz 构建以及 6 项 `npm run test:control` 测试通过。
 
 升级服务端和 viz 后，需要重新启动服务端并刷新或重启 viz，运行中的旧服务不会因源文件更新而自动支持心跳。HTTP 控制权目前不限制 gRPC 客户端。
+
+## 8. Python SDK 验证（2026-10-15）
+
+SDK 的 12 项测试覆盖只读查询不占控制权、首次控制自动连接、独立心跳、阻塞/异步 MoveJ、字典参数、JSON 扩展入口、位姿转换、运动中停止、自动准备 position 工作模式、异常退出释放、接管后停止控制及显式重新连接。传输测试覆盖 HTTP 400 中的业务码、连接中断不重发、拒绝重定向及非 JSON 响应。
+
+测试使用独立 HardwareSim，不占用用户正在运行的机器人。项目根目录执行：
+
+```sh
+cmake -S . -B build
+ctest --test-dir build -R '^python_robot_client_test$' --output-on-failure
+```
+
+原命令行 `auth-test`、`move-demo`，以及新 SDK 示例的只读查询、0.03 rad 往返也已在独立仿真验证通过。五项后端/SDK CTest 通过。

@@ -523,6 +523,12 @@ set_tests_properties(motion_result_test PROPERTIES TIMEOUT 30)
 
 find_program(ROCOS_PYTHON_EXECUTABLE python3)
 if(ROCOS_PYTHON_EXECUTABLE)
+    add_test(NAME python_robot_client_test
+        COMMAND ${ROCOS_PYTHON_EXECUTABLE}
+            ${CMAKE_CURRENT_SOURCE_DIR}/test/python_robot_client_test.py
+            $<TARGET_FILE:rocosAppMain>
+            ${CMAKE_CURRENT_SOURCE_DIR}/config/models/talon/robot.urdf)
+    set_tests_properties(python_robot_client_test PROPERTIES TIMEOUT 90)
     add_test(NAME http_robot_integration_test
         COMMAND ${ROCOS_PYTHON_EXECUTABLE}
             ${CMAKE_CURRENT_SOURCE_DIR}/test/http_robot_integration_test.py

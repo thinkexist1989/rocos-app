@@ -11,145 +11,14 @@ import argparse
 import json
 import math
 import sys
-import threading
 import time
-import urllib.error
-import urllib.request
 import uuid
 
 
-TOKEN_HEADER = "X-Rocos-Control-Token"
-CLIENT_HEADER = "X-Rocos-Client-Id"
-
-
-class ApiError(RuntimeError):
-    def __init__(self, path, response):
-        self.response = response
-        super().__init__("{}: code={}, error_name={}, message={}, detail={}".format(
-            path, response.get("code"), response.get("error_name", ""),
-            response.get("message"), (response.get("data") or {}).get("error")))
-
-
-class RocosClient:
-    def __init__(self, base_url, timeout=5):
-        self.base_url = base_url.rstrip("/")
-        self.timeout = timeout
-        self.client_id = "python-" + str(uuid.uuid4())
-        self.token = None
-        self._heartbeat_stop = threading.Event()
-        self._heartbeat_thread = None
-        self.heartbeat_error = None
-        # LAN requests must go directly to the controller, not through HTTP_PROXY.
-        self.http = urllib.request.build_opener(urllib.request.ProxyHandler({}))
-
-    def request(self, path, body=None, headers=None, timeout=None, checked=True):
-        """Explicit headers replace auth headers, allowing negative auth tests."""
-        request_headers = {"Content-Type": "application/json"}
-        if headers is None:
-            if self.token:
-                request_headers[TOKEN_HEADER] = self.token
-                request_headers[CLIENT_HEADER] = self.client_id
-        else:
-            request_headers.update(headers)
-        data = None if body is None else json.dumps(body, allow_nan=False).encode("utf-8")
-        request = urllib.request.Request(
-            self.base_url + path, data=data, headers=request_headers,
-            method="GET" if body is None else "POST")
-        try:
-            with self.http.open(request, timeout=timeout or self.timeout) as response:
-                result = json.load(response)
-        except urllib.error.HTTPError as error:
-            raise RuntimeError("{}: HTTP {} {}".format(path, error.code, error.reason)) from error
-        except (urllib.error.URLError, TimeoutError, OSError) as error:
-            raise RuntimeError("{}: 网络请求失败：{}。不会自动重发运动指令。".format(
-                path, error)) from error
-        if not isinstance(result, dict) or "success" not in result or "code" not in result:
-            raise RuntimeError("{}: 响应不是 ROCOS 标准 JSON：{!r}".format(path, result))
-        # Business failures can arrive with HTTP 200, including positive error codes.
-        if checked and (result["success"] is not True or result["code"] != 0):
-            raise ApiError(path, result)
-        return result
-
-    def state(self):
-        return self.request("/api/robot/state")["data"]
-
-    def acquire(self, keep_alive=True):
-        result = self.request("/api/control/acquire", {
-            "client_name": "python-http-example", "client_id": self.client_id}, headers={})
-        self.token = result["data"]["token"]
-        # Always use the returned ID, including when the server generated it.
-        self.client_id = result["data"]["client_id"]
-        print("已获得控制权，client_id={}，TTL={} 秒".format(
-            self.client_id, result["data"]["ttl_seconds"]))
-        if keep_alive:
-            self.start_heartbeat(result["data"])
-        return result["data"]
-
-    def start_heartbeat(self, owner):
-        self.stop_heartbeat()
-        self._heartbeat_stop.clear()
-        self.heartbeat_error = None
-        headers = {TOKEN_HEADER: self.token, CLIENT_HEADER: self.client_id}
-        interval = owner.get("heartbeat_interval_seconds", 5)
-
-        def renew():
-            while not self._heartbeat_stop.wait(interval):
-                try:
-                    self.request("/api/control/heartbeat", {}, headers=headers)
-                except ApiError as error:
-                    if error.response["code"] in (3006, 3007):
-                        self.heartbeat_error = error
-                        print("控制权已失效，请重新申请：{}".format(error), file=sys.stderr)
-                        return
-                    print("心跳失败：{}".format(error), file=sys.stderr)
-                except (RuntimeError, ValueError) as error:
-                    print("心跳网络失败，将重试：{}".format(error), file=sys.stderr)
-
-        self._heartbeat_thread = threading.Thread(target=renew, daemon=True)
-        self._heartbeat_thread.start()
-
-    def stop_heartbeat(self):
-        self._heartbeat_stop.set()
-        if self._heartbeat_thread:
-            self._heartbeat_thread.join(timeout=self.timeout + 1)
-            if self._heartbeat_thread.is_alive():
-                raise RuntimeError("心跳请求未结束，暂不释放或替换凭据")
-            self._heartbeat_thread = None
-
-    def release(self):
-        self.stop_heartbeat()
-        if self.token:
-            self.request("/api/control/release", {})
-            self.token = None
-            print("已释放控制权")
-
-    def wait_move(self, timeout=20):
-        deadline = time.monotonic() + timeout
-        while True:
-            remaining = deadline - time.monotonic()
-            if remaining <= 0:
-                raise RuntimeError("等待运动超时，未确认运动完成")
-            # Each protected request renews the token. Public GETs do not renew it.
-            interval = min(2.0, remaining)
-            result = self.request("/api/robot/wait_move", {"timeout": interval},
-                                  timeout=interval + self.timeout, checked=False)
-            if result["success"] is False and result["code"] == 5002:
-                continue
-            if result["success"] is not True or result["code"] != 0:
-                raise ApiError("/api/robot/wait_move", result)
-            return result["data"]
-
-    def movej(self, joints, velocity=0.1, acceleration=0.3, timeout=20):
-        # Deliberately omit jerk/max_vel: do not overwrite shared motion limits.
-        self.request("/api/robot/movej", {
-            "joints": joints, "velocity": velocity, "acceleration": acceleration,
-            "asynchronous": True})
-        result = self.wait_move(timeout)
-        if result.get("motion_outcome") == "stopped":
-            raise RuntimeError("运动被停止，未到达目标")
-        actual = [joint["position"] for joint in self.state()["joint_states"]]
-        if len(actual) != len(joints) or any(abs(a - b) > 1e-4 for a, b in zip(actual, joints)):
-            raise RuntimeError("运动结束但关节位置与目标不符：{}".format(actual))
+try:
+    from .rocos import ApiError, CLIENT_HEADER, TOKEN_HEADER, RocosClient
+except ImportError:
+    from rocos import ApiError, CLIENT_HEADER, TOKEN_HEADER, RocosClient
 
 
 def auth_test(client):

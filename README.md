@@ -45,6 +45,14 @@ REST 接口支持情况、参数限制及 curl 示例见
 从另一台电脑申请控制权、验证鉴权及控制仿真的 Python/curl 示例见
 [跨电脑 HTTP 控制示例](examples/HTTP_CONTROL.md)，Python 示例无需安装第三方包。
 
+Python SDK 只需复制 [rocos.py](examples/rocos.py)，即可使用
+`with Robot(ip) as robot:`、`robot.movej(...)`、`robot.get_joints()`、`robot.get()`；
+控制权和心跳由 SDK 自动处理。可运行 [robot_sdk_demo.py](examples/robot_sdk_demo.py)
+体验仿真往返运动。
+
+完整的方法签名、参数、返回值和异常说明见
+[Python SDK API 手册](examples/PYTHON_SDK_API.md)。
+
 HTTP 控制权默认 300 秒超时，持有者每 5 秒调用
 `POST /api/control/heartbeat`，同时携带 token 和 client_id；GET 查询不续期。
 viz 与 Python 示例已支持独立心跳。可通过 `--http_control_ttl_seconds=30`
