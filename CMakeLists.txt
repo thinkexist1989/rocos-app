@@ -303,6 +303,9 @@ target_link_libraries(rocosAppMain
 add_executable(dynamicsIdMain src/dynamicsIdMain.cc)
 target_link_libraries(dynamicsIdMain PRIVATE robot gflags::gflags)
 
+add_executable(frictionIdMain src/frictionIdMain.cc)
+target_link_libraries(frictionIdMain PRIVATE robot gflags::gflags)
+
 # Optional: uses the same Pinocchio regressor convention as Dynamics ID Studio.
 option(BUILD_JOINT_IMPEDANCE "Build identified-model joint torque impedance controller" OFF)
 if(BUILD_JOINT_IMPEDANCE)
@@ -396,7 +399,7 @@ install(DIRECTORY include/rocos_app
 #        PUBLIC_HEADER DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}  # 头文件安装路径
 #        )
 
-install(TARGETS hardware drive kinematics robot protocol rocos_app rocosAppMain dynamicsIdMain
+install(TARGETS hardware drive kinematics robot protocol rocos_app rocosAppMain dynamicsIdMain frictionIdMain
         EXPORT rocos_app-targets
         LIBRARY DESTINATION ${CMAKE_INSTALL_LIBDIR}  # 动态库安装路径
         ARCHIVE DESTINATION ${CMAKE_INSTALL_LIBDIR}  # 静态库安装路径

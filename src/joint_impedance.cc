@@ -1,3 +1,5 @@
+// 辨识模型驱动的关节阻抗：Y(q,dq,0)·Pβ + 摩擦补偿 + Kp·(qd−q) − Kd·dq。
+// 初始化时加载文件、模型和缓存；控制周期内只校验状态并计算力矩。
 #include <rocos_app/joint_impedance.h>
 #include <pinocchio/algorithm/regressor.hpp>
 #include <pinocchio/parsers/urdf.hpp>
@@ -9,6 +11,7 @@
 #include <cmath>
 #include <fstream>
 #include <iomanip>
+#include <iterator>
 #include <set>
 #include <sstream>
 #include <stdexcept>
@@ -21,12 +24,14 @@ void require(bool ok, const std::string &message) {
     if (!ok) throw std::runtime_error(message);
 }
 
+// 配置中的相对路径以 YAML 所在目录为基准，不随程序工作目录变化。
 std::string relativeTo(const std::string &file, const std::string &path) {
     if (!path.empty() && path.front() == '/') return path;
     const auto slash = file.find_last_of('/');
     return (slash == std::string::npos ? "" : file.substr(0, slash + 1)) + path;
 }
 
+// 核对辨识时的模型文件，避免结构相同但零点、坐标或参数版本不同的文件混用。
 std::string sha256(const std::string &path) {
     std::ifstream file(path, std::ios::binary);
     require(bool(file), "Cannot read URDF: " + path);
@@ -62,14 +67,14 @@ double readAttribute(const tinyxml2::XMLElement *element, const char *name) {
 }
 
 struct FrictionParameters {
-    double coulomb;
-    double loadCoefficient;
-    double stribeckAmplitude;
-    double viscousAtReference;
-    double temperatureSlope;
-    double referenceTemperature;
-    double stribeckVelocity;
-    double smoothVelocity;
+    double coulomb; // 库仑项 Fc，Nm。
+    double loadCoefficient; // 负载相关系数，乘以刚体力矩绝对值。
+    double stribeckAmplitude; // Stribeck 附加幅值 As，Nm。
+    double viscousAtReference; // 参考温度下的黏滞系数，Nm·s/rad。
+    double temperatureSlope; // 黏滞温度斜率，允许为负。
+    double referenceTemperature; // 参考温度，°C。
+    double stribeckVelocity; // Stribeck 衰减速度 vs，rad/s。
+    double smoothVelocity; // 过零平滑速度 c，rad/s，与 vs 含义不同。
 
     explicit FrictionParameters(const YAML::Node &node) {
         auto read = [&](const char *key) {
@@ -92,11 +97,13 @@ struct FrictionParameters {
     }
 
     double compute(double velocity, double rigidTorque, double temperature) const {
+        // load 使用未加摩擦和 PD 的刚体力矩，避免补偿力矩自身进入负载项。
         const double loadFriction = loadCoefficient * std::abs(rigidTorque);
         const double stribeck = stribeckAmplitude * std::exp(-std::pow(velocity / stribeckVelocity, 2));
         const double direction = std::tanh(velocity / smoothVelocity);
         const double viscous = viscousAtReference + temperatureSlope * (temperature - referenceTemperature);
         require(std::isfinite(viscous) && viscous >= 0, "Temperature produces invalid viscous friction");
+        // 返回与驱动力矩同侧相加的有符号摩擦需求，不是实际外力矩测量。
         return (coulomb + loadFriction + stribeck) * direction + viscous * velocity;
     }
 };
@@ -107,7 +114,7 @@ struct JointImpedanceController::Impl {
     JointImpedanceConfig config;
     pinocchio::Model model;
     std::unique_ptr<pinocchio::Data> data;
-    Eigen::VectorXd parameters; // P * beta, exported once from the Studio result.
+    Eigen::VectorXd parameters; // 离线导出的 Pβ，保持 Pinocchio 的惯性参数顺序。
     Eigen::VectorXd zeroAcceleration, rigidTorque, frictionTorque, command;
     std::vector<FrictionParameters> friction;
 
@@ -122,6 +129,7 @@ struct JointImpedanceController::Impl {
         loadHardwareLimits();
         loadFrictionModel(modelPath("friction"));
 
+        // 一次性分配输出和中间缓存，避免周期内反复加载模型或调整向量长度。
         const int n = config.jointNames.size();
         zeroAcceleration = Eigen::VectorXd::Zero(n);
         rigidTorque.resize(n);
@@ -129,6 +137,7 @@ struct JointImpedanceController::Impl {
         command.resize(n);
     }
 
+    // 刚体模型负责 Y 的结构，辨识结果负责参与力矩计算的参数。
     void loadRigidModel(const std::string &path) {
         const auto result = YAML::LoadFile(path);
         config.jointNames = result["joint_names"].as<std::vector<std::string>>();
@@ -138,7 +147,8 @@ struct JointImpedanceController::Impl {
         require(uniqueNames.size() == config.jointNames.size(), "Duplicate model joint names");
         require(result["schema"].as<std::string>() == "rocos_identified_rigid_v1", "Unknown rigid model schema");
         require(result["urdf_hash"].as<std::string>() == sha256(config.urdf), "Rigid model/URDF hash mismatch");
-        // Y needs joint axes and link transforms. Torque parameters come from P * beta.
+        // URDF 提供关节轴和连杆变换，只在启动时解析一次。
+        // 后续计算 Y·Pβ，使用辨识参数，而非直接调用名义惯量的逆动力学。
         pinocchio::urdf::buildModel(config.urdf, model);
         require(model.nq == n && model.nv == n && model.njoints == n + 1, "Expected fixed-base single-DOF model");
         for (int i = 0; i < n; ++i) {
@@ -149,6 +159,7 @@ struct JointImpedanceController::Impl {
         parameters = readVector(result["rigid_parameters"], 10 * n, "P * beta");
     }
 
+    // 所有数组按刚体模型的 joint_names 排列，Kp/Kd 的单位为 Nm/rad、Nm·s/rad。
     void loadGains(const YAML::Node &yaml) {
         const int n = config.jointNames.size();
         config.kp = readVector(yaml["kp"], n, "kp");
@@ -165,14 +176,20 @@ struct JointImpedanceController::Impl {
         const auto document = YAML::LoadFile(path);
         require(document["model"].as<std::string>() == "stribeck_load_temperature_v1",
                 "Unsupported friction model");
+        // 新版导出带有 URDF 指纹时必须匹配；兼容不含此字段的旧版参数库。
+        if (document["urdf_hash"]) {
+            require(document["urdf_hash"].as<std::string>() == sha256(config.urdf), "Friction model/URDF hash mismatch");
+        }
         const auto joints = document["joint_parameters"];
+        require(joints.IsMap(), "Friction joint_parameters must be a map");
         require(joints.size() == config.jointNames.size(), "Friction joint count mismatch");
         for (const auto &name : config.jointNames) {
-            friction.emplace_back(joints[name]); // Match by joint name, never by JSON order.
+            friction.emplace_back(joints[name]); // 按关节名匹配，不依赖 JSON 键的顺序。
             config.needsTemperature |= friction.back().temperatureSlope != 0;
         }
     }
 
+    // 使用模型与硬件限位的交集，并检查 Nm 经驱动器比例换算后不会溢出 int16。
     void loadHardwareLimits() {
         config.lower = model.lowerPositionLimit;
         config.upper = model.upperPositionLimit;
@@ -196,7 +213,8 @@ struct JointImpedanceController::Impl {
 
             int id = -1;
             require(hardware->QueryIntAttribute("id", &id) == tinyxml2::XML_SUCCESS, "Missing hardware ID");
-            require(id >= 0 && id < 4096 && ids.insert(id).second, "Invalid/duplicate hardware ID");
+            require(id >= 0 && id < 4096, "Invalid hardware ID");
+            require(ids.insert(id).second, "Duplicate hardware ID");
             config.hardwareIds.push_back(id);
 
             config.lower[i] = std::max(config.lower[i], readAttribute(limit, "lower"));
@@ -213,6 +231,24 @@ struct JointImpedanceController::Impl {
             require(readAttribute(transform, "cnt_per_unit") != 0, "Position scale must be nonzero");
         }
     }
+
+    // 计算前检查完整输入，避免非有限值、越限目标或缺失温度进入补偿公式。
+    void validateInput(const Eigen::VectorXd &q, const Eigen::VectorXd &dq,
+                       const Eigen::VectorXd &qDesired, const Eigen::VectorXd &temperature) const {
+        const int n = config.jointNames.size();
+        require(q.size() == n && dq.size() == n && qDesired.size() == n, "Wrong state/target size");
+        require(q.allFinite() && dq.allFinite() && qDesired.allFinite(), "Nonfinite state/target");
+        for (int i = 0; i < n; ++i) {
+            require(q[i] >= config.lower[i] && q[i] <= config.upper[i], "Position exceeds joint limits");
+            require(qDesired[i] >= config.lower[i] && qDesired[i] <= config.upper[i], "Target exceeds joint limits");
+            require(std::abs(dq[i]) <= config.velocity[i], "Velocity exceeds joint limits");
+        }
+        if (temperature.size() == 0) {
+            require(!config.needsTemperature, "Friction model requires measured joint temperatures");
+        } else {
+            require(temperature.size() == n && temperature.allFinite(), "Invalid measured temperatures");
+        }
+    }
 };
 
 JointImpedanceController::JointImpedanceController(const std::string &path) : impl_(new Impl(path)) {}
@@ -225,30 +261,23 @@ const Eigen::VectorXd &JointImpedanceController::computeTorque(
     auto &state = *impl_;
     const auto &config = state.config;
     const int n = config.jointNames.size();
-    require(q.size() == n && dq.size() == n && qDesired.size() == n, "Wrong state/target size");
-    require(q.allFinite() && dq.allFinite() && qDesired.allFinite(), "Nonfinite state/target");
-    for (int i = 0; i < n; ++i) {
-        require(q[i] >= config.lower[i] && q[i] <= config.upper[i], "Position exceeds joint limits");
-        require(qDesired[i] >= config.lower[i] && qDesired[i] <= config.upper[i], "Target exceeds joint limits");
-        require(std::abs(dq[i]) <= config.velocity[i], "Velocity exceeds joint limits");
-    }
-    if (temperature.size() == 0) {
-        require(!config.needsTemperature, "Friction model requires measured joint temperatures");
-    } else {
-        require(temperature.size() == n && temperature.allFinite(), "Invalid measured temperatures");
-    }
+    state.validateInput(q, dq, qDesired, temperature);
 
-    // Rigid-body compensation: Y(q, dq, 0) * P * beta, with no inertia cancellation.
+    // 第三项输入零，仅提取科氏/离心和重力补偿，不抵消机械臂本身的惯量。
+    // 这不表示实际加速度为零，也不需要在这里估计或反馈实际加速度。
     const auto &Y = pinocchio::computeJointTorqueRegressor(
             state.model, *state.data, q, dq, state.zeroAcceleration);
     state.rigidTorque.noalias() = Y * state.parameters;
 
     for (int i = 0; i < n; ++i) {
         const auto &friction = state.friction[i];
+        // 无温度项时使用参考温度使温度增量为零；有温度项时前面已强制实测输入。
         const double jointTemperature = temperature.size() ? temperature[i] : friction.referenceTemperature;
         state.frictionTorque[i] = friction.compute(dq[i], state.rigidTorque[i], jointTemperature);
     }
 
+    // 保留机械臂自身惯量：只叠加模型补偿、位置弹簧和实测速度阻尼。
+    // 限幅与变化率约束由主程序在调用 robot.setTorque() 前统一执行。
     state.command = state.rigidTorque + state.frictionTorque
                   + config.kp.cwiseProduct(qDesired - q)
                   - config.kd.cwiseProduct(dq);

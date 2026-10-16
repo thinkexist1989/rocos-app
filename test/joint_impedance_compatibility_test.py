@@ -60,7 +60,7 @@ def main():
 
         parameters = dict(coulomb=.2, load_coefficient=.03, stribeck_amplitude=.1, viscous_at_reference=.08,
                           viscous_temperature_slope=0, reference_temperature_c=25, stribeck_velocity=.15, smooth_velocity=.05)
-        friction = dict(model="stribeck_load_temperature_v1", joint_names=names,
+        friction = dict(model="stribeck_load_temperature_v1", joint_names=names, urdf_hash=identification["urdf_hash"],
                         joint_parameters={name: dict(parameters) for name in reversed(names)})
         config = dict(urdf="robot.urdf", rigid_model="rigid_model.json", friction="friction_model.json",
                       kp=[20, 18, 16, 14, 12, 10, 8], kd=[4, 3.5, 3, 2.5, 2, 1.5, 1],
@@ -92,6 +92,12 @@ def main():
             run(common + ["--sim=true", "--duration=.03"], expected=1 if thermal else 0)
 
         run([binaries / "robot_torque_test", urdf])
+        friction["urdf_hash"] = "wrong-model"
+        (work / "friction_model.json").write_text(json.dumps(friction))
+        assert "Friction model/URDF hash mismatch" in run(common + ["--check_only", "--sim=false"], expected=1).stderr
+        del friction["urdf_hash"]  # Old exports without provenance remain supported.
+        (work / "friction_model.json").write_text(json.dumps(friction))
+        run(common + ["--check_only", "--sim=false"])
         config["kp"][0] = -1
         config_file.write_text(yaml.safe_dump(config))
         assert "kp must be nonnegative" in run(common + ["--check_only"], expected=1).stderr

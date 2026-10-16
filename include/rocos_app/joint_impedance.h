@@ -17,8 +17,8 @@ struct JointImpedanceConfig {
     bool needsTemperature = false;
 };
 
-// All vectors use config().jointNames order, with rad, rad/s, Nm and degC.
-// One instance belongs to one control thread; update qDesired in that thread.
+// 向量统一按 config().jointNames 排列，单位为 rad、rad/s、Nm 和 °C。
+// 每个实例由一个控制线程使用，qDesired 也应在该线程更新。
 class JointImpedanceController {
 public:
     explicit JointImpedanceController(const std::string &yamlPath);
@@ -26,9 +26,9 @@ public:
     const JointImpedanceConfig &config() const;
 
     // Y(q,dq,0) P beta + friction + Kp(qDesired-q) - Kd*dq.
-    // No saturation here: the caller applies torque and torque-rate limits.
-    // Temperature may be empty only when all temperature slopes are zero.
-    // The returned buffer is reused by the next call; no steady-state allocation.
+    // 返回未限幅力矩，由调用方统一限制力矩幅值和变化率。
+    // 仅当全部温度斜率为零时，temperature 才允许为空。
+    // 返回值引用内部缓冲，下次调用会覆盖；模型及缓冲只在初始化时创建。
     const Eigen::VectorXd &computeTorque(const Eigen::VectorXd &q,
                                         const Eigen::VectorXd &dq,
                                         const Eigen::VectorXd &qDesired,

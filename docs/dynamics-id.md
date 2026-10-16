@@ -86,3 +86,44 @@ python test/dynamics_id_compatibility_test.py \
 ```
 
 测试使用 Studio 的原始轨迹函数与预处理器，验证七轴仿真、多循环、关节顺序、直接力矩反馈、数据导入、越限拒绝和中断保存，不连接真机。
+
+## 单关节正反转摩擦采集
+
+独立入口 `src/frictionIdMain.cc` 使用 Studio 导出的 `friction_protocol.json`，按相同的五次速度过渡函数，在 Robot 的 1 ms 周期计算往返位置。`friction_trajectory.csv` 路径也可传入，此时读取同目录协议，不直接逐行执行 CSV。`friction_schedule.csv` 只作摘要，不用于判定连续 ramp 区间。
+
+此入口核对协议与 URDF 的 SHA256。因此 `--urdf` 必须是生成轨迹时的同一份七轴 URDF，既包含标准的 revolute 限位，也包含 ROCOS 的 `<hardware>`、rad 单位和标定参数。关节通过名称和硬件 ID 匹配，不依赖文件顺序。
+
+```bash
+cmake --build build --target frictionIdMain -j2
+
+# 先检查协议、URDF 和硬件位置/速度/加速度/jerk 限制，不连接硬件
+build/bin/frictionIdMain --check_only \
+  --urdf=/absolute/path/robot.urdf \
+  --trajectory=/absolute/path/friction_protocol.json
+
+# EtherCAT 主站已运行时，执行协议中全部 repeats，保存一份新文件
+build/bin/frictionIdMain --sim=false --id=0 \
+  --urdf=/absolute/path/robot.urdf \
+  --trajectory=/absolute/path/friction_protocol.json \
+  --output=/absolute/path/joint_2_train_session01.csv
+```
+
+默认 `--sim=true`。仿真只核对接口，不会生成真实速度、摩擦或温度。`--time_scale=0.1` 将往返函数放慢十倍，并把 CSV 的 `target_velocity` 同步乘以 0.1；实测 `time/q/dq/tau` 不缩放。正式采集应按计划速度执行；导入 Studio 时的时间单位倍率仍设为 1。
+
+程序先通过 `MoveJ()` 以 0.15 rad/s、0.3 rad/s² 到达协议 `initial_pose`，保持 0.5 s 后开始采集；最后一趟回到下限并保持 0.5 s，再下使能。接近与额外保持段不写入 CSV。所有参考阶段均保留，稳态筛选交给 Studio。
+
+```csv
+time,reference_time,repeat,pair,sweep,phase,target_velocity,q_1,dq_1,tau_1,...
+```
+
+`time` 为采集的实际经过秒数；`reference_time` 是协议函数时间。`repeat/pair/sweep` 从零开始，含义与 Studio 一致。`q/dq/tau` 分别直接读取 `getJointPosition()`、`getJointVelocity()` 和 `getJointLoadTorque()`；没有温度与电流接口，因而不输出这些列。力矩原值、内存缓冲、独占新文件、中断保存和进程生命周期约定与上文相同；输出侧 Nm 和信号是否包含目标传动摩擦仍需根据硬件核对。长时间实验的内存需求随总时长和采样数增加，运行前分配缓冲，期间不写盘。
+
+采完后在 Studio 的“摩擦辨识”页面选择协议中的关节，确认其他关节静止，导入 CSV。列序号沿用协议 `joint_names`，不是 Robot 索引；无实测温度时使用无温度项模型。
+
+离线兼容测试使用 Studio 的真实轨迹生成函数和清洗配对函数；另建的合成反馈仅用于检查配对，不冒充 HardwareSim 的实测数据：
+
+```bash
+python3 test/friction_id_compatibility_test.py \
+  --binary=build/bin/frictionIdMain \
+  --studio=/home/rocos/Documents/GitHub/dynamics-id-studio
+```
