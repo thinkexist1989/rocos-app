@@ -299,6 +299,33 @@ target_link_libraries(rocosAppMain
         gflags::gflags
         )
 
+# Robot API adapter for Dynamics ID Studio trajectory execution and recording.
+add_executable(dynamicsIdMain src/dynamicsIdMain.cc)
+target_link_libraries(dynamicsIdMain PRIVATE robot gflags::gflags)
+
+# Optional: uses the same Pinocchio regressor convention as Dynamics ID Studio.
+option(BUILD_JOINT_IMPEDANCE "Build identified-model joint torque impedance controller" OFF)
+if(BUILD_JOINT_IMPEDANCE)
+    find_package(pinocchio REQUIRED)
+    find_library(IMPEDANCE_TINYXML2_LIBRARY tinyxml2 REQUIRED)
+    add_library(joint_impedance SHARED src/joint_impedance.cc)
+    target_compile_features(joint_impedance PRIVATE cxx_std_17)
+    target_include_directories(joint_impedance PUBLIC
+            $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>
+            $<INSTALL_INTERFACE:include>)
+    target_link_libraries(joint_impedance PUBLIC Eigen3::Eigen PRIVATE
+            pinocchio::pinocchio yaml-cpp OpenSSL::Crypto ${IMPEDANCE_TINYXML2_LIBRARY})
+    add_executable(jointImpedanceMain src/jointImpedanceMain.cc)
+    target_link_libraries(jointImpedanceMain PRIVATE joint_impedance robot gflags::gflags)
+    add_executable(joint_impedance_test test/joint_impedance_test.cc)
+    target_link_libraries(joint_impedance_test PRIVATE joint_impedance yaml-cpp)
+    add_executable(robot_torque_test test/robot_torque_test.cc)
+    target_link_libraries(robot_torque_test PRIVATE robot)
+    install(TARGETS joint_impedance jointImpedanceMain
+            LIBRARY DESTINATION ${CMAKE_INSTALL_LIBDIR}
+            RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR})
+endif()
+
 
 configure_file(include/ver.h.in ver.h) # Version Definition
 
@@ -369,7 +396,7 @@ install(DIRECTORY include/rocos_app
 #        PUBLIC_HEADER DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}  # 头文件安装路径
 #        )
 
-install(TARGETS hardware drive kinematics robot protocol rocos_app rocosAppMain
+install(TARGETS hardware drive kinematics robot protocol rocos_app rocosAppMain dynamicsIdMain
         EXPORT rocos_app-targets
         LIBRARY DESTINATION ${CMAKE_INSTALL_LIBDIR}  # 动态库安装路径
         ARCHIVE DESTINATION ${CMAKE_INSTALL_LIBDIR}  # 静态库安装路径

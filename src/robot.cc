@@ -293,6 +293,20 @@ namespace rocos {
     // TODO: 切换HW指针
     bool Robot::switchHW(HardwareInterface *hw) { return false; }
 
+    int Robot::setTorque(const Eigen::VectorXd &torques) {
+        if (torques.size() != jnt_num_ || !torques.allFinite()) return -1;
+        for (int i = 0; i < jnt_num_; ++i) {
+            const double scale = getJointTorquePerUnit(i);
+            const double raw = torques[i] * scale;
+            if (joints_[i]->getMode() != ModeOfOperation::CyclicSynchronousTorqueMode ||
+                !std::isfinite(scale) || scale == 0 || !std::isfinite(raw) ||
+                raw < -32768 || raw > 32767) return -1;
+        }
+        for (int i = 0; i < jnt_num_; ++i) setJointTorque(i, torques[i]);
+        hw_interface_->waitForSignal(0);
+        return 0;
+    }
+
 
     bool Robot::setWorkMode(WorkMode mode) {
 

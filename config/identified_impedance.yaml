@@ -1,0 +1,31 @@
+# Paths are relative to THIS YAML file. Use the exact bounded URDF used by Studio,
+# including ROCOS <hardware> tags and calibrated torque_per_unit in counts/Nm.
+# Export the rigid parameters once (no physical-inertia reconstruction):
+#   python3 tools/export_impedance_model.py /path/to/identification_run models/rigid_model.json
+# Copy that run's friction_model.json and exact URDF into models/, or change paths below.
+# A nonzero viscous_temperature_slope needs real temperatures via computeTorque's
+# fourth argument. The standalone hold example has no temperature source.
+urdf: ../models/robot.urdf
+rigid_model: ../models/rigid_model.json  # Export P * beta with tools/export_impedance_model.py.
+friction: ../models/friction_model.json
+
+# Arrays follow joint_names in rigid_model.json; these are starting examples,
+# not tuned gains for a particular robot. Units: Nm/rad and Nm*s/rad.
+kp: [20, 20, 20, 15, 10, 8, 5]
+kd: [4, 4, 4, 3, 2, 1.5, 1]
+
+# Output-joint Nm and Nm/s; must not exceed URDF effort or int16 drive range.
+# Initial gravity compensation must fit torque_limit before drives are enabled.
+torque_limit: [30, 30, 30, 30, 15, 15, 10]
+torque_rate_limit: [100, 100, 100, 100, 50, 50, 30]
+
+# Build (Pinocchio must be discoverable by CMake):
+#   cmake -S . -B build/impedance -DBUILD_JOINT_IMPEDANCE=ON -DCMAKE_BUILD_TYPE=Release
+#   cmake --build build/impedance --target jointImpedanceMain -j2
+# This workstation also needs -DCMAKE_PREFIX_PATH=/opt/ros/humble and
+# -DCMAKE_DISABLE_FIND_PACKAGE_urdf=TRUE to avoid mixing ROS 1/2 URDF frontends.
+# Validate without hardware:
+#   build/impedance/bin/jointImpedanceMain --config=config/identified_impedance.yaml --check_only
+# Interface smoke test (does not simulate torque dynamics):
+#   build/impedance/bin/jointImpedanceMain --config=config/identified_impedance.yaml --sim=true --duration=1
+# Real hardware: --sim=false. Update gains/limits/scales for the actual robot first.

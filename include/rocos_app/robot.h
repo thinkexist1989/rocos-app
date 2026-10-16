@@ -133,6 +133,10 @@ namespace rocos
 
         inline int getJointNum() const { return jnt_num_; }
 
+        // Resolve external model joint names through URDF hardware IDs without
+        // assuming that CSV order, Robot joint order and bus order are equal.
+        inline int getJointHardwareId(int id) const { return joints_.at(id)->getId(); }
+
         inline std::string getJointName(int id) { return joints_[id]->getName(); }
 
         inline int getJointStatus(int id) { return joints_[id]->getDriveStateRPC(); }
@@ -166,6 +170,11 @@ namespace rocos
         {
             joints_[id]->setTorque(tor);
         }
+
+        // CST commands in Robot joint order and user torque units (configure Nm).
+        // Validate the whole vector before writing; wait for the next bus cycle.
+        // Disabled drives are allowed so the first command can precede enabling.
+        int setTorque(const Eigen::VectorXd &torques);
 
         /////////////////////获取原始信息//////////////////////////
         inline int32_t getJointPositionRaw(int id)
