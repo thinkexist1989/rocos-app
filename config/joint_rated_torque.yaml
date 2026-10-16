@@ -1,0 +1,10 @@
+# 采集端按关节名匹配，避免 Studio 列顺序或硬件 ID 变化造成力矩换算错位。
+# 单位 Nm；getJointTorque() 每个反馈计数对应该关节额定力矩的 1/1000。
+rated_torque:
+  joint_1: 48  # MJB17
+  joint_2: 48  # MJB17
+  joint_3: 40  # MJB17
+  joint_4: 40  # MJB17
+  joint_5: 7   # MJB14
+  joint_6: 7   # MJB14
+  joint_7: 7   # MJB14

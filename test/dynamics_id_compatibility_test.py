@@ -58,7 +58,8 @@ def main():
                     coefficients=coefficients.tolist(), limits_verified=True)
         metadata = work / "trajectory.json"
         metadata.write_text(json.dumps(meta))
-        common = [str(binary), f"--urdf={urdf}", f"--trajectory={metadata}"]
+        torque_config = root / "config/joint_rated_torque.yaml"
+        common = [str(binary), f"--urdf={urdf}", f"--trajectory={metadata}", f"--torque_config={torque_config}", "--loops=1"]
 
         def run(extra, expected=0):
             result = subprocess.run(common + extra, cwd=work, text=True, capture_output=True, timeout=60)
@@ -68,6 +69,16 @@ def main():
         run(["--check_only"])
         run(["--check_only", "--sim=false"])  # Proves check_only does not connect hardware.
         run(["--check_only", f"--trajectory={work / 'trajectory.csv'}"])
+        bad_torque = work / "bad_torque.yaml"
+        ratings = yaml.safe_load(torque_config.read_text())
+        for value in (None, 0, -1, float("nan")):
+            invalid = {"rated_torque": dict(ratings["rated_torque"])}
+            if value is None:
+                del invalid["rated_torque"]["joint_3"]
+            else:
+                invalid["rated_torque"]["joint_3"] = value
+            bad_torque.write_text(yaml.safe_dump(invalid))
+            assert "rated torque" in run(["--check_only", f"--torque_config={bad_torque}"], expected=1).stderr
         for scale in ("0", "-0.1", "1.01", "nan", "inf"):
             assert "time_scale must be" in run(["--check_only", f"--time_scale={scale}"], expected=1).stderr
         assert "too many trajectory points" in run(["--check_only", "--time_scale=1e-300"], expected=1).stderr
@@ -80,14 +91,15 @@ def main():
         assert report["simulation"] is True and report["completed"] is True
         assert report["time_scale"] == 1
         assert report["servo_period_seconds"] == .001
-        assert report["torque_source"] == "Robot::getJointLoadTorque"
-        assert report["torque_conversion"] == "none; save the Robot getter return value directly"
+        assert report["torque_source"] == "Robot::getJointTorque" and report["torque_unit"] == "Nm"
+        assert report["torque_conversion"] == "getJointTorque * rated_torque_Nm / 1000"
+        assert report["rated_torque_Nm"] == dict(zip([f"joint_{j}" for j in range(1, 8)], [48, 48, 40, 40, 7, 7, 7]))
         assert len(data.dtype.names) == 2 + 3 * len(names)
         assert [j["name"] for j in report["joints"]] == names
         assert [j["robot_index"] for j in report["joints"]] == [2, 0, 6, 1, 5, 3, 4]
         servo_q, _, _ = evaluate(coefficients, np.linspace(0, duration, 2001), duration, np.zeros(7))
         for j in range(1, 8):
-            # Save Robot::getJointLoadTorque() directly. HardwareSim returns zero.
+            # HardwareSim actual torque is zero; conversion to Nm preserves zero.
             assert np.all(data[f"tau_{j}"] == 0)
             assert f"load_raw_{j}" not in data.dtype.names
             assert np.all(data[f"dq_{j}"] == 0)  # Do not fabricate measured velocity.
@@ -142,7 +154,7 @@ def main():
         partial_report = yaml.safe_load(Path(str(partial) + ".metadata.yaml").read_text())
         assert partial_report["completed"] is False and partial_report["samples"] > 0
         assert partial_report["failure"] == "Interrupted by signal"
-    print("PASS: Studio trajectory, Robot replay, time scaling at 0.1, name mapping, direct LoadTorque feedback, CSV import, validation failures and interrupted recording")
+    print("PASS: Studio trajectory, Robot replay, time scaling at 0.1, named rated torques, Nm feedback, CSV import, validation failures and interrupted recording")
 
 
 if __name__ == "__main__":

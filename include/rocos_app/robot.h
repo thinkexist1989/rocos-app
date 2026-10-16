@@ -102,7 +102,7 @@ namespace rocos
             Running = 2
         };
 
-        enum class MotionType { None, Axis, Trajectory, Dragging, Teaching };
+        enum class MotionType { None, Trajectory, Dragging, Teaching };
         MotionType getMotionType() const { return motion_type_.load(); }
         bool isMotionBusy() const { return is_running_motion.load(); }
         bool motionStopRequested() const { return motion_stop_requested_.load(); }
@@ -306,36 +306,6 @@ namespace rocos
                    const std::vector<double> &target_vel,
                    Synchronization sync = SYNC_TIME);
 
-        void stopSingleAxis(int id);
-
-        void stopMultiAxis();
-
-        /// 单关节运动
-        /// \param id 关节ID
-        /// \param pos 位置
-        /// \param vel 速度
-        /// \param max_vel 最大速度
-        /// \param max_acc 最大加速度
-        /// \param max_jerk 最大加加速度
-        /// \param least_time 最短运行时间
-        void moveSingleAxis(int id, double pos, double vel = 0.0, double max_vel = -1,
-                            double max_acc = -1, double max_jerk = -1,
-                            double least_time = -1);
-
-        /// \brief 多轴运动
-        /// \param target_pos 位置
-        /// \param target_vel 速度
-        /// \param max_vel 最大速度
-        /// \param max_acc 最大加速度
-        /// \param max_jerk 最大加加速度
-        /// \param least_time 最短运行时间
-        void moveMultiAxis(const std::vector<double> &target_pos,
-                           const std::vector<double> &target_vel,
-                           const std::vector<double> &max_vel,
-                           const std::vector<double> &max_acc,
-                           const std::vector<double> &max_jerk,
-                           double least_time = -1);
-
         /// \brief 设置多关节速度约束
         /// \param max_vel 速度约束值
         inline void setJntVelLimits(std::vector<double> &max_vel)
@@ -426,12 +396,12 @@ namespace rocos
         /// \param sync 无同步、时间同步、相位同步
         inline void setSynchronization(Synchronization sync)
         {
-            std::lock_guard<std::mutex> lock(axis_motion_mutex_);
+            std::lock_guard<std::mutex> lock(synchronization_mutex_);
             sync_ = sync;
             need_plan_.resize(jnt_num_, true);
         }
         Synchronization getSynchronization() {
-            std::lock_guard<std::mutex> lock(axis_motion_mutex_);
+            std::lock_guard<std::mutex> lock(synchronization_mutex_);
             return sync_;
         }
 
@@ -1146,8 +1116,6 @@ namespace rocos
 
         int jnt_num_;
 
-        double least_motion_time_{0.0};
-
         Synchronization sync_{SYNC_TIME};
 
         std::atomic<bool> is_running_motion{false};
@@ -1162,10 +1130,8 @@ namespace rocos
         void runMotionWorker(const std::function<void()>& worker);
         int startTrajectoryWorker(const std::function<void()>& worker, bool asynchronous);
         std::atomic<unsigned int> calibration_pose_mask_{0};
-        std::mutex axis_motion_mutex_;
+        std::mutex synchronization_mutex_;
         std::mutex work_mode_mutex_;
-        std::atomic<bool> axis_motion_active_{false};
-        std::vector<bool> axis_stopping_;
 
         std::vector<bool> need_plan_; // 是否需要重新规划标志
 

@@ -35,10 +35,12 @@ time,loop,q_1,dq_1,tau_1,q_2,dq_2,tau_2,...
 ```cpp
 sample.q[j] = robot.getJointPosition(joint.robotIndex);
 sample.dq[j] = robot.getJointVelocity(joint.robotIndex);
-sample.tau[j] = robot.getJointLoadTorque(joint.robotIndex);
+sample.tau[j] = robot.getJointTorque(joint.robotIndex) * (joint.ratedTorque / 1000.0);
 ```
 
-`time` 是实际经过秒数，循环间不归零。`loop` 从 1 开始。位置和速度沿用 Robot 的 rad、rad/s 单位转换；力矩原样保存，不做二次标定。Studio 需要关节输出端 Nm，但当前 `Drive::getLoadTorque()` 直接转发底层计数，实际单位需与该接口和硬件反馈约定一致。
+`time` 是实际经过秒数，循环间不归零。`loop` 从 1 开始。位置和速度沿用 Robot 的 rad、rad/s 单位转换。当前 `getJointTorque()` 返回额定力矩千分比计数，采集端按 `tau_Nm = feedback * rated_torque_Nm / 1000` 换算后保存，CSV 的 `tau_*` 单位为 Nm。
+
+两份采集入口共用 `--torque_config=config/joint_rated_torque.yaml`，其中按关节名配置 J1–J7 的额定力矩 `[48, 48, 40, 40, 7, 7, 7]` Nm，支持任意 Studio 列顺序和硬件 ID 映射。自定义关节名时同步修改 YAML 键名。启动预检会拒绝缺失、非正数或非有限的额定力矩；元数据记录反馈源、Nm 单位、换算公式和每关节额定值。导入 Studio 时力矩单位倍率使用 1，避免重复换算。
 
 数据使用 `Measurement` 结构保存在预分配内存中，运动结束或 Ctrl+C/SIGTERM 中断后先下使能，再保存已采集的完整行。CSV 和 `.metadata.yaml` 都要求新文件名；侧文件记录仿真标记、关节映射、完成状态和失败原因。断电、SIGKILL 或崩溃无法保存尚未写盘的数据。
 
@@ -50,17 +52,20 @@ cmake --build build --target dynamicsIdMain -j4
 # 只检查轨迹，不连接硬件
 build/bin/dynamicsIdMain --check_only \
   --urdf=/absolute/path/robot-control.urdf \
+  --torque_config=/absolute/path/joint_rated_torque.yaml \
   --trajectory=/absolute/path/trajectory.json
 
 # 仿真核对执行与导出流程
 build/bin/dynamicsIdMain --sim=true \
   --urdf=/absolute/path/robot-control.urdf \
+  --torque_config=/absolute/path/joint_rated_torque.yaml \
   --trajectory=/absolute/path/trajectory.json \
   --loops=2 --output=/absolute/path/measurements.sim.csv
 
 # 真机采集：对应 EtherCAT 主站应已启动，避免其他程序同时控制
 build/bin/dynamicsIdMain --sim=false --id=0 \
   --urdf=/absolute/path/robot-control.urdf \
+  --torque_config=/absolute/path/joint_rated_torque.yaml \
   --base=base_link --tip=link_7 \
   --trajectory=/absolute/path/trajectory.json \
   --time_scale=0.1 \
@@ -99,11 +104,13 @@ cmake --build build --target frictionIdMain -j2
 # 先检查协议、URDF 和硬件位置/速度/加速度/jerk 限制，不连接硬件
 build/bin/frictionIdMain --check_only \
   --urdf=/absolute/path/robot.urdf \
+  --torque_config=/absolute/path/joint_rated_torque.yaml \
   --trajectory=/absolute/path/friction_protocol.json
 
 # EtherCAT 主站已运行时，执行协议中全部 repeats，保存一份新文件
 build/bin/frictionIdMain --sim=false --id=0 \
   --urdf=/absolute/path/robot.urdf \
+  --torque_config=/absolute/path/joint_rated_torque.yaml \
   --trajectory=/absolute/path/friction_protocol.json \
   --output=/absolute/path/joint_2_train_session01.csv
 ```
@@ -116,7 +123,7 @@ build/bin/frictionIdMain --sim=false --id=0 \
 time,reference_time,repeat,pair,sweep,phase,target_velocity,q_1,dq_1,tau_1,...
 ```
 
-`time` 为采集的实际经过秒数；`reference_time` 是协议函数时间。`repeat/pair/sweep` 从零开始，含义与 Studio 一致。`q/dq/tau` 分别直接读取 `getJointPosition()`、`getJointVelocity()` 和 `getJointLoadTorque()`；没有温度与电流接口，因而不输出这些列。力矩原值、内存缓冲、独占新文件、中断保存和进程生命周期约定与上文相同；输出侧 Nm 和信号是否包含目标传动摩擦仍需根据硬件核对。长时间实验的内存需求随总时长和采样数增加，运行前分配缓冲，期间不写盘。
+`time` 为采集的实际经过秒数；`reference_time` 是协议函数时间。`repeat/pair/sweep` 从零开始，含义与 Studio 一致。`q/dq` 分别直接读取 `getJointPosition()`、`getJointVelocity()`；`tau` 读取 `getJointTorque()` 后乘该关节额定力矩并除以 1000，以 Nm 保存。额定力矩通过同一 `--torque_config` 按关节名匹配。没有温度与电流接口，因而不输出这些列。内存缓冲、独占新文件、中断保存和进程生命周期约定与上文相同。长时间实验的内存需求随总时长和采样数增加，运行前分配缓冲，期间不写盘。
 
 采完后在 Studio 的“摩擦辨识”页面选择协议中的关节，确认其他关节静止，导入 CSV。列序号沿用协议 `joint_names`，不是 Robot 索引；无实测温度时使用无温度项模型。
 
@@ -142,3 +149,17 @@ python3 test/friction_id_compatibility_test.py \
 快照包含经过时间、当前循环间隔、实际/目标位置、位置误差、实际速度、刚体/摩擦补偿、弹簧/阻尼项、限幅前请求力矩及下发力矩。
 `load(raw)` 直接读取 `robot.getJointLoadTorque()`，当前接口未做 Nm 换算，其单位不能直接与 Nm 力矩列混用。
 周期打印由独立线程处理，控制线程只尝试投递最新快照，打印繁忙时丢弃快照；这些低频输出用于观察状态，不是完整的数据采集记录。
+
+## 直接使用 URDF 的阻抗入口
+
+`src/jointImpedanceUrdfMain.cc` 是独立副本，使用 URDF 的质量、质心和惯量计算
+`C(q,dq)·dq + g(q) + Kp·(qd-q) - Kd·dq`，没有辨识参数或摩擦模型依赖。
+原辨识入口保持不变。新入口沿用 CST 切换、当前位置保持、自定义速度保护、力矩限制和调试打印。
+在 `config/urdf_impedance.yaml` 中设置 URDF 路径及参数，数组按 URDF 动力学模型的关节顺序排列，启动时打印关节名称。
+
+```bash
+cmake --build build/impedance --target jointImpedanceUrdfMain -j2
+build/impedance/bin/jointImpedanceUrdfMain --config=config/urdf_impedance.yaml --check_only
+# 仿真只验证接口，不模拟动力学；真机沿用 --sim=false。
+build/impedance/bin/jointImpedanceUrdfMain --config=config/urdf_impedance.yaml --sim=true --duration=1
+```

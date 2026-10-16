@@ -1,4 +1,4 @@
-// Execute a Studio excitation with Robot and save measured q, dq and LoadTorque.
+// Execute a Studio excitation with Robot and save measured q, dq and torque in Nm.
 // See docs/dynamics-id.md. Hardware headers precede Robot to avoid macro clashes.
 #include <rocos_app/ethercat/hardware.h>
 #include <rocos_app/ethercat/hardware_sim.h>
@@ -17,6 +17,7 @@
 #include <thread>
 
 DEFINE_string(urdf, "robot.urdf", "ROCOS hardware URDF");
+DEFINE_string(torque_config, "config/joint_rated_torque.yaml", "Named joint rated torques in Nm");
 DEFINE_string(base, "base_link", "Base link name");
 DEFINE_string(tip, "link_7", "Tip link name");
 DEFINE_bool(sim, true, "Use HardwareSim; its feedback is not identification data");
@@ -53,6 +54,7 @@ struct Joint {
     std::string name;
     int hardwareId = -1, robotIndex = -1;
     double lower, upper, velocity, acceleration, jerk;
+    double ratedTorque; // Nm，每个实测力矩计数对应额定力矩的 1/1000。
 };
 struct Trajectory {
     std::array<Joint, jointCount> joints; // Studio order, independent of Robot order.
@@ -102,6 +104,8 @@ Trajectory loadTrajectory() {
 
     tinyxml2::XMLDocument urdf;
     require(urdf.LoadFile(FLAGS_urdf.c_str()) == tinyxml2::XML_SUCCESS && urdf.FirstChildElement("robot"), "Cannot read hardware URDF");
+    const auto ratedTorques = YAML::LoadFile(FLAGS_torque_config)["rated_torque"];
+    require(ratedTorques.IsDefined() && ratedTorques.IsMap(), "Expected named rated_torque mapping");
     Trajectory trajectory;
     const double timeStep = cycleTime * FLAGS_time_scale;
     const double steps = std::ceil(duration / timeStep);
@@ -118,6 +122,9 @@ Trajectory loadTrajectory() {
             if (element->Attribute("name", joint.name.c_str())) hardware = element->FirstChildElement("hardware");
         require(hardware && hardware->Attribute("type", "driver") && hardware->QueryIntAttribute("id", &joint.hardwareId) == tinyxml2::XML_SUCCESS &&
                 joint.hardwareId >= 0 && joint.hardwareId < 4096 && hardwareIds.insert(joint.hardwareId).second, "Invalid hardware mapping: " + joint.name);
+        require(ratedTorques[joint.name].IsDefined(), "Missing rated torque: " + joint.name);
+        joint.ratedTorque = ratedTorques[joint.name].as<double>();
+        require(std::isfinite(joint.ratedTorque) && joint.ratedTorque > 0, "Invalid rated torque: " + joint.name);
         const auto *limit = hardware->FirstChildElement("limit"), *transform = hardware->FirstChildElement("transform");
         require(limit && transform && transform->Attribute("user_unit_name", "rad"), "Missing limits or rad units: " + joint.name);
         auto readLimit = [&](const char *key) {
@@ -199,7 +206,8 @@ void record(rocos::Robot &robot, const Trajectory &trajectory, std::vector<Measu
                 const auto &joint = trajectory.joints[j];
                 sample.q[j] = robot.getJointPosition(joint.robotIndex);
                 sample.dq[j] = robot.getJointVelocity(joint.robotIndex);
-                sample.tau[j] = robot.getJointLoadTorque(joint.robotIndex);
+                // getJointTorque 当前返回千分比原始计数，在采集端只换算一次为 Nm。
+                sample.tau[j] = robot.getJointTorque(joint.robotIndex) * (joint.ratedTorque / 1000.0);
                 require(std::isfinite(sample.q[j]) && std::isfinite(sample.dq[j]) && std::isfinite(sample.tau[j]) &&
                         sample.q[j] >= joint.lower && sample.q[j] <= joint.upper && std::abs(sample.q[j] - positions[j]) <= 0.15 &&
                         std::abs(sample.dq[j]) <= joint.velocity * 1.05, "Invalid feedback or tracking error: " + joint.name);
@@ -228,8 +236,10 @@ int runExperiment(rocos::Robot &robot, Trajectory &trajectory, FILE *csv, FILE *
     result["simulation"] = FLAGS_sim;
     result["time_scale"] = FLAGS_time_scale;
     result["servo_period_seconds"] = cycleTime;
-    result["torque_source"] = "Robot::getJointLoadTorque";
-    result["torque_conversion"] = "none; save the Robot getter return value directly";
+    result["torque_source"] = "Robot::getJointTorque";
+    result["torque_unit"] = "Nm";
+    result["torque_conversion"] = "getJointTorque * rated_torque_Nm / 1000";
+    result["torque_config"] = FLAGS_torque_config;
     result["completed"] = false;
     std::string failure;
     try {
@@ -242,6 +252,7 @@ int runExperiment(rocos::Robot &robot, Trajectory &trajectory, FILE *csv, FILE *
             mapping["name"] = joint.name;
             mapping["robot_index"] = joint.robotIndex;
             result["joints"].push_back(mapping);
+            result["rated_torque_Nm"][joint.name] = joint.ratedTorque;
         }
         std::this_thread::sleep_for(std::chrono::milliseconds(20));
         checkSignal();

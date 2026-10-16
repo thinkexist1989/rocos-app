@@ -37,7 +37,7 @@ DEFINE_string(base, "base_link", "Base link name");
 DEFINE_string(tip, "link_7", "Tip link name");
 DEFINE_bool(sim, true, "Sim or not");
 DEFINE_int32(id, 0, "hardware id, only work for real hardware");
-DEFINE_bool(http, true, "Start the HTTP API server");
+DEFINE_bool(http, false, "Start the HTTP API server");
 DEFINE_string(http_host, "0.0.0.0", "HTTP listening address");
 DEFINE_int32(http_port, 8080, "HTTP listening port");
 DEFINE_int32(http_control_ttl_seconds, 300, "HTTP control lease timeout in seconds");

@@ -25,6 +25,14 @@ email: luoyang@sia.cn
 cmake_minimum_required(VERSION 3.10)
 project(rocos_app VERSION 1.0.5 DESCRIPTION "ROCOS Application Library")
 
+option(BUILD_JOINT_IMPEDANCE "Build identified-model joint torque impedance controller" ON)
+if(BUILD_JOINT_IMPEDANCE)
+    # 本机 Pinocchio 安装于 ROS 2 Humble 前缀，同时查找其配套依赖。
+    list(APPEND CMAKE_PREFIX_PATH "/opt/ros/humble")
+    # KDL 直接使用 urdfdom，避免可选的 ROS 1 urdf 引入另一套解析库。
+    set(CMAKE_DISABLE_FIND_PACKAGE_urdf TRUE)
+endif()
+
 list(APPEND CMAKE_PREFIX_PATH "/opt/grpc")
 include(cmake/common.cmake) # gRPC
 
@@ -336,7 +344,6 @@ add_executable(frictionIdMain src/frictionIdMain.cc)
 target_link_libraries(frictionIdMain PRIVATE robot gflags::gflags)
 
 # Optional: uses the same Pinocchio regressor convention as Dynamics ID Studio.
-option(BUILD_JOINT_IMPEDANCE "Build identified-model joint torque impedance controller" OFF)
 if(BUILD_JOINT_IMPEDANCE)
     find_package(pinocchio REQUIRED)
     find_library(IMPEDANCE_TINYXML2_LIBRARY tinyxml2 REQUIRED)
@@ -349,11 +356,19 @@ if(BUILD_JOINT_IMPEDANCE)
             pinocchio::pinocchio yaml-cpp OpenSSL::Crypto ${IMPEDANCE_TINYXML2_LIBRARY})
     add_executable(jointImpedanceMain src/jointImpedanceMain.cc)
     target_link_libraries(jointImpedanceMain PRIVATE joint_impedance robot gflags::gflags)
+    add_executable(jointImpedanceUrdfMain src/jointImpedanceUrdfMain.cc)
+    target_compile_features(jointImpedanceUrdfMain PRIVATE cxx_std_17)
+    target_link_libraries(jointImpedanceUrdfMain PRIVATE
+            pinocchio::pinocchio robot yaml-cpp ${IMPEDANCE_TINYXML2_LIBRARY} gflags::gflags)
+    add_executable(joint_impedance_urdf_test test/joint_impedance_urdf_test.cc)
+    target_compile_features(joint_impedance_urdf_test PRIVATE cxx_std_17)
+    target_link_libraries(joint_impedance_urdf_test PRIVATE
+            pinocchio::pinocchio robot kdl_parser yaml-cpp ${IMPEDANCE_TINYXML2_LIBRARY} gflags::gflags)
     add_executable(joint_impedance_test test/joint_impedance_test.cc)
     target_link_libraries(joint_impedance_test PRIVATE joint_impedance yaml-cpp)
     add_executable(robot_torque_test test/robot_torque_test.cc)
     target_link_libraries(robot_torque_test PRIVATE robot)
-    install(TARGETS joint_impedance jointImpedanceMain
+    install(TARGETS joint_impedance jointImpedanceMain jointImpedanceUrdfMain
             LIBRARY DESTINATION ${CMAKE_INSTALL_LIBDIR}
             RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR})
 endif()

@@ -27,6 +27,7 @@
 #include <vector>
 
 DEFINE_string(urdf, "robot.urdf", "生成 Studio 协议时使用的同一份 ROCOS URDF");
+DEFINE_string(torque_config, "config/joint_rated_torque.yaml", "按关节名配置的额定力矩 YAML，单位 Nm");
 DEFINE_string(base, "base_link", "运动链基座名称");
 DEFINE_string(tip, "link_7", "运动链末端名称");
 DEFINE_bool(sim, true, "使用 HardwareSim 核对接口；不模拟真实速度和摩擦");
@@ -69,6 +70,7 @@ struct Joint {
     int robotIndex = -1;
     double lower, upper; // 位置限位，rad。
     double velocity, acceleration, jerk; // 对应 rad/s、rad/s²、rad/s³。
+    double ratedTorque; // Nm，实测力矩每个计数对应额定力矩的 1/1000。
 };
 // 一次单向扫掠：加速、匀速、减速、端点停留；正反两次扫掠构成一对。
 struct Sweep {
@@ -125,9 +127,14 @@ void loadHardwareJoints(Protocol &protocol) {
     require(xml.LoadFile(FLAGS_urdf.c_str()) == tinyxml2::XML_SUCCESS, "Cannot load hardware URDF");
     const auto *robot = xml.FirstChildElement("robot");
     require(robot, "URDF has no robot element");
+    const auto ratedTorques = YAML::LoadFile(FLAGS_torque_config)["rated_torque"];
+    require(ratedTorques.IsDefined() && ratedTorques.IsMap(), "Expected named rated_torque mapping");
     std::set<int> ids;
     for (size_t j = 0; j < jointCount; ++j) {
         auto &joint = protocol.joints[j];
+        require(ratedTorques[joint.name].IsDefined(), "Missing joint in rated_torque mapping");
+        joint.ratedTorque = ratedTorques[joint.name].as<double>();
+        require(std::isfinite(joint.ratedTorque) && joint.ratedTorque > 0, "Rated torque must be finite and positive");
         const tinyxml2::XMLElement *hardware = nullptr;
         for (auto *element = robot->FirstChildElement("joint"); element; element = element->NextSiblingElement("joint")) {
             if (element->Attribute("name", joint.name.c_str())) hardware = element->FirstChildElement("hardware");
@@ -316,8 +323,8 @@ void readJointFeedback(rocos::Robot &robot, const Protocol &protocol,
         sample.q[j] = robot.getJointPosition(r);
         // 采集保留实测速度，不在这里滤波，也不用参考速度替代反馈。
         sample.dq[j] = robot.getJointVelocity(r);
-        // 原样保存 getter 返回值；输出侧 Nm 标定需由硬件约定确认。
-        sample.tau[j] = robot.getJointLoadTorque(r);
+        // 当前 getter 返回千分比原始计数，按额定力矩只换算一次为 Nm。
+        sample.tau[j] = robot.getJointTorque(r) * (joint.ratedTorque / 1000.0);
         require(std::isfinite(sample.q[j]) && std::isfinite(sample.dq[j]) && std::isfinite(sample.tau[j]), "Nonfinite feedback");
         require(sample.q[j] >= joint.lower && sample.q[j] <= joint.upper, "Feedback exceeds position limits");
         require(std::abs(sample.q[j] - target(r)) <= maxTrackingError, "Position tracking error exceeds 0.15 rad");
@@ -392,12 +399,15 @@ void writeMetadata(FILE *metadata, const Protocol &protocol,
     status["samples"] = recordedSamples;
     status["time_scale"] = FLAGS_time_scale;
     status["servo_period_seconds"] = DELTA_T;
-    status["torque_source"] = "Robot::getJointLoadTorque";
-    status["torque_conversion"] = "none; confirm getter values are output-joint Nm before identification";
+    status["torque_source"] = "Robot::getJointTorque";
+    status["torque_unit"] = "Nm";
+    status["torque_conversion"] = "getJointTorque * rated_torque_Nm / 1000";
+    status["torque_config"] = FLAGS_torque_config;
     status["temperature_recorded"] = false;
     for (const auto &joint : protocol.joints) {
         status["joint_names"].push_back(joint.name);
         status["robot_indices"].push_back(joint.robotIndex);
+        status["rated_torque_Nm"][joint.name] = joint.ratedTorque;
     }
     YAML::Emitter emitter;
     emitter << status;

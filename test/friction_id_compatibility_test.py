@@ -22,6 +22,7 @@ def main():
     parser.add_argument("--studio", type=Path, required=True)
     args = parser.parse_args()
     binary, studio = args.binary.resolve(), args.studio.resolve()
+    root = Path(__file__).resolve().parents[1]
     sys.path.insert(0, str(studio / "src"))
     from dynamics_id.friction_config import FrictionTrajectoryConfig, FrictionDataConfig
     from dynamics_id.friction_data import prepare_friction_data
@@ -64,7 +65,8 @@ def main():
         generate(urdf, work, config)
         protocol_file = work / "friction_protocol.json"
         original_protocol = protocol_file.read_text()
-        common = [str(binary), f"--urdf={urdf}", f"--trajectory={protocol_file}"]
+        torque_config = root / "config/joint_rated_torque.yaml"
+        common = [str(binary), f"--urdf={urdf}", f"--trajectory={protocol_file}", f"--torque_config={torque_config}"]
 
         def run(extra, expected=0):
             result = subprocess.run(common + extra, cwd=work, capture_output=True, text=True, timeout=60)
@@ -72,6 +74,17 @@ def main():
             return result
 
         run(["--check_only", "--sim=false"])
+        bad_torque = work / "bad_torque.yaml"
+        ratings = yaml.safe_load(torque_config.read_text())
+        for value in (None, 0, -1, float("nan")):
+            invalid = {"rated_torque": dict(ratings["rated_torque"])}
+            if value is None:
+                del invalid["rated_torque"]["joint_3"]
+            else:
+                invalid["rated_torque"]["joint_3"] = value
+            bad_torque.write_text(yaml.safe_dump(invalid))
+            result = run(["--check_only", "--sim=false", f"--torque_config={bad_torque}"], expected=1)
+            assert "rated_torque" in result.stderr or "Rated torque" in result.stderr
         for scale in ("0", "-1", "1.01", "nan", "inf", "1e-300"):
             run(["--check_only", f"--time_scale={scale}"], expected=1)
         # Invalid speeds must fail before hardware access or ordered-set use.
@@ -115,7 +128,10 @@ def main():
         report = yaml.safe_load(Path(str(output) + ".metadata.yaml").read_text())
         assert report["completed"] and report["simulation"] and report["samples"] == len(measured)
         assert report["joint_names"] == model.names and report["robot_indices"] == [2, 0, 6, 1, 5, 3, 4]
-        assert report["torque_source"] == "Robot::getJointLoadTorque" and not report["temperature_recorded"]
+        assert report["torque_source"] == "Robot::getJointTorque" and report["torque_unit"] == "Nm"
+        assert report["torque_conversion"] == "getJointTorque * rated_torque_Nm / 1000"
+        assert report["rated_torque_Nm"] == dict(zip([f"joint_{j}" for j in range(1, 8)], [48, 48, 40, 40, 7, 7, 7]))
+        assert not report["temperature_recorded"]
         before = output.read_bytes()
         run([f"--output={output}"], expected=1)
         assert output.read_bytes() == before

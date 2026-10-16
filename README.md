@@ -127,26 +127,23 @@ URDF，以避免不同模型存在同名网格。HTTP 关节状态使用
 | --- | --- |
 | `POST /api/robot/workmode` | `{"mode":"position"}`；也支持 `ee_admit_teach`、`jnt_admit_teach`、`jnt_imp`、`cart_imp`，或枚举值 0–4 |
 | `POST /api/robot/single_axis/enable`、`disable` | `{"id":0}`；关节编号从 0 开始 |
-| `POST /api/robot/single_axis/move` | `{"id":0,"pos":0.2,"max_vel":0.3,"max_acc":1,"max_jerk":5,"least_time":0}` |
-| `POST /api/robot/single_axis/stop` | `{"id":0}`；减速停止该在线轴 |
 | `POST /api/robot/multi_axis/enable`、`disable` | 整机使能/下使能 |
-| `POST /api/robot/multi_axis/move` | `target_pos` 数组，`max_vel`/`max_acc`/`max_jerk` 可选数组；所有数组长度必须等于关节数 |
 | `POST /api/robot/multi_axis/sync` | `{"sync":"none"}`、`time`、`phase`，或枚举值 0–2 |
-| `POST /api/robot/multi_axis/stop` | 在线多轴减速停止 |
 | `POST /api/robot/jog/joint` | `{"joints":[1,0,0,0,0,0,0],"speed":0.2,"timeout":0.3}` |
 | `POST /api/robot/jog/cartesian` | `{"twist":[0,0,1,0,0,0],"frame":"BASE","speed":0.02,"timeout":0.3}`；支持 BASE/FLANGE/TOOL/OBJECT |
 | `POST /api/robot/jog/svd` | 七轴机械臂的单维零空间点动，如 `{"dim_speeds":[0.02],"timeout":0.3}` |
 | `POST /api/robot/jog/nullspace` | 七轴关节意图向量 `joints` 投影到当前单维零空间，并转换为旧核心的臂角方向 |
 | `POST /api/robot/dragging`（也可用 `/api/robot/jog`） | 旧格式，如 `{"flag":0,"dir":"POSITIVE","max_speed":0.2,"max_acceleration":1,"timeout":0.3}` |
 | `POST /api/robot/jog/stop` | 停止当前点动，不会误停其他类型的运动 |
-| `POST /api/robot/stop` | 根据当前核心运动类型停止在线轴、离线轨迹、点动或示教；响应含 `stopped_motion_type` |
+| `POST /api/robot/stop` | 根据当前核心运动类型停止离线轨迹、点动或示教；响应含 `stopped_motion_type` |
 | `POST /api/robot/wait_move` | `{"timeout":10}`；等待运动结束，超时返回 5002 |
 | `POST /api/calibration/pose` | `id`（1–9）和 `pose`；1–6 为工具标定点，7–9 为工件标定点 |
 | `POST /api/calibration/run` | `{"frame":"tool"}` 或 `{"frame":"object"}`；检查标定点齐全及几何条件后调用原有标定方法 |
 | `GET /api/calibration/result` | 返回最近计算的 `error_state` 和 `pose` |
 
-单轴/多轴移动可加 `raw_data:true`，此时位置和显式速度、加速度、jerk 都按
-编码器单位换算。在线轴执行使用 Ruckig；原来被注释的执行路径已恢复。
+在线轴运动接口 `moveSingleAxis()`、`moveMultiAxis()` 及其停止接口已移除。
+HTTP 的 `single_axis/move`、`single_axis/stop`、`multi_axis/move`、`multi_axis/stop`
+返回 3007（不支持）；对应 gRPC 请求返回 `UNIMPLEMENTED`。
 `GET /api/robot/state?raw_data=true` 返回原始关节数据，同时返回硬件类型、周期、
 从站数、法兰/工具/工件位姿和标定反馈；`torque` 字段用于力矩。
 

@@ -102,7 +102,6 @@ namespace rocos {
 //        addAllJoints( ); // TODO: 这个应该直接加到参数解析里面，解析之后加入关节，顺序和主站顺序可能不一样
 
         jointNum = jnt_num_;
-        axis_stopping_.assign(jnt_num_, false);
 
         target_positions_.resize(jnt_num_);
         target_positions_prev_.resize(jnt_num_);
@@ -440,9 +439,7 @@ namespace rocos {
     void Robot::requestMotionStop() {
         if (!isMotionBusy()) return;
         motion_stop_requested_ = true;
-        if (getMotionType() == MotionType::Axis) {
-            stopMultiAxis();
-        } else if (getMotionType() == MotionType::Teaching) {
+        if (getMotionType() == MotionType::Teaching) {
             if (getWorkMode() == WorkMode::EeAdmitTeach) stop_admittance_teaching();
             if (getWorkMode() == WorkMode::JntAdmitTeach) stop_joint_admittance_teaching();
         }
@@ -648,105 +645,33 @@ namespace rocos {
         // std::vector< double > dt( jnt_num_, 0.0 );  // delta T
         // double max_time = 0.0;
 
-        ruckig::Ruckig<ruckig::DynamicDOFs> axis_otg(jnt_num_, DELTA_T);
-        ruckig::InputParameter<ruckig::DynamicDOFs> axis_input(jnt_num_);
-        ruckig::OutputParameter<ruckig::DynamicDOFs> axis_output(jnt_num_);
-
         while (true) {  // while start
 
             hw_interface_->waitForSignal(9);
 
             {
-            //!< Update Flange State
-            std::lock_guard<std::mutex> lock(mtx);  // 自动获取互斥锁
-            for (int i = 0; i < jnt_num_; i++)
-            {
-                if (joints_[i]->getDriveState() != DriveState::OperationEnabled)
-                {
-                    pos_[i] = joints_[i]->getPosition();
-                    vel_[i] = 0;
-
-                    joints_[i]->setPosition(pos_[i]); // 要把数据同步给共享内存
-                    joints_[i]->setVelocity(vel_[i]);
-                }
-            }
-            updateCartesianInfo();
-
-
-
-            if (axis_motion_active_) {
-                std::lock_guard<std::mutex> axis_lock(axis_motion_mutex_);
-                std::vector<ruckig::ControlInterface> controls(jnt_num_, ruckig::ControlInterface::Position);
-                bool stopping = false;
+                // 同步未使能关节的状态，并更新笛卡尔位姿。
+                std::lock_guard<std::mutex> lock(mtx);
                 for (int i = 0; i < jnt_num_; ++i) {
-                    axis_input.current_position[i] = pos_[i];
-                    axis_input.current_velocity[i] = vel_[i];
-                    axis_input.current_acceleration[i] = acc_[i];
-                    axis_input.target_position[i] = target_positions_[i];
-                    axis_input.target_velocity[i] = target_velocities_[i];
-                    axis_input.target_acceleration[i] = 0;
-                    axis_input.max_velocity[i] = max_vel_[i];
-                    axis_input.max_acceleration[i] = max_acc_[i];
-                    axis_input.max_jerk[i] = max_jerk_[i];
-                    if (axis_stopping_[i]) {
-                        controls[i] = ruckig::ControlInterface::Velocity;
-                        axis_input.target_velocity[i] = 0;
-                        stopping = true;
-                    }
-                }
-                axis_input.per_dof_control_interface = controls;
-                axis_input.synchronization = stopping || sync_ == SYNC_NONE ? ruckig::Synchronization::None
-                    : sync_ == SYNC_PHASE ? ruckig::Synchronization::Phase : ruckig::Synchronization::Time;
-                if (!stopping && least_motion_time_ > 0) axis_input.minimum_duration = least_motion_time_;
-                else axis_input.minimum_duration.reset();
-                ruckig::Result result = ruckig::Result::Error;
-                bool exception = false;
-                int disabled_joint = -1;
-                for (int i = 0; i < jnt_num_; ++i)
-                    if (joints_[i]->getDriveState() != DriveState::OperationEnabled) { disabled_joint = i; break; }
-                if (disabled_joint >= 0) {
-                    exception = true;
-                    recordMotionError(Result::NotEnabled, "execution", disabled_joint);
-                } else {
-                    try { result = axis_otg.update(axis_input, axis_output); }
-                    catch (...) { exception = true; recordMotionError(Result::Fatal, "planning"); }
-                }
-                if (result == ruckig::Result::Working || result == ruckig::Result::Finished) {
-                    for (int i = 0; i < jnt_num_; ++i) {
-                        pos_[i] = axis_output.new_position[i];
-                        vel_[i] = axis_output.new_velocity[i];
-                        acc_[i] = axis_output.new_acceleration[i];
-                        joints_[i]->setPosition(pos_[i]);
+                    if (joints_[i]->getDriveState() != DriveState::OperationEnabled) {
+                        pos_[i] = joints_[i]->getPosition();
+                        vel_[i] = 0;
+
+                        joints_[i]->setPosition(pos_[i]); // 同步到共享内存。
                         joints_[i]->setVelocity(vel_[i]);
                     }
-                } else if (!exception) {
-                    const auto code = result == ruckig::Result::ErrorInvalidInput ? Result::PlanInput
-                        : result == ruckig::Result::ErrorPositionalLimits ? Result::PosLimit
-                        : Result::PlannerError;
-                    recordMotionError(code, "planning", -1, -1, static_cast<int>(result), true);
-                    PLOG_ERROR << "Axis trajectory failed: " << static_cast<int>(result);
                 }
-                if (result != ruckig::Result::Working) {
-                    axis_motion_active_ = false;
-                    for (int i = 0; i < jnt_num_; ++i) {
-                        target_positions_[i] = pos_[i];
-                        vel_[i] = acc_[i] = 0;
-                        joints_[i]->setVelocity(0);
-                    }
-                    setRunState(RunState::Stopped);
-                }
+                updateCartesianInfo();
             }
+            // static bool PressedState=false;
 
-            } // release Cartesian state lock before switching modes
-            static bool PressedState=false;
+            // bool press_now = isPressed();
 
-            bool press_now = isPressed();
-
-            if(press_now ^ PressedState)
-            {
-                PressedState = press_now;
-                press_now ? setWorkMode(WorkMode::JntAdmitTeach) : setWorkMode(WorkMode::Position);
-            }
+            // if(press_now ^ PressedState)
+            // {
+            //     PressedState = press_now;
+            //     press_now ? setWorkMode(WorkMode::JntAdmitTeach) : setWorkMode(WorkMode::Position);
+            // }
 
 
         }
@@ -769,90 +694,6 @@ namespace rocos {
 
         need_plan_.resize(jnt_num_, true);
     }
-
-    /// \brief 停止单轴运动
-    /// \param id 轴ID
-    void Robot::stopSingleAxis(int id) {
-        if (id < 0 || id >= jnt_num_ || !axis_motion_active_) return;
-        std::lock_guard<std::mutex> lock(axis_motion_mutex_);
-        motion_stop_requested_ = true;
-        axis_stopping_[id] = true;
-        target_velocities_[id] = 0;
-    }
-
-    void Robot::stopMultiAxis() {
-        if (!axis_motion_active_) return;
-        std::lock_guard<std::mutex> lock(axis_motion_mutex_);
-        motion_stop_requested_ = true;
-        std::fill(axis_stopping_.begin(), axis_stopping_.end(), true);
-        std::fill(target_velocities_.begin(), target_velocities_.end(), 0.0);
-    }
-
-    /// 设置单轴运动
-    /// \param id 轴ID
-    /// \param pos 目标位置
-    /// \param vel 目标速度
-    /// \param max_vel 最大速度
-    /// \param max_acc 最大加速度
-    /// \param max_jerk 最大加加速度
-    /// \param least_time 最短运行时间
-    void Robot::moveSingleAxis(int id, double pos, double vel, double max_vel,
-                               double max_acc, double max_jerk, double least_time) {
-        if (id < 0 || id >= jnt_num_) return;
-        std::lock_guard<std::mutex> lock(axis_motion_mutex_);
-        if (!axis_motion_active_) {
-            prepareMotionReport("single_axis");
-            for (int i = 0; i < jnt_num_; ++i) {
-                target_positions_[i] = pos_[i];
-                target_velocities_[i] = 0;
-                axis_stopping_[i] = false;
-            }
-            setRunState(RunState::Running);
-            motion_type_ = MotionType::Axis;
-        }
-        target_positions_[id] = pos;
-        target_velocities_[id] = vel;
-        axis_stopping_[id] = false;
-        if (max_vel != -1) max_vel_[id] = max_vel;
-        if (max_acc != -1) max_acc_[id] = max_acc;
-        if (max_jerk != -1) max_jerk_[id] = max_jerk;
-        if (least_time != -1) least_motion_time_ = least_time;
-        axis_motion_active_ = true;
-    }
-
-    /// 设置多轴运动
-    /// \param target_pos 目标位置
-    /// \param target_vel 目标速度
-    /// \param max_vel 最大速度
-    /// \param max_acc 最大加速度
-    /// \param max_jerk 最大加加速度
-    /// \param least_time 最短运行时间
-    void Robot::moveMultiAxis(const vector<double> &target_pos,
-                              const vector<double> &target_vel,
-                              const vector<double> &max_vel,
-                              const vector<double> &max_acc,
-                              const vector<double> &max_jerk, double least_time) {
-        if (target_pos.size() != jnt_num_ || target_vel.size() != jnt_num_ ||
-            max_vel.size() != jnt_num_ || max_acc.size() != jnt_num_ || max_jerk.size() != jnt_num_) return;
-        std::lock_guard<std::mutex> lock(axis_motion_mutex_);
-        if (!axis_motion_active_) {
-            prepareMotionReport("multi_axis");
-            setRunState(RunState::Running);
-        }
-        motion_type_ = MotionType::Axis;
-        for (int i = 0; i < jnt_num_; ++i) {
-            target_positions_[i] = target_pos[i];
-            target_velocities_[i] = target_vel[i];
-            axis_stopping_[i] = false;
-            if (max_vel[i] != -1) max_vel_[i] = max_vel[i];
-            if (max_acc[i] != -1) max_acc_[i] = max_acc[i];
-            if (max_jerk[i] != -1) max_jerk_[i] = max_jerk[i];
-        }
-        if (least_time != -1) least_motion_time_ = least_time;
-        axis_motion_active_ = true;
-    }
-
-
     /////// Motion Command /////////////
 
     int Robot::MoveJ(JntArray q, double speed, double acceleration, double time,

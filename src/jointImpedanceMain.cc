@@ -6,6 +6,7 @@
 #include <rocos_app/robot.h>
 #include <rocos_app/joint_impedance.h>
 #include <gflags/gflags.h>
+#include <yaml-cpp/yaml.h>
 
 #include <algorithm>
 #include <chrono>
@@ -118,6 +119,30 @@ private:
     std::thread worker_;
 };
 
+// 额定力矩按模型关节顺序读取；限幅仍使用 Nm，额定值只用于驱动器千分比换算。
+std::vector<double> loadRatedTorques(const std::string &path, const Eigen::VectorXd &torqueLimits) {
+    const auto yaml = YAML::LoadFile(path);
+    const auto values = yaml["rated_torque"];
+    require(values.IsDefined() && values.IsSequence() && values.size() == size_t(torqueLimits.size()),
+            "rated_torque must contain one value per joint");
+    auto rated = values.as<std::vector<double>>();
+    for (int j = 0; j < torqueLimits.size(); ++j) {
+        require(std::isfinite(rated[j]) && rated[j] > 0, "rated_torque must be finite and positive");
+        const double scale = 1000.0 / rated[j];
+        require(std::isfinite(scale) && torqueLimits[j] * scale <= 32767,
+                "Torque limit exceeds int16 drive range after rated torque conversion");
+    }
+    return rated;
+}
+
+// Robot::setTorque 内部还会乘 torque_per_unit；在此覆盖比例，确保只换算一次。
+// 此后传入 Robot 的仍是 Nm，驱动器收到的值为 torque / ratedTorque * 1000。
+void configureTorqueUnits(rocos::Robot &robot, const std::vector<int> &indices,
+                          const std::vector<double> &ratedTorque) {
+    for (size_t j = 0; j < indices.size(); ++j)
+        robot.setJointTorquePerUnit(indices[j], 1000.0 / ratedTorque[j]);
+}
+
 // 模型列顺序不一定等于 Robot 顺序，用 URDF 硬件 ID 建立一一映射。
 std::vector<int> mapRobotJoints(rocos::Robot &robot, const rocos::JointImpedanceConfig &config) {
     const int n = config.jointNames.size();
@@ -152,7 +177,8 @@ void limitTorque(const rocos::JointImpedanceConfig &config, const Eigen::VectorX
     }
 }
 
-void runController(rocos::Robot &robot, rocos::JointImpedanceController &controller, DebugPrinter &debug) {
+void runController(rocos::Robot &robot, rocos::JointImpedanceController &controller, DebugPrinter &debug,
+                   const std::vector<double> &ratedTorque) {
     const auto &config = controller.config();
     const auto indices = mapRobotJoints(robot, config);
     const int n = indices.size();
@@ -160,6 +186,7 @@ void runController(rocos::Robot &robot, rocos::JointImpedanceController &control
 
     // 先下使能，再读取起始姿态；模型首次计算也在上使能前完成。
     robot.setDisabled();
+    configureTorqueUnits(robot, indices, ratedTorque);
     Eigen::VectorXd q(n), dq(n), qDesired(n), previous(n), command(n);
     DebugSample sample(n);
     readJointState(robot, indices, q, dq);
@@ -179,15 +206,16 @@ void runController(rocos::Robot &robot, rocos::JointImpedanceController &control
     }
     // 启动参数直接在上使能前打印；运行中的输出交给后台线程。
     std::cout << "Starting position hold; units: rad, rad/s, Nm, Nm/s\n"
-              << "joint hardware_id q_start kp kd velocity_limit torque_limit torque_rate_limit preload\n";
+              << "joint hardware_id q_start kp kd velocity_limit torque_limit torque_rate_limit rated_torque preload\n";
     for (int j = 0; j < n; ++j) {
         std::cout << config.jointNames[j] << ' ' << config.hardwareIds[j] << ' ' << qDesired[j]
                   << ' ' << config.kp[j] << ' ' << config.kd[j] << ' ' << config.velocityLimit[j]
                   << ' ' << config.torqueLimit[j] << ' ' << config.torqueRateLimit[j]
-                  << ' ' << previous[j] << '\n';
+                  << ' ' << ratedTorque[j] << ' ' << previous[j] << '\n';
     }
     std::cout << "超速故障将下使能并退出，需人工确认后重新启动。" << std::endl;
 
+    // command 保持 Nm，Robot 按 1000/ratedTorque 换算后下发；预置和周期命令使用同一比例。
     // 下使能时先写入补偿力矩，上使能后即使用该值，而非从零力矩起步。
     require(!stopped && robot.setTorque(command) == 0, "Cannot preload CST torque");
     require(!stopped, "Interrupted before enabling");
@@ -244,6 +272,7 @@ int main(int argc, char **argv) {
         require(std::isfinite(FLAGS_debug_interval) &&
                 (FLAGS_debug_interval == 0 || FLAGS_debug_interval >= 0.1), "debug_interval must be 0 or at least 0.1 s");
         rocos::JointImpedanceController controller(FLAGS_config);
+        const auto ratedTorque = loadRatedTorques(FLAGS_config, controller.config().torqueLimit);
         if (FLAGS_check_only) {
             std::cout << "Impedance configuration and Studio models validated" << std::endl;
             return 0;
@@ -258,7 +287,7 @@ int main(int argc, char **argv) {
         rocos::Robot robot(hw, config.urdf, FLAGS_base, FLAGS_tip);
         int result = 0;
         try {
-            runController(robot, controller, debug);
+            runController(robot, controller, debug, ratedTorque);
             robot.setDisabled();
         } catch (const std::exception &error) {
             // 先停机再打印，避免日志输出阻塞而延迟下使能。

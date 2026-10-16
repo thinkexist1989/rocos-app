@@ -101,16 +101,16 @@ Stephen Brawner (brawner@gmail.com)
     <limit
       lower="-3.1415"
       upper="3.1415"
-      effort="10"
+      effort="100"
       velocity="2" />
     <hardware id="0" type="driver">
-      <limit lower="-3.1415" upper="3.1415" vel="2" acc="10.0" jerk="150.0" effort="10" />
-      <transform ratio="1.0" offset_pos_cnt="0" cnt_per_unit="156455.678" torque_per_unit="1.0" user_unit_name="rad" />
+      <limit lower="-3.1415" upper="3.1415" vel="2" acc="10.0" jerk="150.0" effort="100" />
+      <transform ratio="1.0" offset_pos_cnt="0" cnt_per_unit="20860.757" torque_per_unit="1.0" user_unit_name="rad" />
       <inputs name="Inputs">
         <status_word>Status Word</status_word>
-        <position_actual_value>Position Actual value</position_actual_value>
-        <velocity_actual_value>Velocity Actual value</velocity_actual_value>
-        <torque_actual_value>Torque Actual value</torque_actual_value>
+        <position_actual_value>Position Actual Value</position_actual_value>
+        <velocity_actual_value>Velocity Actual Value</velocity_actual_value>
+        <torque_actual_value>Torque Actual Value</torque_actual_value>
       </inputs>
       <outputs name="Outputs">
         <control_word>Control Word</control_word>
@@ -176,16 +176,16 @@ Stephen Brawner (brawner@gmail.com)
     <limit
       lower="-2.3911"
       upper="2.3911"
-      effort="10"
+      effort="100"
       velocity="2" />
     <hardware id="1" type="driver">
-      <limit lower="-2.3911" upper="2.3911" vel="2" acc="10.0" jerk="150.0" effort="10" />
-      <transform ratio="1.0" offset_pos_cnt="0" cnt_per_unit="156455.678" torque_per_unit="1.0" user_unit_name="rad" />
+      <limit lower="-2.3911" upper="2.3911" vel="2" acc="10.0" jerk="150.0" effort="100" />
+      <transform ratio="1.0" offset_pos_cnt="0" cnt_per_unit="20860.757" torque_per_unit="1.0" user_unit_name="rad" />
       <inputs name="Inputs">
         <status_word>Status Word</status_word>
-        <position_actual_value>Position Actual value</position_actual_value>
-        <velocity_actual_value>Velocity Actual value</velocity_actual_value>
-        <torque_actual_value>Torque Actual value</torque_actual_value>
+        <position_actual_value>Position Actual Value</position_actual_value>
+        <velocity_actual_value>Velocity Actual Value</velocity_actual_value>
+        <torque_actual_value>Torque Actual Value</torque_actual_value>
       </inputs>
       <outputs name="Outputs">
         <control_word>Control Word</control_word>
@@ -251,16 +251,16 @@ Stephen Brawner (brawner@gmail.com)
     <limit
       lower="-3.1415"
       upper="3.1415"
-      effort="10"
+      effort="100"
       velocity="2" />
     <hardware id="2" type="driver">
-      <limit lower="-3.1415" upper="3.1415" vel="2" acc="10.0" jerk="150.0" effort="10" />
-      <transform ratio="1.0" offset_pos_cnt="0" cnt_per_unit="156455.678" torque_per_unit="1.0" user_unit_name="rad" />
+      <limit lower="-3.1415" upper="3.1415" vel="2" acc="10.0" jerk="150.0" effort="100" />
+      <transform ratio="1.0" offset_pos_cnt="0" cnt_per_unit="20860.757" torque_per_unit="1.0" user_unit_name="rad" />
       <inputs name="Inputs">
         <status_word>Status Word</status_word>
-        <position_actual_value>Position Actual value</position_actual_value>
-        <velocity_actual_value>Velocity Actual value</velocity_actual_value>
-        <torque_actual_value>Torque Actual value</torque_actual_value>
+        <position_actual_value>Position Actual Value</position_actual_value>
+        <velocity_actual_value>Velocity Actual Value</velocity_actual_value>
+        <torque_actual_value>Torque Actual Value</torque_actual_value>
       </inputs>
       <outputs name="Outputs">
         <control_word>Control Word</control_word>
@@ -326,16 +326,16 @@ Stephen Brawner (brawner@gmail.com)
     <limit
       lower="-2.5656"
       upper="2.5656"
-      effort="10"
+      effort="100"
       velocity="2" />
     <hardware id="3" type="driver">
-      <limit lower="-2.5656" upper="2.5656" vel="2" acc="10.0" jerk="150.0" effort="10" />
-      <transform ratio="1.0" offset_pos_cnt="0" cnt_per_unit="156455.678" torque_per_unit="1.0" user_unit_name="rad" />
+      <limit lower="-2.5656" upper="2.5656" vel="2" acc="10.0" jerk="150.0" effort="100" />
+      <transform ratio="1.0" offset_pos_cnt="0" cnt_per_unit="20860.757" torque_per_unit="1.0" user_unit_name="rad" />
       <inputs name="Inputs">
         <status_word>Status Word</status_word>
-        <position_actual_value>Position Actual value</position_actual_value>
-        <velocity_actual_value>Velocity Actual value</velocity_actual_value>
-        <torque_actual_value>Torque Actual value</torque_actual_value>
+        <position_actual_value>Position Actual Value</position_actual_value>
+        <velocity_actual_value>Velocity Actual Value</velocity_actual_value>
+        <torque_actual_value>Torque Actual Value</torque_actual_value>
       </inputs>
       <outputs name="Outputs">
         <control_word>Control Word</control_word>
@@ -401,16 +401,16 @@ Stephen Brawner (brawner@gmail.com)
     <limit
       lower="-3.1415"
       upper="3.1415"
-      effort="10"
+      effort="100"
       velocity="2" />
     <hardware id="4" type="driver">
-      <limit lower="-3.1415" upper="3.1415" vel="2" acc="10.0" jerk="150.0" effort="10" />
-      <transform ratio="1.0" offset_pos_cnt="0" cnt_per_unit="156455.678" torque_per_unit="1.0" user_unit_name="rad" />
+      <limit lower="-3.1415" upper="3.1415" vel="2" acc="10.0" jerk="150.0" effort="100" />
+      <transform ratio="1.0" offset_pos_cnt="0" cnt_per_unit="20860.757" torque_per_unit="1.0" user_unit_name="rad" />
       <inputs name="Inputs">
         <status_word>Status Word</status_word>
-        <position_actual_value>Position Actual value</position_actual_value>
-        <velocity_actual_value>Velocity Actual value</velocity_actual_value>
-        <torque_actual_value>Torque Actual value</torque_actual_value>
+        <position_actual_value>Position Actual Value</position_actual_value>
+        <velocity_actual_value>Velocity Actual Value</velocity_actual_value>
+        <torque_actual_value>Torque Actual Value</torque_actual_value>
       </inputs>
       <outputs name="Outputs">
         <control_word>Control Word</control_word>
@@ -476,16 +476,16 @@ Stephen Brawner (brawner@gmail.com)
     <limit
       lower="-2.2166"
       upper="2.2166"
-      effort="10"
+      effort="100"
       velocity="2" />
     <hardware id="5" type="driver">
-      <limit lower="-2.2166" upper="2.2166" vel="2" acc="10.0" jerk="150.0" effort="10" />
-      <transform ratio="1.0" offset_pos_cnt="0" cnt_per_unit="156455.678" torque_per_unit="1.0" user_unit_name="rad" />
+      <limit lower="-2.2166" upper="2.2166" vel="2" acc="10.0" jerk="150.0" effort="100" />
+      <transform ratio="1.0" offset_pos_cnt="0" cnt_per_unit="20860.757" torque_per_unit="1.0" user_unit_name="rad" />
       <inputs name="Inputs">
         <status_word>Status Word</status_word>
-        <position_actual_value>Position Actual value</position_actual_value>
-        <velocity_actual_value>Velocity Actual value</velocity_actual_value>
-        <torque_actual_value>Torque Actual value</torque_actual_value>
+        <position_actual_value>Position Actual Value</position_actual_value>
+        <velocity_actual_value>Velocity Actual Value</velocity_actual_value>
+        <torque_actual_value>Torque Actual Value</torque_actual_value>
       </inputs>
       <outputs name="Outputs">
         <control_word>Control Word</control_word>
@@ -518,7 +518,7 @@ Stephen Brawner (brawner@gmail.com)
         rpy="0 0 0" />
       <geometry>
         <mesh
-          filename="meshes/ee-Link.STL" />
+          filename="meshes/Link7.STL" />
       </geometry>
       <material
         name="">
@@ -532,7 +532,7 @@ Stephen Brawner (brawner@gmail.com)
         rpy="0 0 0" />
       <geometry>
         <mesh
-          filename="meshes/ee-Link.STL" />
+          filename="meshes/Link7.STL" />
       </geometry>
     </collision>
   </link>
@@ -551,16 +551,16 @@ Stephen Brawner (brawner@gmail.com)
     <limit
       lower="-3.1415"
       upper="3.1415"
-      effort="10"
+      effort="100"
       velocity="2" />
     <hardware id="6" type="driver">
-      <limit lower="-3.1415" upper="3.1415" vel="2" acc="10.0" jerk="150.0" effort="10" />
-      <transform ratio="1.0" offset_pos_cnt="0" cnt_per_unit="156455.678" torque_per_unit="1.0" user_unit_name="rad" />
+      <limit lower="-3.1415" upper="3.1415" vel="2" acc="10.0" jerk="150.0" effort="100" />
+      <transform ratio="1.0" offset_pos_cnt="0" cnt_per_unit="20860.757" torque_per_unit="1.0" user_unit_name="rad" />
       <inputs name="Inputs">
         <status_word>Status Word</status_word>
-        <position_actual_value>Position Actual value</position_actual_value>
-        <velocity_actual_value>Velocity Actual value</velocity_actual_value>
-        <torque_actual_value>Torque Actual value</torque_actual_value>
+        <position_actual_value>Position Actual Value</position_actual_value>
+        <velocity_actual_value>Velocity Actual Value</velocity_actual_value>
+        <torque_actual_value>Torque Actual Value</torque_actual_value>
       </inputs>
       <outputs name="Outputs">
         <control_word>Control Word</control_word>

@@ -65,10 +65,21 @@ def main():
         config = dict(urdf="robot.urdf", rigid_model="rigid_model.json", friction="friction_model.json",
                       kp=[20, 18, 16, 14, 12, 10, 8], kd=[4, 3.5, 3, 2.5, 2, 1.5, 1],
                       velocity_limit=[.4]*7,
+                      rated_torque=[48, 48, 40, 40, 7, 7, 7],
                       torque_limit=[29]*7, torque_rate_limit=[100]*7)
         config_file = work / "controller.yaml"
         config_file.write_text(yaml.safe_dump(config))
         common = [binaries / "jointImpedanceMain", f"--config={config_file}"]
+
+        # URDF 版本只提供模型和控制参数，完全不提供辨识/摩擦文件路径。
+        urdf_config = {key: value for key, value in config.items() if key not in ("rigid_model", "friction")}
+        urdf_config_file = work / "urdf_controller.yaml"
+        urdf_config_file.write_text(yaml.safe_dump(urdf_config))
+        urdf_common = [binaries / "jointImpedanceUrdfMain", f"--config={urdf_config_file}"]
+        run([binaries / "joint_impedance_urdf_test", urdf_config_file, "link_8"])
+        run(urdf_common + ["--check_only", "--sim=false"])
+        urdf_smoke = run(urdf_common + ["--sim=true", "--duration=.15", "--debug_interval=.1"])
+        assert "[阻抗调试]" in urdf_smoke.stdout and "friction(Nm)" not in urdf_smoke.stdout
 
         for thermal in (False, True):
             for item in friction["joint_parameters"].values():
@@ -125,7 +136,7 @@ def main():
         assert "hash mismatch" in run(common + ["--check_only"], expected=1).stderr
         np.savez_compressed(work / "identification.npz", P=P, base=beta+1)
         run([sys.executable, root / "tools/export_impedance_model.py", work, work / "bad.json"], expected=1)
-    print("PASS: 200 Studio references, debug components/output, bidirectional custom speed guards, YAML validation, model matching, HardwareSim and atomic torque validation")
+    print("PASS: 100 independent KDL URDF references, 200 Studio references, debug output, bidirectional speed guards, YAML validation, HardwareSim and atomic torque validation")
 
 
 if __name__ == "__main__":

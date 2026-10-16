@@ -121,39 +121,20 @@ with tempfile.TemporaryDirectory(prefix='rocos-http-integration-') as tmp:
             assert not request('/api/robot/jog/joint', {'joints': [1, 1] + [0] * (n-2)})['success']
             assert not state()['motion_busy']
 
-            # Online axis targets must actually execute, including encoder conversion.
-            ok('/api/robot/single_axis/move', {'id': 0, 'pos': .08, 'max_vel': .2, 'max_acc': 1, 'max_jerk': 5})
-            stopped()
-            assert abs(positions()[0] - .08) < .0001, positions()
-            assert state()['motion_outcome'] == 'completed' and state()['error'] is None
-            info = ok('/api/robot/info')['joint_infos']
-            count = info[0]['cnt_per_unit']
-            ok('/api/robot/single_axis/move', {'id': 0, 'pos': .04 * count, 'raw_data': True,
-                                             'max_vel': .2 * count, 'max_acc': count, 'max_jerk': 5 * count})
-            stopped()
-            assert abs(positions()[0] - .04) < .0001
-            raw = ok('/api/robot/state?raw_data=true')
-            assert raw['raw_data'] and abs(raw['joint_states'][0]['position'] / count - .04) < .0001
-
-            target = [.12, -.15, .08, -.25, .05, .15, 0]
-            ok('/api/robot/multi_axis/move', {'target_pos': target, 'max_vel': [.3] * n,
-                                             'max_acc': [1] * n, 'max_jerk': [5] * n, 'sync': 'time'})
-            stopped()
-            assert max(abs(a-b) for a,b in zip(positions(), target)) < .0001
+            # Removed online axis commands explicitly reject motion requests.
+            before = positions()
+            for path, body in [
+                ('/api/robot/single_axis/move', {'id': 0, 'pos': .08}),
+                ('/api/robot/single_axis/stop', {'id': 0}),
+                ('/api/robot/multi_axis/move', {'target_pos': [0] * n}),
+                ('/api/robot/multi_axis/stop', {}),
+            ]:
+                result = request(path, body)
+                assert not result['success'] and result['code'] == 3007, result
+                assert not state()['motion_busy']
+            assert positions() == before
             for sync in ['none', 'phase', 'time']:
                 ok('/api/robot/multi_axis/sync', {'sync': sync})
-
-            # A single axis stop halts its online target; unified stop selects Axis.
-            ok('/api/robot/single_axis/move', {'id': 0, 'pos': .7, 'max_vel': .15, 'max_acc': 1})
-            time.sleep(.15)
-            ok('/api/robot/single_axis/stop', {'id': 0})
-            stopped()
-            assert positions()[0] < .6
-            ok('/api/robot/single_axis/move', {'id': 0, 'pos': .7, 'max_vel': .15, 'max_acc': 1})
-            time.sleep(.1)
-            assert ok('/api/robot/stop', {})['stopped_motion_type'] == 'axis'
-            stopped()
-            assert state()['motion_outcome'] == 'stopped'
 
             # Offline trajectories honor stop on the servo thread. A synchronous
             # HTTP MoveJ must leave a different HTTP worker free to stop it.

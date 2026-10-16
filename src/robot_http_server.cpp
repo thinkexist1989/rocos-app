@@ -558,8 +558,7 @@ nlohmann::json RobotHttpServer::motionData() const {
     const auto type = robot_->getMotionType();
     const bool busy = robot_->isMotionBusy();
     const auto report = robot_->getMotionReport();
-    const char* name = type == Robot::MotionType::Axis ? "axis"
-        : type == Robot::MotionType::Trajectory ? "trajectory"
+    const char* name = type == Robot::MotionType::Trajectory ? "trajectory"
         : type == Robot::MotionType::Dragging ? "dragging"
         : type == Robot::MotionType::Teaching ? "teaching" : "none";
     nlohmann::json error = nullptr;
@@ -1347,41 +1346,14 @@ void RobotHttpServer::handleSingleAxisCommand(const httplib::Request& req, httpl
     if (id < 0 || id >= robot_->getJointNum()) { sendJson(res, false, 1002, "Joint id out of range"); return; }
     const auto action = req.path.substr(req.path.find_last_of('/') + 1);
     std::lock_guard<std::mutex> lock(command_mutex_);
-    if (action == "stop") {
-        if (robot_->isMotionBusy() && robot_->getMotionType() != Robot::MotionType::Axis) {
-            sendJson(res, false, 3003, "Use unified stop for a coordinated trajectory or jogging"); return;
-        }
-        robot_->stopSingleAxis(id); sendMotionResult(res, 0, "Axis stop requested"); return;
+    if (action == "move" || action == "stop") {
+        sendUnsupported(res, "Single-axis motion"); return;
     }
-    if (action != "move" && !requireIdle(res)) return;
-    if (action == "enable" || action == "disable") {
-        if (action == "enable") robot_->setJointEnabled(id); else robot_->setJointDisabled(id);
-        sendJson(res, true, 0, "Axis state command completed", {{"id", id}, {"status", jointStatusName(robot_->getJointStatus(id))}}); return;
-    }
-    if (robot_->isMotionBusy() && robot_->getMotionType() != Robot::MotionType::Axis) {
-        sendJson(res, false, 3003, "Another motion is running"); return;
-    }
-    if (robot_->getWorkMode() != Robot::WorkMode::Position || !positionMode(robot_, id)) {
-        sendJson(res, false, 3005, "Axis movement requires position work mode and CSP/CSV"); return;
-    }
-    if (robot_->getJointStatus(id) != 2) { sendJson(res, false, 3001, "Joint is disabled"); return; }
-    if (!body.contains("pos") || !body["pos"].is_number()) { sendJson(res, false, 1001, "Missing numeric pos"); return; }
-    const double scale = body.value("raw_data", false) ? robot_->getJointCntPerUnit(id) : 1.0;
-    if (!std::isfinite(scale) || scale <= 0) { sendJson(res, false, 1001, "Invalid encoder scale"); return; }
-    const double pos = body["pos"].get<double>() / scale;
-    const double velocity = body.contains("max_vel") ? body["max_vel"].get<double>() / scale : robot_->getJntVelLimit(id);
-    const double acceleration = body.contains("max_acc") ? body["max_acc"].get<double>() / scale : robot_->getJntAccLimit(id);
-    const double jerk = body.contains("max_jerk") ? body["max_jerk"].get<double>() / scale : robot_->getJntJerkLimit(id);
-    const double time = body.value("least_time", 0.0);
-    if (!isFinite(pos) || !isFinite(velocity) || !isFinite(acceleration) || !isFinite(jerk) || !isFinite(time) ||
-        velocity <= 0 || acceleration <= 0 || jerk <= 0 || time < 0 ||
-        velocity > robot_->getJointMaxVelocity(id) || acceleration > robot_->getJointMaxAcceleration(id) ||
-        jerk > robot_->getJointMaxJerk(id) ||
-        pos < robot_->getJointMinPosition(id) || pos > robot_->getJointMaxPosition(id)) {
-        sendJson(res, false, 1001, "Invalid axis position or motion limits"); return;
-    }
-    robot_->moveSingleAxis(id, pos, 0, velocity, acceleration, jerk, time);
-    sendMotionResult(res, 0, "Axis move accepted");
+    if (!requireIdle(res)) return;
+    if (action == "enable") robot_->setJointEnabled(id);
+    else robot_->setJointDisabled(id);
+    sendJson(res, true, 0, "Axis state command completed",
+             {{"id", id}, {"status", jointStatusName(robot_->getJointStatus(id))}});
 }
 
 void RobotHttpServer::handleMultiAxisCommand(const httplib::Request& req, httplib::Response& res) {
@@ -1390,14 +1362,10 @@ void RobotHttpServer::handleMultiAxisCommand(const httplib::Request& req, httpli
     if (!body.is_object()) { sendJson(res, false, 1001, "Invalid JSON"); return; }
     const auto action = req.path.substr(req.path.find_last_of('/') + 1);
     std::lock_guard<std::mutex> lock(command_mutex_);
-    if (action == "stop") {
-        if (robot_->isMotionBusy() && robot_->getMotionType() != Robot::MotionType::Axis) {
-            sendJson(res, false, 3003, "Use unified stop for this motion"); return;
-        }
-        robot_->stopMultiAxis(); sendMotionResult(res, 0, "Multi-axis stop requested"); return;
+    if (action == "move" || action == "stop") {
+        sendUnsupported(res, "Multi-axis motion"); return;
     }
     if (!requireIdle(res)) return;
-    const int n = robot_->getJointNum();
     if (action == "enable") { robot_->setEnabled(); sendMotionResult(res, 0, "Enable command completed"); return; }
     if (action == "disable") { robot_->setDisabled(); sendMotionResult(res, 0, "Disable command completed"); return; }
     Robot::Synchronization sync = robot_->getSynchronization();
@@ -1407,37 +1375,6 @@ void RobotHttpServer::handleMultiAxisCommand(const httplib::Request& req, httpli
         if (!parseSync(value, sync)) { sendJson(res, false, 1001, "Invalid sync mode"); return; }
         robot_->setSynchronization(sync); sendJson(res, true, 0, "Synchronization switched", {{"sync", static_cast<int>(sync)}}); return;
     }
-    if (robot_->getWorkMode() != Robot::WorkMode::Position || !robotEnabled(robot_)) {
-        sendJson(res, false, 3005, "Movement requires enabled position work mode"); return;
-    }
-    std::vector<double> pos, vel = robot_->getJntVelLimits(), acc = robot_->getJntAccLimits(), jerk = robot_->getJntJerkLimits();
-    const auto target = body.contains("target_pos") ? body["target_pos"] : body.value("joints", nlohmann::json());
-    if (!validVector(target, n, pos)) { sendJson(res, false, 1003, "Expected target_pos for every joint"); return; }
-    for (const auto* key : {"max_vel", "max_acc", "max_jerk"}) {
-        auto& values = std::string(key) == "max_vel" ? vel : std::string(key) == "max_acc" ? acc : jerk;
-        if (body.contains(key) && !validVector(body[key], n, values)) { sendJson(res, false, 1003, "Invalid motion-limit array"); return; }
-    }
-    const bool raw = body.value("raw_data", false);
-    const double time = body.value("least_time", 0.0);
-    if (!isFinite(time) || time < 0) { sendJson(res, false, 1001, "Invalid least_time"); return; }
-    for (int i = 0; i < n; ++i) {
-        if (!positionMode(robot_, i)) { sendJson(res, false, 3005, "Expected CSP/CSV joint modes"); return; }
-        if (raw) {
-            const double scale = robot_->getJointCntPerUnit(i);
-            if (!isFinite(scale) || scale <= 0) { sendJson(res, false, 1001, "Invalid encoder scale"); return; }
-            pos[i] /= scale;
-            if (body.contains("max_vel")) vel[i] /= scale;
-            if (body.contains("max_acc")) acc[i] /= scale;
-            if (body.contains("max_jerk")) jerk[i] /= scale;
-        }
-        if (pos[i] < robot_->getJointMinPosition(i) || pos[i] > robot_->getJointMaxPosition(i) ||
-            vel[i] <= 0 || acc[i] <= 0 || jerk[i] <= 0 ||
-            vel[i] > robot_->getJointMaxVelocity(i) || acc[i] > robot_->getJointMaxAcceleration(i) ||
-            jerk[i] > robot_->getJointMaxJerk(i)) { sendJson(res, false, 1001, "Invalid axis position or motion limits"); return; }
-    }
-    robot_->setSynchronization(sync);
-    robot_->moveMultiAxis(pos, std::vector<double>(n, 0), vel, acc, jerk, time);
-    sendMotionResult(res, 0, "Multi-axis move accepted");
 }
 
 void RobotHttpServer::handleSetLoadParameters(const httplib::Request& req, httplib::Response& res) {

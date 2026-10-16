@@ -1,0 +1,22 @@
+# 支持绝对路径或相对于本 YAML 的路径；URDF 需包含 revolute 限位、惯性和 hardware 标签。
+urdf: /home/rocos/Documents/GitHub/rocos-app/config/TC7-robot/TC7-robot.urdf
+
+# 数组按 URDF 动力学模型的关节顺序排列，启动时会打印关节名。
+# 示例参数需按真机调整；Kp: Nm/rad，Kd: Nm·s/rad。
+kp: [20, 20, 20, 15, 10, 8, 5]
+kd: [4, 4, 4, 3, 2, 1.5, 1]
+
+# 关节额定力矩，Nm；J1/J2 MJB17 48，J3/J4 MJB17 40，J5-J7 MJB14 7。
+# 按动力学模型关节顺序排列；驱动器值 = 关节力矩(Nm) / rated_torque * 1000。
+rated_torque: [48, 48, 40, 40, 7, 7, 7]
+
+# 自定义实测速度保护，rad/s；任一周期超速即下使能并退出。
+velocity_limit: [2, 2, 2, 2, 2, 10.0, 2]
+# 关节输出端 Nm、Nm/s；力矩上限不得超过 URDF effort。
+torque_limit: [30, 30, 30, 30, 15, 15, 10]
+torque_rate_limit: [100, 100, 100, 100, 50, 50, 30]
+
+# 当前测试将动力学 dq 置零：g(q) + Kp·(qd-q) - Kd·dq；阻尼和速度保护仍使用实测 dq。
+# 构建：cmake --build build/impedance --target jointImpedanceUrdfMain -j2
+# 检查：build/impedance/bin/jointImpedanceUrdfMain --config=config/urdf_impedance.yaml --check_only
+# 默认 --sim=true；--debug_interval=0.5 为打印间隔（秒），0 关闭周期打印。

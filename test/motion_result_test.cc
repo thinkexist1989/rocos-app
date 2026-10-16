@@ -104,11 +104,13 @@ int main(int argc, char** argv) {
         check(!waited["success"] && waited["code"] == -2310 && waited["error_name"] == "SpeedLimit", "WaitMove lost async result");
         robot->setJntVelLimit(0, robot->getJointMaxVelocity(0));
 
-        // Zero jerk reaches Ruckig::ErrorInvalidInput in the servo loop.
-        robot->moveSingleAxis(0, .2, 0, .2, .6, 0, 0);
-        failure = terminal();
-        check(failure["result"] == -2316 && failure["error"]["native_code"] == -100, "Ruckig raw code was not mapped");
-        check(failure["error"]["command"] == "single_axis", "Axis command missing");
+        // Removed online axis commands must fail without starting a motion.
+        for (const auto* path : {"/api/robot/single_axis/move", "/api/robot/single_axis/stop",
+                                 "/api/robot/multi_axis/move", "/api/robot/multi_axis/stop"}) {
+            const auto unsupported = json(client.Post(path, headers, R"({"id":0,"pos":0.2})", "application/json"));
+            check(!unsupported["success"] && unsupported["code"] == 3007, "Removed axis command accepted");
+            check(!robot->isMotionBusy(), "Removed axis command started a motion");
+        }
         auto jerks = robot->getJntJerkLimits(); jerks[0] = robot->getJointMaxJerk(0); robot->setJntJerkLimits(jerks);
 
         // An impossible interpolation jerk reaches RunMoveJ's planner failure.
@@ -129,15 +131,17 @@ int main(int argc, char** argv) {
 
         // New successful work clears old errors and does not reset a worker's
         // terminal error by publishing RUNNING after the worker starts.
-        robot->moveSingleAxis(0, .04, 0, .2, .6, 5, 0);
+        q(0) = .04;
+        expect(robot->MoveJ(q, .2, .6, 0, 0, true), Result::NoError);
         auto completed = terminal();
         check(completed["result"] == 0 && completed["error"].is_null() && completed["motion_outcome"] == "completed", "Error was not cleared for new motion");
-        robot->moveSingleAxis(0, .5, 0, .1, .6, 5, 0);
+        q(0) = .5;
+        expect(robot->MoveJ(q, .1, .6, 0, 0, true), Result::NoError);
         robot->requestMotionStop();
         auto stopped = terminal();
         check(stopped["result"] == 0 && stopped["motion_outcome"] == "stopped", "Stop incorrectly marked completed/failed");
         server.stop();
-        std::cout << "PASS: native validation, IK, async planning, Ruckig mapping, enablement loss and REST terminal reports\n" << std::flush;
+        std::cout << "PASS: native validation, IK, async planning, removed axis commands, enablement loss and REST terminal reports\n" << std::flush;
         std::_Exit(0);
     } catch (const std::exception& e) {
         std::cerr << e.what() << '\n' << std::flush;

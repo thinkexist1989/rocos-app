@@ -1,5 +1,5 @@
 # Paths are relative to THIS YAML file. Use the exact bounded URDF used by Studio,
-# including ROCOS <hardware> tags and calibrated torque_per_unit in counts/Nm.
+# including ROCOS <hardware> tags. The entry point sets torque_per_unit from rated_torque.
 # Export the rigid parameters once (no physical-inertia reconstruction):
 #   python3 tools/export_impedance_model.py /path/to/identification_run models/rigid_model.json
 # Copy that run's friction_model.json and exact URDF into models/, or change paths below.
@@ -13,6 +13,10 @@ friction: ../models/friction_model.json
 # not tuned gains for a particular robot. Units: Nm/rad and Nm*s/rad.
 kp: [20, 20, 20, 15, 10, 8, 5]
 kd: [4, 4, 4, 3, 2, 1.5, 1]
+
+# 关节额定力矩，Nm；按 joint_names 排列：J1/J2 MJB17 48，J3/J4 MJB17 40，J5-J7 MJB14 7。
+# 仅用于下发单位换算：驱动器值 = 关节力矩(Nm) / rated_torque * 1000。
+rated_torque: [48, 48, 40, 40, 7, 7, 7]
 
 # 每关节实测速度保护阈值，rad/s，顺序同 joint_names；必须为正且不高于 URDF 限制。
 # 以下仅为低速调试示例，需按真机设置；任一周期超限即下使能并退出，人工确认后重新启动。
