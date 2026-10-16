@@ -147,6 +147,8 @@ namespace rocos {
         double cnt_per_unit_{131072 / (2*M_PI) };// 每个单位对应脉冲数，比如cnt/rad, cnt/r, cnt/m 2^17=131072
 //        double cnt_per_unit_{991232.0 / (2 * M_PI) };// 每个单位对应脉冲数，比如cnt/rad, cnt/r, cnt/m 2^17=131072
 
+        double velocity_actual_scale_{1.0}; // 606C 每个原始计数对应的脉冲/s；MJB 为 0.1。
+
         double torque_per_unit_{1.0}; // 每个力矩单位对应的脉冲数，比如cnt/N，通常返回值是千分之一
 
         std::string user_unit_name_{"rad"}; //用户单位名称
@@ -184,6 +186,8 @@ namespace rocos {
         inline void setCntPerUnit(double val) { cnt_per_unit_ = val; } // 设置位置、速度转换
 
         inline double getCntPerUnit() const { return cnt_per_unit_; } // 获取位置、速度转换
+
+        void setVelocityActualScale(double val); // 仅用于实测速度，不影响目标速度 60FF。
 
         inline void setTorquePerUnit(double val) { torque_per_unit_ = val; } // 设置力矩转换
 

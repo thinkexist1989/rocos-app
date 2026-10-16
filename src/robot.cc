@@ -322,12 +322,18 @@ namespace rocos {
                     jnt_ptr->setRatio(trans->DoubleAttribute("ratio", 1.0));
                     jnt_ptr->setPosZeroOffset(trans->IntAttribute("offset_pos_cnt", 0));
                     jnt_ptr->setCntPerUnit(trans->DoubleAttribute("cnt_per_unit", 1.0));
+                    double velocityActualScale = 1.0; // 旧配置默认 606C 单位为脉冲/s。
+                    if (trans->Attribute("velocity_actual_scale") &&
+                        trans->QueryDoubleAttribute("velocity_actual_scale", &velocityActualScale) != tinyxml2::XML_SUCCESS)
+                        throw std::invalid_argument("Invalid URDF velocity_actual_scale");
+                    jnt_ptr->setVelocityActualScale(velocityActualScale);
                     jnt_ptr->setTorquePerUnit(trans->DoubleAttribute("torque_per_unit", 1.0));
 
                     std::cout << "- transform: \n"
                               << "----- ratio: " << trans->DoubleAttribute("ratio", 1.0) << std::endl
                               << "----- offset_pos_cnt: " << trans->IntAttribute("offset_pos_cnt", 0) << std::endl
                               << "----- cnt_per_unit: " << trans->DoubleAttribute("cnt_per_unit", 1.0) << std::endl
+                              << "----- velocity_actual_scale: " << velocityActualScale << " pulse/s per raw count" << std::endl
                               << "----- torque_per_unit: " << trans->DoubleAttribute("torque_per_unit", 1.0)
                               << std::endl;
                     if (trans->Attribute("user_unit_name")) {

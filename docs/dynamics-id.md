@@ -40,6 +40,8 @@ sample.tau[j] = robot.getJointTorque(joint.robotIndex) * (joint.ratedTorque / 10
 
 `time` 是实际经过秒数，循环间不归零。`loop` 从 1 开始。位置和速度沿用 Robot 的 rad、rad/s 单位转换。当前 `getJointTorque()` 返回额定力矩千分比计数，采集端按 `tau_Nm = feedback * rated_torque_Nm / 1000` 换算后保存，CSV 的 `tau_*` 单位为 Nm。
 
+速度反馈按 `dq = raw_606C * velocity_actual_scale / cnt_per_unit` 换算。URDF 的 `hardware/transform` 可设置 `velocity_actual_scale`，表示每个 606C 原始计数对应的脉冲/s，必须为有限正数，省略时为 `1.0`。TC7 的 MJB 驱动器使用 `0.1`；位置换算仍使用原 `cnt_per_unit`，该反馈比例不用于目标速度 60FF。
+
 两份采集入口共用 `--torque_config=config/joint_rated_torque.yaml`，其中按关节名配置 J1–J7 的额定力矩 `[48, 48, 40, 40, 7, 7, 7]` Nm，支持任意 Studio 列顺序和硬件 ID 映射。自定义关节名时同步修改 YAML 键名。启动预检会拒绝缺失、非正数或非有限的额定力矩；元数据记录反馈源、Nm 单位、换算公式和每关节额定值。导入 Studio 时力矩单位倍率使用 1，避免重复换算。
 
 数据使用 `Measurement` 结构保存在预分配内存中，运动结束或 Ctrl+C/SIGTERM 中断后先下使能，再保存已采集的完整行。CSV 和 `.metadata.yaml` 都要求新文件名；侧文件记录仿真标记、关节映射、完成状态和失败原因。断电、SIGKILL 或崩溃无法保存尚未写盘的数据。

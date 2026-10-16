@@ -18,6 +18,8 @@
 // email: luoyang@sia.cn
 
 #include "include/rocos_app/drive.h"
+#include <cmath>
+#include <stdexcept>
 
 
 namespace rocos {
@@ -354,7 +356,14 @@ namespace rocos {
     /// \brief 获取速度
     /// \return 速度值[User Custom Unit]
     double Drive::getVelocity() {
-        return getVelocityInCnt() / cnt_per_unit_; // 单位转换
+        // 先将 606C 原值转换为脉冲/s，再按位置编码器的脉冲/单位换算。
+        return getVelocityInCnt() * velocity_actual_scale_ / cnt_per_unit_;
+    }
+
+    void Drive::setVelocityActualScale(double val) {
+        if (!std::isfinite(val) || val <= 0)
+            throw std::invalid_argument("velocity_actual_scale must be finite and positive");
+        velocity_actual_scale_ = val;
     }
 
     /// \brief 获取力矩

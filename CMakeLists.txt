@@ -530,6 +530,17 @@ install(FILES "${CMAKE_CURRENT_BINARY_DIR}/rocos_app-config.cmake"
 #############
 
 enable_testing()
+add_executable(drive_velocity_test test/drive_velocity_test.cc)
+target_link_libraries(drive_velocity_test PRIVATE robot)
+add_test(NAME drive_velocity_tc7 COMMAND drive_velocity_test
+    ${CMAKE_CURRENT_SOURCE_DIR}/config/TC7-robot/TC7-robot.urdf 0.1)
+add_test(NAME drive_velocity_tc7_legacy_model COMMAND drive_velocity_test
+    ${CMAKE_CURRENT_SOURCE_DIR}/config/TC7/robot.urdf 0.1)
+add_test(NAME drive_velocity_default COMMAND drive_velocity_test
+    ${CMAKE_CURRENT_SOURCE_DIR}/config/robot.urdf 1.0)
+set_tests_properties(drive_velocity_tc7 drive_velocity_tc7_legacy_model drive_velocity_default
+    PROPERTIES TIMEOUT 20)
+
 add_executable(unit_test test/unit_test.cc)
 target_link_libraries(unit_test
         PRIVATE
