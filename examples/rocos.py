@@ -399,15 +399,18 @@ class Robot:
     def set_work_mode(self, mode):
         return self.post("workmode", {"mode": mode})
 
-    def wait_move(self, timeout=20):
-        if not math.isfinite(timeout) or timeout <= 0:
-            raise ValueError("timeout 必须是正的有限秒数")
-        deadline = time.monotonic() + timeout
+    def wait_move(self, timeout=None):
+        """Wait for the current motion to finish; None sets no total deadline."""
+        if timeout is not None and (not math.isfinite(timeout) or timeout <= 0):
+            raise ValueError("timeout 必须是 None 或正的有限秒数")
+        deadline = None if timeout is None else time.monotonic() + timeout
         while True:
-            remaining = deadline - time.monotonic()
-            if remaining <= 0:
-                raise TransportError("等待运动超时，未确认运动完成；不会自动重发运动")
-            interval = min(2.0, remaining)
+            interval = 2.0
+            if deadline is not None:
+                remaining = deadline - time.monotonic()
+                if remaining <= 0:
+                    raise TransportError("等待运动超时，未确认运动完成；不会自动重发运动")
+                interval = min(interval, remaining)
             result = self.request("wait_move", {"timeout": interval},
                                   timeout=interval + self.timeout, checked=False)
             if result["success"] is False and result["code"] == 5002:
@@ -417,8 +420,8 @@ class Robot:
             return result["data"]
 
     def _move(self, name, body, velocity, acceleration, timeout, wait, parameters):
-        if not math.isfinite(timeout) or timeout <= 0:
-            raise ValueError("timeout 必须是正的有限秒数")
+        if timeout is not None and (not math.isfinite(timeout) or timeout <= 0):
+            raise ValueError("timeout 必须是 None 或正的有限秒数")
         payload = dict(body)
         payload.setdefault("velocity", velocity)
         payload.setdefault("acceleration", acceleration)
@@ -441,7 +444,7 @@ class Robot:
             raise RuntimeError("运动被停止，未确认到达目标")
         return result
 
-    def movej(self, joints, velocity=0.1, acceleration=0.3, timeout=20, *, wait=True, **parameters):
+    def movej(self, joints, velocity=0.1, acceleration=0.3, timeout=None, *, wait=True, **parameters):
         """Joint vector or complete MoveJ dict; blocking by default; angles in rad."""
         body = dict(joints) if isinstance(joints, dict) else {"joints": list(joints)}
         result = self._move("movej", body, velocity, acceleration, timeout, wait, parameters)
@@ -454,12 +457,12 @@ class Robot:
 
     movrj = movej  # Convenience alias for the spelling used in the original request.
 
-    def movel(self, pose, velocity=0.05, acceleration=0.1, timeout=20, *, wait=True, **parameters):
+    def movel(self, pose, velocity=0.05, acceleration=0.1, timeout=None, *, wait=True, **parameters):
         """Straight-line flange target for the current legacy Robot controller."""
         value = pose.to_dict() if isinstance(pose, Pose) else pose
         return self._move("movel", {"pose": value}, velocity, acceleration, timeout, wait, parameters)
 
-    def movej_ik(self, pose, velocity=0.1, acceleration=0.3, timeout=20, *, wait=True, **parameters):
+    def movej_ik(self, pose, velocity=0.1, acceleration=0.3, timeout=None, *, wait=True, **parameters):
         """Joint move to a flange target via the controller's inverse kinematics."""
         value = pose.to_dict() if isinstance(pose, Pose) else pose
         return self._move("movej_ik", {"pose": value}, velocity, acceleration, timeout, wait, parameters)
