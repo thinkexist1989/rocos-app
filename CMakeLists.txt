@@ -25,12 +25,12 @@ email: luoyang@sia.cn
 cmake_minimum_required(VERSION 3.10)
 project(rocos_app VERSION 1.0.5 DESCRIPTION "ROCOS Application Library")
 
-list(APPEND CMAKE_PREFIX_PATH "/opt/rocos/ecm")
 list(APPEND CMAKE_PREFIX_PATH "/opt/grpc")
 include(cmake/common.cmake) # gRPC
 
 # add_compile_options(-std=c++11)
-set(CMAKE_CXX_STANDARD 11)
+set(CMAKE_CXX_STANDARD 17)
+set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
 set(CMAKE_INCLUDE_CURRENT_DIR ON)
 
@@ -60,8 +60,6 @@ find_package(Threads REQUIRED)
 #find_package(Qt5 REQUIRED COMPONENTS Core)
 find_package(Eigen3 REQUIRED)
 find_package(OpenSSL REQUIRED)
-
-find_package(rocos_ecm REQUIRED)
 
 find_package(orocos_kdl REQUIRED)
 
@@ -130,7 +128,6 @@ target_link_libraries(hardware
         PUBLIC
         ${DEP_LIBS}
         Boost::thread
-        rocos::ecat_config
         )
 add_library(rocos::hardware ALIAS hardware)
 
@@ -194,6 +191,26 @@ target_link_libraries(robot
         OpenSSL::SSL
         )
 add_library(rocos::robot ALIAS robot)
+
+########## HTTP server #################
+add_library(robot_http_server SHARED
+        src/robot_http_server.cpp
+        include/rocos_app/robot_http_server.hpp
+        )
+target_compile_features(robot_http_server PUBLIC cxx_std_17)
+target_include_directories(robot_http_server PUBLIC
+        $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>
+        $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/3rdparty/httplib>
+        $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/3rdparty/json>
+        $<INSTALL_INTERFACE:${CMAKE_INSTALL_INCLUDEDIR}>
+        $<INSTALL_INTERFACE:${CMAKE_INSTALL_INCLUDEDIR}/rocos_app/third_party>
+        )
+target_link_libraries(robot_http_server PUBLIC
+        robot Threads::Threads
+        PRIVATE
+        $<BUILD_INTERFACE:spdlog::spdlog_header_only>
+        )
+add_library(rocos::robot_http_server ALIAS robot_http_server)
 
 
 ################
@@ -281,15 +298,27 @@ target_link_libraries(rocos_app
         protocol
         )
 add_library(rocos::rocos_app ALIAS rocos_app)
+target_link_libraries(rocos_app INTERFACE robot_http_server)
 
 ########## Executable RocosAppMain ################
 # move rocosAppMain to test. Due to rocos_app is a robot library.
 add_executable(rocosAppMain
         src/rocosAppMain.cc
         )
-
+add_executable(demo_torque_7joint
+        src/demo_torque_7joint.cpp        )
 ## Specify libraries to link a library or executable target against
 target_link_libraries(rocosAppMain
+        PRIVATE
+        hardware
+        drive
+        protocol
+        kinematics
+        robot
+        robot_http_server
+        gflags::gflags
+        )
+target_link_libraries(demo_torque_7joint
         PRIVATE
         hardware
         drive
@@ -353,6 +382,9 @@ install(FILES include/tinyfsm.hpp
 install(DIRECTORY include/rocos_app
         DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}
         )
+install(FILES 3rdparty/httplib/httplib.h 3rdparty/json/json.hpp
+        DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}/rocos_app/third_party
+        )
 
 ## Install hardware library
 #install(TARGETS hardware
@@ -399,7 +431,7 @@ install(DIRECTORY include/rocos_app
 #        PUBLIC_HEADER DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}  # 头文件安装路径
 #        )
 
-install(TARGETS hardware drive kinematics robot protocol rocos_app rocosAppMain dynamicsIdMain frictionIdMain
+install(TARGETS hardware drive kinematics robot protocol robot_http_server rocos_app rocosAppMain dynamicsIdMain frictionIdMain
         EXPORT rocos_app-targets
         LIBRARY DESTINATION ${CMAKE_INSTALL_LIBDIR}  # 动态库安装路径
         ARCHIVE DESTINATION ${CMAKE_INSTALL_LIBDIR}  # 静态库安装路径
@@ -502,3 +534,36 @@ target_link_libraries(unit_test
 #        robot
 #        )
 add_test(NAME unit_test COMMAND unit_test)
+
+# HTTP smoke tests do not construct a Robot or connect to hardware.
+add_executable(http_server_test test/http_server_test.cc)
+target_link_libraries(http_server_test PRIVATE rocos::robot_http_server)
+add_test(NAME http_server_test COMMAND http_server_test)
+set_tests_properties(http_server_test PROPERTIES TIMEOUT 20)
+
+add_executable(http_control_heartbeat_test test/http_control_heartbeat_test.cc)
+target_link_libraries(http_control_heartbeat_test PRIVATE rocos::robot_http_server)
+add_test(NAME http_control_heartbeat_test COMMAND http_control_heartbeat_test)
+set_tests_properties(http_control_heartbeat_test PROPERTIES TIMEOUT 20)
+
+add_executable(motion_result_test test/motion_result_test.cc)
+target_link_libraries(motion_result_test PRIVATE rocos::robot_http_server)
+add_test(NAME motion_result_test COMMAND motion_result_test
+    ${CMAKE_CURRENT_SOURCE_DIR}/config/models/talon/robot.urdf)
+set_tests_properties(motion_result_test PROPERTIES TIMEOUT 30)
+
+find_program(ROCOS_PYTHON_EXECUTABLE python3)
+if(ROCOS_PYTHON_EXECUTABLE)
+    add_test(NAME python_robot_client_test
+        COMMAND ${ROCOS_PYTHON_EXECUTABLE}
+            ${CMAKE_CURRENT_SOURCE_DIR}/test/python_robot_client_test.py
+            $<TARGET_FILE:rocosAppMain>
+            ${CMAKE_CURRENT_SOURCE_DIR}/config/models/talon/robot.urdf)
+    set_tests_properties(python_robot_client_test PROPERTIES TIMEOUT 90)
+    add_test(NAME http_robot_integration_test
+        COMMAND ${ROCOS_PYTHON_EXECUTABLE}
+            ${CMAKE_CURRENT_SOURCE_DIR}/test/http_robot_integration_test.py
+            $<TARGET_FILE:rocosAppMain>
+            ${CMAKE_CURRENT_SOURCE_DIR}/config/models/talon/robot.urdf)
+    set_tests_properties(http_robot_integration_test PROPERTIES TIMEOUT 90)
+endif()

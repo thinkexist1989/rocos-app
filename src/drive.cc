@@ -399,6 +399,11 @@ namespace rocos {
         return hw_interface_->getSecondaryPositionRaw(id_);
     }
 
+    int32_t Drive::getDigitalInputsRaw()
+    {
+        return hw_interface_->getDigitalInputsRaw(id_);
+    }
+
     int32_t Drive::getSecondaryVelocityInCnt() {
         return hw_interface_->getSecondaryVelocityRaw(id_);
     }

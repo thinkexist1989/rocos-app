@@ -28,6 +28,7 @@
 #include <iostream>
 #include <rocos_app/robot.h>
 #include <rocos_app/robot_service.h>
+#include <rocos_app/robot_http_server.hpp>
 #include <string>
 #include <gflags/gflags.h>
 
@@ -36,13 +37,19 @@ DEFINE_string(base, "base_link", "Base link name");
 DEFINE_string(tip, "link_7", "Tip link name");
 DEFINE_bool(sim, true, "Sim or not");
 DEFINE_int32(id, 0, "hardware id, only work for real hardware");
+DEFINE_bool(http, true, "Start the HTTP API server");
+DEFINE_string(http_host, "0.0.0.0", "HTTP listening address");
+DEFINE_int32(http_port, 8080, "HTTP listening port");
+DEFINE_int32(http_control_ttl_seconds, 300, "HTTP control lease timeout in seconds");
+DEFINE_bool(grpc, true, "Start the gRPC API server");
+DEFINE_string(grpc_address, "0.0.0.0:30001", "gRPC listening address");
 
 bool isRuning = true;
 
 rocos::Robot *robot_ptr = nullptr;
 
 void signalHandler(int signo) {
-    if (signo == SIGINT) {
+    if (signo == SIGINT || signo == SIGTERM) {
         std::cout << "\033[1;31m"
                   << "[!!SIGNAL!!]"
                   << "INTERRUPT by CTRL-C"
@@ -50,7 +57,7 @@ void signalHandler(int signo) {
 
         isRuning = false;
 
-        robot_ptr->setDisabled();
+        if (robot_ptr) robot_ptr->setDisabled();
 
         exit(0);
     }
@@ -58,7 +65,8 @@ void signalHandler(int signo) {
 
 
 int main(int argc, char *argv[]) {
-    if (signal(SIGINT, signalHandler) == SIG_ERR) {
+    if (signal(SIGINT, signalHandler) == SIG_ERR ||
+        signal(SIGTERM, signalHandler) == SIG_ERR) {
         std::cout << "\033[1;31m"
                   << "Can not catch SIGINT"
                   << "\033[0m" << std::endl;
@@ -67,6 +75,16 @@ int main(int argc, char *argv[]) {
     using namespace rocos;
 
     gflags::ParseCommandLineFlags(&argc, &argv, true);
+    if ((!FLAGS_http && !FLAGS_grpc) ||
+        (FLAGS_http && (FLAGS_http_port < 1 || FLAGS_http_port > 65535 ||
+                        FLAGS_http_control_ttl_seconds <= 0))) {
+        std::cerr << "Enable HTTP or gRPC, use a valid HTTP port and a positive control TTL.\n";
+        return EXIT_FAILURE;
+    }
+    if (!std::ifstream(FLAGS_urdf)) {
+        std::cerr << "Cannot open URDF: " << FLAGS_urdf << '\n';
+        return EXIT_FAILURE;
+    }
     //**-------------------------------**//
 
     //**-------------启动admittance_joint-----------**//
@@ -81,10 +99,26 @@ int main(int argc, char *argv[]) {
 
     robot_ptr = &robot;
 
-    auto robotService = RobotServiceImpl::getInstance(&robot);
-
-    //------------------------wait----------------------------------
-    robotService->runServer();
+    try {
+        std::unique_ptr<RobotHttpServer> httpServer;
+        if (FLAGS_http) {
+            httpServer = std::make_unique<RobotHttpServer>(&robot, nullptr, FLAGS_http_control_ttl_seconds);
+            if (FLAGS_grpc) {
+                httpServer->runAsync(FLAGS_http_host, FLAGS_http_port);
+            } else {
+                httpServer->run(FLAGS_http_host, FLAGS_http_port);
+            }
+        }
+        if (FLAGS_grpc) {
+            auto robotService = RobotServiceImpl::getInstance(&robot);
+            robotService->runServer(FLAGS_grpc_address);
+        }
+    } catch (const std::exception& e) {
+        std::cerr << "Server startup failed: " << e.what() << '\n';
+        // The legacy Robot/DriveGuard background threads are process-scoped.
+        // Match the signal shutdown path: do not destroy their live Robot here.
+        std::exit(EXIT_FAILURE);
+    }
 
     return 0;
 }

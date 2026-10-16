@@ -177,7 +177,7 @@ namespace JC_helper
             collection_force.resize(joint_num);
         };
         //开始示教
-         void Runteaching(rocos::Robot *robot_ptr,bool *flag_admittance_joint_turnoff);
+         void Runteaching(rocos::Robot *robot_ptr,std::atomic<bool> *flag_admittance_joint_turnoff);
 
     };
 
@@ -187,7 +187,7 @@ namespace JC_helper
         KDL::Frame frame_offset{};
         std::mutex mutex_traj_joint;
         std::atomic<bool> on_stop_trajectory{false};
-        bool FinishRunPlanningIK{false};
+        std::atomic<bool> FinishRunPlanningIK{false};
         ft_sensor *my_ft_sensor_ptr{nullptr};
         KDL::ChainIkSolverVel_pinv _ik_vel;
 
@@ -199,7 +199,7 @@ namespace JC_helper
         ~admittance();
         int init(KDL::Frame flange_pos);
         // void start( rocos::Robot* robot_ptr, const std::vector< KDL::Frame >& traj_target );
-        void Runteaching(rocos::Robot *robot_ptr, const KDL::Frame traj_target, bool *flag_turn_off);
+        void Runteaching(rocos::Robot *robot_ptr, const KDL::Frame traj_target, std::atomic<bool> *flag_turn_off);
         void RunLink(rocos::Robot *robot_ptr, const KDL::Frame frame_taget, double max_path_v, double max_path_a);
         void sensor_update(rocos::Robot *robot_ptr);
     };

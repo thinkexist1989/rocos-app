@@ -29,7 +29,7 @@ namespace rocos {
 
     Hardware::Hardware(const std::string &urdf_file_path, int id) {
         _type = HW_ETHERCAT;
-        ecPtr_ = EcatConfig::getInstance(id);
+        ecPtr_ = SharedMemoryConfig::getInstance(id);
 
         slave_num_ = ecPtr_->getSlaveNum();
 
@@ -216,12 +216,12 @@ namespace rocos {
                     pSecondaryVel_[id] = ecPtr_->findSlaveInputVarPtrByName<int32_t>(id, "Secondary velocity value");
                 }
 
-                auto digital_inputs = inputs->FirstChildElement("digital_inputs");
+                auto digital_inputs = inputs->FirstChildElement("Analog_input_2");
                 if(digital_inputs) {
                     
                     pDigitalInputs_[id] = ecPtr_->findSlaveInputVarPtrByName<int32_t>(id, digital_inputs->GetText());
                 } else {
-                    pDigitalInputs_[id] = ecPtr_->findSlaveInputVarPtrByName<int32_t>(id, "Digital Inputs");
+                    pDigitalInputs_[id] = ecPtr_->findSlaveInputVarPtrByName<int32_t>(id, "App Object");
                 }
                 
 
