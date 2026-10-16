@@ -64,6 +64,7 @@ def main():
                         joint_parameters={name: dict(parameters) for name in reversed(names)})
         config = dict(urdf="robot.urdf", rigid_model="rigid_model.json", friction="friction_model.json",
                       kp=[20, 18, 16, 14, 12, 10, 8], kd=[4, 3.5, 3, 2.5, 2, 1.5, 1],
+                      velocity_limit=[.4]*7,
                       torque_limit=[29]*7, torque_rate_limit=[100]*7)
         config_file = work / "controller.yaml"
         config_file.write_text(yaml.safe_dump(config))
@@ -89,7 +90,11 @@ def main():
             references.write_text(json.dumps(cases))
             run([binaries / "joint_impedance_test", config_file, references])
             run(common + ["--check_only", "--sim=false"])
-            run(common + ["--sim=true", "--duration=.03"], expected=1 if thermal else 0)
+            smoke = run(common + ["--sim=true", "--duration=.15", "--debug_interval=.1"], expected=1 if thermal else 0)
+            if not thermal:
+                assert "[阻抗调试]" in smoke.stdout and "requested(Nm) sent(Nm) load(raw)" in smoke.stdout, smoke.stdout + smoke.stderr
+                quiet = run(common + ["--sim=true", "--duration=.03", "--debug_interval=0"])
+                assert "[阻抗调试]" not in quiet.stdout
 
         run([binaries / "robot_torque_test", urdf])
         friction["urdf_hash"] = "wrong-model"
@@ -102,12 +107,25 @@ def main():
         config_file.write_text(yaml.safe_dump(config))
         assert "kp must be nonnegative" in run(common + ["--check_only"], expected=1).stderr
         config["kp"][0] = 20
+        for bad_limit, error in ((None, "Missing velocity_limit"), ([.4]*6, "Wrong length: velocity_limit"),
+                                 ([0]*7, "velocity_limit must be positive"), ([-.1]*7, "velocity_limit must be positive"),
+                                 ([float("nan")]*7, "Nonfinite values: velocity_limit"),
+                                 ([1000]*7, "velocity_limit exceeds URDF velocity limit")):
+            if bad_limit is None:
+                config.pop("velocity_limit")
+            else:
+                config["velocity_limit"] = bad_limit
+            config_file.write_text(yaml.safe_dump(config))
+            rejected = run(common + ["--check_only"], expected=1)
+            assert error in rejected.stderr, (bad_limit, rejected.stderr)
+        config["velocity_limit"] = [.4]*7
         config_file.write_text(yaml.safe_dump(config))
+        assert "debug_interval must be" in run(common + ["--check_only", "--debug_interval=.01"], expected=1).stderr
         urdf.write_bytes(urdf.read_bytes() + b"\n")
         assert "hash mismatch" in run(common + ["--check_only"], expected=1).stderr
         np.savez_compressed(work / "identification.npz", P=P, base=beta+1)
         run([sys.executable, root / "tools/export_impedance_model.py", work, work / "bad.json"], expected=1)
-    print("PASS: 200 Studio reference cases, temperature requirement, YAML validation, model matching, HardwareSim and atomic torque validation")
+    print("PASS: 200 Studio references, debug components/output, bidirectional custom speed guards, YAML validation, model matching, HardwareSim and atomic torque validation")
 
 
 if __name__ == "__main__":

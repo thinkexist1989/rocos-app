@@ -14,6 +14,11 @@ friction: ../models/friction_model.json
 kp: [20, 20, 20, 15, 10, 8, 5]
 kd: [4, 4, 4, 3, 2, 1.5, 1]
 
+# 每关节实测速度保护阈值，rad/s，顺序同 joint_names；必须为正且不高于 URDF 限制。
+# 以下仅为低速调试示例，需按真机设置；任一周期超限即下使能并退出，人工确认后重新启动。
+# 不限制相对目标的位置偏差；原有 URDF 绝对位置限位仍然保留。
+velocity_limit: [0.2, 0.2, 0.2, 0.2, 0.2, 0.2, 0.2]
+
 # Output-joint Nm and Nm/s; must not exceed URDF effort or int16 drive range.
 # Initial gravity compensation must fit torque_limit before drives are enabled.
 torque_limit: [30, 30, 30, 30, 15, 15, 10]
@@ -29,3 +34,6 @@ torque_rate_limit: [100, 100, 100, 100, 50, 50, 30]
 # Interface smoke test (does not simulate torque dynamics):
 #   build/impedance/bin/jointImpedanceMain --config=config/identified_impedance.yaml --sim=true --duration=1
 # Real hardware: --sim=false. Update gains/limits/scales for the actual robot first.
+# 调试打印：默认 --debug_interval=0.5 秒；设为 0 关闭，开启时最小 0.1 秒。
+# 启动时打印参数，运行快照由独立线程输出，包含状态、补偿分量、请求/下发力矩（Nm）。
+# load(raw) 原样打印 getJointLoadTorque 反馈；当前接口未做 Nm 换算。

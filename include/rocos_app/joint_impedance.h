@@ -13,6 +13,7 @@ struct JointImpedanceConfig {
     std::vector<int> hardwareIds;
     Eigen::VectorXd kp, kd;
     Eigen::VectorXd lower, upper, velocity;
+    Eigen::VectorXd velocityLimit; // YAML 独立保护阈值，rad/s，不高于 URDF 速度限制。
     Eigen::VectorXd torqueLimit, torqueRateLimit;
     bool needsTemperature = false;
 };
@@ -24,6 +25,10 @@ public:
     explicit JointImpedanceController(const std::string &yamlPath);
     ~JointImpedanceController();
     const JointImpedanceConfig &config() const;
+
+    // 最近一次成功计算的补偿分量，供同一控制线程采样调试数据。
+    const Eigen::VectorXd &rigidTorque() const;
+    const Eigen::VectorXd &frictionTorque() const;
 
     // Y(q,dq,0) P beta + friction + Kp(qDesired-q) - Kd*dq.
     // 返回未限幅力矩，由调用方统一限制力矩幅值和变化率。

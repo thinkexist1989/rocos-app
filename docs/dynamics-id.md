@@ -127,3 +127,18 @@ python3 test/friction_id_compatibility_test.py \
   --binary=build/bin/frictionIdMain \
   --studio=/home/rocos/Documents/GitHub/dynamics-id-studio
 ```
+
+## 阻抗控制的速度保护与调试
+
+`jointImpedanceMain` 默认以启动位置为目标，启动前检查静止并预置补偿力矩，再上使能。
+在 `config/identified_impedance.yaml` 中设置必填的 `velocity_limit`，单位 rad/s，数组按刚体模型的 `joint_names` 排列。
+这是自定义实测速度阈值，不从 URDF 推导；每项必须为正且不高于 URDF 的硬件速度限制。
+任一控制周期发现 `abs(dq[j]) > velocity_limit[j]` 就抛出异常，主程序先调用 `robot.setDisabled()`，再打印关节名、实测速度和阈值，以失败状态退出；人工确认后重新启动，不自动恢复使能。
+没有增加相对目标的位置偏差限制，原有绝对位置限位、力矩幅值和变化率限制继续保留。
+下使能后的减速及抱闸取决于驱动器配置，软件速度检查不是独立的硬件看门狗。
+
+启动时打印每关节硬件 ID、起始位置、Kp/Kd、速度阈值、力矩限制及预置力矩。
+运行中默认每 0.5 s 打印一组调试快照，可以用 `--debug_interval=0.1` 提高到 10 Hz，或 `--debug_interval=0` 关闭周期打印。
+快照包含经过时间、当前循环间隔、实际/目标位置、位置误差、实际速度、刚体/摩擦补偿、弹簧/阻尼项、限幅前请求力矩及下发力矩。
+`load(raw)` 直接读取 `robot.getJointLoadTorque()`，当前接口未做 Nm 换算，其单位不能直接与 Nm 力矩列混用。
+周期打印由独立线程处理，控制线程只尝试投递最新快照，打印繁忙时丢弃快照；这些低频输出用于观察状态，不是完整的数据采集记录。

@@ -164,10 +164,13 @@ struct JointImpedanceController::Impl {
         const int n = config.jointNames.size();
         config.kp = readVector(yaml["kp"], n, "kp");
         config.kd = readVector(yaml["kd"], n, "kd");
+        require(yaml["velocity_limit"].IsDefined(), "Missing velocity_limit");
+        config.velocityLimit = readVector(yaml["velocity_limit"], n, "velocity_limit");
         config.torqueLimit = readVector(yaml["torque_limit"], n, "torque_limit");
         config.torqueRateLimit = readVector(yaml["torque_rate_limit"], n, "torque_rate_limit");
         require((config.kp.array() >= 0).all(), "kp must be nonnegative");
         require((config.kd.array() >= 0).all(), "kd must be nonnegative");
+        require((config.velocityLimit.array() > 0).all(), "velocity_limit must be positive");
         require((config.torqueLimit.array() > 0).all(), "Torque limits must be positive");
         require((config.torqueRateLimit.array() > 0).all(), "Torque rate limits must be positive");
     }
@@ -222,6 +225,7 @@ struct JointImpedanceController::Impl {
             config.velocity[i] = std::min(config.velocity[i], readAttribute(limit, "vel"));
             require(config.lower[i] < config.upper[i], "Empty position limit interval");
             require(config.velocity[i] > 0, "Velocity limit must be positive");
+            require(config.velocityLimit[i] <= config.velocity[i], "velocity_limit exceeds URDF velocity limit");
 
             const double effort = std::min(model.effortLimit[i], readAttribute(limit, "effort"));
             require(std::isfinite(effort) && config.torqueLimit[i] <= effort, "Torque limit exceeds URDF effort");
@@ -239,6 +243,13 @@ struct JointImpedanceController::Impl {
         require(q.size() == n && dq.size() == n && qDesired.size() == n, "Wrong state/target size");
         require(q.allFinite() && dq.allFinite() && qDesired.allFinite(), "Nonfinite state/target");
         for (int i = 0; i < n; ++i) {
+            // 使用实测速度的绝对值，正反转同样保护；不滤波、不等待连续超限。
+            // 异常交给主程序下使能并退出，不会自动恢复，也不检查位置跟随误差。
+            if (std::abs(dq[i]) > config.velocityLimit[i]) {
+                throw std::runtime_error("Safety velocity limit exceeded: " + config.jointNames[i]
+                    + ", dq=" + std::to_string(dq[i]) + " rad/s, limit="
+                    + std::to_string(config.velocityLimit[i]) + " rad/s; restart required");
+            }
             require(q[i] >= config.lower[i] && q[i] <= config.upper[i], "Position exceeds joint limits");
             require(qDesired[i] >= config.lower[i] && qDesired[i] <= config.upper[i], "Target exceeds joint limits");
             require(std::abs(dq[i]) <= config.velocity[i], "Velocity exceeds joint limits");
@@ -254,6 +265,8 @@ struct JointImpedanceController::Impl {
 JointImpedanceController::JointImpedanceController(const std::string &path) : impl_(new Impl(path)) {}
 JointImpedanceController::~JointImpedanceController() = default;
 const JointImpedanceConfig &JointImpedanceController::config() const { return impl_->config; }
+const Eigen::VectorXd &JointImpedanceController::rigidTorque() const { return impl_->rigidTorque; }
+const Eigen::VectorXd &JointImpedanceController::frictionTorque() const { return impl_->frictionTorque; }
 
 const Eigen::VectorXd &JointImpedanceController::computeTorque(
         const Eigen::VectorXd &q, const Eigen::VectorXd &dq,

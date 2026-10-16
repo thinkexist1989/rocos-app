@@ -25,6 +25,10 @@ int main(int argc, char **argv) {
             const auto &actual = controller.computeTorque(q, dq, target, temperature);
             if ((actual - expected).cwiseAbs().maxCoeff() > 1e-9)
                 throw std::runtime_error("Controller differs from Studio reference");
+            const auto reconstructed = controller.rigidTorque() + controller.frictionTorque()
+                + controller.config().kp.cwiseProduct(target - q) - controller.config().kd.cwiseProduct(dq);
+            if ((actual - reconstructed).cwiseAbs().maxCoeff() > 1e-9)
+                throw std::runtime_error("Debug torque components do not match command");
         }
         Eigen::VectorXd q = Eigen::VectorXd::Zero(7);
         Eigen::VectorXd dq = q, target = q;
@@ -39,7 +43,25 @@ int main(int argc, char **argv) {
         target[6] = controller.config().upper[6] + 1;
         mustReject(q, target);
         if (controller.config().needsTemperature) mustReject(q, q);
-        std::cout << "PASS: Studio torque reference and invalid input checks" << std::endl;
+        // 每个关节在正负阈值处允许计算，刚刚超过自定义阈值即拒绝，独立于 URDF 极限。
+        const auto temperature = Eigen::VectorXd::Constant(7, 25);
+        for (int j = 0; j < 7; ++j) {
+            for (double sign : {-1.0, 1.0}) {
+                dq.setZero();
+                const double limit = controller.config().velocityLimit[j];
+                dq[j] = sign * limit;
+                controller.computeTorque(q, dq, q, temperature);
+                dq[j] = sign * std::nextafter(limit, std::numeric_limits<double>::infinity());
+                bool rejected = false;
+                try { controller.computeTorque(q, dq, q, temperature); }
+                catch (const std::exception &error) {
+                    const std::string message = error.what();
+                    rejected = message.find("Safety velocity limit exceeded: " + controller.config().jointNames[j]) != std::string::npos;
+                }
+                if (!rejected) throw std::runtime_error("Custom velocity guard failed");
+            }
+        }
+        std::cout << "PASS: Studio torque reference, debug components, invalid input and bidirectional speed guards" << std::endl;
     } catch (const std::exception &error) {
         std::cerr << error.what() << std::endl;
         return 1;
