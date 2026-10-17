@@ -32,6 +32,7 @@ DEFINE_double(duration, 0, "保持时间，单位秒；0 表示运行至 SIGINT/
 DEFINE_double(debug_interval, 0.5, "调试打印间隔，秒；0 关闭，开启时至少 0.1 秒");
 
 namespace {
+using Clock = std::chrono::steady_clock;
 constexpr double stationarySpeed = 0.02; // 启动时允许的实测速度，rad/s。
 constexpr double maxControlGap = 0.020; // 真机控制周期超时阈值，s。
 volatile std::sig_atomic_t stopped = 0;
@@ -157,13 +158,9 @@ std::vector<int> mapRobotJoints(rocos::Robot &robot, const rocos::JointImpedance
     return indices;
 }
 
-void readJointState(rocos::Robot &robot, const std::vector<int> &indices,
-                    Eigen::VectorXd &q, Eigen::VectorXd &dq) {
-    for (size_t j = 0; j < indices.size(); ++j) {
+void readJointPositions(rocos::Robot &robot, const std::vector<int> &indices, Eigen::VectorXd &q) {
+    for (size_t j = 0; j < indices.size(); ++j)
         q[j] = robot.getJointPosition(indices[j]);
-        // 当前直接使用驱动器实测速度，此处没有附加滤波，也不使用期望速度。
-        dq[j] = robot.getJointVelocity(indices[j]);
-    }
 }
 
 // 先限绝对力矩，再限制相邻周期的变化量；previous 保存实际下发前的限制结果。
@@ -187,9 +184,14 @@ void runController(rocos::Robot &robot, rocos::JointImpedanceController &control
     // 先下使能，再读取起始姿态；模型首次计算也在上使能前完成。
     robot.setDisabled();
     configureTorqueUnits(robot, indices, ratedTorque);
-    Eigen::VectorXd q(n), dq(n), qDesired(n), previous(n), command(n);
+    Eigen::VectorXd q(n), dq(n), previousQ(n), qDesired(n), previous(n), command(n);
     DebugSample sample(n);
-    readJointState(robot, indices, q, dq);
+    // 启动静止检查使用 20 ms 窗口的位置差分，减小编码器量化的影响。
+    readJointPositions(robot, indices, previousQ);
+    const auto stationaryStart = Clock::now();
+    std::this_thread::sleep_for(std::chrono::milliseconds(20));
+    readJointPositions(robot, indices, q);
+    dq = (q - previousQ) / std::chrono::duration<double>(Clock::now() - stationaryStart).count();
     require(q.allFinite() && dq.allFinite() && dq.cwiseAbs().maxCoeff() < stationarySpeed, "Robot must be stationary");
     qDesired = q; // 弹簧初始误差为零，保持当前位置。
     previous = controller.computeTorque(q, dq, qDesired);
@@ -213,7 +215,9 @@ void runController(rocos::Robot &robot, rocos::JointImpedanceController &control
                   << ' ' << config.torqueLimit[j] << ' ' << config.torqueRateLimit[j]
                   << ' ' << ratedTorque[j] << ' ' << previous[j] << '\n';
     }
-    std::cout << "超速故障将下使能并退出，需人工确认后重新启动。" << std::endl;
+    std::cout << "摩擦补偿系数：" << config.frictionScale << "（YAML 启动时读取）\n"
+              << "速度来源：实际位置差分 / 实际采样间隔，不做在线滤波。\n"
+              << "超速故障将下使能并退出，需人工确认后重新启动。" << std::endl;
 
     // command 保持 Nm，Robot 按 1000/ratedTorque 换算后下发；预置和周期命令使用同一比例。
     // 下使能时先写入补偿力矩，上使能后即使用该值，而非从零力矩起步。
@@ -222,19 +226,25 @@ void runController(rocos::Robot &robot, rocos::JointImpedanceController &control
     robot.setEnabled();
     require(robot.isEnabled(), "Robot did not enable");
 
-    using Clock = std::chrono::steady_clock;
+    readJointPositions(robot, indices, previousQ);
     const auto start = Clock::now();
     auto last = start;
+    // 保持预置力矩并等待一个总线周期，为首周期位置差分提供有效时间间隔。
+    require(!stopped && robot.setTorque(command) == 0, "Cannot hold preloaded CST torque");
     double nextDebug = 0;
     while (!stopped) {
+        require(robot.isEnabled(), "Robot was disabled during impedance control");
+        readJointPositions(robot, indices, q);
         const auto now = Clock::now();
         const double elapsed = std::chrono::duration<double>(now - start).count();
         const double cycle = std::chrono::duration<double>(now - last).count();
         if (FLAGS_duration > 0 && elapsed >= FLAGS_duration) break;
+        require(std::isfinite(cycle) && cycle > 0, "Invalid sampling interval");
         require(FLAGS_sim || cycle <= maxControlGap, "Control cycle exceeded 20 ms");
+        // 同一个差分速度用于动力学、摩擦、阻尼和超速检查；不依赖驱动器速度单位。
+        dq = (q - previousQ) / cycle;
+        previousQ = q;
         last = now;
-        require(robot.isEnabled(), "Robot was disabled during impedance control");
-        readJointState(robot, indices, q, dq);
         // 外部轨迹接入点：更新 qDesired，保持位置连续且按 config.jointNames 排列。
         // 网络收发等可能阻塞的工作放在上层线程，不放进此循环。
         // computeTorque 首先检查自定义 velocity_limit，超速则抛异常，不再下发新的力矩。

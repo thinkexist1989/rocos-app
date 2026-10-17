@@ -3,6 +3,7 @@
 #include <rocos_app/ethercat/hardware.h>
 #include <rocos_app/ethercat/hardware_sim.h>
 #include <rocos_app/robot.h>
+#include <rocos_app/robot_http_server.hpp>
 #include <gflags/gflags.h>
 #include <tinyxml2.h>
 
@@ -12,8 +13,10 @@
 #include <csignal>
 #include <cstdio>
 #include <cstdlib>
+#include <iomanip>
 #include <memory>
 #include <set>
+#include <sstream>
 #include <thread>
 
 DEFINE_string(urdf, "robot.urdf", "ROCOS hardware URDF");
@@ -27,6 +30,9 @@ DEFINE_string(output, "", "New measured CSV; default measurements.csv or measure
 DEFINE_int32(loops, 4, "Excitation repetitions");
 DEFINE_double(time_scale, 1.0, "Trajectory speed factor (0, 1]; 0.1 advances 0.1 ms per 1 ms servo cycle");
 DEFINE_bool(check_only, false, "Validate trajectory without connecting hardware");
+DEFINE_bool(http, true, "Serve live robot state and model for ROCOS-Viz");
+DEFINE_string(http_host, "0.0.0.0", "HTTP listening address");
+DEFINE_int32(http_port, 9090, "HTTP listening port");
 
 namespace {
 constexpr size_t jointCount = 7; // Current Robot initializes a seven-axis SRS solver.
@@ -164,6 +170,27 @@ KDL::JntArray targetForRobot(const Trajectory &trajectory, const Positions &posi
     return target;
 }
 
+Positions readPositions(rocos::Robot &robot, const Trajectory &trajectory) {
+    Positions positions;
+    for (size_t j = 0; j < jointCount; ++j)
+        positions[j] = robot.getJointPosition(trajectory.joints[j].robotIndex);
+    return positions;
+}
+
+void requireStationary(rocos::Robot &robot, const Trajectory &trajectory, double velocityLimit) {
+    const auto previous = readPositions(robot, trajectory);
+    const auto start = Clock::now();
+    // 静止检查用 20 ms 的位置变化，避免单周期编码器量化导致误判。
+    std::this_thread::sleep_for(std::chrono::milliseconds(20));
+    checkSignal();
+    const auto current = readPositions(robot, trajectory);
+    const double dt = seconds(start);
+    for (size_t j = 0; j < jointCount; ++j)
+        require(std::isfinite(previous[j]) && std::isfinite(current[j]) &&
+                std::abs((current[j] - previous[j]) / dt) <= velocityLimit,
+                "Robot is not stationary: " + trajectory.joints[j].name);
+}
+
 void settle(rocos::Robot &robot, const Trajectory &trajectory, const Positions &positions) {
     const auto target = targetForRobot(trajectory, positions);
     const auto start = Clock::now();
@@ -171,15 +198,15 @@ void settle(rocos::Robot &robot, const Trajectory &trajectory, const Positions &
         checkSignal();
         require(robot.isEnabled() && robot.servoJ(target) == 0, "Robot rejected hold target");
     } while (seconds(start) < 0.5);
+    requireStationary(robot, trajectory, 0.02);
     for (const auto &joint : trajectory.joints)
-        require(std::abs(robot.getJointPosition(joint.robotIndex) - target(joint.robotIndex)) <= 0.01 &&
-                std::abs(robot.getJointVelocity(joint.robotIndex)) <= 0.02, "Robot did not settle: " + joint.name);
+        require(std::abs(robot.getJointPosition(joint.robotIndex) - target(joint.robotIndex)) <= 0.01,
+                "Robot did not settle: " + joint.name);
 }
 
 void moveToStart(rocos::Robot &robot, const Trajectory &trajectory) {
     checkSignal();
-    for (const auto &joint : trajectory.joints)
-        require(std::abs(robot.getJointVelocity(joint.robotIndex)) <= 0.02, "Robot must be stationary before MoveJ");
+    requireStationary(robot, trajectory, 0.2);
     require(robot.MoveJ(targetForRobot(trajectory, trajectory.points.front()), 0.15, 0.3, 0, 0, true) == 0, "MoveJ rejected start pose");
     const auto start = Clock::now();
     while (robot.getRunState() == rocos::Robot::RunState::Running) {
@@ -191,27 +218,56 @@ void moveToStart(rocos::Robot &robot, const Trajectory &trajectory) {
 }
 
 void record(rocos::Robot &robot, const Trajectory &trajectory, std::vector<Measurement> &samples) {
+    // 用激励开始前的实际位置初始化，首条数据也有真实差分速度。
+    auto previousPositions = readPositions(robot, trajectory);
     const auto start = Clock::now();
     auto previous = start;
     for (int loop = 1; loop <= FLAGS_loops; ++loop) {
         for (const auto &positions : trajectory.points) {
             checkSignal();
+            // servoJ 内部等待总线同步；连续调用即可，此处不额外 sleep 或等待信号。
             require(robot.isEnabled() && robot.servoJ(targetForRobot(trajectory, positions)) == 0, "Robot rejected excitation target");
-            const auto now = Clock::now();
-            require(FLAGS_sim || std::chrono::duration<double>(now - previous).count() <= 0.02, "Servo cycle exceeded 20 ms");
-            previous = now;
             Measurement sample;
+            sample.q = readPositions(robot, trajectory);
+            const auto now = Clock::now();
+            const double cycle = std::chrono::duration<double>(now - previous).count();
+            // 仅测量周期并检查超时，不引入延时。
+            require(std::isfinite(cycle) && cycle > 0, "Invalid sampling interval");
+            require(FLAGS_sim || cycle <= 0.02, "Servo cycle exceeded 20 ms");
+            previous = now;
             sample.time = std::chrono::duration<double>(now - start).count(); sample.loop = loop;
             for (size_t j = 0; j < jointCount; ++j) {
                 const auto &joint = trajectory.joints[j];
-                sample.q[j] = robot.getJointPosition(joint.robotIndex);
-                sample.dq[j] = robot.getJointVelocity(joint.robotIndex);
+                // 实际位置后向差分；使用真实采样间隔，不使用轨迹 time_scale。
+                sample.dq[j] = (sample.q[j] - previousPositions[j]) / cycle;
                 // getJointTorque 当前返回千分比原始计数，在采集端只换算一次为 Nm。
                 sample.tau[j] = robot.getJointTorque(joint.robotIndex) * (joint.ratedTorque / 1000.0);
-                require(std::isfinite(sample.q[j]) && std::isfinite(sample.dq[j]) && std::isfinite(sample.tau[j]) &&
-                        sample.q[j] >= joint.lower && sample.q[j] <= joint.upper && std::abs(sample.q[j] - positions[j]) <= 0.15 &&
-                        std::abs(sample.dq[j]) <= joint.velocity * 1.05, "Invalid feedback or tracking error: " + joint.name);
+                const double error = sample.q[j] - positions[j];
+                const char *reason = nullptr;
+                if (!std::isfinite(sample.q[j]) || !std::isfinite(sample.dq[j]) || !std::isfinite(sample.tau[j]))
+                    reason = "反馈包含 NaN/Inf";
+                else if (sample.q[j] < joint.lower || sample.q[j] > joint.upper)
+                    reason = "实际位置超过硬件限位";
+                else if (std::abs(error) > 0.15)
+                    reason = "实际位置与目标位置的偏差超过 0.15 rad";
+                else if (std::abs(sample.dq[j]) > joint.velocity * 1.05)
+                    reason = "实际速度超过硬件速度限值的 1.05 倍";
+                if (reason) {
+                    // 异常由上层捕获；先下使能，再打印，避免终端输出阻塞采集线程。
+                    std::ostringstream message;
+                    message << std::fixed << std::setprecision(6)
+                            << "Invalid feedback or tracking error: " << joint.name << "\n原因：" << reason
+                            << "\nhardware_id=" << joint.hardwareId << ", loop=" << loop
+                            << ", time=" << sample.time << " s, cycle=" << cycle * 1000 << " ms"
+                            << "\nq_target=" << positions[j] << " rad, q_actual=" << sample.q[j]
+                            << " rad, error(actual-target)=" << error << " rad, error_limit=0.150000 rad"
+                            << "\nposition_limits=[" << joint.lower << ", " << joint.upper << "] rad"
+                            << "\ndq_actual=" << sample.dq[j] << " rad/s, velocity_limit=" << joint.velocity * 1.05
+                            << " rad/s, tau_actual=" << sample.tau[j] << " Nm";
+                    throw std::runtime_error(message.str());
+                }
             }
+            previousPositions = sample.q;
             samples.push_back(sample);
         }
     }
@@ -236,6 +292,9 @@ int runExperiment(rocos::Robot &robot, Trajectory &trajectory, FILE *csv, FILE *
     result["simulation"] = FLAGS_sim;
     result["time_scale"] = FLAGS_time_scale;
     result["servo_period_seconds"] = cycleTime;
+    result["velocity_source"] = "position_difference";
+    result["velocity_conversion"] = "(q_current - q_previous) / measured_dt";
+    result["velocity_unit"] = "rad/s";
     result["torque_source"] = "Robot::getJointTorque";
     result["torque_unit"] = "Nm";
     result["torque_conversion"] = "getJointTorque * rated_torque_Nm / 1000";
@@ -292,6 +351,7 @@ int main(int argc, char **argv) {
         require(FLAGS_loops > 0, "Loops must be positive");
         require(std::isfinite(FLAGS_time_scale) && FLAGS_time_scale > 0 && FLAGS_time_scale <= 1,
                 "time_scale must be finite and in (0, 1]");
+        require(!FLAGS_http || (FLAGS_http_port >= 1 && FLAGS_http_port <= 65535), "Invalid HTTP port");
         auto trajectory = loadTrajectory();
         if (FLAGS_check_only) return 0;
 
@@ -310,12 +370,19 @@ int main(int argc, char **argv) {
         Robot robot(hw, FLAGS_urdf, FLAGS_base, FLAGS_tip);
 
         int exitCode = 1;
+        std::unique_ptr<RobotHttpServer> httpServer;
         try {
+            // 可视化复用采集使用的 Robot，在后台提供状态、URDF 和网格，不阻塞采集。
+            if (FLAGS_http) {
+                httpServer = std::make_unique<RobotHttpServer>(&robot);
+                httpServer->runAsync(FLAGS_http_host, FLAGS_http_port);
+            }
             exitCode = runExperiment(robot, trajectory, csv.get(), metadata.get());
         } catch (const std::exception &e) {
             robot.setDisabled();
             std::cerr << e.what() << std::endl;
         }
+        httpServer.reset(); // 机械臂已下使能，再停止服务并等待后台线程退出。
         csv.reset();
         metadata.reset();
         // Robot's current destructor does not stop its workers. Exit after

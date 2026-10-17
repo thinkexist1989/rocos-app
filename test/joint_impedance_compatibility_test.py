@@ -64,7 +64,7 @@ def main():
                         joint_parameters={name: dict(parameters) for name in reversed(names)})
         config = dict(urdf="robot.urdf", rigid_model="rigid_model.json", friction="friction_model.json",
                       kp=[20, 18, 16, 14, 12, 10, 8], kd=[4, 3.5, 3, 2.5, 2, 1.5, 1],
-                      velocity_limit=[.4]*7,
+                      velocity_limit=[.4]*7, friction_scale=.7,
                       rated_torque=[48, 48, 40, 40, 7, 7, 7],
                       torque_limit=[29]*7, torque_rate_limit=[100]*7)
         config_file = work / "controller.yaml"
@@ -94,7 +94,8 @@ def main():
                 coefficients = np.tile([.2, .03, .1, .08, .002 if thermal else 0], (7, 1))
                 matrix = namespace["friction_matrix"](dq[None], temperature[None], rigid[None],
                                                        np.full(7, .15), np.full(7, .05), np.full(7, 25), True, thermal)
-                torque = rigid + matrix @ coefficients.flatten() + config["kp"] * (target-q) - config["kd"] * dq
+                torque = (rigid + config["friction_scale"] * (matrix @ coefficients.flatten())
+                          + config["kp"] * (target-q) - config["kd"] * dq)
                 cases.append({key: value.tolist() for key, value in dict(q=q, dq=dq, target=target,
                                                                         temperature=temperature, torque=torque).items()})
             references = work / "reference.json"
@@ -114,6 +115,14 @@ def main():
         del friction["urdf_hash"]  # Old exports without provenance remain supported.
         (work / "friction_model.json").write_text(json.dumps(friction))
         run(common + ["--check_only", "--sim=false"])
+        for scale in (0, 1, -.1, 1.1, float("nan"), float("inf")):
+            config["friction_scale"] = scale
+            config_file.write_text(yaml.safe_dump(config))
+            valid = 0 <= scale <= 1
+            result = run(common + ["--check_only"], expected=0 if valid else 1)
+            if not valid:
+                assert "friction_scale must be finite and in [0, 1]" in result.stderr
+        config["friction_scale"] = .7
         config["kp"][0] = -1
         config_file.write_text(yaml.safe_dump(config))
         assert "kp must be nonnegative" in run(common + ["--check_only"], expected=1).stderr

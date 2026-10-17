@@ -1,0 +1,85 @@
+{
+  "model": "stribeck_load_temperature_v1",
+  "joint_names": [
+    "joint_1",
+    "joint_2",
+    "joint_3",
+    "joint_4",
+    "joint_5",
+    "joint_6",
+    "joint_7"
+  ],
+  "units": "output-joint SI: Nm, rad/s for revolute; N, m/s for prismatic; temperature degC",
+  "joint_parameters": {
+    "joint_1": {
+      "coulomb": 7.120557779874917,
+      "load_coefficient": 0.0,
+      "stribeck_amplitude": 0.0,
+      "viscous_at_reference": 9.289931087649608,
+      "viscous_temperature_slope": 0.0,
+      "reference_temperature_c": 25.0,
+      "stribeck_velocity": 0.15,
+      "smooth_velocity": 0.05
+    },
+    "joint_2": {
+      "coulomb": 4.800384308982969,
+      "load_coefficient": 0.0,
+      "stribeck_amplitude": 0.0,
+      "viscous_at_reference": 11.36390049222666,
+      "viscous_temperature_slope": 0.0,
+      "reference_temperature_c": 25.0,
+      "stribeck_velocity": 0.15,
+      "smooth_velocity": 0.05
+    },
+    "joint_3": {
+      "coulomb": 4.774783632112101,
+      "load_coefficient": 0.0,
+      "stribeck_amplitude": 0.0,
+      "viscous_at_reference": 0.791822505117502,
+      "viscous_temperature_slope": 0.0,
+      "reference_temperature_c": 25.0,
+      "stribeck_velocity": 0.15,
+      "smooth_velocity": 0.05
+    },
+    "joint_4": {
+      "coulomb": 4.559040926459717,
+      "load_coefficient": 0.0,
+      "stribeck_amplitude": 0.0,
+      "viscous_at_reference": 3.780338594947053,
+      "viscous_temperature_slope": 0.0,
+      "reference_temperature_c": 25.0,
+      "stribeck_velocity": 0.15,
+      "smooth_velocity": 0.05
+    },
+    "joint_5": {
+      "coulomb": 0.591453828964355,
+      "load_coefficient": 0.0,
+      "stribeck_amplitude": 0.0,
+      "viscous_at_reference": 0.3066559785945108,
+      "viscous_temperature_slope": 0.0,
+      "reference_temperature_c": 25.0,
+      "stribeck_velocity": 0.15,
+      "smooth_velocity": 0.05
+    },
+    "joint_6": {
+      "coulomb": 0.3326189686905668,
+      "load_coefficient": 0.0,
+      "stribeck_amplitude": 0.0,
+      "viscous_at_reference": 0.9881586368714137,
+      "viscous_temperature_slope": 0.0,
+      "reference_temperature_c": 25.0,
+      "stribeck_velocity": 0.15,
+      "smooth_velocity": 0.05
+    },
+    "joint_7": {
+      "coulomb": 0.43300558644478077,
+      "load_coefficient": 0.0,
+      "stribeck_amplitude": 0.0,
+      "viscous_at_reference": 3.0022382285427334e-13,
+      "viscous_temperature_slope": 0.0,
+      "reference_temperature_c": 25.0,
+      "stribeck_velocity": 0.15,
+      "smooth_velocity": 0.05
+    }
+  }
+}

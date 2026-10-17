@@ -1,2 +1,5 @@
 # Auto detect text files and perform LF normalization
 * text=auto
+
+# Identified models validate the exact URDF bytes with SHA-256.
+models/**/*.urdf -text whitespace=cr-at-eol,-blank-at-eol

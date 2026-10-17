@@ -1,4 +1,4 @@
-// 辨识模型驱动的关节阻抗：Y(q,dq,0)·Pβ + 摩擦补偿 + Kp·(qd−q) − Kd·dq。
+// 辨识模型驱动的关节阻抗：Y(q,dq,0)·Pβ + friction_scale·摩擦补偿 + Kp·(qd−q) − Kd·dq。
 // 初始化时加载文件、模型和缓存；控制周期内只校验状态并计算力矩。
 #include <rocos_app/joint_impedance.h>
 #include <pinocchio/algorithm/regressor.hpp>
@@ -164,6 +164,9 @@ struct JointImpedanceController::Impl {
         const int n = config.jointNames.size();
         config.kp = readVector(yaml["kp"], n, "kp");
         config.kd = readVector(yaml["kd"], n, "kd");
+        config.frictionScale = yaml["friction_scale"].as<double>(1.0);
+        require(std::isfinite(config.frictionScale) && config.frictionScale >= 0 && config.frictionScale <= 1,
+                "friction_scale must be finite and in [0, 1]");
         require(yaml["velocity_limit"].IsDefined(), "Missing velocity_limit");
         config.velocityLimit = readVector(yaml["velocity_limit"], n, "velocity_limit");
         config.torqueLimit = readVector(yaml["torque_limit"], n, "torque_limit");
@@ -286,7 +289,8 @@ const Eigen::VectorXd &JointImpedanceController::computeTorque(
         const auto &friction = state.friction[i];
         // 无温度项时使用参考温度使温度增量为零；有温度项时前面已强制实测输入。
         const double jointTemperature = temperature.size() ? temperature[i] : friction.referenceTemperature;
-        state.frictionTorque[i] = friction.compute(dq[i], state.rigidTorque[i], jointTemperature);
+        // 缩放整个摩擦补偿，调试输出与最终力矩使用同一个缩放后的分量。
+        state.frictionTorque[i] = config.frictionScale * friction.compute(dq[i], state.rigidTorque[i], jointTemperature);
     }
 
     // 保留机械臂自身惯量：只叠加模型补偿、位置弹簧和实测速度阻尼。

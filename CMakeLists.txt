@@ -338,7 +338,7 @@ target_link_libraries(demo_torque_7joint
 
 # Robot API adapter for Dynamics ID Studio trajectory execution and recording.
 add_executable(dynamicsIdMain src/dynamicsIdMain.cc)
-target_link_libraries(dynamicsIdMain PRIVATE robot gflags::gflags)
+target_link_libraries(dynamicsIdMain PRIVATE robot robot_http_server gflags::gflags)
 
 add_executable(frictionIdMain src/frictionIdMain.cc)
 target_link_libraries(frictionIdMain PRIVATE robot gflags::gflags)

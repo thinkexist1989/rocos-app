@@ -15,6 +15,7 @@ struct JointImpedanceConfig {
     Eigen::VectorXd lower, upper, velocity;
     Eigen::VectorXd velocityLimit; // YAML 独立保护阈值，rad/s，不高于 URDF 速度限制。
     Eigen::VectorXd torqueLimit, torqueRateLimit;
+    double frictionScale = 1.0; // 摩擦补偿比例 [0,1]；旧配置未指定时保持全量补偿。
     bool needsTemperature = false;
 };
 
@@ -26,11 +27,11 @@ public:
     ~JointImpedanceController();
     const JointImpedanceConfig &config() const;
 
-    // 最近一次成功计算的补偿分量，供同一控制线程采样调试数据。
+    // 最近一次成功计算的补偿分量；frictionTorque 已乘 frictionScale。
     const Eigen::VectorXd &rigidTorque() const;
     const Eigen::VectorXd &frictionTorque() const;
 
-    // Y(q,dq,0) P beta + friction + Kp(qDesired-q) - Kd*dq.
+    // Y(q,dq,0) P beta + frictionScale * friction + Kp(qDesired-q) - Kd*dq.
     // 返回未限幅力矩，由调用方统一限制力矩幅值和变化率。
     // 仅当全部温度斜率为零时，temperature 才允许为空。
     // 返回值引用内部缓冲，下次调用会覆盖；模型及缓冲只在初始化时创建。

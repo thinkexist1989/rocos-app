@@ -30,17 +30,17 @@
 time,loop,q_1,dq_1,tau_1,q_2,dq_2,tau_2,...
 ```
 
-每个采样点直接读取：
+每个采样点读取实际位置和力矩，速度由相邻两次实际位置差分计算：
 
 ```cpp
 sample.q[j] = robot.getJointPosition(joint.robotIndex);
-sample.dq[j] = robot.getJointVelocity(joint.robotIndex);
+sample.dq[j] = (sample.q[j] - previousPositions[j]) / cycle;
 sample.tau[j] = robot.getJointTorque(joint.robotIndex) * (joint.ratedTorque / 1000.0);
 ```
 
-`time` 是实际经过秒数，循环间不归零。`loop` 从 1 开始。位置和速度沿用 Robot 的 rad、rad/s 单位转换。当前 `getJointTorque()` 返回额定力矩千分比计数，采集端按 `tau_Nm = feedback * rated_torque_Nm / 1000` 换算后保存，CSV 的 `tau_*` 单位为 Nm。
+`time` 是实际经过秒数，循环间不归零。`loop` 从 1 开始。实际位置由 Robot 返回，单位为 rad；`cycle` 为相邻位置采样的实际时间间隔（秒），差分速度单位为 rad/s，不受 `time_scale` 影响。首条数据以激励开始前读取的位置为差分基准，回合之间连续计算。当前 `getJointTorque()` 返回额定力矩千分比计数，采集端按 `tau_Nm = feedback * rated_torque_Nm / 1000` 换算后保存，CSV 的 `tau_*` 单位为 Nm。
 
-速度反馈按 `dq = raw_606C * velocity_actual_scale / cnt_per_unit` 换算。URDF 的 `hardware/transform` 可设置 `velocity_actual_scale`，表示每个 606C 原始计数对应的脉冲/s，必须为有限正数，省略时为 `1.0`。TC7 的 MJB 驱动器使用 `0.1`；位置换算仍使用原 `cnt_per_unit`，该反馈比例不用于目标速度 60FF。
+动力学采集的 CSV 速度和超速检查共用上述位置差分速度，不读取 `getJointVelocity()`，不做在线滤波。MoveJ 前及保持结束后的静止检查使用 20 ms 窗口的位置差分，减小编码器量化的影响；激励采集仍逐周期执行，不增加 sleep。元数据记录速度来源和换算公式。位置差分会放大量化噪声，辨识前应按 Studio 的预处理流程处理数据。
 
 两份采集入口共用 `--torque_config=config/joint_rated_torque.yaml`，其中按关节名配置 J1–J7 的额定力矩 `[48, 48, 40, 40, 7, 7, 7]` Nm，支持任意 Studio 列顺序和硬件 ID 映射。自定义关节名时同步修改 YAML 键名。启动预检会拒绝缺失、非正数或非有限的额定力矩；元数据记录反馈源、Nm 单位、换算公式和每关节额定值。导入 Studio 时力矩单位倍率使用 1，避免重复换算。
 
@@ -75,6 +75,12 @@ build/bin/dynamicsIdMain --sim=false --id=0 \
 ```
 
 目前 Robot 会初始化七轴 SRS 求解器，因此此入口面向七轴机器人。`MoveJ` 接近速度固定为 0.15 rad/s、加速度 0.3 rad/s²，首尾停留 0.5 s；接近和停留数据不写入辨识 CSV。
+
+采集时默认启动 ROCOS-Viz 的 HTTP 接口，监听 `0.0.0.0:9090`，通过同一个 Robot
+提供实时状态、URDF 和网格。可视化客户端连接采集电脑 IP 和端口 `9090` 即可，
+无需另外运行 `rocosAppMain`。服务在后台运行，采集结束后随程序关闭。
+使用 `--http_host`、`--http_port` 修改地址和端口，或用 `--http=false` 关闭；
+`--check_only` 不连接硬件，也不启动 HTTP 服务。采集期间仅查看状态，避免通过可视化界面发送运动命令。
 
 `HardwareSim` 没有真实速度、力矩与动力学，只能核对接口。真机 CSV 可在 Studio 中自动映射列；加速度由 Studio 从实测速度估计。程序没有温度输入，辨识时关闭温度摩擦项。
 
@@ -140,6 +146,8 @@ python3 test/friction_id_compatibility_test.py \
 ## 阻抗控制的速度保护与调试
 
 `jointImpedanceMain` 默认以启动位置为目标，启动前检查静止并预置补偿力矩，再上使能。
+`friction_scale: 0.7` 将整个摩擦补偿乘以 0.7，刚体补偿、弹簧和阻尼项不缩放。范围为 `[0,1]`，0 关闭摩擦补偿，1 为全量补偿；仅启动时读取，修改 YAML 后需重启，旧配置未指定时保持系数 1。调试输出 `friction(Nm)` 为缩放后的补偿分量。降低比例不保证系统稳定，原有速度和力矩保护继续生效。
+该入口不读取驱动器速度反馈：启动静止检查使用 20 ms 窗口的位置差分，控制循环使用相邻两次实际位置之差除以实际采样时间间隔。使能后先保持预置力矩一个总线周期，再计算首周期速度。动力学、摩擦补偿、阻尼项、调试打印和超速检查共用此速度，不做在线滤波；位置量化仍会造成差分速度抖动。
 在 `config/identified_impedance.yaml` 中设置必填的 `velocity_limit`，单位 rad/s，数组按刚体模型的 `joint_names` 排列。
 这是自定义实测速度阈值，不从 URDF 推导；每项必须为正且不高于 URDF 的硬件速度限制。
 任一控制周期发现 `abs(dq[j]) > velocity_limit[j]` 就抛出异常，主程序先调用 `robot.setDisabled()`，再打印关节名、实测速度和阈值，以失败状态退出；人工确认后重新启动，不自动恢复使能。
@@ -151,6 +159,40 @@ python3 test/friction_id_compatibility_test.py \
 快照包含经过时间、当前循环间隔、实际/目标位置、位置误差、实际速度、刚体/摩擦补偿、弹簧/阻尼项、限幅前请求力矩及下发力矩。
 `load(raw)` 直接读取 `robot.getJointLoadTorque()`，当前接口未做 Nm 换算，其单位不能直接与 Nm 力矩列混用。
 周期打印由独立线程处理，控制线程只尝试投递最新快照，打印繁忙时丢弃快照；这些低频输出用于观察状态，不是完整的数据采集记录。
+
+## 当前辨识结果：5d082d97
+
+`config/identified_impedance.yaml` 已指向 `models/identified_5d082d97/`。结果来自 Studio 项目
+`acc058eeeb2f4f428c06c31769afa7de` 的任务 `5d082d97a3f74883bd67ebe6105ebf1e`（2026-10-17）。
+目录中保存辨识时的原始 URDF、由 `tools/export_impedance_model.py` 导出的 `Pβ` 和同次任务的 `friction_model.json`。
+43 个最小惯性参数经 `70×43` 的 P 映射为 70 个回归参数；这不要求重建物理惯量，也没有改用 URDF 名义惯量。
+URDF SHA-256 与结果一致，七轴顺序为 `joint_1` 至 `joint_7`，硬件 ID 为 0 至 6。
+摩擦只启用了库仑、黏滞项；Stribeck、负载和温度项均为零，不需要外部温度输入。
+额定力矩保持 `[48,48,40,40,7,7,7]` Nm，下发仍按 `Nm / rated_torque * 1000` 换算。
+
+已完成配置检查、50 组 Studio/C++ 力矩对照（误差小于 `1e-9` Nm）及 HardwareSim 启动测试；没有运行真机。
+这些检查证明接口和计算一致，不证明真实机械臂稳定。本次使用 `damped` 求解器且已收敛，
+验证集来自同一采集实验的留出数据；各轴力矩 RMSE 约为 `[2.55,1.37,1.76,1.52,0.27,0.18,0.18]` Nm。
+此外，1 ms 内一个位置计数对应约 0.048 rad/s，全量摩擦补偿（`friction_scale=1`）会产生约
+`[5.74,4.11,3.59,3.57,0.45,0.29,0.32]` Nm 的正向请求；当前配置再乘 0.5。
+需留意保持时的抖动；请求仍经过原有力矩限幅和变化率限制。
+在此前日志的姿态 `q=[0.930455,0,-0.0000959,1.57094,0.0000479,0.0035953,0.0000479]`，
+辨识重力项的 joint_2/joint_4 为 `-9.39/-9.49` Nm，该 URDF 名义值为 `-8.08/-8.08` Nm。
+旧版模型的方向差异已不适用于本次结果；真机补偿效果仍需验证。
+
+从仓库根目录执行：
+
+```bash
+cmake --build build --target jointImpedanceMain -j2
+build/bin/jointImpedanceMain --config=config/identified_impedance.yaml --check_only
+build/bin/jointImpedanceMain --config=config/identified_impedance.yaml --sim --duration=1
+
+# 真机会切换 CST、上使能并保持启动位置；5 秒后下使能退出，Ctrl+C 也会退出。
+sudo ./build/bin/jointImpedanceMain --config=config/identified_impedance.yaml \
+  --nosim --duration=5 --debug_interval=0.5
+```
+
+持续保持时使用 `--duration=0`。Kp/Kd、`velocity_limit`、力矩及变化率限制仍在同一 YAML 中修改。
 
 ## 直接使用 URDF 的阻抗入口
 
