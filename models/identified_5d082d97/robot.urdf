@@ -104,7 +104,7 @@
     <!-- MJB 606C: 0.1 pulse/s per raw count; cnt_per_unit remains pulse/rad. -->
     <hardware id="0" type="driver">
       <limit lower="-3.1415" upper="3.1415" vel="10" acc="10.0" jerk="150.0" effort="100" />
-      <transform ratio="1.0" offset_pos_cnt="0" cnt_per_unit="20860.757" velocity_actual_scale="0.1" torque_per_unit="1.0" user_unit_name="rad" />
+      <transform ratio="1.0" offset_pos_cnt="0" cnt_per_unit="20860.757" vel_per_unit="6111549.90" torque_per_unit="1.0" user_unit_name="rad" />
       <inputs name="Inputs">
         <status_word>Status Word</status_word>
         <position_actual_value>Position Actual Value</position_actual_value>
@@ -179,7 +179,7 @@
       velocity="10" />
     <hardware id="1" type="driver">
       <limit lower="-2.3911" upper="2.3911" vel="10" acc="10.0" jerk="150.0" effort="100" />
-      <transform ratio="1.0" offset_pos_cnt="0" cnt_per_unit="20860.757" velocity_actual_scale="0.1" torque_per_unit="1.0" user_unit_name="rad" />
+      <transform ratio="1.0" offset_pos_cnt="0" cnt_per_unit="20860.757" vel_per_unit="6111549.90" torque_per_unit="1.0" user_unit_name="rad" />
       <inputs name="Inputs">
         <status_word>Status Word</status_word>
         <position_actual_value>Position Actual Value</position_actual_value>
@@ -254,7 +254,7 @@
       velocity="10" />
     <hardware id="2" type="driver">
       <limit lower="-3.1415" upper="3.1415" vel="10" acc="10.0" jerk="150.0" effort="100" />
-      <transform ratio="1.0" offset_pos_cnt="0" cnt_per_unit="20860.757" velocity_actual_scale="0.1" torque_per_unit="1.0" user_unit_name="rad" />
+      <transform ratio="1.0" offset_pos_cnt="0" cnt_per_unit="20860.757" vel_per_unit="5092958.30" torque_per_unit="1.0" user_unit_name="rad" />
       <inputs name="Inputs">
         <status_word>Status Word</status_word>
         <position_actual_value>Position Actual Value</position_actual_value>
@@ -329,7 +329,7 @@
       velocity="10" />
     <hardware id="3" type="driver">
       <limit lower="-2.5656" upper="2.5656" vel="10" acc="10.0" jerk="150.0" effort="100" />
-      <transform ratio="1.0" offset_pos_cnt="0" cnt_per_unit="20860.757" velocity_actual_scale="0.1" torque_per_unit="1.0" user_unit_name="rad" />
+      <transform ratio="1.0" offset_pos_cnt="0" cnt_per_unit="20860.757" vel_per_unit="5092958.30" torque_per_unit="1.0" user_unit_name="rad" />
       <inputs name="Inputs">
         <status_word>Status Word</status_word>
         <position_actual_value>Position Actual Value</position_actual_value>
@@ -404,7 +404,7 @@
       velocity="10" />
     <hardware id="4" type="driver">
       <limit lower="-3.1415" upper="3.1415" vel="10" acc="10.0" jerk="150.0" effort="100" />
-      <transform ratio="1.0" offset_pos_cnt="0" cnt_per_unit="20860.757" velocity_actual_scale="0.1" torque_per_unit="1.0" user_unit_name="rad" />
+      <transform ratio="1.0" offset_pos_cnt="0" cnt_per_unit="20860.757" vel_per_unit="5092958.30" torque_per_unit="1.0" user_unit_name="rad" />
       <inputs name="Inputs">
         <status_word>Status Word</status_word>
         <position_actual_value>Position Actual Value</position_actual_value>
@@ -479,7 +479,7 @@
       velocity="10" />
     <hardware id="5" type="driver">
       <limit lower="-2.2166" upper="2.2166" vel="10" acc="10.0" jerk="150.0" effort="100" />
-      <transform ratio="1.0" offset_pos_cnt="0" cnt_per_unit="20860.757" velocity_actual_scale="0.1" torque_per_unit="1.0" user_unit_name="rad" />
+      <transform ratio="1.0" offset_pos_cnt="0" cnt_per_unit="20860.757" vel_per_unit="5092958.30" torque_per_unit="1.0" user_unit_name="rad" />
       <inputs name="Inputs">
         <status_word>Status Word</status_word>
         <position_actual_value>Position Actual Value</position_actual_value>
@@ -554,7 +554,7 @@
       velocity="10" />
     <hardware id="6" type="driver">
       <limit lower="-3.1415" upper="3.1415" vel="10" acc="10.0" jerk="150.0" effort="100" />
-      <transform ratio="1.0" offset_pos_cnt="0" cnt_per_unit="20860.757" velocity_actual_scale="0.1" torque_per_unit="1.0" user_unit_name="rad" />
+      <transform ratio="1.0" offset_pos_cnt="0" cnt_per_unit="20860.757" vel_per_unit="5092958.30" torque_per_unit="1.0" user_unit_name="rad" />
       <inputs name="Inputs">
         <status_word>Status Word</status_word>
         <position_actual_value>Position Actual Value</position_actual_value>

@@ -356,14 +356,13 @@ namespace rocos {
     /// \brief 获取速度
     /// \return 速度值[User Custom Unit]
     double Drive::getVelocity() {
-        // 先将 606C 原值转换为脉冲/s，再按位置编码器的脉冲/单位换算。
-        return getVelocityInCnt() * velocity_actual_scale_ / cnt_per_unit_;
+        return getVelocityInCnt() / vel_per_unit_; // 单位转换
     }
 
-    void Drive::setVelocityActualScale(double val) {
+    void Drive::setVelPerUnit(double val) {
         if (!std::isfinite(val) || val <= 0)
-            throw std::invalid_argument("velocity_actual_scale must be finite and positive");
-        velocity_actual_scale_ = val;
+            throw std::invalid_argument("vel_per_unit must be finite and positive");
+        vel_per_unit_ = val;
     }
 
     /// \brief 获取力矩

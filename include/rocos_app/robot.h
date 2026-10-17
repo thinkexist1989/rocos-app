@@ -155,6 +155,11 @@ namespace rocos
 
         inline void setJointMode(int id, ModeOfOperation mode)
         {
+            if (mode == ModeOfOperation::CyclicSynchronousPositionMode && joints_[id]->getMode() != mode) {
+                // 在线切回 CSP 时，以实际位置重置规划起点，避免 servoJ/MoveJ 沿用切换前的位置。
+                pos_[id] = joints_[id]->getPosition();
+                vel_[id] = acc_[id] = 0;
+            }
             joints_[id]->setMode(mode);
         }
 

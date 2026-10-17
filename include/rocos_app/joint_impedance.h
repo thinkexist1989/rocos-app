@@ -19,11 +19,18 @@ struct JointImpedanceConfig {
     bool needsTemperature = false;
 };
 
+// 启动时覆盖控制增益与摩擦比例；模型、单位及保护限制仍从 YAML 加载。
+struct JointImpedanceTuning {
+    Eigen::VectorXd kp, kd;
+    double frictionScale = 1.0;
+};
+
 // 向量统一按 config().jointNames 排列，单位为 rad、rad/s、Nm 和 °C。
 // 每个实例由一个控制线程使用，qDesired 也应在该线程更新。
 class JointImpedanceController {
 public:
     explicit JointImpedanceController(const std::string &yamlPath);
+    JointImpedanceController(const std::string &yamlPath, const JointImpedanceTuning &tuning);
     ~JointImpedanceController();
     const JointImpedanceConfig &config() const;
 
@@ -39,6 +46,13 @@ public:
                                         const Eigen::VectorXd &dq,
                                         const Eigen::VectorXd &qDesired,
                                         const Eigen::VectorXd &temperature = Eigen::VectorXd());
+
+    // 按周期选择是否补偿摩擦；不修改 YAML 系数，原有接口仍默认开启。
+    const Eigen::VectorXd &computeTorque(const Eigen::VectorXd &q,
+                                        const Eigen::VectorXd &dq,
+                                        const Eigen::VectorXd &qDesired,
+                                        const Eigen::VectorXd &temperature,
+                                        bool frictionEnabled);
 
 private:
     struct Impl;

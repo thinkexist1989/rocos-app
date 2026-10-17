@@ -12,14 +12,15 @@ rigid_model: ../models/identified_5d082d97/rigid_model.json  # 已导出 P * bet
 friction: ../models/identified_5d082d97/friction_model.json
 
 # 整体摩擦补偿比例：[0,1]，0 关闭，1 全量补偿；仅启动时读取，修改后重启生效。
-friction_scale: 0.5
+friction_scale: 0.2
 
 # Arrays follow joint_names in rigid_model.json; these are starting examples,
 # not tuned gains for a particular robot. Units: Nm/rad and Nm*s/rad.
 # kp: [20, 20, 20, 20, 10, 8, 5]
-kp: [0, 0, 0, 0, 0, 0, 0]
-
-kd: [4, 4, 4, 3, 2, 1.5, 1]
+kp: [500, 500, 500, 500, 60, 50, 60]
+# kp: [0, 0, 0, 0, 0, 0, 0]
+kd: [100,100, 100, 100, 10, 10, 10]
+# kd: [4, 4, 4, 3, 2, 1.5, 1]
 
 # 关节额定力矩，Nm；按 joint_names 排列：J1/J2 MJB17 48，J3/J4 MJB17 40，J5-J7 MJB14 7。
 # 仅用于下发单位换算：驱动器值 = 关节力矩(Nm) / rated_torque * 1000。

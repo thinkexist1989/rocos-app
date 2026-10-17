@@ -1,6 +1,6 @@
 {
   "schema": "rocos_identified_rigid_v1",
-  "urdf_hash": "e58d29ff235ccadd3bee2630d193411bf9d8edb222b57f5adbc1cbb638ebb0d2",
+  "urdf_hash": "d7187a47c0c5752656063b9a8a5f55b4d3017257563932dd78b6d5f5724c359f",
   "joint_names": [
     "joint_1",
     "joint_2",

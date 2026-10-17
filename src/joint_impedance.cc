@@ -266,6 +266,19 @@ struct JointImpedanceController::Impl {
 };
 
 JointImpedanceController::JointImpedanceController(const std::string &path) : impl_(new Impl(path)) {}
+JointImpedanceController::JointImpedanceController(const std::string &path, const JointImpedanceTuning &tuning)
+    : JointImpedanceController(path) {
+    auto &config = impl_->config;
+    const auto n = config.kp.size();
+    require(tuning.kp.size() == n && tuning.kd.size() == n && tuning.kp.allFinite() && tuning.kd.allFinite(),
+            "Invalid override gain dimensions or nonfinite values");
+    require((tuning.kp.array() >= 0).all() && (tuning.kd.array() >= 0).all(), "Override gains must be nonnegative");
+    require(std::isfinite(tuning.frictionScale) && tuning.frictionScale >= 0 && tuning.frictionScale <= 1,
+            "Override friction_scale must be finite and in [0, 1]");
+    config.kp = tuning.kp;
+    config.kd = tuning.kd;
+    config.frictionScale = tuning.frictionScale;
+}
 JointImpedanceController::~JointImpedanceController() = default;
 const JointImpedanceConfig &JointImpedanceController::config() const { return impl_->config; }
 const Eigen::VectorXd &JointImpedanceController::rigidTorque() const { return impl_->rigidTorque; }
@@ -274,6 +287,12 @@ const Eigen::VectorXd &JointImpedanceController::frictionTorque() const { return
 const Eigen::VectorXd &JointImpedanceController::computeTorque(
         const Eigen::VectorXd &q, const Eigen::VectorXd &dq,
         const Eigen::VectorXd &qDesired, const Eigen::VectorXd &temperature) {
+    return computeTorque(q, dq, qDesired, temperature, true);
+}
+
+const Eigen::VectorXd &JointImpedanceController::computeTorque(
+        const Eigen::VectorXd &q, const Eigen::VectorXd &dq,
+        const Eigen::VectorXd &qDesired, const Eigen::VectorXd &temperature, bool frictionEnabled) {
     auto &state = *impl_;
     const auto &config = state.config;
     const int n = config.jointNames.size();
@@ -290,7 +309,8 @@ const Eigen::VectorXd &JointImpedanceController::computeTorque(
         // 无温度项时使用参考温度使温度增量为零；有温度项时前面已强制实测输入。
         const double jointTemperature = temperature.size() ? temperature[i] : friction.referenceTemperature;
         // 缩放整个摩擦补偿，调试输出与最终力矩使用同一个缩放后的分量。
-        state.frictionTorque[i] = config.frictionScale * friction.compute(dq[i], state.rigidTorque[i], jointTemperature);
+        state.frictionTorque[i] = frictionEnabled
+            ? config.frictionScale * friction.compute(dq[i], state.rigidTorque[i], jointTemperature) : 0.0;
     }
 
     // 保留机械臂自身惯量：只叠加模型补偿、位置弹簧和实测速度阻尼。

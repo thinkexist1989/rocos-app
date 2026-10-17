@@ -29,6 +29,12 @@ int main(int argc, char **argv) {
                 + controller.config().kp.cwiseProduct(target - q) - controller.config().kd.cwiseProduct(dq);
             if ((actual - reconstructed).cwiseAbs().maxCoeff() > 1e-9)
                 throw std::runtime_error("Debug torque components do not match command");
+            const Eigen::VectorXd withFriction = actual;
+            const Eigen::VectorXd friction = controller.frictionTorque();
+            const auto &withoutFriction = controller.computeTorque(q, dq, target, temperature, false);
+            if (controller.frictionTorque().norm() != 0 ||
+                (withFriction - withoutFriction - friction).cwiseAbs().maxCoeff() > 1e-9)
+                throw std::runtime_error("Per-cycle friction switch changed rigid/PD torque");
         }
         Eigen::VectorXd q = Eigen::VectorXd::Zero(7);
         Eigen::VectorXd dq = q, target = q;

@@ -35,8 +35,21 @@ int main(int argc, char **argv) {
         reject(bad);
         robot->setJointMode(6, rocos::ModeOfOperation::CyclicSynchronousPositionMode);
         reject(Eigen::VectorXd::Zero(7));
+
+        // 模拟 CST 期间各轴被外力推离旧 CSP 起点；预置当前位置后，在线切回 CSP。
+        robot->setJointMode(6, rocos::ModeOfOperation::CyclicSynchronousTorqueMode);
+        KDL::JntArray hold(7);
+        for (int i = 0; i < 7; ++i) {
+            robot->setJointPosition(i, 0.25);
+            hold(i) = robot->getJointPosition(i);
+        }
+        hardware->waitForSignal(0);
+        for (int i = 0; i < 7; ++i)
+            robot->setJointMode(i, rocos::ModeOfOperation::CyclicSynchronousPositionMode);
+        if (!robot->isEnabled() || robot->servoJ(hold) != 0)
+            throw std::runtime_error("Live CST to CSP did not reset the position reference");
         robot->setDisabled();
-        std::cout << "PASS: Robot::setTorque writes valid commands and rejects invalid vectors before any write" << std::endl;
+        std::cout << "PASS: torque validation and live CST to CSP reference synchronization" << std::endl;
         std::exit(0); // Robot workers have process lifetime.
     } catch (const std::exception &error) {
         robot->setDisabled();
