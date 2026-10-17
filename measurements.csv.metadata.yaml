@@ -1,0 +1,36 @@
+simulation: false
+time_scale: 1
+servo_period_seconds: 0.001
+velocity_source: position_difference
+velocity_conversion: (q_current - q_previous) / measured_dt
+velocity_unit: rad/s
+torque_source: Robot::getJointTorque
+torque_unit: Nm
+torque_conversion: getJointTorque * rated_torque_Nm / 1000
+torque_config: config/joint_rated_torque.yaml
+completed: true
+joints:
+  - name: joint_1
+    robot_index: 0
+  - name: joint_2
+    robot_index: 1
+  - name: joint_3
+    robot_index: 2
+  - name: joint_4
+    robot_index: 3
+  - name: joint_5
+    robot_index: 4
+  - name: joint_6
+    robot_index: 5
+  - name: joint_7
+    robot_index: 6
+rated_torque_Nm:
+  joint_1: 48
+  joint_2: 48
+  joint_3: 40
+  joint_4: 40
+  joint_5: 7
+  joint_6: 7
+  joint_7: 7
+samples: 160004
+failure: ""
