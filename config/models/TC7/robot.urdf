@@ -1,0 +1,573 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- This URDF was automatically created by SolidWorks to URDF Exporter! Originally created by Stephen Brawner (brawner@gmail.com) 
+     Commit Version: 1.6.0-4-g7f85cfe  Build Version: 1.6.7995.38578
+     For more information, please see http://wiki.ros.org/sw_urdf_exporter -->
+<robot
+  name="TC7-robot">
+  <link
+    name="base_link">
+    <inertial>
+      <origin
+        xyz="0.00042812908419268 -1.65094491676426E-05 0.0387766451313615"
+        rpy="0 0 0" />
+      <mass
+        value="0.95720819718381704" />
+      <inertia
+        ixx="0.0011156261089435227"
+        ixy="1.4370931138611612e-7"
+        ixz="0.000010298014445477507"
+        iyy="0.0011040307466463723"
+        iyz="-4.0416829653010525e-7"
+        izz="0.0012090861829034727" />
+    </inertial>
+    <visual>
+      <origin
+        xyz="0 0 0"
+        rpy="0 0 0" />
+      <geometry>
+        <mesh
+          filename="package://TC7-robot/meshes/base_link.STL" />
+      </geometry>
+      <material
+        name="">
+        <color
+          rgba="1 1 1 1" />
+      </material>
+    </visual>
+    <collision>
+      <origin
+        xyz="0 0 0"
+        rpy="0 0 0" />
+      <geometry>
+        <mesh
+          filename="package://TC7-robot/meshes/base_link.STL" />
+      </geometry>
+    </collision>
+  </link>
+  <link
+    name="link_1">
+    <inertial>
+      <origin
+        xyz="-2.20212348002332E-06 0.0156916247453043 0.0809537615689704"
+        rpy="0 0 0" />
+      <mass
+        value="1.3495035801557364" />
+      <inertia
+        ixx="0.0040906663072827543"
+        ixy="-1.6238266387315848e-7"
+        ixz="-4.5507901478007201e-8"
+        iyy="0.0040653700840991420"
+        iyz="-0.00063410791456843267"
+        izz="0.0012852865245206269" />
+    </inertial>
+    <visual>
+      <origin
+        xyz="0 0 0"
+        rpy="0 0 0" />
+      <geometry>
+        <mesh
+          filename="package://TC7-robot/meshes/Link1.STL" />
+      </geometry>
+      <material
+        name="">
+        <color
+          rgba="1 1 1 1" />
+      </material>
+    </visual>
+    <collision>
+      <origin
+        xyz="0 0 0"
+        rpy="0 0 0" />
+      <geometry>
+        <mesh
+          filename="package://TC7-robot/meshes/Link1.STL" />
+      </geometry>
+    </collision>
+  </link>
+  <joint
+    name="joint_1"
+    type="revolute">
+    <origin
+      xyz="0 0 0.0823"
+      rpy="0 0 3.1415926" />
+    <parent
+      link="base_link" />
+    <child
+      link="link_1" />
+    <axis
+      xyz="0 0 -1" />
+    <limit
+      lower="-3.1415"
+      upper="3.1415"
+      effort="100"
+      velocity="10" />
+    <!-- MJB 606C: 0.1 pulse/s per raw count; cnt_per_unit remains pulse/rad. -->
+    <hardware id="0" type="driver">
+      <limit lower="-3.1415" upper="3.1415" vel="10" acc="10.0" jerk="150.0" effort="100" />
+      <transform ratio="1.0" offset_pos_cnt="0" cnt_per_unit="20860.757" vel_per_unit="6111549.90" torque_per_unit="1.0" user_unit_name="rad" />
+      <inputs name="Inputs">
+        <status_word>Status Word</status_word>
+        <position_actual_value>Position Actual Value</position_actual_value>
+        <velocity_actual_value>Velocity Actual Value</velocity_actual_value>
+        <torque_actual_value>Torque Actual Value</torque_actual_value>
+      </inputs>
+      <outputs name="Outputs">
+        <control_word>Control Word</control_word>
+        <mode_of_operation>Mode of Operation</mode_of_operation>
+        <target_position>Target Position</target_position>
+        <target_velocity>Target Velocity</target_velocity>
+        <target_torque>Target Torque</target_torque>
+      </outputs>
+    </hardware>
+  </joint>
+  <link
+    name="link_2">
+    <inertial>
+      <origin
+        xyz="-1.21493643904945E-05 0.0919561858912101 0.0102373235118796"
+        rpy="0 0 0" />
+      <mass
+        value="1.5025316960893401" />
+      <inertia
+        ixx="0.0086211409589954097"
+        ixy="-0.0000020551109373420626"
+        ixz="1.9865290633187631e-7"
+        iyy="0.0014639375796644280"
+        iyz="0.0015098587499143606"
+        izz="0.0084531256505816529" />
+    </inertial>
+    <visual>
+      <origin
+        xyz="0 0 0"
+        rpy="0 0 0" />
+      <geometry>
+        <mesh
+          filename="package://TC7-robot/meshes/Link2.STL" />
+      </geometry>
+      <material
+        name="">
+        <color
+          rgba="1 1 1 1" />
+      </material>
+    </visual>
+    <collision>
+      <origin
+        xyz="0 0 0"
+        rpy="0 0 0" />
+      <geometry>
+        <mesh
+          filename="package://TC7-robot/meshes/Link2.STL" />
+      </geometry>
+    </collision>
+  </link>
+  <joint
+    name="joint_2"
+    type="revolute">
+    <origin
+      xyz="0 -0.0105 0.1263"
+      rpy="1.5708 0 0" />
+    <parent
+      link="link_1" />
+    <child
+      link="link_2" />
+    <axis
+      xyz="0 0 -1" />
+    <limit
+      lower="-2.3911"
+      upper="2.3911"
+      effort="100"
+      velocity="10" />
+    <hardware id="1" type="driver">
+      <limit lower="-2.3911" upper="2.3911" vel="10" acc="10.0" jerk="150.0" effort="100" />
+      <transform ratio="1.0" offset_pos_cnt="0" cnt_per_unit="20860.757" vel_per_unit="6111549.90" torque_per_unit="1.0" user_unit_name="rad" />
+      <inputs name="Inputs">
+        <status_word>Status Word</status_word>
+        <position_actual_value>Position Actual Value</position_actual_value>
+        <velocity_actual_value>Velocity Actual Value</velocity_actual_value>
+        <torque_actual_value>Torque Actual Value</torque_actual_value>
+      </inputs>
+      <outputs name="Outputs">
+        <control_word>Control Word</control_word>
+        <mode_of_operation>Mode of Operation</mode_of_operation>
+        <target_position>Target Position</target_position>
+        <target_velocity>Target Velocity</target_velocity>
+        <target_torque>Target Torque</target_torque>
+      </outputs>
+    </hardware>
+  </joint>
+  <link
+    name="link_3">
+    <inertial>
+      <origin
+        xyz="1.08359934578556E-05 -0.0187424086267603 0.102608788331855"
+        rpy="0 0 0" />
+      <mass
+        value="1.5024741349840683" />
+      <inertia
+        ixx="0.0086196792665395310"
+        ixy="2.0759418129399847e-7"
+        ixz="-0.0000018177990513422731"
+        iyy="0.0084635789061291336"
+        iyz="0.0015084347140221516"
+        izz="0.0014518401797404368" />
+    </inertial>
+    <visual>
+      <origin
+        xyz="0 0 0"
+        rpy="0 0 0" />
+      <geometry>
+        <mesh
+          filename="package://TC7-robot/meshes/Link3.STL" />
+      </geometry>
+      <material
+        name="">
+        <color
+          rgba="1 1 1 1" />
+      </material>
+    </visual>
+    <collision>
+      <origin
+        xyz="0 0 0"
+        rpy="0 0 0" />
+      <geometry>
+        <mesh
+          filename="package://TC7-robot/meshes/Link3.STL" />
+      </geometry>
+    </collision>
+  </link>
+  <joint
+    name="joint_3"
+    type="revolute">
+    <origin
+      xyz="0 0.1955 -0.0085"
+      rpy="-1.5708 0 0" />
+    <parent
+      link="link_2" />
+    <child
+      link="link_3" />
+    <axis
+      xyz="0 0 -1" />
+    <limit
+      lower="-3.1415"
+      upper="3.1415"
+      effort="100"
+      velocity="10" />
+    <hardware id="2" type="driver">
+      <limit lower="-3.1415" upper="3.1415" vel="10" acc="10.0" jerk="150.0" effort="100" />
+      <transform ratio="1.0" offset_pos_cnt="0" cnt_per_unit="20860.757" vel_per_unit="5092958.30" torque_per_unit="1.0" user_unit_name="rad" />
+      <inputs name="Inputs">
+        <status_word>Status Word</status_word>
+        <position_actual_value>Position Actual Value</position_actual_value>
+        <velocity_actual_value>Velocity Actual Value</velocity_actual_value>
+        <torque_actual_value>Torque Actual Value</torque_actual_value>
+      </inputs>
+      <outputs name="Outputs">
+        <control_word>Control Word</control_word>
+        <mode_of_operation>Mode of Operation</mode_of_operation>
+        <target_position>Target Position</target_position>
+        <target_velocity>Target Velocity</target_velocity>
+        <target_torque>Target Torque</target_torque>
+      </outputs>
+    </hardware>
+  </joint>
+  <link
+    name="link_4">
+    <inertial>
+      <origin
+        xyz="-7.72237360151551E-07 -0.0708254171205411 0.024515507954195"
+        rpy="0 0 0" />
+      <mass
+        value="1.5074684972413436" />
+      <inertia
+        ixx="0.0084919598575571042"
+        ixy="3.0669083296242477e-8"
+        ixz="3.3956699414836545e-8"
+        iyy="0.0012509901979159846"
+        iyz="-0.0010431364835178977"
+        izz="0.0084224023439356866" />
+    </inertial>
+    <visual>
+      <origin
+        xyz="0 0 0"
+        rpy="0 0 0" />
+      <geometry>
+        <mesh
+          filename="package://TC7-robot/meshes/Link4.STL" />
+      </geometry>
+      <material
+        name="">
+        <color
+          rgba="1 1 1 1" />
+      </material>
+    </visual>
+    <collision>
+      <origin
+        xyz="0 0 0"
+        rpy="0 0 0" />
+      <geometry>
+        <mesh
+          filename="package://TC7-robot/meshes/Link4.STL" />
+      </geometry>
+    </collision>
+  </link>
+  <joint
+    name="joint_4"
+    type="revolute">
+    <origin
+      xyz="0 -0.0075 0.1945"
+      rpy="-1.5708 0 0" />
+    <parent
+      link="link_3" />
+    <child
+      link="link_4" />
+    <axis
+      xyz="0 0 1" />
+    <limit
+      lower="-2.5656"
+      upper="2.5656"
+      effort="100"
+      velocity="10" />
+    <hardware id="3" type="driver">
+      <limit lower="-2.5656" upper="2.5656" vel="10" acc="10.0" jerk="150.0" effort="100" />
+      <transform ratio="1.0" offset_pos_cnt="0" cnt_per_unit="20860.757" vel_per_unit="5092958.30" torque_per_unit="1.0" user_unit_name="rad" />
+      <inputs name="Inputs">
+        <status_word>Status Word</status_word>
+        <position_actual_value>Position Actual Value</position_actual_value>
+        <velocity_actual_value>Velocity Actual Value</velocity_actual_value>
+        <torque_actual_value>Torque Actual Value</torque_actual_value>
+      </inputs>
+      <outputs name="Outputs">
+        <control_word>Control Word</control_word>
+        <mode_of_operation>Mode of Operation</mode_of_operation>
+        <target_position>Target Position</target_position>
+        <target_velocity>Target Velocity</target_velocity>
+        <target_torque>Target Torque</target_torque>
+      </outputs>
+    </hardware>
+  </joint>
+  <link
+    name="link_5">
+    <inertial>
+      <origin
+        xyz="-1.27501936146238E-05 0.0130911955174951 0.0675660872931558"
+        rpy="0 0 0" />
+      <mass
+        value="0.86307726882147356" />
+      <inertia
+        ixx="0.0018171556069561252"
+        ixy="-3.4039426284554007e-7"
+        ixz="-7.6751472380441018e-7"
+        iyy="0.0017948052444865911"
+        iyz="-0.00026066645332988243"
+        izz="0.00063814865294823016" />
+    </inertial>
+    <visual>
+      <origin
+        xyz="0 0 0"
+        rpy="0 0 0" />
+      <geometry>
+        <mesh
+          filename="package://TC7-robot/meshes/Link5.STL" />
+      </geometry>
+      <material
+        name="">
+        <color
+          rgba="1 1 1 1" />
+      </material>
+    </visual>
+    <collision>
+      <origin
+        xyz="0 0 0"
+        rpy="0 0 0" />
+      <geometry>
+        <mesh
+          filename="package://TC7-robot/meshes/Link5.STL" />
+      </geometry>
+    </collision>
+  </link>
+  <joint
+    name="joint_5"
+    type="revolute">
+    <origin
+      xyz="0 -0.189 0.0095"
+      rpy="1.5708 0 0" />
+    <parent
+      link="link_4" />
+    <child
+      link="link_5" />
+    <axis
+      xyz="0 0 -1" />
+    <limit
+      lower="-3.1415"
+      upper="3.1415"
+      effort="100"
+      velocity="10" />
+    <hardware id="4" type="driver">
+      <limit lower="-3.1415" upper="3.1415" vel="10" acc="10.0" jerk="150.0" effort="100" />
+      <transform ratio="1.0" offset_pos_cnt="0" cnt_per_unit="20860.757" vel_per_unit="5092958.30" torque_per_unit="1.0" user_unit_name="rad" />
+      <inputs name="Inputs">
+        <status_word>Status Word</status_word>
+        <position_actual_value>Position Actual Value</position_actual_value>
+        <velocity_actual_value>Velocity Actual Value</velocity_actual_value>
+        <torque_actual_value>Torque Actual Value</torque_actual_value>
+      </inputs>
+      <outputs name="Outputs">
+        <control_word>Control Word</control_word>
+        <mode_of_operation>Mode of Operation</mode_of_operation>
+        <target_position>Target Position</target_position>
+        <target_velocity>Target Velocity</target_velocity>
+        <target_torque>Target Torque</target_torque>
+      </outputs>
+    </hardware>
+  </joint>
+  <link
+    name="link_6">
+    <inertial>
+      <origin
+        xyz="-5.65236122702609E-06 0.0534714161281222 0.004431081235741"
+        rpy="0 0 0" />
+      <mass
+        value="0.85342395863886931" />
+      <inertia
+        ixx="0.0022529883348729306"
+        ixy="-3.5888181604633952e-8"
+        ixz="-4.7038107168108064e-8"
+        iyy="0.00071976941960654861"
+        iyz="0.00052705749446854294"
+        izz="0.0021443640118771465" />
+    </inertial>
+    <visual>
+      <origin
+        xyz="0 0 0"
+        rpy="0 0 0" />
+      <geometry>
+        <mesh
+          filename="package://TC7-robot/meshes/Link6.STL" />
+      </geometry>
+      <material
+        name="">
+        <color
+          rgba="1 1 1 1" />
+      </material>
+    </visual>
+    <collision>
+      <origin
+        xyz="0 0 0"
+        rpy="0 0 0" />
+      <geometry>
+        <mesh
+          filename="package://TC7-robot/meshes/Link6.STL" />
+      </geometry>
+    </collision>
+  </link>
+  <joint
+    name="joint_6"
+    type="revolute">
+    <origin
+      xyz="0 -0.0114 0.1002"
+      rpy="1.5708 0 0" />
+    <parent
+      link="link_5" />
+    <child
+      link="link_6" />
+    <axis
+      xyz="0 0 -1" />
+    <limit
+      lower="-2.2166"
+      upper="2.2166"
+      effort="100"
+      velocity="10" />
+    <hardware id="5" type="driver">
+      <limit lower="-2.2166" upper="2.2166" vel="10" acc="10.0" jerk="150.0" effort="100" />
+      <transform ratio="1.0" offset_pos_cnt="0" cnt_per_unit="20860.757" vel_per_unit="5092958.30" torque_per_unit="1.0" user_unit_name="rad" />
+      <inputs name="Inputs">
+        <status_word>Status Word</status_word>
+        <position_actual_value>Position Actual Value</position_actual_value>
+        <velocity_actual_value>Velocity Actual Value</velocity_actual_value>
+        <torque_actual_value>Torque Actual Value</torque_actual_value>
+      </inputs>
+      <outputs name="Outputs">
+        <control_word>Control Word</control_word>
+        <mode_of_operation>Mode of Operation</mode_of_operation>
+        <target_position>Target Position</target_position>
+        <target_velocity>Target Velocity</target_velocity>
+        <target_torque>Target Torque</target_torque>
+      </outputs>
+    </hardware>
+  </joint>
+  <link
+    name="link_7">
+    <inertial>
+      <origin
+        xyz="-0.000200872774793521 4.41883767489635E-06 0.0275983313206918"
+        rpy="0 0 0" />
+      <mass
+        value="0.46431266688535171" />
+      <inertia
+        ixx="0.00030064781911307282"
+        ixy="9.5117257223567313e-9"
+        ixz="0.0000021727180129173133"
+        iyy="0.00030373602192880522"
+        iyz="5.1536084750030164e-8"
+        izz="0.00035471881417329949" />
+    </inertial>
+    <visual>
+      <origin
+        xyz="0 0 0"
+        rpy="0 0 0" />
+      <geometry>
+        <mesh
+          filename="package://TC7-robot/meshes/Link7.STL" />
+      </geometry>
+      <material
+        name="">
+        <color
+          rgba="0.776470588235294 0.756862745098039 0.737254901960784 1" />
+      </material>
+    </visual>
+    <collision>
+      <origin
+        xyz="0 0 0"
+        rpy="0 0 0" />
+      <geometry>
+        <mesh
+          filename="package://TC7-robot/meshes/Link7.STL" />
+      </geometry>
+    </collision>
+  </link>
+  <joint
+    name="joint_7"
+    type="revolute">
+    <origin
+      xyz="0 0.1208 -0.0114"
+      rpy="-1.5708 0 0" />
+    <parent
+      link="link_6" />
+    <child
+      link="link_7" />
+    <axis
+      xyz="0 0 -1" />
+    <limit
+      lower="-3.1415"
+      upper="3.1415"
+      effort="100"
+      velocity="10" />
+    <hardware id="6" type="driver">
+      <limit lower="-3.1415" upper="3.1415" vel="10" acc="10.0" jerk="150.0" effort="100" />
+      <transform ratio="1.0" offset_pos_cnt="0" cnt_per_unit="20860.757" vel_per_unit="5092958.30" torque_per_unit="1.0" user_unit_name="rad" />
+      <inputs name="Inputs">
+        <status_word>Status Word</status_word>
+        <position_actual_value>Position Actual Value</position_actual_value>
+        <velocity_actual_value>Velocity Actual Value</velocity_actual_value>
+        <torque_actual_value>Torque Actual Value</torque_actual_value>
+      </inputs>
+      <outputs name="Outputs">
+        <control_word>Control Word</control_word>
+        <mode_of_operation>Mode of Operation</mode_of_operation>
+        <target_position>Target Position</target_position>
+        <target_velocity>Target Velocity</target_velocity>
+        <target_torque>Target Torque</target_torque>
+      </outputs>
+    </hardware>
+  </joint>
+</robot>
