@@ -66,8 +66,16 @@ namespace rocos {
         std::cout << "robot: " << std::endl;
         response->set_name(robot_model->getName());
 
-        std::vector<urdf::LinkSharedPtr> links;
-        robot_model->getLinks(links);
+        std::vector<urdf::LinkConstSharedPtr> links;
+        // The viewer applies transforms in list order and only supports a serial chain.
+        for (auto current = robot_model->getRoot(); current;) {
+            links.push_back(current);
+            if (current->child_links.size() > 1) {
+                return grpc::Status(grpc::StatusCode::INVALID_ARGUMENT,
+                                    "Robot model must be a serial chain");
+            }
+            current = current->child_links.empty() ? nullptr : current->child_links.front();
+        }
 
         for (int i = 0; i < links.size(); i++) {
 
@@ -78,52 +86,80 @@ namespace rocos {
 
             std::cout << "    order: " << i << std::endl;
             link.set_order(i);
+            link.set_type(JointType::FIXED);
+            link.set_active(false);
 
             if (links[i]->parent_joint) {
+                if (!enumMap.count(links[i]->parent_joint->type)) {
+                    return grpc::Status(grpc::StatusCode::INVALID_ARGUMENT,
+                                        "Unsupported joint type in robot model");
+                }
                 std::cout << "    type: " << enumMap[links[i]->parent_joint->type] << std::endl;
                 link.set_type(static_cast<JointType>(links[i]->parent_joint->type));
+                link.set_active(links[i]->parent_joint->type != urdf::Joint::FIXED &&
+                                !links[i]->parent_joint->mimic);
 
-                std::cout << "    translate: " << links[i]->parent_joint->parent_to_joint_origin_transform.position.x
+                if (links[i]->parent_joint->mimic) {
+                    const auto &mimic = links[i]->parent_joint->mimic;
+                    const auto source = robot_model->getJoint(mimic->joint_name);
+                    if (!source) {
+                        return grpc::Status(grpc::StatusCode::INVALID_ARGUMENT,
+                                            "Unknown mimic source joint: " + mimic->joint_name);
+                    }
+                    // Model names remain link names; URDF mimic references joint names.
+                    link.mutable_mimic()->set_joint(source->child_link_name);
+                    link.mutable_mimic()->set_multiplier(mimic->multiplier);
+                    link.mutable_mimic()->set_offset(mimic->offset);
+                    std::cout << "    mimic:\n      joint: " << source->child_link_name
+                              << "\n      multiplier: " << mimic->multiplier
+                              << "\n      offset: " << mimic->offset << std::endl;
+                }
+
+                std::cout << "    translate: [" << links[i]->parent_joint->parent_to_joint_origin_transform.position.x
                           << ", "
                           << links[i]->parent_joint->parent_to_joint_origin_transform.position.y << ", "
-                          << links[i]->parent_joint->parent_to_joint_origin_transform.position.z << std::endl;
+                          << links[i]->parent_joint->parent_to_joint_origin_transform.position.z << "]" << std::endl;
                 link.mutable_translate()->set_x(links[i]->parent_joint->parent_to_joint_origin_transform.position.x);
                 link.mutable_translate()->set_y(links[i]->parent_joint->parent_to_joint_origin_transform.position.y);
                 link.mutable_translate()->set_z(links[i]->parent_joint->parent_to_joint_origin_transform.position.z);
 
                 links[i]->parent_joint->parent_to_joint_origin_transform.rotation.getRPY(roll, pitch, yaw);
-                std::cout << "    rotate: " << roll << ", " << pitch << ", " << yaw << std::endl;
+                std::cout << "    rotate: [" << roll << ", " << pitch << ", " << yaw << "]" << std::endl;
                 link.mutable_rotate()->set_x(roll);
                 link.mutable_rotate()->set_y(pitch);
                 link.mutable_rotate()->set_z(yaw);
 
-                std::cout << "    axis: " << links[i]->parent_joint->axis.x << ", "
+                std::cout << "    angleAxis: [" << links[i]->parent_joint->axis.x << ", "
                           << links[i]->parent_joint->axis.y << ", "
-                          << links[i]->parent_joint->axis.z << std::endl;
+                          << links[i]->parent_joint->axis.z << "]" << std::endl;
                 link.mutable_axis()->set_x(links[i]->parent_joint->axis.x);
                 link.mutable_axis()->set_y(links[i]->parent_joint->axis.y);
                 link.mutable_axis()->set_z(links[i]->parent_joint->axis.z);
+            } else {
+                std::cout << "    type: fixed" << std::endl;
             }
+            std::cout << "    active: " << (link.active() ? "true" : "false") << std::endl;
 
             if (links[i]->visual) {
-                std::cout << "    translateLink: " << links[i]->visual->origin.position.x << ", "
+                std::cout << "    translateLink: [" << links[i]->visual->origin.position.x << ", "
                           << links[i]->visual->origin.position.y << ", "
-                          << links[i]->visual->origin.position.z << std::endl;
+                          << links[i]->visual->origin.position.z << "]" << std::endl;
                 link.mutable_translatelink()->set_x(links[i]->visual->origin.position.x);
                 link.mutable_translatelink()->set_y(links[i]->visual->origin.position.y);
                 link.mutable_translatelink()->set_z(links[i]->visual->origin.position.z);
 
                 links[i]->visual->origin.rotation.getRPY(roll, pitch, yaw);
-                std::cout << "    rotateLink: " << roll << ", " << pitch << ", " << yaw << std::endl;
+                std::cout << "    rotateLink: [" << roll << ", " << pitch << ", " << yaw << "]" << std::endl;
                 link.mutable_rotatelink()->set_x(roll);
                 link.mutable_rotatelink()->set_y(pitch);
                 link.mutable_rotatelink()->set_z(yaw);
 
-                std::cout << "    mesh: " << std::dynamic_pointer_cast<urdf::Mesh>(links[i]->visual->geometry)->filename
-                          << std::endl;
-                std::filesystem::path mesh_path = std::dynamic_pointer_cast<urdf::Mesh>(
-                        links[i]->visual->geometry)->filename;
-                link.set_mesh(mesh_path.filename());
+                const auto mesh = std::dynamic_pointer_cast<urdf::Mesh>(links[i]->visual->geometry);
+                if (mesh) {
+                    std::filesystem::path mesh_path = mesh->filename;
+                    link.set_mesh(mesh_path.filename());
+                    std::cout << "    mesh: " << link.mesh() << std::endl;
+                }
 
 
             }
