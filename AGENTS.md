@@ -19,6 +19,8 @@ cd build/bin
 
 The application reads relative runtime paths, including `robot.urdf` and `scripts/`. Configure the intended hardware or simulator before starting it; current entry-point flags do not include `--sim`.
 
+With CMake 3.21+ and Ninja, use the `debug`, `release`, `relwithdebinfo`, or `minsizerel` presets: `cmake --preset debug`, `cmake --build --preset debug --parallel 2`, then `ctest --preset debug`. Preset builds use separate `build/<preset>/` directories, with runtime files in `build/<preset>/bin/`. Local overrides belong in the ignored `CMakeUserPresets.json`.
+
 ## Coding Style & Naming Conventions
 
 Use C++17, RAII, and explicit ownership; prefer `std::unique_ptr`. Follow nearby naming: snake_case filenames, PascalCase classes/public APIs, lowerCamelCase internal functions, and trailing underscores for member variables. Existing contributor instructions specify four spaces without tabs, while `.clang-format` uses Google's two-space default. Preserve surrounding indentation and avoid unrelated formatting changes. Use clang-format on touched code with this discrepancy in mind. Keep explanatory comments concise, generally in Chinese with English technical terms.
@@ -30,3 +32,7 @@ Use the bundled `test/doctest.h`. Name suites `test/<feature>_test.cc` and regis
 ## Commit & Pull Request Guidelines
 
 History commonly uses `feat:`, `fix:`, `docs:`, `chore:`, and `example:` prefixes. Prefer these with specific, imperative summaries. PRs should describe behavior changes, related issues, validation commands/results, and hardware or simulation assumptions. Include screenshots for UI changes. Update HTTP API documentation when routes or return codes change. Edit source configurations under `config/`, not generated copies in `build/bin/`.
+
+## Repository Skills
+
+Before creating every Git commit, read and follow [rocos-version-maintenance](skills/rocos-version-maintenance/SKILL.md) to check and update the version, including documentation-only and maintenance commits. Include the version update in the same commit; reuse an update already prepared for that commit rather than incrementing again on retries. Also use this skill for version bumps, internal test builds, release preparation, and SemVer decisions. Version maintenance alone does not authorize a Git commit, tag, push, or release publication.

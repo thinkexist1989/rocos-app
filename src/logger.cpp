@@ -21,7 +21,7 @@ Logger::Logger(string name) {
 std::vector<sink_ptr> &Logger::getSinks() {
     static std::vector<sink_ptr> sinks;
     if (sinks.empty()) {
-      sinks.push_back(std::make_shared<spdlog::sinks::daily_file_sink_mt>("logs/BoneCutting", 23, 59));
+      sinks.push_back(std::make_shared<spdlog::sinks::daily_file_sink_mt>("logs/rocos-app", 23, 59));
       sinks.push_back(std::make_shared<spdlog::sinks::stdout_color_sink_mt>());
     }
     return sinks;
@@ -32,7 +32,7 @@ Logger::~Logger() {
 
 
 // // 创建每日轮换的异步日志接收器
-// sink_ptr Logger::daily_sink = std::make_shared<spdlog::sinks::daily_file_sink_mt>("logs/BoneCutting", 23, 59);
+// sink_ptr Logger::daily_sink = std::make_shared<spdlog::sinks::daily_file_sink_mt>("logs/rocos-app", 23, 59);
 // // 创建控制台接收器
 // sink_ptr Logger::console_sink = std::make_shared<spdlog::sinks::stdout_color_sink_mt>();
 //
