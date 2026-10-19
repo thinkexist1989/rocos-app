@@ -12,7 +12,7 @@
 </div>
 :warning: Rocos-App is under development, not finished~ :thinking:
 
-版本遵循 [SemVer 2.0.0](https://semver.org/lang/zh-CN/)。当前处于面向 `3.0.1` 的内部测试阶段，使用 `3.0.1-alpha.N`，测试稳定后正式发布 `3.0.1`。实际版本以 `CMakeLists.txt` 为准；维护规则见 [版本维护 skill](skills/rocos-version-maintenance/SKILL.md)。
+版本遵循 [SemVer 2.0.0](https://semver.org/lang/zh-CN/)。当前处于面向 `3.0.1` 的内部测试阶段，使用 `3.0.1-rc.N`，测试稳定后正式发布 `3.0.1`。实际版本以 `CMakeLists.txt` 为准；维护规则见 [版本维护 skill](skills/rocos-version-maintenance/SKILL.md)。
 
 ## Introduction
 
