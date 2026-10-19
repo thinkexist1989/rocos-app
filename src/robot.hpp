@@ -102,7 +102,18 @@ class Robot {
     double timestamp{0.0};  // 快照生成时刻 (epoch seconds)
   };
 
+  struct Config {
+    std::string hardware_config{"hardware_talon_config.yaml"};
+    int ecat_id{0};
+    std::string urdf{"robot.urdf"};
+    std::string base_link{"base_link"};
+    std::string tip_link{"link_7"};
+    std::string joint_binding{"joint_binding.yaml"};
+    std::string payload{"payload.yaml"};
+  };
+
   explicit Robot();
+  explicit Robot(const Config& config);
 
   ~Robot();
 
@@ -135,12 +146,15 @@ class Robot {
   Result SetLoadParameters(double mass, const Vector& com);
 
   /// @brief 从 YAML 文件加载已知负载参数（质量 + 质心）
-  /// @param path 配置文件路径，为空时使用默认路径 "payload.yaml"
-  Result LoadLoadParameters(const std::string& path = "payload.yaml");
+  /// @param path 配置文件路径，为空时使用启动配置指定的负载文件
+  Result LoadLoadParameters(const std::string& path = "");
 
   /// @brief 将当前负载参数保存到 YAML 文件
-  /// @param path 配置文件路径，为空时使用默认路径 "payload.yaml"
-  Result SaveLoadParameters(const std::string& path = "payload.yaml") const;
+  /// @param path 配置文件路径，为空时使用启动配置指定的负载文件
+  Result SaveLoadParameters(const std::string& path = "") const;
+
+  [[nodiscard]] const std::string& GetUrdfPath() const { return urdf_path_; }
+  [[nodiscard]] const std::string& GetLoadParametersPath() const { return load_params_path_; }
 
   /// @brief 查询当前是否已持有有效的负载参数（预置或辨识得到）
   [[nodiscard]] bool HasLoadParameters() const { return load_params_valid_; }
@@ -170,8 +184,8 @@ class Robot {
   // - GetRobotModelInfo(): 对应 GET /api/robot/model，返回 URDF model name、links、joint origin、
   //   joint axis、visual origin、mesh path 等前端建模数据。
   // - GetRobotModelMesh(path): 对应 GET /api/robot/model/mesh，由 Robot 根据当前 URDF 路径解析并读取 mesh。
-  // - GetUrdfPath()/GetModelBaseLink()/GetModelTipLink(): 暴露当前 Robot 实际加载的模型配置，
-  //   避免 HTTP 使用硬编码 robot.urdf/base_link/link_7。
+  // ✓ GetUrdfPath(): 返回启动配置指定的模型文件。
+  // - GetModelBaseLink()/GetModelTipLink(): 暴露当前模型的基座和末端 link。
   // ✓ GetRobotStateSnapshot(): 对应 GET /api/robot/state，已实现。
   // - GetMotionStatus()/GetCurrentTaskInfo(): 对应 GET /api/robot/move_status，封装当前任务状态而不是 HTTP 自己拼。
   //
@@ -408,6 +422,7 @@ class Robot {
   Vector load_com_;
   bool load_params_valid_{false};
   std::string load_params_path_{"payload.yaml"};  // 负载参数持久化文件
+  std::string urdf_path_{"robot.urdf"};
 
   MotionMode servo_mode_{MotionMode::kJointPosition};  // 伺服运动模式: kJointPosition | kCartesianPosition
 

@@ -164,14 +164,16 @@ bool parseNamedFrameBody(const nlohmann::json& body,
 // Construction / Destruction
 // ============================================================================
 
-RobotHttpServer::RobotHttpServer(Robot* robot, LuaScriptEngine* script_engine, int control_ttl_seconds)
+RobotHttpServer::RobotHttpServer(Robot* robot, LuaScriptEngine* script_engine, int control_ttl_seconds,
+                                 const std::string& web_root)
     : robot_(robot),
       script_engine_(script_engine),
       server_(new httplib::Server()),
       taskCounter_(0),
       poolShutdown_(false),
       activeWorkers_(0),
-      control_ttl_seconds_(control_ttl_seconds) {
+      control_ttl_seconds_(control_ttl_seconds),
+      web_root_(web_root) {
     if (control_ttl_seconds_ <= 0) {
         throw std::invalid_argument("control_ttl_seconds must be positive");
     }
@@ -251,9 +253,12 @@ void RobotHttpServer::stop() {
 // ============================================================================
 
 void RobotHttpServer::registerRoutes() {
-    if (!server_->set_mount_point("/", "web") &&
-        !server_->set_mount_point("/", "../web") &&
-        !server_->set_mount_point("/", "../../web")) {
+    if (!web_root_.empty()) {
+        if (!server_->set_mount_point("/", web_root_)) {
+            log_ptr_->error("Failed to mount web UI directory: {}", web_root_);
+        }
+    } else if (!server_->set_mount_point("/", "web") && !server_->set_mount_point("/", "../web") &&
+               !server_->set_mount_point("/", "../../web")) {
         log_ptr_->error("Failed to mount web UI directory. Tried: web, ../web, ../../web");
     }
 
@@ -760,9 +765,7 @@ KDL::Frame RobotHttpServer::jsonToFrame(const nlohmann::json& pos,
     return KDL::Frame(r, p);
 }
 
-std::string RobotHttpServer::getUrdfPath() {
-    return "robot.urdf";
-}
+std::string RobotHttpServer::getUrdfPath() { return robot_ != nullptr ? robot_->GetUrdfPath() : "robot.urdf"; }
 
 nlohmann::json RobotHttpServer::frameToJson(const KDL::Frame& frame) {
     double x, y, z, w;
@@ -978,8 +981,9 @@ void RobotHttpServer::handleGetLinkMesh(const httplib::Request& req, httplib::Re
         ? rel_path.substr(sep + 1)
         : rel_path;
 
-    // 候选搜索根目录：当前目录、上级目录、上上级目录
-    const std::vector<fs::path> search_bases = {".", "..", "../.." };
+    // 从当前 URDF 所在目录查找，避免命中 bin 中的旧副本。
+    const fs::path urdf_dir = fs::absolute(getUrdfPath()).parent_path();
+    const std::vector<fs::path> search_bases = {urdf_dir};
 
     std::string found_path;
 
@@ -1178,7 +1182,7 @@ void RobotHttpServer::handleSaveLoadParameters(const httplib::Request& req, http
     const Result result = robot_->SaveLoadParameters(path);
 
     nlohmann::json data;
-    data["path"] = path.empty() ? "payload.yaml" : path;
+    data["path"] = path.empty() ? robot_->GetLoadParametersPath() : path;
 
     sendJson(res, resultSucceeded(result), resultCode(result),
              resultSucceeded(result)

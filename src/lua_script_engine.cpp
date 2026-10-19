@@ -688,14 +688,12 @@ private:
             });
         robot_table_.set_function(
             "LoadLoadParameters", [this](sol::optional<std::string> path) {
-                requireSuccess(robot_.LoadLoadParameters(
-                                   path.value_or("payload.yaml")),
+                requireSuccess(robot_.LoadLoadParameters(path.value_or("")),
                                "LoadLoadParameters");
             });
         robot_table_.set_function(
             "SaveLoadParameters", [this](sol::optional<std::string> path) {
-                requireSuccess(robot_.SaveLoadParameters(
-                                   path.value_or("payload.yaml")),
+                requireSuccess(robot_.SaveLoadParameters(path.value_or("")),
                                "SaveLoadParameters");
             });
 

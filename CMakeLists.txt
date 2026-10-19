@@ -26,7 +26,7 @@ cmake_minimum_required(VERSION 3.15)
 project(rocos_app VERSION 3.0.1 DESCRIPTION "ROCOS Application Library")
 
 # CMake VERSION 仅接受数字；完整 SemVer 版本单独拼接。
-set(ROCOS_APP_VERSION_PRERELEASE "rc.3")
+set(ROCOS_APP_VERSION_PRERELEASE "rc.4")
 set(ROCOS_APP_VERSION_FULL "${PROJECT_VERSION}")
 if(NOT ROCOS_APP_VERSION_PRERELEASE STREQUAL "")
     string(APPEND ROCOS_APP_VERSION_FULL "-${ROCOS_APP_VERSION_PRERELEASE}")
@@ -99,7 +99,6 @@ link_directories(
 
 file(GLOB_RECURSE SRCS src/*.cpp)
 file(GLOB_RECURSE HDRS include/*.h include/*.hpp)
-file(GLOB_RECURSE CONFIG_FILE CONFIGURE_DEPENDS config/*.urdf config/*.yaml)
 
 set(DEP_LIBS
         dl
@@ -212,6 +211,8 @@ add_library(rocos::rocos_app ALIAS rocos_app)
 add_executable(rocosAppMain
         src/rocosAppMain.cpp
         )
+target_compile_definitions(rocosAppMain PRIVATE
+        ROCOS_DEFAULT_CONFIG_FILE="${CMAKE_CURRENT_SOURCE_DIR}/config/config.yaml")
 
 ## Specify libraries to link a library or executable target against
 target_link_libraries(rocosAppMain
@@ -235,9 +236,7 @@ target_link_libraries(VirtualWallMain
 
 configure_file(include/ver.h.in ver.h) # Version Definition
 
-# Copy config files to bin/
-file(COPY ${CONFIG_FILE} DESTINATION ${CMAKE_BINARY_DIR}/bin)
-file(COPY config/scripts DESTINATION ${CMAKE_BINARY_DIR}/bin)
+# 运行配置直接从指定路径加载，不复制到 bin，避免同名 YAML/URDF 相互覆盖。
 
 #############
 ## Install ##
@@ -263,7 +262,7 @@ file(COPY config/scripts DESTINATION ${CMAKE_BINARY_DIR}/bin)
 #        )
 #
 ## Install config files
-#install(FILES ${CONFIG_FILE}
+#install(DIRECTORY config/
 #        DESTINATION ${${PROJECT_NAME}_INSTALL_CONFIGDIR}
 #        )
 #
@@ -509,6 +508,12 @@ target_link_libraries(virtual_wall_test
 add_test(NAME virtual_wall_test COMMAND virtual_wall_test)
 set_tests_properties(virtual_wall_test PROPERTIES
         WORKING_DIRECTORY ${CMAKE_SOURCE_DIR})
+
+add_executable(app_config_test test/app_config_test.cc)
+target_link_libraries(app_config_test PRIVATE robot)
+target_compile_definitions(app_config_test PRIVATE
+        ROCOS_TEST_CONFIG_FILE="${CMAKE_CURRENT_SOURCE_DIR}/config/config.yaml")
+add_test(NAME app_config_test COMMAND app_config_test)
 
 add_executable(http_control_rights_test test/http_control_rights_test.cc)
 target_link_libraries(http_control_rights_test PRIVATE robot)

@@ -41,7 +41,8 @@ class LuaScriptEngine;
 
 class RobotHttpServer {
 public:
-    explicit RobotHttpServer(Robot* robot, LuaScriptEngine* script_engine = nullptr, int control_ttl_seconds = 300);
+    explicit RobotHttpServer(Robot* robot, LuaScriptEngine* script_engine = nullptr, int control_ttl_seconds = 300,
+                             const std::string& web_root = "");
     ~RobotHttpServer();
 
     /// Start server (blocking)
@@ -218,6 +219,7 @@ private:
     std::chrono::steady_clock::time_point acquired_at_{};
     std::chrono::steady_clock::time_point last_seen_at_{};
     const int control_ttl_seconds_;
+    const std::string web_root_;
     static constexpr const char* CONTROL_TOKEN_HEADER = "X-Rocos-Control-Token";
     static constexpr const char* CONTROL_CLIENT_ID_HEADER = "X-Rocos-Client-Id";
 

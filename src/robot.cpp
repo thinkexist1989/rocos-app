@@ -671,14 +671,16 @@ namespace rocos {
             joint_binding_path_);
     }
 
+    Robot::Robot() : Robot(Config{}) {}
 
-    Robot::Robot()
-        : log_ptr_(Logger::getInstance("Robot")),
-          impl_(std::make_unique<Impl>(*this)) {
+    Robot::Robot(const Config &config) : log_ptr_(Logger::getInstance("Robot")), impl_(std::make_unique<Impl>(*this)) {
         executor = std::make_unique<Executor>();
 
-        hardware = std::make_unique<Hardware>("hardware_talon_config.yaml", 0); //TODO: 初始化Hardware指针，后续路径需要从配置文件加载
-        model = std::make_unique<Model>("robot.urdf", "base_link", "link_7"); //TODO：初始化Model指针，后续路径需要从配置文件加载
+        joint_binding_path_ = config.joint_binding;
+        load_params_path_ = config.payload;
+        urdf_path_ = config.urdf;
+        hardware = std::make_unique<Hardware>(config.hardware_config, config.ecat_id);
+        model = std::make_unique<Model>(config.urdf, config.base_link, config.tip_link);
 
         jointBinding();
 
