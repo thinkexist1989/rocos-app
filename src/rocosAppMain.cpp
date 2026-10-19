@@ -13,6 +13,7 @@
 
 DEFINE_string(http_host, "0.0.0.0", "HTTP server listen host");
 DEFINE_int32(http_port, 8080, "HTTP server listen port");
+DEFINE_int32(http_control_ttl_seconds, 300, "HTTP control rights TTL in seconds (positive)");
 
 bool isRuning = true;
 
@@ -44,6 +45,10 @@ int main(int argc, char *argv[]) {
     using namespace rocos;
 
     gflags::ParseCommandLineFlags(&argc, &argv, true);
+    if (FLAGS_http_control_ttl_seconds <= 0) {
+        std::cerr << "--http_control_ttl_seconds must be positive" << std::endl;
+        return 1;
+    }
 
     // 初始化机器人（内部自动加载硬件与运动学模型）
     Robot robot;
@@ -52,7 +57,7 @@ int main(int argc, char *argv[]) {
     LuaScriptEngine script_engine(robot, "scripts");
 
     // 启动 HTTP REST API 服务器（非阻塞）
-    RobotHttpServer httpServer(&robot, &script_engine);
+    RobotHttpServer httpServer(&robot, &script_engine, FLAGS_http_control_ttl_seconds);
     httpServer.runAsync(FLAGS_http_host, FLAGS_http_port);
 
     std::cout << "\033[1;32m"

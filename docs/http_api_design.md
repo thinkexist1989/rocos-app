@@ -19,7 +19,7 @@ ROCOS-App 当前使用 gRPC 作为唯一的外部通信接口（端口 30001）�
 
 ### 1.3 控制权（Control Rights）
 
-自 2026-08-11 起，`RobotHttpServer` 引入**单持有者控制权**机制，避免多路并发下发写指令造成的状态机竞态。控制权按连接绑定：服务器记录 `remote_addr:remote_port` 连接键，确保同一台电脑中的不同连接视为不同 owner，即使 IP 相同也必须使用同一 socket 的 token。所有 GET 接口保持开放；所有写接口（POST/DELETE）必须携带 `X-Rocos-Control-Token` header。控制权通过 `POST /api/control/acquire` 申请、`POST /api/control/takeover` 强制抢占、`POST /api/control/release` 释放，TTL 60s 自动续期。详见 [`http_api_control_rights.md`](http_api_control_rights.md)。
+自 2026-08-11 起，`RobotHttpServer` 引入**单持有者控制权**机制，避免多路并发下发写指令造成的状态机竞态。控制权绑定 token 与 client_id，`remote_addr:remote_port` 仅用于审计。GET 接口无需鉴权且不续期；普通写接口（POST/DELETE）必须同时携带 `X-Rocos-Control-Token` 和匹配的 `X-Rocos-Client-Id` 请求头。控制权通过 `POST /api/control/acquire` 申请、`POST /api/control/takeover` 强制抢占、`POST /api/control/release` 释放；`POST /api/control/heartbeat` 校验两个请求头及有效期后续期，通过鉴权的业务写请求也续期。默认 TTL 为 300 秒，可由正整数启动参数 `--http_control_ttl_seconds` 配置；建议心跳间隔由响应 `heartbeat_interval_seconds` 给出，默认 5 秒。过期或被接管的 token 不可通过心跳恢复。现有调试旁路仅兼容普通业务写接口，不适用于心跳或释放。详见 [`http_api_control_rights.md`](http_api_control_rights.md)。
 
 ---
 
@@ -53,7 +53,8 @@ namespace rocos {
 
 class RobotHttpServer {
 public:
-    explicit RobotHttpServer(Robot* robot);
+    explicit RobotHttpServer(Robot* robot, LuaScriptEngine* script_engine = nullptr,
+                             int control_ttl_seconds = 300);
     ~RobotHttpServer();
 
     // 启动服务器（阻塞）

@@ -166,6 +166,7 @@ paths:
           headers: {}
       security:
         - ControlToken: []
+          ClientId: []
   /api/robot/disable:
     post:
       summary: 全局下电 / 关闭使能
@@ -184,6 +185,7 @@ paths:
           headers: {}
       security:
         - ControlToken: []
+          ClientId: []
   /api/robot/reset:
     post:
       summary: 清除机器人报警并复位到 STOPPED
@@ -217,6 +219,7 @@ paths:
           headers: {}
       security:
         - ControlToken: []
+          ClientId: []
   /api/robot/workmode:
     post:
       summary: 设置工作模式
@@ -248,6 +251,7 @@ paths:
           headers: {}
       security:
         - ControlToken: []
+          ClientId: []
   /api/robot/servo/start:
     post:
       summary: 启动 UDP 伺服运动模式
@@ -279,6 +283,7 @@ paths:
           headers: {}
       security:
         - ControlToken: []
+          ClientId: []
   /api/robot/servo/stop:
     post:
       summary: 停止 UDP 伺服运动模式
@@ -297,6 +302,7 @@ paths:
           headers: {}
       security:
         - ControlToken: []
+          ClientId: []
   /api/robot/servo/mode:
     post:
       summary: 设置伺服运动模式
@@ -330,6 +336,7 @@ paths:
           headers: {}
       security:
         - ControlToken: []
+          ClientId: []
   /api/robot/movej:
     post:
       summary: 关节空间运动 (MoveJ)
@@ -372,6 +379,7 @@ paths:
           headers: {}
       security:
         - ControlToken: []
+          ClientId: []
   /api/robot/movej_ik:
     post:
       summary: 笛卡尔位姿逆解运动 (MoveJ_IK)
@@ -410,6 +418,7 @@ paths:
           headers: {}
       security:
         - ControlToken: []
+          ClientId: []
   /api/robot/movel:
     post:
       summary: 笛卡尔直线运动 (MoveL)
@@ -451,6 +460,7 @@ paths:
           headers: {}
       security:
         - ControlToken: []
+          ClientId: []
   /api/robot/movel_fk:
     post:
       summary: 关节空间直线运动 (MoveL_FK)
@@ -495,6 +505,7 @@ paths:
           headers: {}
       security:
         - ControlToken: []
+          ClientId: []
   /api/robot/movec:
     post:
       summary: 笛卡尔圆弧运动 (MoveC)
@@ -549,6 +560,7 @@ paths:
           headers: {}
       security:
         - ControlToken: []
+          ClientId: []
   /api/robot/pause:
     post:
       summary: 暂停运动
@@ -567,6 +579,7 @@ paths:
           headers: {}
       security:
         - ControlToken: []
+          ClientId: []
   /api/robot/resume:
     post:
       summary: 继续运动
@@ -585,6 +598,7 @@ paths:
           headers: {}
       security:
         - ControlToken: []
+          ClientId: []
   /api/robot/stop:
     post:
       summary: 停止运动
@@ -603,6 +617,7 @@ paths:
           headers: {}
       security:
         - ControlToken: []
+          ClientId: []
   /api/robot/wait_move:
     post:
       summary: 等待当前运动结束（阻塞）
@@ -621,6 +636,7 @@ paths:
           headers: {}
       security:
         - ControlToken: []
+          ClientId: []
   /api/robot/move_status:
     get:
       summary: 查询运动/任务状态
@@ -698,6 +714,7 @@ paths:
           headers: {}
       security:
         - ControlToken: []
+          ClientId: []
   /api/robot/jog/cartesian:
     post:
       summary: 笛卡尔点动
@@ -760,6 +777,7 @@ paths:
           headers: {}
       security:
         - ControlToken: []
+          ClientId: []
   /api/robot/jog/nullspace:
     post:
       summary: 零空间点动
@@ -807,6 +825,7 @@ paths:
           headers: {}
       security:
         - ControlToken: []
+          ClientId: []
   /api/robot/jog/svd:
     post:
       summary: SVD 维度速度点动
@@ -845,6 +864,7 @@ paths:
           headers: {}
       security:
         - ControlToken: []
+          ClientId: []
   /api/robot/jog/stop:
     post:
       summary: 停止点动
@@ -863,6 +883,7 @@ paths:
           headers: {}
       security:
         - ControlToken: []
+          ClientId: []
   /api/robot/tool_frames:
     get:
       summary: 获取所有工具坐标系名称列表
@@ -976,6 +997,7 @@ paths:
           headers: {}
       security:
         - ControlToken: []
+          ClientId: []
     delete:
       summary: 删除指定工具坐标系
       deprecated: false
@@ -1000,6 +1022,7 @@ paths:
           headers: {}
       security:
         - ControlToken: []
+          ClientId: []
   /api/robot/object_frame:
     get:
       summary: 查询指定工件坐标系
@@ -1067,6 +1090,7 @@ paths:
           headers: {}
       security:
         - ControlToken: []
+          ClientId: []
     delete:
       summary: 删除指定工件坐标系
       deprecated: false
@@ -1091,6 +1115,7 @@ paths:
           headers: {}
       security:
         - ControlToken: []
+          ClientId: []
   /api/robot/active_tool_frame:
     post:
       summary: 激活指定工具坐标系
@@ -1120,6 +1145,7 @@ paths:
           headers: {}
       security:
         - ControlToken: []
+          ClientId: []
   /api/robot/active_object_frame:
     post:
       summary: 激活指定工件坐标系
@@ -1149,6 +1175,7 @@ paths:
           headers: {}
       security:
         - ControlToken: []
+          ClientId: []
   /api/robot/frames/load:
     post:
       summary: 从 YAML 文件加载坐标系
@@ -1184,6 +1211,7 @@ paths:
           headers: {}
       security:
         - ControlToken: []
+          ClientId: []
   /api/robot/frames/save:
     post:
       summary: 保存坐标系到 YAML 文件
@@ -1218,6 +1246,7 @@ paths:
           headers: {}
       security:
         - ControlToken: []
+          ClientId: []
   /api/calibration/pose:
     post:
       summary: 设置标定点位
@@ -1236,6 +1265,7 @@ paths:
           headers: {}
       security:
         - ControlToken: []
+          ClientId: []
   /api/calibration/tool:
     post:
       summary: 设置工具坐标系（等同 POST /api/robot/tool_frame）
@@ -1270,6 +1300,7 @@ paths:
           headers: {}
       security:
         - ControlToken: []
+          ClientId: []
   /api/calibration/object:
     post:
       summary: 设置工件坐标系（等同 POST /api/robot/object_frame）
@@ -1304,6 +1335,7 @@ paths:
           headers: {}
       security:
         - ControlToken: []
+          ClientId: []
   /api/calibration/run:
     post:
       summary: 执行标定计算
@@ -1322,6 +1354,7 @@ paths:
           headers: {}
       security:
         - ControlToken: []
+          ClientId: []
   /api/calibration/result:
     get:
       summary: 获取标定结果
@@ -1363,6 +1396,7 @@ paths:
           headers: {}
       security:
         - ControlToken: []
+          ClientId: []
   /api/script/run:
     post:
       summary: 异步执行已加载的 Lua 脚本
@@ -1381,6 +1415,7 @@ paths:
           headers: {}
       security:
         - ControlToken: []
+          ClientId: []
   /api/script/pause:
     post:
       summary: 暂停 Lua 脚本
@@ -1399,6 +1434,7 @@ paths:
           headers: {}
       security:
         - ControlToken: []
+          ClientId: []
   /api/script/resume:
     post:
       summary: 继续 Lua 脚本
@@ -1417,6 +1453,7 @@ paths:
           headers: {}
       security:
         - ControlToken: []
+          ClientId: []
   /api/script/stop:
     post:
       summary: 停止 Lua 脚本
@@ -1435,6 +1472,7 @@ paths:
           headers: {}
       security:
         - ControlToken: []
+          ClientId: []
   /api/script/step:
     post:
       summary: 单步执行 Lua 脚本
@@ -1453,6 +1491,7 @@ paths:
           headers: {}
       security:
         - ControlToken: []
+          ClientId: []
   /api/script/status:
     get:
       summary: 获取 Lua 脚本状态
@@ -1534,6 +1573,7 @@ paths:
           headers: {}
       security:
         - ControlToken: []
+          ClientId: []
   /api/script/breakpoint/remove:
     post:
       summary: 删除断点
@@ -1558,6 +1598,7 @@ paths:
           headers: {}
       security:
         - ControlToken: []
+          ClientId: []
   /api/script/breakpoint/clear:
     post:
       summary: 清空所有断点
@@ -1576,15 +1617,43 @@ paths:
           headers: {}
       security:
         - ControlToken: []
+          ClientId: []
+  /api/control/heartbeat:
+    post:
+      summary: 持有者会话心跳
+      description: 校验 token、client_id 和有效期，成功后续期。默认建议每 5 秒发送；以响应 heartbeat_interval_seconds 为准。旧 token 过期或被接管后不可通过心跳恢复。调试旁路凭据不能用于心跳。此接口不改变机器人运动状态。
+      tags:
+      - 控制权 (Control)
+      parameters: []
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              type: object
+      responses:
+        '200':
+          description: 心跳结果；业务失败仍可能返回 HTTP 200
+          content:
+            application/json:
+              schema:
+                allOf:
+                - $ref: '#/components/schemas/StandardResponse'
+                - type: object
+                  properties:
+                    data:
+                      $ref: '#/components/schemas/ControlOwnerData'
+      security:
+      - ControlToken: []
+        ClientId: []
   /api/control/acquire:
     post:
       summary: 申请机器人控制权
-      description: >
-        无持有者时颁发新 UUID token 并返回。若已有持有者且未过期，返回 `code=3008`。
-        该 token 仅绑定到当前连接的 `remote_addr:remote_port`；同一台机器上的不同连接即使 IP 相同也必须重新申请。
-        携带此 token（`X-Rocos-Control-Token` header）方可调用写接口。TTL 60s，任何调用自动续期。
+      description: 无持有者或原持有者已超时时颁发新 token。已有有效持有者时返回 3008。控制权绑定 token 和 client_id，不绑定 TCP 源端口。默认 TTL 300
+        秒，可由 http_control_ttl_seconds 配置；以响应 ttl_seconds 为准。持有者应按 heartbeat_interval_seconds 发送带两个鉴权头的心跳。普通
+        GET 不续期。
       tags:
-        - 控制权 (Control)
+      - 控制权 (Control)
       parameters: []
       requestBody:
         content:
@@ -1606,18 +1675,18 @@ paths:
             application/json:
               schema:
                 allOf:
-                  - $ref: '#/components/schemas/StandardResponse'
-                  - type: object
-                    properties:
-                      data:
-                        $ref: '#/components/schemas/ControlOwnerData'
+                - $ref: '#/components/schemas/StandardResponse'
+                - type: object
+                  properties:
+                    data:
+                      $ref: '#/components/schemas/ControlOwnerData'
       security: []
   /api/control/release:
     post:
       summary: 释放机器人控制权
-      description: 必须携带匹配当前持有者的 `X-Rocos-Control-Token`。
+      description: 必须携带匹配当前持有者的 token 和 client_id。过期 token 不可释放新的控制权。
       tags:
-        - 控制权 (Control)
+      - 控制权 (Control)
       parameters: []
       responses:
         '200':
@@ -1627,13 +1696,14 @@ paths:
               schema:
                 $ref: '#/components/schemas/StandardResponse'
       security:
-        - ControlToken: []
+      - ControlToken: []
+        ClientId: []
   /api/control/takeover:
     post:
       summary: 强制抢占控制权
       description: 无条件覆盖当前持有者，颁发新 token；原 token 立即失效。日志中记录被抢占的原持有者信息。
       tags:
-        - 控制权 (Control)
+      - 控制权 (Control)
       parameters: []
       requestBody:
         content:
@@ -1651,18 +1721,18 @@ paths:
             application/json:
               schema:
                 allOf:
-                  - $ref: '#/components/schemas/StandardResponse'
-                  - type: object
-                    properties:
-                      data:
-                        $ref: '#/components/schemas/ControlOwnerData'
+                - $ref: '#/components/schemas/StandardResponse'
+                - type: object
+                  properties:
+                    data:
+                      $ref: '#/components/schemas/ControlOwnerData'
       security: []
   /api/control/status:
     get:
       summary: 查询控制权状态
-      description: 无需鉴权。返回当前持有者信息与剩余 TTL；若 token 已过期会先做懒清理。
+      description: 无需鉴权的只读查询。返回当前持有者和剩余 TTL，发现过期时清理控制权；即使携带持有者凭据也不会续期。
       tags:
-        - 控制权 (Control)
+      - 控制权 (Control)
       parameters: []
       responses:
         '200':
@@ -1671,11 +1741,11 @@ paths:
             application/json:
               schema:
                 allOf:
-                  - $ref: '#/components/schemas/StandardResponse'
-                  - type: object
-                    properties:
-                      data:
-                        $ref: '#/components/schemas/ControlOwnerData'
+                - $ref: '#/components/schemas/StandardResponse'
+                - type: object
+                  properties:
+                    data:
+                      $ref: '#/components/schemas/ControlOwnerData'
       security: []
 components:
   schemas:
@@ -2035,17 +2105,17 @@ components:
       properties:
         token:
           type: string
-          description: 仅在 acquire/takeover 成功响应中返回；status/release 中不返回
+          description: 仅 acquire/takeover 成功时返回，心跳与查询不返回 token
         has_owner:
           type: boolean
         owner_ip:
           type: string
         owner_port:
           type: integer
-          description: 当前控制权持有连接的远端端口，区分同一 IP 的不同连接
+          description: 申请控制权时的源端口，仅供审计，不用于身份校验
         owner_connection:
           type: string
-          description: 连网键 `remote_addr:remote_port`，同 IP 但不同 socket 会被视作不同 owner
+          description: 申请时的 remote_addr:remote_port，仅供审计，不绑定 TCP 连接
         owner_client_id:
           type: string
           description: 稳定客户端会话 ID；浏览器端口变更时仍可保证同一前端会话继续持有 token
@@ -2065,17 +2135,29 @@ components:
           description: 距离 TTL 到期的剩余秒数
         ttl_seconds:
           type: integer
-          description: 常量 60
+          minimum: 1
+          description: 控制权超时秒数，默认 300，http_control_ttl_seconds 必须为正整数；通过鉴权的写请求与心跳续期
+        heartbeat_interval_seconds:
+          type: number
+          description: 建议心跳间隔，默认 5 秒；短 TTL 时不超过 TTL/3
+        client_id:
+          type: string
+          description: 绑定的客户端身份，acquire/takeover 返回；后续写请求和心跳须通过请求头回传
+        client_id_auto:
+          type: boolean
+          description: 服务端自动生成 client_id 时为 true
   responses: {}
   securitySchemes:
     ControlToken:
       type: apiKey
       in: header
       name: X-Rocos-Control-Token
-      description: >
-        单持有者控制权令牌。通过 POST /api/control/acquire 或 /api/control/takeover 获取。
-        若客户端带上稳定的 `X-Rocos-Client-Id`，同一浏览器会话在端口变化时可继续持有同一个 token；
-        若来自不同 `client_id` 且不是同一连接，则返回 3007。
-        所有写接口必须携带；缺失返回 3006，无效/过期返回 3007。详见 docs/http_api_control_rights.md。
+      description: 单持有者控制权令牌，由 acquire/takeover 获取。写接口和 heartbeat 必须同时携带 X-Rocos-Control-Token 与匹配的 X-Rocos-Client-Id；缺
+        token 返回 3006，错误、过期或身份不匹配返回 3007。通过鉴权的写请求与心跳续期；GET 不续期。
+    ClientId:
+      type: apiKey
+      in: header
+      name: X-Rocos-Client-Id
+      description: 与申请控制权时绑定的 client_id 一致；和 ControlToken 必须同时提供。
 servers: []
 security: []

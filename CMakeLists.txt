@@ -26,7 +26,7 @@ cmake_minimum_required(VERSION 3.15)
 project(rocos_app VERSION 3.0.1 DESCRIPTION "ROCOS Application Library")
 
 # CMake VERSION 仅接受数字；完整 SemVer 版本单独拼接。
-set(ROCOS_APP_VERSION_PRERELEASE "rc.2")
+set(ROCOS_APP_VERSION_PRERELEASE "rc.3")
 set(ROCOS_APP_VERSION_FULL "${PROJECT_VERSION}")
 if(NOT ROCOS_APP_VERSION_PRERELEASE STREQUAL "")
     string(APPEND ROCOS_APP_VERSION_FULL "-${ROCOS_APP_VERSION_PRERELEASE}")
@@ -509,6 +509,13 @@ target_link_libraries(virtual_wall_test
 add_test(NAME virtual_wall_test COMMAND virtual_wall_test)
 set_tests_properties(virtual_wall_test PROPERTIES
         WORKING_DIRECTORY ${CMAKE_SOURCE_DIR})
+
+add_executable(http_control_rights_test test/http_control_rights_test.cc)
+target_link_libraries(http_control_rights_test PRIVATE robot)
+add_test(NAME http_control_rights_test COMMAND http_control_rights_test)
+set_tests_properties(http_control_rights_test PROPERTIES
+        WORKING_DIRECTORY ${CMAKE_SOURCE_DIR}
+        TIMEOUT 30)
 
 add_executable(lua_script_engine_test test/lua_script_engine_test.cc)
 target_link_libraries(lua_script_engine_test
