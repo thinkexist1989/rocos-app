@@ -17,6 +17,7 @@
 
 #include "lua_script_engine.hpp"
 #include "robot.hpp"
+#include "tool_package_json.hpp"
 
 namespace rocos {
 
@@ -284,6 +285,10 @@ void RobotHttpServer::registerRoutes() {
     server_->Get("/api/robot/impedance", [this](auto& req, auto& res) { handleGetImpedance(req, res); });
     server_->Get("/api/robot/urdf", [this](auto& req, auto& res) { handleGetRobotModel(req, res); });
     server_->Get("/api/robot/urdf/mesh", [this](auto& req, auto& res) { handleGetLinkMesh(req, res); });
+    for (const auto* path : {"/api/robot/tool_packages", "/api/robot/tool_package/asset", "/api/robot/tool_package/export", "/api/robot/tool_package/installation"})
+        server_->Get(path, [this](auto& req, auto& res) { handleToolPackages(req, res); });
+    for (const auto* path : {"/api/robot/tool_packages/import", "/api/robot/tool_packages/reload", "/api/robot/tool_package/overrides", "/api/robot/tool_package/installation", "/api/calibration/save"})
+        server_->Post(path, [this](auto& req, auto& res) { handleToolPackages(req, res); });
     server_->Get("/api/robot/enabled", [this](auto& req, auto& res) { handleIsEnabled(req, res); });
     server_->Post("/api/robot/enable", [this](auto& req, auto& res) { handleEnable(req, res); });
     server_->Post("/api/robot/disable", [this](auto& req, auto& res) { handleDisable(req, res); });
@@ -900,6 +905,7 @@ void RobotHttpServer::handleGetRobotState(const httplib::Request& req, httplib::
     // 激活的坐标系
     data["active_tool_frame_name"] = snap.active_tool_frame_name;
     data["active_tool_frame"] = frameToJson(snap.active_tool_frame);
+    data["active_tool_package"] = snap.active_tool_package ? toolPackageJson(*snap.active_tool_package, false) : nlohmann::json(nullptr);
     data["active_object_frame_name"] = snap.active_object_frame_name;
     data["active_object_frame"] = frameToJson(snap.active_object_frame);
 
@@ -2167,7 +2173,8 @@ void RobotHttpServer::handleGetToolFrameNames(const httplib::Request&, httplib::
     const auto state = frame_registry_->snapshot();
     std::vector<std::string> names;
     for (const auto& tool : state->tools) names.push_back(tool.first);
-    sendJson(res, true, 0, "ok", {{"names", names}, {"active", state->active_tool}, {"file_path", frame_registry_->path()}});
+    sendJson(res, true, 0, "ok", {{"names", names}, {"active", state->active_tool}, {"file_path", frame_registry_->path()},
+        {"package_support", true}, {"robot_id", frame_registry_->robotId()}});
 }
 
 void RobotHttpServer::handleGetObjectFrameNames(const httplib::Request& req, httplib::Response& res) {
@@ -2183,10 +2190,11 @@ void RobotHttpServer::handleGetToolFrame(const httplib::Request& req, httplib::R
     const auto name = req.get_param_value("name");
     if (name.empty()) { sendJson(res, false, 1001, "Missing 'name' query parameter"); return; }
     if (!frame_registry_) { sendJson(res, false, -3001, "Tool registry is unavailable"); return; }
-    Frame frame;
-    const auto result = frame_registry_->get(name, true, frame);
-    sendJson(res, resultSucceeded(result), resultCode(result), resultSucceeded(result) ? "ok" : "Tool frame not found",
-             resultSucceeded(result) ? nlohmann::json{{"name", name}, {"frame", frameToJson(frame)}} : nlohmann::json());
+    const auto state=frame_registry_->snapshot(); const auto found=state->tools.find(name);
+    if (found==state->tools.end()) { sendJson(res,false,-3001,"Tool frame not found"); return; }
+    nlohmann::json data{{"name",name},{"frame",frameToJson(found->second)}};
+    if (state->packages.count(name)) data["package"]=toolPackageJson(state->packages.at(name));
+    sendJson(res,true,0,"ok",data);
 }
 
 void RobotHttpServer::handleGetObjectFrame(const httplib::Request& req, httplib::Response& res) {
@@ -2228,6 +2236,7 @@ void RobotHttpServer::handleSetPoseFrame(const httplib::Request& req, httplib::R
     }
     if (id.empty() && index != 1) { sendJson(res, false, 4001, "Start a new calibration by capturing point 1"); return; }
     if (!id.empty() && found->second.name != name) { sendJson(res, false, 1001, "Tool name does not match calibration session"); return; }
+    if (!id.empty() && !calibrationContextCurrent(found->second)) { sendJson(res,false,4004,"Tool installation changed; restart calibration"); return; }
     ToolCalibrationSample sample;
     const auto result = calibration_capture_(sample);
     if (result != Result::NoError || !FrameRegistry::validFrame(sample.flange) || sample.joints.empty() ||
@@ -2245,6 +2254,9 @@ void RobotHttpServer::handleSetPoseFrame(const httplib::Request& req, httplib::R
         session.id = "cal-" + generateControlToken(); session.name = name;
         session.owner_token = req.get_header_value(CONTROL_TOKEN_HEADER);
         session.created = ++calibration_counter_;
+        const auto frames=frame_registry_->snapshot();
+        const auto tool=frames->packages.find(name);
+        if (tool!=frames->packages.end()) { session.package_digest=tool->second.digest; session.package_revision=tool->second.revision; }
         found = calibration_sessions_.emplace(session.id, std::move(session)).first;
     }
     found->second.samples[index - 1] = std::move(sample);
@@ -2407,6 +2419,7 @@ void RobotHttpServer::handleCalibrationRun(const httplib::Request& req, httplib:
     }
     auto& session = found->second;
     session.result.reset();
+    if (!calibrationContextCurrent(session)) { sendJson(res,false,4004,"Tool installation changed; restart calibration"); return; }
     std::array<KDL::Frame, 6> poses;
     for (size_t i = 0; i < poses.size(); ++i) {
         if (!session.samples[i]) { sendJson(res, false, 4001, "Capture all six points before calculating"); return; }
@@ -2457,8 +2470,14 @@ nlohmann::json RobotHttpServer::calibrationSessionJson(const CalibrationSession&
                   {"metrics", {{"rms_error", value.rms_error}, {"max_error", value.max_error},
                                {"condition_number", value.condition_number}, {"axis_angle_degrees", value.axis_angle_degrees}}}};
     }
-    return {{"session_id", session.id}, {"name", session.name}, {"samples", samples},
+    return {{"session_id", session.id}, {"name", session.name}, {"samples", samples}, {"package_digest",session.package_digest}, {"package_revision",session.package_revision},
             {"captured", captured}, {"result", result}};
+}
+
+bool RobotHttpServer::calibrationContextCurrent(const CalibrationSession& session) const {
+    const auto state=frame_registry_->snapshot(); const auto found=state->packages.find(session.name);
+    if (session.package_digest.empty()) return found==state->packages.end();
+    return found!=state->packages.end() && found->second.digest==session.package_digest && found->second.revision==session.package_revision;
 }
 
 }  // namespace rocos

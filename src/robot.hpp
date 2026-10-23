@@ -93,6 +93,7 @@ class Robot {
     Frame tcp;  // 基座到当前 TCP，与 flange 使用同一关节采样和注册表快照
     bool tcp_valid{false};
     std::string active_tool_frame_name;
+    std::optional<ToolPackage> active_tool_package;
     std::string active_object_frame_name;
     Frame active_tool_frame;
     Frame active_object_frame;
@@ -114,6 +115,8 @@ class Robot {
     std::string joint_binding{"joint_binding.yaml"};
     std::string payload{"payload.yaml"};
     std::string frames{"frames.yaml"};
+    std::string tool_library{"../tools"};
+    std::string id{"default"};
   };
 
   explicit Robot();

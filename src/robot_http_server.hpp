@@ -120,6 +120,7 @@ private:
     void handleSetActiveObjectFrame(const httplib::Request& req, httplib::Response& res);
     void handleLoadFrames(const httplib::Request& req, httplib::Response& res);
     void handleSaveFrames(const httplib::Request& req, httplib::Response& res);
+    void handleToolPackages(const httplib::Request& req, httplib::Response& res);
 
     // ---- Calibration ----
     void handleCalibrationRun(const httplib::Request& req, httplib::Response& res);
@@ -129,8 +130,11 @@ private:
         std::array<std::optional<ToolCalibrationSample>, 6> samples;
         std::optional<ToolCalibrationSolution> result;
         uint64_t created{0};
+        std::string package_digest;
+        uint64_t package_revision{0};
     };
     nlohmann::json calibrationSessionJson(const CalibrationSession& session);
+    bool calibrationContextCurrent(const CalibrationSession& session) const;
     bool prepareToolMutation(const httplib::Request& req, httplib::Response& res, std::unique_lock<std::recursive_mutex>& state_lock);
 
     // ---- Lua Script ----

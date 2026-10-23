@@ -34,6 +34,7 @@ struct AppConfig {
         if (robot.base_link.empty() || robot.tip_link.empty()) {
             throw std::invalid_argument("robot.base_link and robot.tip_link must not be empty");
         }
+        if (!FrameRegistry::validName(robot.id)) throw std::invalid_argument("robot.id must be a valid stable name");
     }
 
     static AppConfig load(const std::string& filename) {
@@ -63,6 +64,8 @@ struct AppConfig {
             config.robot.joint_binding = read(robot, "joint_binding", config.robot.joint_binding);
             config.robot.payload = read(robot, "payload", config.robot.payload);
             config.robot.frames = read(robot, "frames", config.robot.frames);
+            config.robot.tool_library = read(robot, "tool_library", config.robot.tool_library);
+            config.robot.id = read(robot, "id", config.robot.id);
         }
         const auto logging = root["logging"];
         if (logging) {
@@ -98,6 +101,7 @@ struct AppConfig {
         resolve(config.robot.joint_binding);
         resolve(config.robot.payload);
         resolve(config.robot.frames);
+        resolve(config.robot.tool_library);
         resolve(config.scripts);
         resolve(config.web_root);
         resolve(config.logging.directory);

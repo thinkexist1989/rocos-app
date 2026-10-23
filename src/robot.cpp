@@ -609,7 +609,7 @@ namespace rocos {
 
     Robot::Robot() : Robot(Config{}) {}
 
-    Robot::Robot(const Config &config) : frames_(config.frames), log_ptr_(Logger::getInstance("Robot")), impl_(std::make_unique<Impl>(*this)) {
+    Robot::Robot(const Config &config) : frames_(config.frames, config.tool_library, config.id), log_ptr_(Logger::getInstance("Robot")), impl_(std::make_unique<Impl>(*this)) {
         executor = std::make_unique<Executor>();
 
         joint_binding_path_ = config.joint_binding;
@@ -622,6 +622,7 @@ namespace rocos {
         if (std::filesystem::exists(config.frames) && frames_.load() != Result::NoError) {
             throw std::runtime_error("Cannot load configured coordinate frames: " + config.frames);
         }
+        frames_.reloadPackages(false);
 
         // 尝试从配置文件加载已知负载参数（存在则跳过辨识）
         const Result load_rc = LoadLoadParameters();
@@ -738,6 +739,7 @@ namespace rocos {
         snap.active_tool_frame_name = frames->active_tool;
         snap.active_object_frame_name = frames->active_object;
         if (frames->tools.count(frames->active_tool)) snap.active_tool_frame = frames->tools.at(frames->active_tool);
+        if (frames->packages.count(frames->active_tool)) snap.active_tool_package = frames->packages.at(frames->active_tool);
         if (frames->objects.count(frames->active_object)) snap.active_object_frame = frames->objects.at(frames->active_object);
         snap.tcp_valid = flange_result == Result::NoError &&
                          FrameRegistry::resolveTcp(*frames, snap.flange, snap.tcp) == Result::NoError;

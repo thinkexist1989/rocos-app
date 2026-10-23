@@ -1,0 +1,20 @@
+<?xml version="1.0"?>
+<robot name="demo_gripper">
+  <link name="gripper_base">
+    <visual>
+      <origin xyz="0 0 0.03"/>
+      <geometry><box size="0.08 0.06 0.06"/></geometry>
+      <material name="housing"><color rgba="0.18 0.35 0.6 1"/></material>
+    </visual>
+    <visual>
+      <origin xyz="0.03 0 0.09"/>
+      <geometry><mesh filename="package://demo_gripper/meshes/finger.stl"/></geometry>
+      <material name="finger"><color rgba="0.7 0.72 0.75 1"/></material>
+    </visual>
+    <visual>
+      <origin xyz="-0.03 0 0.09"/>
+      <geometry><mesh filename="package://demo_gripper/meshes/finger.stl"/></geometry>
+      <material name="finger"/>
+    </visual>
+  </link>
+</robot>

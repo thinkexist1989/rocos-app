@@ -49,6 +49,8 @@ robot:
   joint_binding: bindings.yaml
   payload: load.yaml
   frames: tools/calibration.yaml
+  id: robot_A
+  tool_library: ../tool-library
 scripts: lua
 web_root: ../web
 )");
@@ -63,6 +65,8 @@ web_root: ../web
     CHECK(config.robot.joint_binding == (directory / "bindings.yaml").string());
     CHECK(config.robot.payload == (directory / "load.yaml").string());
     CHECK(config.robot.frames == (directory / "tools/calibration.yaml").string());
+    CHECK(config.robot.id == "robot_A");
+    CHECK(config.robot.tool_library == (directory.parent_path() / "tool-library").string());
     CHECK(config.scripts == (directory / "lua").string());
     CHECK(config.web_root == (directory.parent_path() / "web").string());
     CHECK(fs::current_path() == directory / "unrelated-cwd");

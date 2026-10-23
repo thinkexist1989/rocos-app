@@ -24,9 +24,11 @@ email: luoyang@sia.cn
 
 cmake_minimum_required(VERSION 3.15)
 project(rocos_app VERSION 3.1.0 DESCRIPTION "ROCOS Application Library")
+find_package(LibArchive REQUIRED)
+find_package(OpenSSL REQUIRED)
 
 # CMake VERSION 仅接受数字；完整 SemVer 版本单独拼接。
-set(ROCOS_APP_VERSION_PRERELEASE "rc.2")
+set(ROCOS_APP_VERSION_PRERELEASE "rc.3")
 set(ROCOS_APP_VERSION_FULL "${PROJECT_VERSION}")
 if(NOT ROCOS_APP_VERSION_PRERELEASE STREQUAL "")
     string(APPEND ROCOS_APP_VERSION_FULL "-${ROCOS_APP_VERSION_PRERELEASE}")
@@ -155,6 +157,8 @@ add_library(robot
         src/robot_http_server.cpp
         src/tool_calibration.cpp
         src/frame_registry.cpp
+        src/tool_package.cpp
+        src/tool_package_http.cpp
         src/joint_binding.cpp
         src/model.cpp
 
@@ -189,6 +193,7 @@ target_include_directories(robot
         )
 target_link_libraries(robot
         PUBLIC
+        LibArchive::LibArchive OpenSSL::Crypto
         ${DEP_LIBS}
         $<BUILD_INTERFACE:rocos::logger>
         $<BUILD_INTERFACE:ruckig::ruckig>
@@ -590,10 +595,14 @@ add_executable(tool_calibration_test test/tool_calibration_test.cc src/tool_cali
 target_include_directories(tool_calibration_test PRIVATE ${CMAKE_SOURCE_DIR} ${CMAKE_SOURCE_DIR}/src)
 target_link_libraries(tool_calibration_test PRIVATE Eigen3::Eigen orocos-kdl)
 add_test(NAME tool_calibration_test COMMAND tool_calibration_test)
-add_executable(frame_registry_test test/frame_registry_test.cc src/frame_registry.cpp)
+add_executable(frame_registry_test test/frame_registry_test.cc src/frame_registry.cpp src/tool_package.cpp)
 target_include_directories(frame_registry_test PRIVATE ${CMAKE_SOURCE_DIR} ${CMAKE_SOURCE_DIR}/src)
-target_link_libraries(frame_registry_test PRIVATE yaml-cpp orocos-kdl)
+target_link_libraries(frame_registry_test PRIVATE yaml-cpp orocos-kdl LibArchive::LibArchive OpenSSL::Crypto tinyxml2)
 add_test(NAME frame_registry_test COMMAND frame_registry_test)
+add_executable(tool_package_test test/tool_package_test.cc src/frame_registry.cpp src/tool_package.cpp)
+target_include_directories(tool_package_test PRIVATE ${CMAKE_SOURCE_DIR} ${CMAKE_SOURCE_DIR}/src)
+target_link_libraries(tool_package_test PRIVATE yaml-cpp orocos-kdl LibArchive::LibArchive OpenSSL::Crypto tinyxml2)
+add_test(NAME tool_package_test COMMAND tool_package_test)
 add_executable(tooling_http_test test/tooling_http_test.cc)
 target_link_libraries(tooling_http_test PRIVATE robot)
 add_test(NAME tooling_http_test COMMAND tooling_http_test)

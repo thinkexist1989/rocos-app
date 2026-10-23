@@ -35,6 +35,8 @@ Viz 的新增、编辑、重命名、删除和激活均发送 `persist: true`，
 
 工具负载在页面中读取和保存控制器全局 `load_params`，质量单位 kg、质心单位米；它与命名 TCP 分开管理。切换工具不会自动切换质量或质心。
 
+带模型的工具包及本机安装覆盖见 [tool_packages.md](tool_packages.md)。包工具的有效偏置为安装变换乘局部 TCP；六点结果保存时由 App 反算局部 TCP，旧 POST tool_frame 仅用于普通工具。`frames.yaml` 会保留 package_tools 绑定，恢复时需要同一工具库的不可变资源快照。
+
 ## 接口衔接
 
 完整协议以 [Apifox 项目 8387612](https://app.apifox.com/project/8387612) 为准。API 版本与 App 发布版本独立。

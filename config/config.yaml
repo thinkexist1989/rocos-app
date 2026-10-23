@@ -12,6 +12,8 @@ robot:
   joint_binding: joint_binding.yaml
   payload: payload.yaml
   frames: frames.yaml
+  id: default
+  tool_library: ../tools
 
 scripts: scripts
 web_root: ../web
