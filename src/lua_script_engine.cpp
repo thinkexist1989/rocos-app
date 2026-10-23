@@ -110,7 +110,7 @@ struct LuaScriptEngine::Impl {
             const sol::error error_ = load_result_;
             state_ = State::Failed;
             this->error_ = error_.what();
-            log_ptr_->error("Lua 脚本编译失败: {}", this->error_);
+            Logger::logCode(LogLevel::Error, "LuaScriptEngine", static_cast<int>(Result::LuaExecutionError), "Lua script compilation failed: {}", this->error_);
             return Result::LuaExecutionError;
         }
 
@@ -152,14 +152,14 @@ struct LuaScriptEngine::Impl {
 
         std::ifstream stream_(script_path_);
         if (!stream_.is_open()) {
-            log_ptr_->error("无法打开 Lua 脚本: {}", script_path_.string());
+            Logger::logCode(LogLevel::Error, "LuaScriptEngine", static_cast<int>(Result::LuaFileError), "Cannot open Lua script file: {}", script_path_.string());
             return Result::LuaFileError;
         }
 
         std::ostringstream buffer_;
         buffer_ << stream_.rdbuf();
         if (stream_.bad()) {
-            log_ptr_->error("读取 Lua 脚本失败: {}", script_path_.string());
+            Logger::logCode(LogLevel::Error, "LuaScriptEngine", static_cast<int>(Result::LuaFileError), "Lua script file read failed: {}", script_path_.string());
             return Result::LuaFileError;
         }
         return LoadSource(buffer_.str(), display_path_.generic_string());
@@ -238,7 +238,7 @@ struct LuaScriptEngine::Impl {
             std::lock_guard<std::mutex> lock(mutex_);
             state_ = State::Loaded;
             error_ = exception_.what();
-            log_ptr_->error("启动 Lua worker 失败: {}", this->error_);
+            Logger::logCode(LogLevel::Error, "LuaScriptEngine", static_cast<int>(Result::ResourceUnavailable), "Cannot start Lua worker thread: {}", this->error_);
             return Result::ResourceUnavailable;
         }
         return Result::NoError;
@@ -371,8 +371,7 @@ struct LuaScriptEngine::Impl {
                 state_ = State::Loaded;
                 step_mode_ = false;
                 error_ = exception_.what();
-                log_ptr_->error(
-                    "启动 Lua worker 失败: {}", this->error_);
+                Logger::logCode(LogLevel::Error, "LuaScriptEngine", static_cast<int>(Result::ResourceUnavailable), "Cannot start Lua worker thread: {}", this->error_);
                 return Result::ResourceUnavailable;
             }
             return Result::NoError;
@@ -481,14 +480,14 @@ private:
                 const int joint_count_ = robot_.getJointNum();
                 if (joint_count_ <= 0 ||
                     joints.size() != static_cast<std::size_t>(joint_count_)) {
-                    throw sol::error("MoveJ 关节数量与机器人不匹配");
+                    throw sol::error("MoveJ joint count does not match the robot.");
                 }
 
                 JntArray target_(static_cast<unsigned int>(joint_count_));
                 for (int index_ = 0; index_ < joint_count_; ++index_) {
                     const sol::object value_ = joints[index_ + 1];
                     if (!value_.is<double>()) {
-                        throw sol::error("MoveJ 关节值必须为 number");
+                        throw sol::error("MoveJ joint positions must be numeric.");
                     }
                     target_(static_cast<unsigned int>(index_)) =
                         requireFinite(value_.as<double>(), "MoveJ joint");
@@ -560,7 +559,7 @@ private:
             "GetJointPosition", [this](int index) {
                 const int joint_count_ = robot_.getJointNum();
                 if (index <= 0 || index > joint_count_) {
-                    throw sol::error("joint index 超出范围");
+                    throw sol::error("Joint index is out of range.");
                 }
                 return robot_.getJointPosition(index - 1);
             });
@@ -640,7 +639,7 @@ private:
                 const int joint_count_ = robot_.getJointNum();
                 if (joint_count_ <= 0 ||
                     joints.size() != static_cast<std::size_t>(joint_count_)) {
-                    throw sol::error("MoveL_FK 关节数量与机器人不匹配");
+                    throw sol::error("MoveL_FK joint count does not match the robot.");
                 }
                 executeMotion(robot_.MoveL_FK(
                     toJntArray(joints, "MoveL_FK"),
@@ -872,7 +871,7 @@ private:
             } else {
                 state_ = State::Failed;
                 error_ = exception_.what();
-                log_ptr_->error("Lua 脚本执行失败: {}", error_);
+                Logger::logCode(LogLevel::Error, "LuaScriptEngine", static_cast<int>(Result::LuaExecutionError), "Lua script execution failed: {}", error_);
             }
         }
         control_cv_.notify_all();
@@ -881,7 +880,7 @@ private:
     void executeMotion(Result result) {
         if (result != Result::NoError && result != Result::PlanFinished) {
             throw sol::error(
-                "机器人运动提交失败: " + to_string(result));
+                "Robot motion submission failed: " + to_string(result));
         }
         if (result == Result::PlanFinished) {
             return;
@@ -901,7 +900,7 @@ private:
                 std::lock_guard<std::mutex> lock(mutex_);
                 motion_active_ = false;
                 throw sol::error(
-                    "暂停机器人运动失败: " + to_string(pause_result_));
+                    "Robot motion pause failed: " + to_string(pause_result_));
             }
             std::lock_guard<std::mutex> lock(mutex_);
             state_ = State::Paused;
@@ -915,10 +914,10 @@ private:
         }
 
         if (wait_result_ == Result::Fatal) {
-            throw sol::error("机器人运动异常终止，状态: ERROR_STATE");
+            throw sol::error("Robot motion terminated in ERROR_STATE.");
         }
         if (wait_result_ == Result::NotEnabled) {
-            throw sol::error("机器人运动异常终止，状态: IDLE");
+            throw sol::error("Robot motion terminated in IDLE.");
         }
 
         bool should_stop_ = false;
@@ -933,7 +932,7 @@ private:
 
     void sleepInterruptibly(int milliseconds) {
         if (milliseconds < 0) {
-            throw sol::error("Sleep 时长不能为负数");
+            throw sol::error("Sleep duration must be nonnegative.");
         }
 
         auto remaining_ = std::chrono::milliseconds(milliseconds);
@@ -968,7 +967,7 @@ private:
 
     static double requireFinite(double value, const char* name) {
         if (!std::isfinite(value)) {
-            throw sol::error(std::string(name) + " 包含 NaN 或 Inf");
+            throw sol::error(std::string(name) + " contains NaN or infinity.");
         }
         return value;
     }
@@ -976,7 +975,7 @@ private:
     static double requirePositive(double value, const char* name) {
         requireFinite(value, name);
         if (value <= 0.0) {
-            throw sol::error(std::string(name) + " 必须大于 0");
+            throw sol::error(std::string(name) + " must be greater than zero.");
         }
         return value;
     }
@@ -984,7 +983,7 @@ private:
     // 将 Robot 控制接口的返回值统一转为 Lua 错误，与运动提交行为保持一致
     static void requireSuccess(Result result, const char* operation) {
         if (result != Result::NoError) {
-            throw sol::error(std::string(operation) + " 失败: " +
+            throw sol::error(std::string(operation) + " failed: " +
                              to_string(result));
         }
     }
@@ -992,7 +991,7 @@ private:
     static double tableNumber(const sol::table& table, const char* key) {
         const sol::object value_ = table[key];
         if (!value_.is<double>()) {
-            throw sol::error(std::string("pose.") + key + " 必须为 number");
+            throw sol::error(std::string("pose.") + key + " must be numeric.");
         }
         return requireFinite(value_.as<double>(), key);
     }
@@ -1011,7 +1010,7 @@ private:
             pose_.qx * pose_.qx + pose_.qy * pose_.qy +
             pose_.qz * pose_.qz + pose_.qw * pose_.qw);
         if (norm_ <= 1e-12) {
-            throw sol::error("pose quaternion 不能为零");
+            throw sol::error("Pose quaternion must have nonzero norm.");
         }
 
         return Frame(
@@ -1029,7 +1028,7 @@ private:
     int checkedJointIndex(int index) const {
         const int joint_count_ = robot_.getJointNum();
         if (index <= 0 || index > joint_count_) {
-            throw sol::error("joint index 超出范围");
+            throw sol::error("Joint index is out of range.");
         }
         return index - 1;
     }
@@ -1038,13 +1037,13 @@ private:
     static JntArray toJntArray(const sol::table& joints, const char* name) {
         const std::size_t count_ = joints.size();
         if (count_ == 0) {
-            throw sol::error(std::string(name) + " 关节数组不能为空");
+            throw sol::error(std::string(name) + " joint array must not be empty.");
         }
         JntArray result_(static_cast<unsigned int>(count_));
         for (std::size_t i = 0; i < count_; ++i) {
             const sol::object value_ = joints[i + 1];
             if (!value_.is<double>()) {
-                throw sol::error(std::string(name) + " 关节值必须为 number");
+                throw sol::error(std::string(name) + " joint positions must be numeric.");
             }
             result_(static_cast<unsigned int>(i)) =
                 requireFinite(value_.as<double>(), name);
@@ -1058,7 +1057,7 @@ private:
         const sol::object y_ = table["y"];
         const sol::object z_ = table["z"];
         if (!x_.is<double>() || !y_.is<double>() || !z_.is<double>()) {
-            throw sol::error("向量必须包含 number 字段 x/y/z");
+            throw sol::error("Vector must contain numeric x, y and z fields.");
         }
         return Vector(requireFinite(x_.as<double>(), "x"),
                       requireFinite(y_.as<double>(), "y"),

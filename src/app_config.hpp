@@ -7,6 +7,7 @@
 #include <string>
 
 #include "robot.hpp"
+#include "diagnostics_http_server.hpp"
 
 namespace rocos {
 
@@ -14,11 +15,16 @@ struct AppConfig {
     std::string http_host{"0.0.0.0"};
     int http_port{8080};
     int http_control_ttl_seconds{300};
+    LoggingConfig logging;
+    DiagnosticsConfig diagnostics;
     Robot::Config robot;
     std::string scripts{"scripts"};
     std::string web_root{"../web"};
 
     void validate() const {
+        logging.validate();
+        diagnostics.validate();
+        if (diagnostics.port == 0 || diagnostics.port == http_port) throw std::invalid_argument("diagnostics.port must be nonzero and differ from http_port");
         if (http_host.empty()) throw std::invalid_argument("http_host must not be empty");
         if (http_port < 1 || http_port > 65535) throw std::invalid_argument("http_port must be in [1, 65535]");
         if (http_control_ttl_seconds <= 0) {
@@ -56,6 +62,31 @@ struct AppConfig {
             config.robot.tip_link = read(robot, "tip_link", config.robot.tip_link);
             config.robot.joint_binding = read(robot, "joint_binding", config.robot.joint_binding);
             config.robot.payload = read(robot, "payload", config.robot.payload);
+            config.robot.frames = read(robot, "frames", config.robot.frames);
+        }
+        const auto logging = root["logging"];
+        if (logging) {
+            if (!logging.IsMap()) throw std::invalid_argument("logging must contain a mapping");
+            config.logging.directory = read(logging, "directory", std::string("../logs"));
+            config.logging.file_level = parseLogLevel(read(logging, "file_level", std::string("info")));
+            config.logging.console_level = parseLogLevel(read(logging, "console_level", std::string("info")));
+            const auto mib = read(logging, "max_file_size_mib", 50);
+            const auto files = read(logging, "max_files", 20);
+            if (mib < 1 || mib > 1024 || files < 1) throw std::invalid_argument("Invalid logging file limits");
+            config.logging.max_file_size = static_cast<size_t>(mib) * 1024 * 1024;
+            config.logging.max_files = static_cast<size_t>(files);
+            config.logging.flush_interval_ms = read(logging, "flush_interval_ms", 1000);
+        } else config.logging.directory = "../logs";
+        const auto diagnostics = root["diagnostics"];
+        if (diagnostics) {
+            if (!diagnostics.IsMap()) throw std::invalid_argument("diagnostics must contain a mapping");
+            config.diagnostics.host = read(diagnostics, "host", config.diagnostics.host);
+            config.diagnostics.port = read(diagnostics, "port", config.diagnostics.port);
+            const auto clients = read(diagnostics, "max_sse_clients", 4);
+            const auto downloads = read(diagnostics, "max_downloads", 1);
+            if (clients < 1 || downloads < 1) throw std::invalid_argument("Invalid diagnostics quotas");
+            config.diagnostics.max_sse_clients = clients;
+            config.diagnostics.max_downloads = downloads;
         }
         // 相对路径统一以启动配置所在目录为基准，不依赖进程工作目录。
         auto resolve = [&](std::string& path) {
@@ -66,8 +97,10 @@ struct AppConfig {
         resolve(config.robot.urdf);
         resolve(config.robot.joint_binding);
         resolve(config.robot.payload);
+        resolve(config.robot.frames);
         resolve(config.scripts);
         resolve(config.web_root);
+        resolve(config.logging.directory);
         config.validate();
         return config;
     }

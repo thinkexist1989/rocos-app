@@ -193,9 +193,10 @@ rocos::JntArray makeConstJntArray(unsigned int n, double val = 0.0) {
 // ==========================================================================
 
 TEST_CASE("JointImpedanceController - SetHardware / SetModel") {
-    rocos::JointImpedanceController ctrl;
+    // 控制器析构会访问依赖，硬件和模型必须先构造、后销毁。
     FakeHardware hw;
     FakeModel model;
+    rocos::JointImpedanceController ctrl;
 
     SUBCASE("SetHardware nullptr → ParameterPointerEqualsNullptr") {
         CHECK(ctrl.SetHardware(nullptr) == rocos::Result::ParameterPointerEqualsNullptr);
@@ -273,8 +274,9 @@ TEST_CASE("JointImpedanceController - 增益设置") {
 // ==========================================================================
 
 TEST_CASE("JointImpedanceController - GenerateCmd") {
-    rocos::JointImpedanceController ctrl;
     FakeHardware hw;
+    FakeModel model;
+    rocos::JointImpedanceController ctrl;
     hw.fake_position_ = makeJntArray(3);
     ctrl.SetHardware(&hw);
 
@@ -287,7 +289,6 @@ TEST_CASE("JointImpedanceController - GenerateCmd") {
     }
 
     SUBCASE("Frame → IK") {
-        FakeModel model;
         ctrl.SetModel(&model);
         rocos::Frame frame;
         rocos::Reference ref = frame;
@@ -301,9 +302,9 @@ TEST_CASE("JointImpedanceController - GenerateCmd") {
 // ==========================================================================
 
 TEST_CASE("JointImpedanceController - UpdateCmd 力矩计算") {
-    rocos::JointImpedanceController ctrl;
     FakeHardware hw;
     FakeModel model;
+    rocos::JointImpedanceController ctrl;
     model.grav_torque_ = 5.0;    // τ_grav = 5.0 Nm per joint
 
     SUBCASE("无 hardware → 报错") {
@@ -502,9 +503,9 @@ TEST_CASE("JointImpedanceController - destructor routes through UpdateCmd") {
 // ==========================================================================
 
 TEST_CASE("JointImpedanceController - CST 模式") {
-    rocos::JointImpedanceController ctrl;
     FakeHardware hw;
     FakeModel model;
+    rocos::JointImpedanceController ctrl;
     hw.fake_position_ = makeConstJntArray(3, 0.0);
     hw.fake_velocity_ = makeConstJntArray(3, 0.0);
     ctrl.SetHardware(&hw);

@@ -11,6 +11,21 @@ robot:
   tip_link: link_7
   joint_binding: joint_binding.yaml
   payload: payload.yaml
+  frames: frames.yaml
 
 scripts: scripts
 web_root: ../web
+
+logging:
+  directory: ../logs
+  file_level: info
+  console_level: info
+  max_file_size_mib: 50
+  max_files: 20
+  flush_interval_ms: 1000
+
+diagnostics:
+  host: "0.0.0.0"
+  port: 8082
+  max_sse_clients: 4
+  max_downloads: 1

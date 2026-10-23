@@ -178,6 +178,12 @@ RobotHttpServer::RobotHttpServer(Robot* robot, LuaScriptEngine* script_engine, i
         throw std::invalid_argument("control_ttl_seconds must be positive");
     }
 
+    frame_registry_ = robot ? &robot->frames_ : nullptr;
+    tool_motion_busy_ = [robot] { return !robot || robot->IsMotionBusy(); };
+    calibration_capture_ = [robot](ToolCalibrationSample& sample) {
+        if (!robot) return Result::ResourceUnavailable;
+        return robot->CaptureCalibrationPose(sample.flange, sample.joints, sample.timestamp);
+    };
     log_ptr_ = Logger::getInstance("HttpServer");
 
     // Start worker thread pool
@@ -2136,13 +2142,12 @@ void RobotHttpServer::handleJogStop(const httplib::Request& req, httplib::Respon
 // Frame Management Handlers
 // ============================================================================
 
-void RobotHttpServer::handleGetToolFrameNames(const httplib::Request& req, httplib::Response& res) {
-    log_ptr_->info("GET /api/robot/tool_frames");
-
-    nlohmann::json data;
-    data["names"] = robot_->GetToolFrameNames();
-    data["active"] = robot_->GetActiveToolFrameName();
-    sendJson(res, true, 0, "ok", data);
+void RobotHttpServer::handleGetToolFrameNames(const httplib::Request&, httplib::Response& res) {
+    if (!frame_registry_) { sendJson(res, false, -3001, "Tool registry is unavailable"); return; }
+    const auto state = frame_registry_->snapshot();
+    std::vector<std::string> names;
+    for (const auto& tool : state->tools) names.push_back(tool.first);
+    sendJson(res, true, 0, "ok", {{"names", names}, {"active", state->active_tool}, {"file_path", frame_registry_->path()}});
 }
 
 void RobotHttpServer::handleGetObjectFrameNames(const httplib::Request& req, httplib::Response& res) {
@@ -2155,21 +2160,13 @@ void RobotHttpServer::handleGetObjectFrameNames(const httplib::Request& req, htt
 }
 
 void RobotHttpServer::handleGetToolFrame(const httplib::Request& req, httplib::Response& res) {
-    const std::string name = req.get_param_value("name");
-    log_ptr_->info("GET /api/robot/tool_frame name={}", name);
-    if (name.empty()) {
-        sendJson(res, false, 1001, "Missing 'name' query parameter");
-        return;
-    }
-
+    const auto name = req.get_param_value("name");
+    if (name.empty()) { sendJson(res, false, 1001, "Missing 'name' query parameter"); return; }
+    if (!frame_registry_) { sendJson(res, false, -3001, "Tool registry is unavailable"); return; }
     Frame frame;
-    const Result result = robot_->GetToolFrame(name, frame);
-    nlohmann::json data;
-    data["name"] = name;
-    if (resultSucceeded(result)) data["frame"] = frameToJson(frame);
-    sendJson(res, resultSucceeded(result), resultCode(result),
-             resultSucceeded(result) ? "ok" : "Tool frame not found",
-             data);
+    const auto result = frame_registry_->get(name, true, frame);
+    sendJson(res, resultSucceeded(result), resultCode(result), resultSucceeded(result) ? "ok" : "Tool frame not found",
+             resultSucceeded(result) ? nlohmann::json{{"name", name}, {"frame", frameToJson(frame)}} : nlohmann::json());
 }
 
 void RobotHttpServer::handleGetObjectFrame(const httplib::Request& req, httplib::Response& res) {
@@ -2191,30 +2188,69 @@ void RobotHttpServer::handleGetObjectFrame(const httplib::Request& req, httplib:
 }
 
 void RobotHttpServer::handleSetPoseFrame(const httplib::Request& req, httplib::Response& res) {
-    log_ptr_->info("POST /api/calibration/pose");
-    if (!ensureControl(req, res)) return;
-    sendJson(res, false, 1004, "Pose frame calibration endpoint is not implemented");
+    std::unique_lock<std::recursive_mutex> state_lock;
+    if (!prepareToolMutation(req, res, state_lock)) return;
+    const auto body = nlohmann::json::parse(req.body, nullptr, false);
+    if (!body.is_object() || !body.contains("index") || !body["index"].is_number_integer() ||
+        body["index"].get<int64_t>() < 1 || body["index"].get<int64_t>() > 6 ||
+        !body.contains("name") || !body["name"].is_string() ||
+        !FrameRegistry::validName(body["name"].get<std::string>()) ||
+        (body.contains("session_id") && !body["session_id"].is_string())) {
+        sendJson(res, false, 1001, "Expected a valid tool name, index in [1,6] and optional session_id"); return;
+    }
+    const auto name = body["name"].get<std::string>();
+    const auto id = body.value("session_id", std::string());
+    const int index = body["index"].get<int>();
+    std::lock_guard<std::mutex> lock(calibration_mutex_);
+    auto found = calibration_sessions_.find(id);
+    if (!id.empty() && (found == calibration_sessions_.end() || found->second.owner_token != req.get_header_value(CONTROL_TOKEN_HEADER))) {
+        sendJson(res, false, 4004, "Calibration session is unavailable for this control session; start again"); return;
+    }
+    if (id.empty() && index != 1) { sendJson(res, false, 4001, "Start a new calibration by capturing point 1"); return; }
+    if (!id.empty() && found->second.name != name) { sendJson(res, false, 1001, "Tool name does not match calibration session"); return; }
+    ToolCalibrationSample sample;
+    const auto result = calibration_capture_(sample);
+    if (result != Result::NoError || !FrameRegistry::validFrame(sample.flange) || sample.joints.empty() ||
+        !std::isfinite(sample.timestamp) || sample.timestamp <= 0 ||
+        !std::all_of(sample.joints.begin(), sample.joints.end(), [](double value) { return std::isfinite(value); })) {
+        sendJson(res, false, 4005, "Cannot capture a valid stationary flange pose; stop motion and check controller state"); return;
+    }
+    if (id.empty()) {
+        if (calibration_sessions_.size() >= 16) {
+            auto oldest = std::min_element(calibration_sessions_.begin(), calibration_sessions_.end(),
+                [](const auto& a, const auto& b) { return a.second.created < b.second.created; });
+            calibration_sessions_.erase(oldest);
+        }
+        CalibrationSession session;
+        session.id = "cal-" + generateControlToken(); session.name = name;
+        session.owner_token = req.get_header_value(CONTROL_TOKEN_HEADER);
+        session.created = ++calibration_counter_;
+        found = calibration_sessions_.emplace(session.id, std::move(session)).first;
+    }
+    found->second.samples[index - 1] = std::move(sample);
+    found->second.result.reset();
+    sendJson(res, true, 0, "Calibration point captured", calibrationSessionJson(found->second));
 }
 
 void RobotHttpServer::handleSetToolFrame(const httplib::Request& req, httplib::Response& res) {
-    log_ptr_->info("POST /api/robot/tool_frame");
-    if (!ensureControl(req, res)) return;
-
-    nlohmann::json body = nlohmann::json::parse(req.body, nullptr, false);
+    std::unique_lock<std::recursive_mutex> state_lock;
+    if (!prepareToolMutation(req, res, state_lock)) return;
+    const auto body = nlohmann::json::parse(req.body, nullptr, false);
     std::string name;
     Frame frame;
-    if (!parseNamedFrameBody(body, name, frame)) {
-        sendJson(res, false, 1001, "Invalid JSON or missing 'name' and 'frame' fields");
-        return;
+    try {
+        if (!body.is_object() || !parseNamedFrameBody(body, name, frame) ||
+            (body.contains("persist") && !body["persist"].is_boolean()) ||
+            (body.contains("previous_name") && !body["previous_name"].is_string())) {
+            sendJson(res, false, 1001, "Expected name, a valid frame, and optional boolean persist"); return;
+        }
+    } catch (const nlohmann::json::exception&) {
+        sendJson(res, false, 1001, "Invalid tool pose values"); return;
     }
-
-    const Result result = robot_->SetToolFrame(name, frame);
-    nlohmann::json data;
-    data["name"] = name;
-    data["frame"] = frameToJson(frame);
-    sendJson(res, resultSucceeded(result), resultCode(result),
-             resultSucceeded(result) ? "Tool frame set" : "Tool frame set failed",
-             data);
+    const bool persist = body.value("persist", false);
+    const auto result = frame_registry_->set(name, frame, true, false, persist, body.value("previous_name", std::string()));
+    sendJson(res, resultSucceeded(result), resultCode(result), resultSucceeded(result) ? "Tool frame saved" : "Tool save failed; previous registry retained",
+             {{"name", name}, {"frame", frameToJson(frame)}, {"persisted", resultSucceeded(result) && persist}});
 }
 
 void RobotHttpServer::handleSetObjectFrame(const httplib::Request& req, httplib::Response& res) {
@@ -2239,21 +2275,16 @@ void RobotHttpServer::handleSetObjectFrame(const httplib::Request& req, httplib:
 }
 
 void RobotHttpServer::handleRemoveToolFrame(const httplib::Request& req, httplib::Response& res) {
-    const std::string name = req.get_param_value("name");
-    log_ptr_->info("DELETE /api/robot/tool_frame name={}", name);
-    if (!ensureControl(req, res)) return;
-    if (name.empty()) {
-        sendJson(res, false, 1001, "Missing 'name' query parameter");
-        return;
+    std::unique_lock<std::recursive_mutex> state_lock;
+    if (!prepareToolMutation(req, res, state_lock)) return;
+    const auto name = req.get_param_value("name"), persist_text = req.get_param_value("persist");
+    if (name.empty() || (!persist_text.empty() && persist_text != "true" && persist_text != "false")) {
+        sendJson(res, false, 1001, "Expected name and optional true/false persist query"); return;
     }
-
-    const Result result = robot_->RemoveToolFrame(name);
-    nlohmann::json data;
-    data["name"] = name;
-    data["active"] = robot_->GetActiveToolFrameName();
-    sendJson(res, resultSucceeded(result), resultCode(result),
-             resultSucceeded(result) ? "Tool frame removed" : "Tool frame remove failed",
-             data);
+    const bool persist = persist_text == "true";
+    const auto result = frame_registry_->remove(name, true, persist);
+    sendJson(res, resultSucceeded(result), resultCode(result), resultSucceeded(result) ? "Tool frame removed" : "Tool removal failed; previous registry retained",
+             {{"name", name}, {"active", frame_registry_->snapshot()->active_tool}, {"persisted", resultSucceeded(result) && persist}});
 }
 
 void RobotHttpServer::handleRemoveObjectFrame(const httplib::Request& req, httplib::Response& res) {
@@ -2275,22 +2306,17 @@ void RobotHttpServer::handleRemoveObjectFrame(const httplib::Request& req, httpl
 }
 
 void RobotHttpServer::handleSetActiveToolFrame(const httplib::Request& req, httplib::Response& res) {
-    log_ptr_->info("POST /api/robot/active_tool_frame");
-    if (!ensureControl(req, res)) return;
-
-    nlohmann::json body = nlohmann::json::parse(req.body, nullptr, false);
-    if (body.is_discarded() || !body.contains("name") || !body["name"].is_string()) {
-        sendJson(res, false, 1001, "Invalid JSON or missing 'name' field");
-        return;
+    std::unique_lock<std::recursive_mutex> state_lock;
+    if (!prepareToolMutation(req, res, state_lock)) return;
+    const auto body = nlohmann::json::parse(req.body, nullptr, false);
+    if (!body.is_object() || !body.contains("name") || !body["name"].is_string() ||
+        (body.contains("persist") && !body["persist"].is_boolean())) {
+        sendJson(res, false, 1001, "Expected name and optional boolean persist"); return;
     }
-
-    const std::string name = body["name"].get<std::string>();
-    const Result result = robot_->SetActiveToolFrame(name);
-    nlohmann::json data;
-    data["active"] = robot_->GetActiveToolFrameName();
-    sendJson(res, resultSucceeded(result), resultCode(result),
-             resultSucceeded(result) ? "Active tool frame set" : "Active tool frame set failed",
-             data);
+    const bool persist = body.value("persist", false);
+    const auto result = frame_registry_->activate(body["name"].get<std::string>(), true, persist);
+    sendJson(res, resultSucceeded(result), resultCode(result), resultSucceeded(result) ? "Active tool frame set" : "Tool activation failed; previous registry retained",
+             {{"active", frame_registry_->snapshot()->active_tool}, {"persisted", resultSucceeded(result) && persist}});
 }
 
 void RobotHttpServer::handleSetActiveObjectFrame(const httplib::Request& req, httplib::Response& res) {
@@ -2313,64 +2339,106 @@ void RobotHttpServer::handleSetActiveObjectFrame(const httplib::Request& req, ht
 }
 
 void RobotHttpServer::handleLoadFrames(const httplib::Request& req, httplib::Response& res) {
-    log_ptr_->info("POST /api/robot/frames/load");
-    if (!ensureControl(req, res)) return;
-
-    nlohmann::json body = nlohmann::json::parse(req.body, nullptr, false);
-    if (body.is_discarded() || !body.contains("path") || !body["path"].is_string()) {
-        sendJson(res, false, 1001, "Invalid JSON or missing 'path' field");
-        return;
+    std::unique_lock<std::recursive_mutex> state_lock;
+    if (!prepareToolMutation(req, res, state_lock)) return;
+    const auto body = nlohmann::json::parse(req.body.empty() ? "{}" : req.body, nullptr, false);
+    if (!body.is_object() || (body.contains("path") && !body["path"].is_string())) {
+        sendJson(res, false, 1001, "Expected an optional string path"); return;
     }
-
-    const std::string path = body["path"].get<std::string>();
-    const Result result = robot_->LoadFrames(path);
-    nlohmann::json data;
-    data["path"] = path;
-    data["tool_frames"] = robot_->GetToolFrameNames();
-    data["object_frames"] = robot_->GetObjectFrameNames();
-    data["active_tool_frame"] = robot_->GetActiveToolFrameName();
-    data["active_object_frame"] = robot_->GetActiveObjectFrameName();
-    sendJson(res, resultSucceeded(result), resultCode(result),
-             resultSucceeded(result) ? "Frames loaded" : "Frames load failed",
-             data);
+    const auto path = body.value("path", std::string());
+    const auto result = frame_registry_->load(path);
+    const auto state = frame_registry_->snapshot();
+    sendJson(res, resultSucceeded(result), resultCode(result), resultSucceeded(result) ? "Frames loaded" : "Frames load failed",
+             {{"path", path.empty() ? frame_registry_->path() : path}, {"tool_frames", frame_registry_->names(true)},
+               {"object_frames", frame_registry_->names(false)}, {"active_tool_frame", state->active_tool}, {"active_object_frame", state->active_object}});
 }
 
 void RobotHttpServer::handleSaveFrames(const httplib::Request& req, httplib::Response& res) {
-    log_ptr_->info("POST /api/robot/frames/save");
-    if (!ensureControl(req, res)) return;
-
-    nlohmann::json body = nlohmann::json::parse(req.body, nullptr, false);
-    if (body.is_discarded() || !body.contains("path") || !body["path"].is_string()) {
-        sendJson(res, false, 1001, "Invalid JSON or missing 'path' field");
-        return;
+    std::unique_lock<std::recursive_mutex> state_lock;
+    if (!prepareToolMutation(req, res, state_lock)) return;
+    const auto body = nlohmann::json::parse(req.body.empty() ? "{}" : req.body, nullptr, false);
+    if (!body.is_object() || (body.contains("path") && !body["path"].is_string())) {
+        sendJson(res, false, 1001, "Expected an optional string path"); return;
     }
-
-    const std::string path = body["path"].get<std::string>();
-    const Result result = robot_->SaveFrames(path);
-    nlohmann::json data;
-    data["path"] = path;
-    data["tool_frames"] = robot_->GetToolFrameNames();
-    data["object_frames"] = robot_->GetObjectFrameNames();
-    data["active_tool_frame"] = robot_->GetActiveToolFrameName();
-    data["active_object_frame"] = robot_->GetActiveObjectFrameName();
-    sendJson(res, resultSucceeded(result), resultCode(result),
-             resultSucceeded(result) ? "Frames saved" : "Frames save failed",
-             data);
+    const auto path = body.value("path", std::string());
+    const auto result = frame_registry_->save(path);
+    const auto state = frame_registry_->snapshot();
+    sendJson(res, resultSucceeded(result), resultCode(result), resultSucceeded(result) ? "Frames saved" : "Frames save failed",
+             {{"path", path.empty() ? frame_registry_->path() : path}, {"tool_frames", frame_registry_->names(true)},
+               {"object_frames", frame_registry_->names(false)}, {"active_tool_frame", state->active_tool}, {"active_object_frame", state->active_object}});
 }
 
-// ============================================================================
-// Calibration Handlers
-// ============================================================================
-
 void RobotHttpServer::handleCalibrationRun(const httplib::Request& req, httplib::Response& res) {
-    log_ptr_->info("POST /api/calibration/run");
-    if (!ensureControl(req, res)) return;
-    sendJson(res, false, 1004, "Calibration run endpoint is not implemented");
+    std::unique_lock<std::recursive_mutex> state_lock;
+    if (!prepareToolMutation(req, res, state_lock)) return;
+    const auto body = nlohmann::json::parse(req.body, nullptr, false);
+    if (!body.is_object() || !body.contains("session_id") || !body["session_id"].is_string() ||
+        (body.contains("max_error") && !body["max_error"].is_number())) {
+        sendJson(res, false, 1001, "Expected session_id and optional max_error in metres"); return;
+    }
+    const double tolerance = body.value("max_error", 0.001);
+    if (!std::isfinite(tolerance) || tolerance <= 0 || tolerance > 0.05) {
+        sendJson(res, false, 1001, "max_error must be in (0, 0.05] m"); return;
+    }
+    std::lock_guard<std::mutex> lock(calibration_mutex_);
+    auto found = calibration_sessions_.find(body["session_id"].get<std::string>());
+    if (found == calibration_sessions_.end() || found->second.owner_token != req.get_header_value(CONTROL_TOKEN_HEADER)) {
+        sendJson(res, false, 4004, "Calibration session is unavailable for this control session; start again"); return;
+    }
+    auto& session = found->second;
+    session.result.reset();
+    std::array<KDL::Frame, 6> poses;
+    for (size_t i = 0; i < poses.size(); ++i) {
+        if (!session.samples[i]) { sendJson(res, false, 4001, "Capture all six points before calculating"); return; }
+        poses[i] = session.samples[i]->flange;
+    }
+    ToolCalibrationSolution solution;
+    std::string error;
+    if (!solveSixPointTool(poses, tolerance, solution, error)) {
+        sendJson(res, false, 4002, error, calibrationSessionJson(session)); return;
+    }
+    session.result = solution;
+    sendJson(res, true, 0, "Tool calibration calculated; save the result to a tool explicitly", calibrationSessionJson(session));
 }
 
 void RobotHttpServer::handleCalibrationResult(const httplib::Request& req, httplib::Response& res) {
-    log_ptr_->info("GET /api/calibration/result");
-    sendJson(res, false, 1004, "Calibration result endpoint is not implemented");
+    const auto id = req.get_param_value("session_id");
+    if (id.empty()) { sendJson(res, false, 1001, "Missing session_id query parameter"); return; }
+    std::lock_guard<std::mutex> lock(calibration_mutex_);
+    const auto found = calibration_sessions_.find(id);
+    if (found == calibration_sessions_.end()) { sendJson(res, false, 4004, "Calibration session not found"); return; }
+    sendJson(res, true, 0, "ok", calibrationSessionJson(found->second));
+}
+
+bool RobotHttpServer::prepareToolMutation(const httplib::Request& req, httplib::Response& res, std::unique_lock<std::recursive_mutex>& state_lock) {
+    if (!ensureControl(req, res)) return false;
+    if (!frame_registry_) { sendJson(res, false, -3001, "Tool registry is unavailable"); return false; }
+    if (robot_) state_lock = robot_->LockToolState();
+    if ((robot_ && !robot_->CanChangeToolState()) || (tool_motion_busy_ && tool_motion_busy_())) {
+        sendJson(res, false, 4005, "Stop robot motion before changing tools or capturing calibration points"); return false;
+    }
+    return true;
+}
+
+nlohmann::json RobotHttpServer::calibrationSessionJson(const CalibrationSession& session) {
+    nlohmann::json samples = nlohmann::json::array();
+    size_t captured = 0;
+    for (size_t i = 0; i < session.samples.size(); ++i) {
+        if (!session.samples[i]) { samples.push_back(nullptr); continue; }
+        ++captured;
+        const auto& sample = *session.samples[i];
+        samples.push_back({{"index", i + 1}, {"flange", frameToJson(sample.flange)},
+                           {"joints", sample.joints}, {"timestamp", sample.timestamp}});
+    }
+    nlohmann::json result;
+    if (session.result) {
+        const auto& value = *session.result;
+        result = {{"pose", frameToJson(value.frame)}, {"error_state", false},
+                  {"metrics", {{"rms_error", value.rms_error}, {"max_error", value.max_error},
+                               {"condition_number", value.condition_number}, {"axis_angle_degrees", value.axis_angle_degrees}}}};
+    }
+    return {{"session_id", session.id}, {"name", session.name}, {"samples", samples},
+            {"captured", captured}, {"result", result}};
 }
 
 }  // namespace rocos

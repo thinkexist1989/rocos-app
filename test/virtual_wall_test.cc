@@ -90,6 +90,15 @@ public:
 ///        IK 反之，便于测试 Cartesian ↔ Joint 互转
 class FakeFKModel : public rocos::ModelInterface {
 public:
+    explicit FakeFKModel(unsigned int joints = 7)
+        : lower_(joints), upper_(joints), velocity_(joints) {
+        for (unsigned int i = 0; i < joints; ++i) {
+            lower_(i) = -10.0;
+            upper_(i) = 10.0;
+            velocity_(i) = 10.0;
+        }
+    }
+
     bool fk_should_fail_{false};
     bool ik_should_fail_{false};
 
@@ -141,8 +150,14 @@ public:
         return rocos::Result::NoError;
     }
 
-    int GetJointNum() const override { return 7; }
+    int GetJointNum() const override { return static_cast<int>(lower_.rows()); }
     std::vector<std::string> GetJointNames() const override { return {}; }
+    const rocos::JntArray& GetPosLowerLimit() const override { return lower_; }
+    const rocos::JntArray& GetPosUpperLimit() const override { return upper_; }
+    const rocos::JntArray& GetVelocityLimit() const override { return velocity_; }
+
+private:
+    rocos::JntArray lower_, upper_, velocity_;
 };
 
 class FakeController : public rocos::ControllerInterface {
@@ -703,7 +718,7 @@ TEST_CASE("VW - SetEnabled / IsEnabled") {
 
 TEST_CASE("VW - 包装 PositionController") {
     auto posCtrl = std::make_unique<rocos::PositionController>();
-    FakeFKModel model;
+    FakeFKModel model(6);
     FakeHardware hw;
     hw.fake_position_ = makeJntAt(1, 2, 3);
 

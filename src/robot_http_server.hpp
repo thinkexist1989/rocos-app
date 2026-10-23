@@ -34,6 +34,8 @@
 
 #include "logger.hpp"
 #include "robot.hpp"
+#include "tool_calibration.hpp"
+#include <optional>
 
 namespace rocos {
 
@@ -121,6 +123,14 @@ private:
     // ---- Calibration ----
     void handleCalibrationRun(const httplib::Request& req, httplib::Response& res);
     void handleCalibrationResult(const httplib::Request& req, httplib::Response& res);
+    struct CalibrationSession {
+        std::string id, name, owner_token;
+        std::array<std::optional<ToolCalibrationSample>, 6> samples;
+        std::optional<ToolCalibrationSolution> result;
+        uint64_t created{0};
+    };
+    nlohmann::json calibrationSessionJson(const CalibrationSession& session);
+    bool prepareToolMutation(const httplib::Request& req, httplib::Response& res, std::unique_lock<std::recursive_mutex>& state_lock);
 
     // ---- Lua Script ----
     void handleScriptUpload(const httplib::Request& req, httplib::Response& res);
@@ -220,6 +230,12 @@ private:
     std::chrono::steady_clock::time_point last_seen_at_{};
     const int control_ttl_seconds_;
     const std::string web_root_;
+    FrameRegistry* frame_registry_{nullptr};
+    std::function<bool()> tool_motion_busy_;
+    std::function<Result(ToolCalibrationSample&)> calibration_capture_;
+    std::mutex calibration_mutex_;
+    std::unordered_map<std::string, CalibrationSession> calibration_sessions_;
+    uint64_t calibration_counter_{0};
     static constexpr const char* CONTROL_TOKEN_HEADER = "X-Rocos-Control-Token";
     static constexpr const char* CONTROL_CLIENT_ID_HEADER = "X-Rocos-Client-Id";
 

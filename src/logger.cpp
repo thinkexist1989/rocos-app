@@ -1,46 +1,27 @@
 #include "logger.hpp"
+#include "spdlog/sinks/base_sink.h"
+#include <map>
 
-using namespace std;
-using namespace spdlog;
-
-Logger::Logger(string name) {
-    name_ = name;
-    if(!isThreadPoolInit) {
-        init_thread_pool(8192, 1);
-        isThreadPoolInit = true;
+namespace {
+class ManagerSink : public spdlog::sinks::base_sink<std::mutex> {
+    void sink_it_(const spdlog::details::log_msg& msg) override {
+        rocos::LogManager::instance().submit(static_cast<rocos::LogLevel>(msg.level),
+            std::string(msg.logger_name.data(), msg.logger_name.size()),
+            std::string(msg.payload.data(), msg.payload.size()), 0,
+            std::chrono::duration_cast<std::chrono::microseconds>(msg.time.time_since_epoch()).count());
     }
-    // logger_ptr_ = make_shared<async_logger>(name_, sinks.begin(), sinks.end(), spdlog::thread_pool(), spdlog::async_overflow_policy::block);
-    logger_ptr_ = make_shared<async_logger>(name_, getSinks().begin(), getSinks().end(), spdlog::thread_pool(), spdlog::async_overflow_policy::block);
-    register_logger(logger_ptr_);
-
-    // logger_ptr_->set_level(spdlog::level::err);
-    logger_ptr_->flush_on(spdlog::level::info);
-
-    // spdlog::flush_every(std::chrono::milliseconds(100));
+    void flush_() override {} // 刷新仅由独立文件线程执行。
+};
 }
-std::vector<sink_ptr> &Logger::getSinks() {
-    static std::vector<sink_ptr> sinks;
-    if (sinks.empty()) {
-      sinks.push_back(std::make_shared<spdlog::sinks::daily_file_sink_mt>("logs/rocos-app", 23, 59));
-      sinks.push_back(std::make_shared<spdlog::sinks::stdout_color_sink_mt>());
+Logger::logger_ptr Logger::getInstance(const std::string& name) {
+    static std::mutex mutex;
+    static std::map<std::string, logger_ptr> instances;
+    static auto sink = std::make_shared<ManagerSink>();
+    std::lock_guard<std::mutex> lock(mutex);
+    auto& logger = instances[name];
+    if (!logger) {
+        logger = std::make_shared<spdlog::logger>(name, sink);
+        logger->set_level(spdlog::level::trace);
     }
-    return sinks;
-  }
-Logger::~Logger() {
-    drop(name_); // 清理日志记录器
-}
-
-
-// // 创建每日轮换的异步日志接收器
-// sink_ptr Logger::daily_sink = std::make_shared<spdlog::sinks::daily_file_sink_mt>("logs/rocos-app", 23, 59);
-// // 创建控制台接收器
-// sink_ptr Logger::console_sink = std::make_shared<spdlog::sinks::stdout_color_sink_mt>();
-//
-// std::vector<sink_ptr> Logger::sinks = {daily_sink,console_sink};
-
-bool Logger::isThreadPoolInit = false;
-
-Logger::logger_ptr Logger::getInstance(const string &name) {
-        auto log = make_shared<Logger>(name);
-        return log->logger_ptr_;
+    return logger;
 }

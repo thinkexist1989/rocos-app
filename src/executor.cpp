@@ -44,10 +44,9 @@ Result Executor::Update() {
   int sum = 0; //TODO:
 
   if (motion_ == nullptr || controller_ == nullptr || hardware_ == nullptr) {
-    log_ptr_->error(
-        "Executor update has null dependency: motion={}, controller={}, hardware={}",
-        static_cast<const void*>(motion_), static_cast<const void*>(controller_),
-        static_cast<const void*>(hardware_));
+    emitLogEvent(LogEventType::Result, LogModule::Executor,
+                 static_cast<int>(Result::ParameterPointerEqualsNullptr));
+    return Result::ParameterPointerEqualsNullptr;
   }
 
   profiler_->MeasureEnd(kCycleMeasurement);
@@ -61,7 +60,7 @@ Result Executor::Update() {
   profiler_->MeasureEnd(kMotionMeasurement);
 
   if (static_cast<int>(res) < 0) {
-    log_ptr_->error("Executor motion phase failed: result={}", static_cast<int>(res));
+    emitLogEvent(LogEventType::MotionFailed, LogModule::Executor, static_cast<int>(res));
     return res;
   }
 
@@ -74,8 +73,7 @@ Result Executor::Update() {
   profiler_->MeasureEnd(kControllerMeasurement);
 
   if (static_cast<int>(res) < 0) {
-    log_ptr_->error("Executor controller phase failed: result={}",
-                    static_cast<int>(res));
+    emitLogEvent(LogEventType::ControllerFailed, LogModule::Executor, static_cast<int>(res));
     return res;
   }
 
@@ -86,8 +84,7 @@ Result Executor::Update() {
   res = controller_->UpdateCmd(q_cmd);
 
   if (static_cast<int>(res) < 0) {
-    log_ptr_->error("Executor hardware command phase failed: result={}",
-                    static_cast<int>(res));
+    emitLogEvent(LogEventType::CommandFailed, LogModule::Executor, static_cast<int>(res));
     return res;
   }
 

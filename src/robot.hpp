@@ -31,6 +31,7 @@
 #include "result.hpp"
 #include "servo_type.hpp"
 #include "logger.hpp"
+#include "frame_registry.hpp"
 
 
 // #include "dh_params_loader.hpp"
@@ -110,6 +111,7 @@ class Robot {
     std::string tip_link{"link_7"};
     std::string joint_binding{"joint_binding.yaml"};
     std::string payload{"payload.yaml"};
+    std::string frames{"frames.yaml"};
   };
 
   explicit Robot();
@@ -243,12 +245,15 @@ class Robot {
   Frame GetToolFrame(const std::string& name) const;
   Frame GetObjectFrame(const std::string& name) const;
   Result SetToolFrame(const std::string& name, const Frame& T_tool);
+  Result SetToolFrame(const std::string& name, const Frame& frame, bool persist);
   Result SetObjectFrame(const std::string& name, const Frame& T_object);
   Result AddToolFrame(const std::string& name, const Frame& T_tool);
   Result AddObjectFrame(const std::string& name, const Frame& T_object);
   Result RemoveToolFrame(const std::string& name);
+  Result RemoveToolFrame(const std::string& name, bool persist);
   Result RemoveObjectFrame(const std::string& name);
   Result SetActiveToolFrame(const std::string& name);
+  Result SetActiveToolFrame(const std::string& name, bool persist);
   Result SetActiveObjectFrame(const std::string& name);
   std::string GetActiveToolFrameName() const;
   std::string GetActiveObjectFrameName() const;
@@ -256,8 +261,10 @@ class Robot {
   Result GetActiveObjectFrame(Frame& frame) const;
   Frame GetActiveToolFrame() const;
   Frame GetActiveObjectFrame() const;
-  Result LoadFrames(const std::string& path);
-  Result SaveFrames(const std::string& path) const;
+  Result LoadFrames(const std::string& path = "");
+  Result SaveFrames(const std::string& path = "") const;
+  const std::string& GetFramesPath() const { return frames_.path(); }
+  Result CaptureCalibrationPose(Frame& flange, std::vector<double>& joints, double& timestamp) const;
 
   // MoveC 圆心+角度
   Result MoveC(const Frame& pose_start, const Frame& center_frame, double theta,
@@ -396,6 +403,9 @@ class Robot {
 
  public:
 
+  std::unique_lock<std::recursive_mutex> LockToolState() const;
+  bool CanChangeToolState() const;
+  Result ModifyFrames(const std::function<Result()>& change) const;
   friend class RobotHttpServer;  // 允许 Server 直接访问 Robot 的私有/保护成员
                                  // TODO: ================================
 
@@ -410,10 +420,7 @@ class Robot {
   mutable std::mutex mtx_;
 
   // 命名坐标系注册表：key 是上位机展示和选择的坐标系 name，value 是对应位姿。
-  std::unordered_map<std::string, Frame> tool_frames_;
-  std::unordered_map<std::string, Frame> object_frames_;
-  std::string active_tool_frame_name_;
-  std::string active_object_frame_name_;
+  FrameRegistry frames_;
 
   std::string work_mode_ {"position"};  // 当前工作模式字符串: "position" | "jnt_imp" | "jnt_admit_teach" | "cart_imp" | "zero_force_drag" | "ee_admit_teach"
 
@@ -430,6 +437,9 @@ class Robot {
   std::unique_ptr<JointBinding> joint_binding_;
   std::string joint_binding_path_{"joint_binding.yaml"};
 
+  std::shared_ptr<RtLogProducer> rt_log_producer_{
+      LogManager::instance().createRtProducer(),
+      [](RtLogProducer* producer) { LogManager::instance().releaseRtProducer(producer); }};
   Logger::logger_ptr log_ptr_ = nullptr;
 
   // FSM 初始状态是 ERROR_STATE，构造时会进入一次；用它区分“初始进入”和“真正的错误进入”

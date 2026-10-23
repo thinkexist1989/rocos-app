@@ -253,9 +253,10 @@ static rocos::JntArray dummy_q_cmd;
 // ==========================================================================
 
 TEST_CASE("CartesianImpedance - SetHardware / SetModel") {
-    rocos::CartesianImpedanceController ctrl;
+    // 控制器析构会访问依赖，硬件和模型必须先构造、后销毁。
     FakeHardware hw;
     FakeModel model;
+    rocos::CartesianImpedanceController ctrl;
 
     SUBCASE("SetHardware nullptr → ParameterPointerEqualsNullptr") {
         CHECK(ctrl.SetHardware(nullptr) == rocos::Result::ParameterPointerEqualsNullptr);
@@ -332,9 +333,9 @@ TEST_CASE("CartesianImpedance - 力矩安全参数") {
 // ==========================================================================
 
 TEST_CASE("CartesianImpedance - GenerateCmd") {
-    rocos::CartesianImpedanceController ctrl;
     FakeHardware hw;
     FakeModel model;
+    rocos::CartesianImpedanceController ctrl;
     hw.fake_position_ = makeConstJntArray(7, 0.0);
     ctrl.SetHardware(&hw);
     ctrl.SetModel(&model);

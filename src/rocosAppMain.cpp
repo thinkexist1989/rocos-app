@@ -15,19 +15,9 @@ DEFINE_string(http_host, "0.0.0.0", "Override HTTP server listen host from confi
 DEFINE_int32(http_port, 8080, "Override HTTP server listen port from config");
 DEFINE_int32(http_control_ttl_seconds, 300, "Override HTTP control rights TTL from config (positive)");
 
-bool isRuning = true;
-rocos::Robot* robot_ptr = nullptr;
-
+volatile std::sig_atomic_t isRuning = 1;
 void signalHandler(int signo) {
-    if (signo == SIGINT) {
-        std::cout << "\033[1;31m"
-                  << "[!!SIGNAL!!]"
-                  << "INTERRUPT by CTRL-C"
-                  << "\033[0m" << std::endl;
-        isRuning = false;
-        if (robot_ptr != nullptr) robot_ptr->setDisabled();
-        exit(0);
-    }
+    if (signo == SIGINT || signo == SIGTERM) isRuning = 0;
 }
 
 int main(int argc, char* argv[]) {
@@ -43,6 +33,11 @@ int main(int argc, char* argv[]) {
             config.http_control_ttl_seconds = FLAGS_http_control_ttl_seconds;
         }
         config.validate();
+        LogManager::configure(config.logging);
+        auto& logs = LogManager::instance();
+        DiagnosticsHttpServer diagnostics(logs, config.diagnostics);
+        diagnostics.start();
+        auto startup_log = Logger::getInstance("Startup");
 
         // 在初始化硬件前检查必需资源，避免错误路径引起部分启动。
         for (const auto& path : {config.robot.hardware_config, config.robot.urdf}) {
@@ -53,27 +48,28 @@ int main(int argc, char* argv[]) {
         if (!std::filesystem::is_directory(config.scripts)) {
             throw std::runtime_error("Scripts directory not found: " + config.scripts);
         }
-        std::cout << "[Config] " << std::filesystem::absolute(FLAGS_config).lexically_normal() << std::endl;
+        startup_log->info("Startup configuration loaded: {}", std::filesystem::absolute(FLAGS_config).lexically_normal().string());
 
         Robot robot(config.robot);
-        robot_ptr = &robot;
-        if (signal(SIGINT, signalHandler) == SIG_ERR) {
-            std::cerr << "Cannot catch SIGINT" << std::endl;
+        if (signal(SIGINT, signalHandler) == SIG_ERR || signal(SIGTERM, signalHandler) == SIG_ERR) {
+            startup_log->error("Cannot register process shutdown signal handler.");
         }
         LuaScriptEngine script_engine(robot, config.scripts);
         RobotHttpServer httpServer(&robot, &script_engine, config.http_control_ttl_seconds, config.web_root);
         httpServer.runAsync(config.http_host, config.http_port);
 
-        std::cout << "\033[1;32m[HTTP Server] Running on " << config.http_host << ":" << config.http_port << "\033[0m"
-                  << std::endl;
+        startup_log->info("Control HTTP service listening on {}:{}; diagnostics listening on {}:{}.",
+                          config.http_host, config.http_port, config.diagnostics.host, config.diagnostics.port);
         while (isRuning) {
             std::this_thread::sleep_for(std::chrono::seconds(1));
         }
-        robot_ptr = nullptr;
+        robot.setDisabled();
+        diagnostics.stop();
     } catch (const std::exception& error) {
-        robot_ptr = nullptr;
         std::cerr << "Startup failed (config=" << FLAGS_config << "): " << error.what() << std::endl;
+        LogManager::shutdown();
         return 1;
     }
+    LogManager::shutdown();
     return 0;
 }

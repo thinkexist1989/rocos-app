@@ -12,13 +12,17 @@
 </div>
 :warning: Rocos-App is under development, not finished~ :thinking:
 
-版本遵循 [SemVer 2.0.0](https://semver.org/lang/zh-CN/)。当前处于面向 `3.0.1` 的内部测试阶段，使用 `3.0.1-rc.N`，测试稳定后正式发布 `3.0.1`。实际版本以 `CMakeLists.txt` 为准；维护规则见 [版本维护 skill](.agents/skills/rocos-version-maintenance/SKILL.md)。
+版本遵循 [SemVer 2.0.0](https://semver.org/lang/zh-CN/)。当前处于面向 `3.1.0` 的内部测试阶段，使用 `3.1.0-rc.N`，测试稳定并确认后正式发布 `3.1.0`。实际版本以 `CMakeLists.txt` 为准；维护规则见 [版本维护 skill](.agents/skills/rocos-version-maintenance/SKILL.md)。
 
 ## Introduction
 
 ROCOS-App is the application of robotics, which is designed as the robot controller for ROCOS. 
 
 
+
+## 工具管理与六点法标定
+
+已接入 Viz 的真实工具管理、六点采集与标定计算。工具保存到 `robot.frames` 指定的 YAML，支持重命名、激活与重启恢复；标定计算后需明确保存并单独激活。操作顺序、坐标约定和接口衔接见 [六点法标定与工具管理](docs/tool_calibration.md)。
 
 ## Dependencies
 

@@ -18,6 +18,7 @@
 // email: luoyang@sia.cn
 
 #include "position_controller.hpp"
+#include "log_manager.hpp"
 
 #include <cmath>
 #include <variant>
@@ -181,6 +182,8 @@ Result PositionController::ValidatePositionCommand(const JntArray& q_cmd) {
             return Result::ParameterNanOrInf;
         }
         if (q_cmd(i) < q_lower(i) || q_cmd(i) > q_upper(i)) {
+            emitLogEvent(LogEventType::PositionLimit, LogModule::PositionController,
+                         static_cast<int>(Result::PosLimit), i, q_cmd(i), q_lower(i), q_upper(i));
             return Result::PosLimit;
         }
         if (q_vel_limit(i) < 0.0) {
@@ -189,6 +192,8 @@ Result PositionController::ValidatePositionCommand(const JntArray& q_cmd) {
         if (has_prev_cmd) {
             const double cmd_velocity = std::abs(q_cmd(i) - q_last_cmd_(i)) / dt;
             if (cmd_velocity > q_vel_limit(i)) {
+                emitLogEvent(LogEventType::VelocityLimit, LogModule::PositionController,
+                             static_cast<int>(Result::SpeedLimit), i, cmd_velocity, 0, q_vel_limit(i));
                 return Result::SpeedLimit;
             }
         }

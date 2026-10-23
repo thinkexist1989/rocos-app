@@ -94,7 +94,7 @@ Model::Model(const std::string& urdf_file_path,
 
 Result Model::ForwardKinematics(const JntArray& q_in, Frame& p_out) {
   if (fk_solver_->JntToCart(q_in, p_out) < 0) {
-    log_ptr_->error("Forward kinematics computation failed!");
+    emitLogEvent(LogEventType::Result, LogModule::Model, static_cast<int>(Result::FkCalcFail));
     return Result::FkCalcFail;
   }
   return Result::NoError;
@@ -103,7 +103,7 @@ Result Model::ForwardKinematics(const JntArray& q_in, Frame& p_out) {
 Result Model::InverseKinematics(const JntArray& q_in, const Frame& p_in,
                                 JntArray& q_out) {
   if (ik_solver_->CartToJnt(q_in, p_in, q_out) < 0) {
-    log_ptr_->error("Inverse kinematics computation failed!");
+    emitLogEvent(LogEventType::Result, LogModule::Model, static_cast<int>(Result::IkCalcFail));
     return Result::IkCalcFail;
   }
   return Result::NoError;
@@ -121,7 +121,7 @@ Result Model::ForwardDynamics(const JntArray& q, const JntArray& q_dot,
     f_ext_ptr = &f_ext_zero;
   }
   if (fd_solver_->CartToJnt(q, q_dot, torques, *f_ext_ptr, q_dotdot) < 0) {
-    log_ptr_->error("Forward dynamics computation failed!");
+    emitLogEvent(LogEventType::Result, LogModule::Model, static_cast<int>(Result::FdCalcFail));
     return Result::FdCalcFail;
   }
   return Result::NoError;
@@ -139,7 +139,7 @@ Result Model::InverseDynamics(const JntArray& q, const JntArray& q_dot,
     f_ext_ptr = &f_ext_zero;
   }
   if (id_solver_->CartToJnt(q, q_dot, q_dotdot, *f_ext_ptr, torques) < 0) {
-    log_ptr_->error("Inverse dynamics computation failed!");
+    emitLogEvent(LogEventType::Result, LogModule::Model, static_cast<int>(Result::IdCalcFail));
     return Result::IdCalcFail;
   }
   return Result::NoError;
@@ -149,7 +149,7 @@ Result Model::GetJacobian(const JntArray& q, Jacobian& J_out) {
   KDL::ChainJntToJacSolver jac_solver(chain_);
   J_out.resize(chain_.getNrOfJoints());
   if (jac_solver.JntToJac(q, J_out) < 0) {
-    log_ptr_->error("Jacobian computation failed!");
+    emitLogEvent(LogEventType::Result, LogModule::Model, static_cast<int>(Result::JacobianCalcFail));
     return Result::JacobianCalcFail;
   }
 

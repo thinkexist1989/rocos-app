@@ -23,10 +23,10 @@ email: luoyang@sia.cn
 ]]
 
 cmake_minimum_required(VERSION 3.15)
-project(rocos_app VERSION 3.0.1 DESCRIPTION "ROCOS Application Library")
+project(rocos_app VERSION 3.1.0 DESCRIPTION "ROCOS Application Library")
 
 # CMake VERSION 仅接受数字；完整 SemVer 版本单独拼接。
-set(ROCOS_APP_VERSION_PRERELEASE "rc.6")
+set(ROCOS_APP_VERSION_PRERELEASE "rc.1")
 set(ROCOS_APP_VERSION_FULL "${PROJECT_VERSION}")
 if(NOT ROCOS_APP_VERSION_PRERELEASE STREQUAL "")
     string(APPEND ROCOS_APP_VERSION_FULL "-${ROCOS_APP_VERSION_PRERELEASE}")
@@ -115,8 +115,9 @@ set(DEP_LIBS
         )
 
 
-add_library(logger SHARED src/logger.cpp)
-target_link_libraries(logger PUBLIC spdlog::spdlog_header_only)
+add_library(logger SHARED src/logger.cpp src/log_event.cpp src/log_manager.cpp src/log_storage.cpp src/diagnostics_http_server.cpp)
+target_include_directories(logger PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/3rdparty/json ${CMAKE_CURRENT_SOURCE_DIR}/3rdparty/httplib)
+target_link_libraries(logger PUBLIC spdlog::spdlog_header_only Threads::Threads)
 add_library(rocos::logger ALIAS logger)
 
 ######### Library Hardware ###############
@@ -152,6 +153,8 @@ add_library(robot
         src/lua_script_engine.cpp
         src/robot.cpp
         src/robot_http_server.cpp
+        src/tool_calibration.cpp
+        src/frame_registry.cpp
         src/joint_binding.cpp
         src/model.cpp
 
@@ -551,3 +554,47 @@ target_link_libraries(udp_example
         PRIVATE
         robot
         )
+
+add_executable(logging_system_test test/logging_system_test.cc)
+target_link_libraries(logging_system_test PRIVATE logger)
+add_test(NAME logging_system_test COMMAND logging_system_test)
+set_tests_properties(logging_system_test PROPERTIES TIMEOUT 30)
+add_executable(diagnostics_http_test test/diagnostics_http_test.cc)
+target_link_libraries(diagnostics_http_test PRIVATE logger)
+add_test(NAME diagnostics_http_test COMMAND diagnostics_http_test)
+set_tests_properties(diagnostics_http_test PROPERTIES TIMEOUT 60)
+add_executable(diagnostics_http_memory_test test/diagnostics_http_memory_test.cc)
+target_link_libraries(diagnostics_http_memory_test PRIVATE logger)
+add_test(NAME diagnostics_http_memory_test COMMAND diagnostics_http_memory_test)
+set_tests_properties(diagnostics_http_memory_test PROPERTIES TIMEOUT 40)
+set_tests_properties(diagnostics_http_test PROPERTIES LABELS network)
+
+# 离线回归只读取源资源，库的后备日志落在独立构建目录，避免测试清理用户日志。
+set(ROCOS_OFFLINE_TEST_DIRECTORY "${CMAKE_BINARY_DIR}/test-work")
+file(MAKE_DIRECTORY "${ROCOS_OFFLINE_TEST_DIRECTORY}")
+foreach(resource config models)
+    file(CREATE_LINK "${CMAKE_SOURCE_DIR}/${resource}"
+         "${ROCOS_OFFLINE_TEST_DIRECTORY}/${resource}" SYMBOLIC)
+endforeach()
+set_tests_properties(
+    model_test hardware_test position_controller_test
+    joint_admittance_controller_test joint_impedance_controller_test
+    cartesian_impedance_controller_test unit_velocity_profile_test
+    performance_profiler_test move_joint_test move_servo_test move_line_test
+    move_line_offline_test move_circle_test move_circle_three_point_test
+    virtual_wall_test app_config_test logging_system_test
+    diagnostics_http_test diagnostics_http_memory_test
+    PROPERTIES WORKING_DIRECTORY "${ROCOS_OFFLINE_TEST_DIRECTORY}")
+
+add_executable(tool_calibration_test test/tool_calibration_test.cc src/tool_calibration.cpp)
+target_include_directories(tool_calibration_test PRIVATE ${CMAKE_SOURCE_DIR} ${CMAKE_SOURCE_DIR}/src)
+target_link_libraries(tool_calibration_test PRIVATE Eigen3::Eigen orocos-kdl)
+add_test(NAME tool_calibration_test COMMAND tool_calibration_test)
+add_executable(frame_registry_test test/frame_registry_test.cc src/frame_registry.cpp)
+target_include_directories(frame_registry_test PRIVATE ${CMAKE_SOURCE_DIR} ${CMAKE_SOURCE_DIR}/src)
+target_link_libraries(frame_registry_test PRIVATE yaml-cpp orocos-kdl)
+add_test(NAME frame_registry_test COMMAND frame_registry_test)
+add_executable(tooling_http_test test/tooling_http_test.cc)
+target_link_libraries(tooling_http_test PRIVATE robot)
+add_test(NAME tooling_http_test COMMAND tooling_http_test)
+set_tests_properties(tooling_http_test PROPERTIES TIMEOUT 30 WORKING_DIRECTORY "${ROCOS_OFFLINE_TEST_DIRECTORY}")

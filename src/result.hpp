@@ -276,6 +276,7 @@ namespace rocos {
             RESULT_CASE(FkCalcFail);
             RESULT_CASE(IdCalcFail);
             RESULT_CASE(FdCalcFail);
+            RESULT_CASE(JacobianCalcFail);
             RESULT_CASE(ParameterPointerEqualsNullptr);
             RESULT_CASE(ParameterNanOrInf);
             RESULT_CASE(EnterForceModeError);

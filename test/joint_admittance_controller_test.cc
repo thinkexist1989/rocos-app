@@ -196,9 +196,10 @@ rocos::JntArray makeConstJntArray(unsigned int n, double val = 0.0) {
 // ==========================================================================
 
 TEST_CASE("JointAdmittanceController - SetHardware / SetModel") {
-    rocos::JointAdmittanceController ctrl;
+    // 控制器析构会访问依赖，硬件和模型必须先构造、后销毁。
     FakeHardware hw;
     FakeModel model;
+    rocos::JointAdmittanceController ctrl;
 
     CHECK(ctrl.SetHardware(nullptr) == rocos::Result::ParameterPointerEqualsNullptr);
     CHECK(ctrl.SetHardware(&hw) == rocos::Result::NoError);
@@ -242,8 +243,9 @@ TEST_CASE("JointAdmittanceController - 增益设置") {
 // ==========================================================================
 
 TEST_CASE("JointAdmittanceController - GenerateCmd") {
-    rocos::JointAdmittanceController ctrl;
     FakeHardware hw;
+    FakeModel model;
+    rocos::JointAdmittanceController ctrl;
     hw.fake_position_ = makeJntArray(3);
     ctrl.SetHardware(&hw);
 
@@ -256,7 +258,6 @@ TEST_CASE("JointAdmittanceController - GenerateCmd") {
     }
 
     SUBCASE("Frame → IK") {
-        FakeModel model;
         ctrl.SetModel(&model);
         rocos::Frame frame;
         rocos::Reference ref = frame;
@@ -379,13 +380,13 @@ TEST_CASE("JointAdmittanceController - UpdateCmd 导纳输出") {
 
 TEST_CASE("JointAdmittanceController - CSP 模式管理") {
     FakeHardware hw;
+    FakeModel model;
     hw.fake_position_ = makeConstJntArray(3, 0.0);
     hw.fake_velocity_ = makeConstJntArray(3, 0.0);
     hw.fake_torque_    = makeConstJntArray(3, 0.0);
 
     rocos::JointAdmittanceController ctrl;
     ctrl.SetHardware(&hw);
-    FakeModel model;
     ctrl.SetModel(&model);
 
     SUBCASE("首次 UpdateCmd 设置 CSP 模式") {

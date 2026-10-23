@@ -10,6 +10,8 @@
 //   rocos::EcatConfig        ->  rocos::SharedMemoryConfig
 
 #pragma once
+#include "logger.hpp"
+#include "result.hpp"
 
 #include <algorithm>
 #include <cerrno>
@@ -180,7 +182,7 @@ public:
     static SharedMemoryConfig *getInstance(int id = 0) {
         static std::unordered_map<int, SharedMemoryConfig *> instances;
         if (instances.find(id) == instances.end()) {
-            std::cout << "[SHM] Create new SharedMemoryConfig instance: " << id << std::endl;
+            Logger::getInstance("Hardware")->info("Creating shared memory configuration: bus_id={}", id);
             instances[id] = new SharedMemoryConfig(id);
             instances[id]->init();
         }
@@ -413,7 +415,7 @@ public:
             waitForSignal(static_cast<int>(std::distance(threadId_.begin(), it)));
         } else {
             if (threadId_.size() >= EC_SEM_NUM) {
-                print_message("[SHM] Too many threads.", MessageLevel::ERROR);
+                emitLogEvent(LogEventType::HardwareThreadLimit, LogModule::Hardware, static_cast<int>(Result::ResourceUnavailable), -1, 0, 0, EC_SEM_NUM);
                 return;
             }
             threadId_.push_back(id);
@@ -478,22 +480,22 @@ public:
     // -----------------------------------------------------------------------
     template<typename T> T getSlaveInputVarValue(int slaveId, int varId) {
         if (sizeof(T) != static_cast<std::size_t>(ecatBus->slaves[slaveId].input_vars[varId].size))
-            print_message("Size mismatch", MessageLevel::WARNING);
+            emitLogEvent(LogEventType::HardwareSizeMismatch, LogModule::Hardware, 0, slaveId, varId, ecatBus->slaves[slaveId].input_vars[varId].size, sizeof(T), LogLevel::Warn);
         return *(T *)((char *)pdInputPtr + ecatBus->slaves[slaveId].input_vars[varId].offset);
     }
     template<typename T> void setSlaveInputVarValue(int slaveId, int varId, T value) {
         if (sizeof(T) != static_cast<std::size_t>(ecatBus->slaves[slaveId].input_vars[varId].size))
-            print_message("Size mismatch", MessageLevel::WARNING);
+            emitLogEvent(LogEventType::HardwareSizeMismatch, LogModule::Hardware, 0, slaveId, varId, ecatBus->slaves[slaveId].input_vars[varId].size, sizeof(T), LogLevel::Warn);
         *(T *)((char *)pdInputPtr + ecatBus->slaves[slaveId].input_vars[varId].offset) = value;
     }
     template<typename T> T getSlaveOutputVarValue(int slaveId, int varId) {
         if (sizeof(T) != static_cast<std::size_t>(ecatBus->slaves[slaveId].output_vars[varId].size))
-            print_message("Size mismatch", MessageLevel::WARNING);
+            emitLogEvent(LogEventType::HardwareSizeMismatch, LogModule::Hardware, 0, slaveId, varId, ecatBus->slaves[slaveId].output_vars[varId].size, sizeof(T), LogLevel::Warn);
         return *(T *)((char *)pdOutputPtr + ecatBus->slaves[slaveId].output_vars[varId].offset);
     }
     template<typename T> void setSlaveOutputVarValue(int slaveId, int varId, T value) {
         if (sizeof(T) != static_cast<std::size_t>(ecatBus->slaves[slaveId].output_vars[varId].size))
-            print_message("Size mismatch", MessageLevel::WARNING);
+            emitLogEvent(LogEventType::HardwareSizeMismatch, LogModule::Hardware, 0, slaveId, varId, ecatBus->slaves[slaveId].output_vars[varId].size, sizeof(T), LogLevel::Warn);
         *(T *)((char *)pdOutputPtr + ecatBus->slaves[slaveId].output_vars[varId].offset) = value;
     }
 
@@ -502,7 +504,7 @@ public:
         for (int i = 0; i < ecatBus->slaves[slaveId].input_var_num; ++i)
             if (strcmp(ecatBus->slaves[slaveId].input_vars[i].name, name.c_str()) == 0) {
                 if (sizeof(T) != static_cast<std::size_t>(ecatBus->slaves[slaveId].input_vars[i].size))
-                    print_message("Size mismatch", MessageLevel::WARNING);
+                    emitLogEvent(LogEventType::HardwareSizeMismatch, LogModule::Hardware, 0, slaveId, i, ecatBus->slaves[slaveId].input_vars[i].size, sizeof(T), LogLevel::Warn);
                 return *(T *)((char *)pdInputPtr + ecatBus->slaves[slaveId].input_vars[i].offset);
             }
         return std::numeric_limits<T>::max();
@@ -511,7 +513,7 @@ public:
         for (int i = 0; i < ecatBus->slaves[slaveId].input_var_num; ++i)
             if (strcmp(ecatBus->slaves[slaveId].input_vars[i].name, name.c_str()) == 0) {
                 if (sizeof(T) != static_cast<std::size_t>(ecatBus->slaves[slaveId].input_vars[i].size))
-                    print_message("Size mismatch", MessageLevel::WARNING);
+                    emitLogEvent(LogEventType::HardwareSizeMismatch, LogModule::Hardware, 0, slaveId, i, ecatBus->slaves[slaveId].input_vars[i].size, sizeof(T), LogLevel::Warn);
                 *(T *)((char *)pdInputPtr + ecatBus->slaves[slaveId].input_vars[i].offset) = value;
             }
     }
@@ -519,7 +521,7 @@ public:
         for (int i = 0; i < ecatBus->slaves[slaveId].output_var_num; ++i)
             if (strcmp(ecatBus->slaves[slaveId].output_vars[i].name, name.c_str()) == 0) {
                 if (sizeof(T) != static_cast<std::size_t>(ecatBus->slaves[slaveId].output_vars[i].size))
-                    print_message("Size mismatch", MessageLevel::WARNING);
+                    emitLogEvent(LogEventType::HardwareSizeMismatch, LogModule::Hardware, 0, slaveId, i, ecatBus->slaves[slaveId].output_vars[i].size, sizeof(T), LogLevel::Warn);
                 return *(T *)((char *)pdOutputPtr + ecatBus->slaves[slaveId].output_vars[i].offset);
             }
         return std::numeric_limits<T>::max();
@@ -528,7 +530,7 @@ public:
         for (int i = 0; i < ecatBus->slaves[slaveId].output_var_num; ++i)
             if (strcmp(ecatBus->slaves[slaveId].output_vars[i].name, name.c_str()) == 0) {
                 if (sizeof(T) != static_cast<std::size_t>(ecatBus->slaves[slaveId].output_vars[i].size))
-                    print_message("Size mismatch", MessageLevel::WARNING);
+                    emitLogEvent(LogEventType::HardwareSizeMismatch, LogModule::Hardware, 0, slaveId, i, ecatBus->slaves[slaveId].output_vars[i].size, sizeof(T), LogLevel::Warn);
                 *(T *)((char *)pdOutputPtr + ecatBus->slaves[slaveId].output_vars[i].offset) = value;
             }
     }
@@ -536,19 +538,19 @@ public:
     // Template PD pointer methods
     template<typename T> T *getSlaveInputVarPtr(int slaveId, int varId) {
         if (sizeof(T) != static_cast<std::size_t>(ecatBus->slaves[slaveId].input_vars[varId].size))
-            print_message("Size mismatch", MessageLevel::WARNING);
+            emitLogEvent(LogEventType::HardwareSizeMismatch, LogModule::Hardware, 0, slaveId, varId, ecatBus->slaves[slaveId].input_vars[varId].size, sizeof(T), LogLevel::Warn);
         return (T *)((char *)pdInputPtr + ecatBus->slaves[slaveId].input_vars[varId].offset);
     }
     template<typename T> T *getSlaveOutputVarPtr(int slaveId, int varId) {
         if (sizeof(T) != static_cast<std::size_t>(ecatBus->slaves[slaveId].output_vars[varId].size))
-            print_message("Size mismatch", MessageLevel::WARNING);
+            emitLogEvent(LogEventType::HardwareSizeMismatch, LogModule::Hardware, 0, slaveId, varId, ecatBus->slaves[slaveId].output_vars[varId].size, sizeof(T), LogLevel::Warn);
         return (T *)((char *)pdOutputPtr + ecatBus->slaves[slaveId].output_vars[varId].offset);
     }
     template<typename T> T *findSlaveInputVarPtrByName(int slaveId, const std::string &name) {
         for (int i = 0; i < ecatBus->slaves[slaveId].input_var_num; ++i)
             if (strcmp(ecatBus->slaves[slaveId].input_vars[i].name, name.c_str()) == 0) {
                 if (sizeof(T) != static_cast<std::size_t>(ecatBus->slaves[slaveId].input_vars[i].size))
-                    print_message("Size mismatch", MessageLevel::WARNING);
+                    emitLogEvent(LogEventType::HardwareSizeMismatch, LogModule::Hardware, 0, slaveId, i, ecatBus->slaves[slaveId].input_vars[i].size, sizeof(T), LogLevel::Warn);
                 return (T *)((char *)pdInputPtr + ecatBus->slaves[slaveId].input_vars[i].offset);
             }
         return nullptr;
@@ -557,7 +559,7 @@ public:
         for (int i = 0; i < ecatBus->slaves[slaveId].output_var_num; ++i)
             if (strcmp(ecatBus->slaves[slaveId].output_vars[i].name, name.c_str()) == 0) {
                 if (sizeof(T) != static_cast<std::size_t>(ecatBus->slaves[slaveId].output_vars[i].size))
-                    print_message("Size mismatch", MessageLevel::WARNING);
+                    emitLogEvent(LogEventType::HardwareSizeMismatch, LogModule::Hardware, 0, slaveId, i, ecatBus->slaves[slaveId].output_vars[i].size, sizeof(T), LogLevel::Warn);
                 return (T *)((char *)pdOutputPtr + ecatBus->slaves[slaveId].output_vars[i].offset);
             }
         return nullptr;
@@ -598,12 +600,9 @@ private:
     enum class MessageLevel { NORMAL, WARNING, ERROR };
 
     void print_message(const std::string &msg, MessageLevel lvl) const {
-        switch (lvl) {
-            case MessageLevel::NORMAL:  std::cout << "\033[1;32m [INFO]";    break;
-            case MessageLevel::WARNING: std::cout << "\033[1;33m [WARNING]"; break;
-            case MessageLevel::ERROR:   std::cout << "\033[1;31m [ERROR]";   break;
-        }
-        std::cout << msg << "\033[0m" << std::endl;
+        const auto level = lvl == MessageLevel::ERROR ? LogLevel::Error :
+                           lvl == MessageLevel::WARNING ? LogLevel::Warn : LogLevel::Info;
+        LogManager::instance().submit(level, "Hardware", msg);
     }
 };
 

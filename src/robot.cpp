@@ -26,6 +26,8 @@
 #include <chrono>
 #include <cmath>
 #include <fstream>
+#include <filesystem>
+#include <type_traits>
 #include <kdl_parser/kdl_parser.hpp>  // 用于将urdf文件解析为KDL::Tree
 #include <sstream>
 
@@ -119,25 +121,6 @@ namespace {
     struct EventResetReq {
     }; // 恢复请求
 
-    bool isValidFrameNameValue(const std::string &name) {
-        if (name.empty() || name.size() > 64) return false;
-        for (const unsigned char ch : name) {
-            if (!std::isalnum(ch) && ch != '_' && ch != '-' && ch != '.') {
-                return false;
-            }
-        }
-        return true;
-    }
-
-    std::vector<std::string> collectFrameNames(const std::unordered_map<std::string, rocos::Frame> &frames) {
-        std::vector<std::string> names;
-        names.reserve(frames.size());
-        for (const auto &frame : frames) {
-            names.push_back(frame.first);
-        }
-        return names;
-    }
-
     std::string joinNames(const std::vector<std::string> &names) {
         std::ostringstream oss;
         for (size_t i = 0; i < names.size(); ++i) {
@@ -156,74 +139,9 @@ namespace {
         return oss.str();
     }
 
-    YAML::Node frameToYaml(const rocos::Frame &frame) {
-        YAML::Node node;
-        node["position"].push_back(frame.p.x());
-        node["position"].push_back(frame.p.y());
-        node["position"].push_back(frame.p.z());
-
-        double qx = 0.0;
-        double qy = 0.0;
-        double qz = 0.0;
-        double qw = 1.0;
-        frame.M.GetQuaternion(qx, qy, qz, qw);
-        node["orientation"].push_back(qx);
-        node["orientation"].push_back(qy);
-        node["orientation"].push_back(qz);
-        node["orientation"].push_back(qw);
-        return node;
-    }
-
-    bool yamlToFrame(const YAML::Node &node, rocos::Frame &frame) {
-        const YAML::Node position = node["position"];
-        const YAML::Node orientation = node["orientation"];
-        if (!position || !orientation || !position.IsSequence() || !orientation.IsSequence()) {
-            return false;
-        }
-        if (position.size() != 3 || orientation.size() != 4) {
-            return false;
-        }
-
-        const double x = position[0].as<double>();
-        const double y = position[1].as<double>();
-        const double z = position[2].as<double>();
-        const double qx = orientation[0].as<double>();
-        const double qy = orientation[1].as<double>();
-        const double qz = orientation[2].as<double>();
-        const double qw = orientation[3].as<double>();
-
-        frame = rocos::Frame(KDL::Rotation::Quaternion(qx, qy, qz, qw), KDL::Vector(x, y, z));
-        return true;
-    }
-
-    YAML::Node frameMapToYaml(const std::unordered_map<std::string, rocos::Frame> &frames) {
-        YAML::Node node;
-        for (const auto &frame : frames) {
-            node[frame.first] = frameToYaml(frame.second);
-        }
-        return node;
-    }
-
     rocos::Twist rotateTwist(const rocos::Twist &twist, const KDL::Rotation &rotation) {
         return rocos::Twist(rotation * twist.vel, rotation * twist.rot);
     }
-
-    bool yamlToFrameMap(const YAML::Node &node, std::unordered_map<std::string, rocos::Frame> &frames) {
-        frames.clear();
-        if (!node) return true;
-        if (!node.IsMap()) return false;
-
-        for (const auto &entry : node) {
-            const std::string name = entry.first.as<std::string>();
-            if (!isValidFrameNameValue(name)) return false;
-
-            rocos::Frame frame;
-            if (!yamlToFrame(entry.second, frame)) return false;
-            frames[name] = frame;
-        }
-        return true;
-    }
-
 
     namespace sml = boost::sml;
 
@@ -335,6 +253,13 @@ namespace rocos {
         // 进入时 on_fsm_enable 再触发 EventSuccess），属同线程重入，普通锁会死锁。
         template<typename Event>
         bool process_event(const Event &event) {
+            // 外部启动/使能等命令与工具事务互斥；实时状态读取和故障事件不等待磁盘。
+            std::unique_lock<std::recursive_mutex> command_lock(command_mtx_, std::defer_lock);
+            if constexpr (std::is_same_v<Event, EventStartReq> || std::is_same_v<Event, EventServoReq> ||
+                          std::is_same_v<Event, EventResumeReq> || std::is_same_v<Event, EventEnableReq> ||
+                          std::is_same_v<Event, EventDisableReq> || std::is_same_v<Event, EventResetReq>) {
+                command_lock.lock();
+            }
             std::lock_guard<std::recursive_mutex> lock(mtx_);
             return sm_.process_event(event);
         }
@@ -345,38 +270,42 @@ namespace rocos {
             return sm_.is(s);
         }
 
+        std::unique_lock<std::recursive_mutex> lock() const { return std::unique_lock<std::recursive_mutex>(command_mtx_); }
+        std::unique_lock<std::recursive_mutex> lockState() const { return std::unique_lock<std::recursive_mutex>(mtx_); }
+
     private:
         sml::sm<StateMachine> sm_; // 状态机实例
+        mutable std::recursive_mutex command_mtx_; // 工具事务与外部状态切换命令的门闩
         mutable std::recursive_mutex mtx_; // 保护状态机的并发访问（允许同线程重入）
     };
 
 #pragma region 状态机action处理函数
 
     void Robot::on_fsm_enabling() {
-        log_ptr_->info("机器人正在上使能中");
+        log_ptr_->info("Robot enable requested.");
 
         setEnabled();
 
         if (IsEnabled()) {
             startControlThread();
 
-            log_ptr_->info("机器人上使能成功，准备进入STOPPED状态");
+            log_ptr_->info("Robot enable confirmed; transitioning to STOPPED.");
             impl_->process_event(EventEnabled{});
         } else {
-            log_ptr_->error("机器人上使能失败，准备进入ERROR_STATE状态");
+            log_ptr_->error("Robot enable was not confirmed; transitioning to ERROR_STATE.");
             impl_->process_event(EventErrorOccurred{});
         }
     }
 
     void Robot::on_fsm_disabling() {
-        log_ptr_->info("机器人正在下使能中");
+        log_ptr_->info("Robot disable requested.");
 
         setDisabled();
         if (IsDisabled()) {
-            log_ptr_->info("机器人下使能成功，准备进入IDLE状态");
+            log_ptr_->info("Robot disable confirmed; transitioning to IDLE.");
             impl_->process_event(EventDisabled{});
         } else {
-            log_ptr_->error("机器人下使能失败，准备进入ERROR_STATE状态");
+            log_ptr_->error("Robot disable was not confirmed; transitioning to ERROR_STATE.");
             impl_->process_event(EventErrorOccurred{});
         }
     }
@@ -386,12 +315,12 @@ namespace rocos {
         auto rc = data_ready_callback_();
         if (rc != Result::NoError) {
             if (rc == Result::PlanFinished) {
-                log_ptr_->info("机器人已在目标位置，无需运动");
+                log_ptr_->info("Robot is already at the requested target; no motion is required.");
                 impl_->process_event(EventAtTarget{});
                 return;
             }
 
-            log_ptr_->error("机器人启动失败，退回Stopped状态: result={}, state={}, enabled={}",
+            Logger::logCode(LogLevel::Error, "Robot", static_cast<int>(rc), "Motion start failed: result={}, state={}, enabled={}; returning to STOPPED.",
                             static_cast<int>(rc), GetStateString(), IsEnabled());
             impl_->process_event(EventStartFailedReq{});
 
@@ -405,7 +334,7 @@ namespace rocos {
     }
 
     void Robot::on_fsm_running() {
-        log_ptr_->info("Robot is running.");
+        emitLogEvent(LogEventType::EnteredRunning, LogModule::Robot, 0, -1, 0, 0, 0, LogLevel::Info);
 
     }
 
@@ -417,9 +346,9 @@ namespace rocos {
             rc = executor->Stop();
         }
         if (rc == Result::NoError) {
-            log_ptr_->info("机器人停止成功，准备进入Stopped状态");
+            log_ptr_->info("Motion stop request accepted.");
         } else {
-            log_ptr_->error("机器人停止失败，退回ERROR状态: result={}, state={}",
+            Logger::logCode(LogLevel::Error, "Robot", static_cast<int>(rc), "Motion stop request failed: result={}, state={}; transitioning to ERROR_STATE.",
                             static_cast<int>(rc), GetStateString());
             impl_->process_event(EventErrorOccurred{});
         }
@@ -434,10 +363,10 @@ namespace rocos {
             rc = executor->Pause();
         }
         if (rc == Result::NoError) {
-            log_ptr_->info("机器人暂停成功，准备进入PAUSED状态");
+            log_ptr_->info("Motion pause request accepted.");
         } else {
             //TODO: 暂停失败  这块我感觉不允许失败 by think
-            log_ptr_->error("机器人暂停失败，退回RUNNING状态: result={}, state={}",
+            Logger::logCode(LogLevel::Error, "Robot", static_cast<int>(rc), "Motion pause request failed: result={}, state={}; returning to RUNNING.",
                             static_cast<int>(rc), GetStateString());
             impl_->process_event(EventPauseFailed{});
         }
@@ -452,10 +381,10 @@ namespace rocos {
             rc = executor->Resume();
         }
         if (rc == Result::NoError) {
-            log_ptr_->info("机器人继续成功，准备进入RUNNING状态");
+            log_ptr_->info("Motion resume request accepted; transitioning to RUNNING.");
             impl_->process_event(EventRunning{});
         } else {
-            log_ptr_->error("机器人继续失败: result={}, state={}",
+            Logger::logCode(LogLevel::Error, "Robot", static_cast<int>(rc), "Motion resume request failed: result={}, state={}.",
                             static_cast<int>(rc), GetStateString());
         }
 
@@ -471,8 +400,7 @@ namespace rocos {
         fsm_error_entered_once_ = true;
         return;
       }
-      log_ptr_->error("机器人进入ERROR: state={}, enabled={}, control_active={}",
-                      GetStateString(), IsEnabled(), IsControlActive());
+      emitLogEvent(LogEventType::EnteredError, LogModule::Robot, 0);
       {
         std::lock_guard<std::mutex> lock(mtx_);
         if (motion) {
@@ -481,7 +409,7 @@ namespace rocos {
       }
     }
     void Robot::on_fsm_stopped() {
-      log_ptr_->info("机器人进入STOPPED状态");
+      emitLogEvent(LogEventType::EnteredStopped, LogModule::Robot, 0, -1, 0, 0, 0, LogLevel::Info);
 
       {
         std::lock_guard<std::mutex> lock(mtx_);
@@ -494,7 +422,7 @@ namespace rocos {
     }
 
     void Robot::on_fsm_resetting() {
-        log_ptr_->info("机器人进入RESETTING，开始清除报警并重新建立使能状态");
+        log_ptr_->info("Robot entered RESETTING; clearing hardware faults and checking enable state.");
 
         bool controller_reset_failed = false;
         {
@@ -502,7 +430,7 @@ namespace rocos {
             if (motion) {
                 const Result motion_reset = motion->Reset();
                 if (motion_reset != Result::NoError && motion_reset != Result::PlanFinished) {
-                    log_ptr_->warn("ResetFault重置当前motion返回: {}", static_cast<int>(motion_reset));
+                    Logger::logCode(LogLevel::Warn, "Robot", static_cast<int>(motion_reset), "ResetFault motion reset returned result={}.", static_cast<int>(motion_reset));
                 }
                 motion.reset();
                 if (executor) {
@@ -511,7 +439,7 @@ namespace rocos {
             }
 
             if (controller && !controller->Reset()) {
-                log_ptr_->error("ResetFault重置控制器失败，保持ERROR_STATE");
+                log_ptr_->error("ResetFault controller reset failed; remaining in ERROR_STATE.");
                 controller_reset_failed = true;
             }
         }
@@ -524,31 +452,31 @@ namespace rocos {
             const Result clear_result = hardware->ClearFault(); //TODO： 这一步会下使能
             if (clear_result != Result::NoError &&
                 clear_result != Result::FunctionNotSupported) {
-                log_ptr_->error("ResetFault清除硬件报警失败: {}", static_cast<int>(clear_result));
+                Logger::logCode(LogLevel::Error, "Robot", static_cast<int>(clear_result), "ResetFault hardware fault clear failed: result={}.", static_cast<int>(clear_result));
                 impl_->process_event(EventErrorOccurred{});
                 return;
             }
             if (clear_result == Result::FunctionNotSupported) {
-                log_ptr_->warn("当前Hardware未实现ClearFault，继续尝试重新使能");
+                log_ptr_->warn("Hardware does not implement ClearFault; continuing the enable-state check.");
             }
         }
 
         if (IsEnabled()) {
-            log_ptr_->info("ResetFault成功，机器人已经使能，准备进入STOPPED状态");
+            log_ptr_->info("ResetFault completed and enable state confirmed; transitioning to STOPPED.");
             impl_->process_event(EventEnabled{}); // 模拟初始化成功事件
             startControlThread(); //TODO: 兼容设计，原本在Enabling中启动线程
         } else {
-          log_ptr_->info("机器人启动初始化完成，保持IDLE状态");
+          log_ptr_->info("Robot initialization completed; remaining disabled in IDLE.");
           impl_->process_event(EventDisabled{});
         }
     }
 
     void Robot::on_fsm_servoing() {
-        log_ptr_->info("机器人已进入SERVOING状态");
+        log_ptr_->info("Robot entered SERVOING.");
         if (data_ready_callback_) {
             Result rc = data_ready_callback_();
             if (rc != Result::NoError && rc != Result::PlanFinished) {
-                log_ptr_->error("伺服模式启动失败: {}", static_cast<int>(rc));
+                Logger::logCode(LogLevel::Error, "Robot", static_cast<int>(rc), "Servo motion initialization failed: result={}.", static_cast<int>(rc));
                 impl_->process_event(EventErrorOccurred{});
             }
         }
@@ -561,10 +489,18 @@ namespace rocos {
       stopControlThread();
 
         control_thread_ = std::thread([this]() {
+            bindRtLogProducer(rt_log_producer_.get());
+            const auto monotonic_us = std::chrono::duration_cast<std::chrono::microseconds>(
+                std::chrono::steady_clock::now().time_since_epoch()).count();
+            setRtLogClock(static_cast<uint64_t>(logNowMicros()), monotonic_us);
+            uint64_t cycle = 0;
             while (IsControlActive()) {
+                setRtLogCycle(cycle, 0); // Executor 的现有性能采样更新实际周期时间。
+                ++cycle;
                 RunCycle();
                 waitControlCycle();
             }
+            bindRtLogProducer(nullptr);
         });
     }
 
@@ -577,7 +513,7 @@ namespace rocos {
             return;
         }
         if (control_thread_.get_id() == std::this_thread::get_id()) {
-            log_ptr_->warn("控制线程尝试join自身，跳过");
+            emitLogEvent(LogEventType::ThreadJoinSkipped, LogModule::Robot, 0, -1, 0, 0, 0, LogLevel::Warn);
             return;
         }
         control_thread_.join();
@@ -589,7 +525,7 @@ namespace rocos {
         const auto hardware_drive_ids = hardware->GetDriveIds();
 
         log_ptr_->info(
-            "JointBinding 开始初始化: model joints={} [{}], hw drives={} [{}], "
+            "Joint binding initialization started: model joints={} [{}], hardware drives={} [{}], "
             "yaml={}",
             model_joint_names.size(), joinNames(model_joint_names),
             hardware_drive_ids.size(), joinDriveIds(hardware_drive_ids),
@@ -600,7 +536,7 @@ namespace rocos {
             joint_binding_->Configure(model_joint_names, hardware_drive_ids);
         if (rc != Result::NoError) {
           log_ptr_->error(
-              "JointBinding Configure 失败: model joints={}, hw drives={}",
+              "Joint binding configuration failed: model joints={}, hardware drives={}.",
               model_joint_names.size(), hardware_drive_ids.size());
           throw std::runtime_error(
               "JointBinding Configure failed: model joints=" +
@@ -611,11 +547,11 @@ namespace rocos {
         // 检查 joint_binding.yaml 是否存在
         std::ifstream binding_file(joint_binding_path_);
         if (binding_file.good()) {
-          log_ptr_->info("发现 JointBinding YAML，使用显式绑定: {}",
+          log_ptr_->info("Loading explicit joint binding from YAML: {}",
                          joint_binding_path_);
           rc = joint_binding_->LoadFromYaml(joint_binding_path_);
           if (rc != Result::NoError) {
-            log_ptr_->error("JointBinding YAML 加载失败: {}",
+            log_ptr_->error("Joint binding YAML load failed: {}",
                             joint_binding_path_);
             throw std::runtime_error("JointBinding LoadFromYaml failed: " +
                                      joint_binding_path_);
@@ -624,7 +560,7 @@ namespace rocos {
           // 无 YAML 时要求 model joint 数量 == hardware drive 数量
           if (model_joint_names.size() != hardware_drive_ids.size()) {
             log_ptr_->error(
-                "JointBinding YAML 不存在且数量不匹配: yaml={}, model "
+                "Joint binding YAML is missing and joint counts differ: yaml={}, model "
                 "joints={}, hw drives={}",
                 joint_binding_path_, model_joint_names.size(),
                 hardware_drive_ids.size());
@@ -635,7 +571,7 @@ namespace rocos {
                 " hw=" + std::to_string(hardware_drive_ids.size()));
           }
           log_ptr_->warn(
-              "JointBinding YAML 不存在，使用默认顺序绑定: model joints={}, hw "
+              "Joint binding YAML is missing; using sequential binding: model joints={}, hardware "
               "drives={}",
               model_joint_names.size(), hardware_drive_ids.size());
           // 自动生成默认顺序绑定
@@ -646,7 +582,7 @@ namespace rocos {
 
         rc = joint_binding_->Validate();
         if (rc != Result::NoError) {
-          log_ptr_->error("JointBinding Validate 失败: yaml={}",
+          log_ptr_->error("Joint binding validation failed: yaml={}",
                           joint_binding_path_);
           throw std::runtime_error("JointBinding Validate failed");
         }
@@ -654,18 +590,18 @@ namespace rocos {
         const auto model_index_to_drive_id =
             joint_binding_->GetModelIndexToDriveIds();
         log_ptr_->info(
-            "准备写入 Hardware JointBinding: model_index_to_drive_id=[{}]",
+            "Applying hardware joint binding: model_index_to_drive_id=[{}]",
             joinDriveIds(model_index_to_drive_id));
         rc = hardware->SetJointBinding(model_index_to_drive_id);
         if (rc != Result::NoError) {
           log_ptr_->error(
-              "Hardware SetJointBinding 失败: model_index_to_drive_id=[{}]",
+              "Hardware joint binding failed: model_index_to_drive_id=[{}]",
               joinDriveIds(model_index_to_drive_id));
           throw std::runtime_error("Hardware SetJointBinding failed");
         }
 
         log_ptr_->info(
-            "JointBinding 初始化完成: model joints={}, hw drives={}, "
+            "Joint binding initialization completed: model joints={}, hardware drives={}, "
             "binding={}",
             model_joint_names.size(), hardware_drive_ids.size(),
             joint_binding_path_);
@@ -673,7 +609,7 @@ namespace rocos {
 
     Robot::Robot() : Robot(Config{}) {}
 
-    Robot::Robot(const Config &config) : log_ptr_(Logger::getInstance("Robot")), impl_(std::make_unique<Impl>(*this)) {
+    Robot::Robot(const Config &config) : frames_(config.frames), log_ptr_(Logger::getInstance("Robot")), impl_(std::make_unique<Impl>(*this)) {
         executor = std::make_unique<Executor>();
 
         joint_binding_path_ = config.joint_binding;
@@ -683,11 +619,14 @@ namespace rocos {
         model = std::make_unique<Model>(config.urdf, config.base_link, config.tip_link);
 
         jointBinding();
+        if (std::filesystem::exists(config.frames) && frames_.load() != Result::NoError) {
+            throw std::runtime_error("Cannot load configured coordinate frames: " + config.frames);
+        }
 
         // 尝试从配置文件加载已知负载参数（存在则跳过辨识）
         const Result load_rc = LoadLoadParameters();
         if (load_rc == Result::NoError) {
-            log_ptr_->info("已加载持久化负载参数，零力拖动将跳过辨识");
+            log_ptr_->info("Persisted payload parameters loaded; zero-force drag will skip payload identification.");
         }
 
         dt_=hardware->GetDt()/1000000.0; // 将微秒转换为秒
@@ -699,11 +638,11 @@ namespace rocos {
 
         const Result work_mode_result = SetWorkMode("position");
         if (work_mode_result != Result::NoError) {
-          log_ptr_->error("机器人默认工作模式初始化失败: {}", static_cast<int>(work_mode_result));
+          Logger::logCode(LogLevel::Error, "Robot", static_cast<int>(work_mode_result), "Default robot work mode initialization failed: result={}.", static_cast<int>(work_mode_result));
           throw std::runtime_error("Robot default work mode initialization failed");
         }
 
-        log_ptr_->info("机器人开始初始化");
+        log_ptr_->info("Robot initialization started.");
         impl_->process_event(EventResetReq{}); // 进入初始化状态
     }
 
@@ -794,10 +733,11 @@ namespace rocos {
         snap.flange = getFlange();
 
         // 激活的坐标系
-        snap.active_tool_frame_name = GetActiveToolFrameName();
-        snap.active_object_frame_name = GetActiveObjectFrameName();
-        snap.active_tool_frame = GetActiveToolFrame();
-        snap.active_object_frame = GetActiveObjectFrame();
+        const auto frames = frames_.snapshot();
+        snap.active_tool_frame_name = frames->active_tool;
+        snap.active_object_frame_name = frames->active_object;
+        if (frames->tools.count(frames->active_tool)) snap.active_tool_frame = frames->tools.at(frames->active_tool);
+        if (frames->objects.count(frames->active_object)) snap.active_object_frame = frames->objects.at(frames->active_object);
 
         // 硬件摘要
         snap.joint_num = n;
@@ -809,7 +749,7 @@ namespace rocos {
     }
 
     Result Robot::SetEnabled() {
-        log_ptr_->info("收到上使能指令");
+        log_ptr_->info("Enable command received.");
 
         //TODO: 代码清理 by think
         // if (impl_->is(sml::state<class IDLE>) ||
@@ -818,7 +758,7 @@ namespace rocos {
         // }
 
         if (!impl_->process_event(EventEnableReq{})) {
-            log_ptr_->error("当前状态无法执行上使能指令");
+            log_ptr_->error("Enable command rejected in the current robot state.");
             return Result::JointStateError;
         }
 
@@ -826,9 +766,9 @@ namespace rocos {
     }
 
     Result Robot::SetDisabled() {
-        log_ptr_->info("收到下使能指令");
+        log_ptr_->info("Disable command received.");
         if (!impl_->process_event(EventDisableReq{})) {
-            log_ptr_->error("当前状态无法执行下使能指令");
+            log_ptr_->error("Disable command rejected in the current robot state.");
             return Result::JointStateError;
         }
 
@@ -842,16 +782,16 @@ namespace rocos {
     }
 
     Result Robot::ResetFault() {
-        log_ptr_->info("收到ResetFault清除报警指令，当前状态: {}", GetStateString());
+        log_ptr_->info("ResetFault command received: state={}.", GetStateString());
         if (!impl_->is(sml::state<class ERROR_STATE>)) {
-            log_ptr_->error("当前状态不是ERROR_STATE，拒绝ResetFault: {}", GetStateString());
+            log_ptr_->error("ResetFault rejected: state={} is not ERROR_STATE.", GetStateString());
             return Result::JointStateError;
         }
 
         // stopControlThread(); //TODO： 代码清理 by think
 
         if (!impl_->process_event(EventResetReq{})) {
-            log_ptr_->error("ResetFault状态机事件被拒绝，当前状态: {}", GetStateString());
+            log_ptr_->error("ResetFault state transition rejected: state={}.", GetStateString());
             return Result::JointStateError;
         }
 
@@ -859,7 +799,7 @@ namespace rocos {
             return Result::NoError;
         }
 
-        log_ptr_->error("ResetFault未能回到STOPPED，当前状态: {}", GetStateString());
+        log_ptr_->error("ResetFault did not reach STOPPED: state={}.", GetStateString());
         return Result::Fatal;
     }
 
@@ -870,7 +810,7 @@ namespace rocos {
             impl_->is(sml::state<class STOPPED>) ||
             impl_->is(sml::state<class ERROR_STATE>); // 允许在 ERROR_STATE 下切换控制器，以便恢复
         if (!is_switchable_state) {
-            log_ptr_->error("SetWorkMode 只能在 IDLE 或 STOPPED 状态下调用, 当前状态: {}",
+            log_ptr_->error("SetWorkMode requires IDLE or STOPPED: current state={}.",
                             GetStateString());
             return Result::IllegalParameter;
         }
@@ -903,22 +843,22 @@ namespace rocos {
 
             new_controller = std::move(zfd);
         } else if (mode == "ee_admit_teach") {
-            log_ptr_->error("SetWorkMode: 暂未实现 '{}'", mode);
+            log_ptr_->error("SetWorkMode is not implemented for mode='{}'.", mode);
             return Result::IllegalParameter;
         } else {
-            log_ptr_->error("SetWorkMode: 未知模式 '{}'", mode);
+            log_ptr_->error("SetWorkMode received unknown mode='{}'.", mode);
             return Result::IllegalParameter;
         }
 
         Result rc = new_controller->SetHardware(hardware.get());
         if (rc != Result::NoError) {
-            log_ptr_->error("SetWorkMode: SetHardware 失败, mode={}", mode);
+            log_ptr_->error("SetWorkMode hardware binding failed: mode={}.", mode);
             return rc;
         }
 
         rc = new_controller->SetModel(model.get());
         if (rc != Result::NoError) {
-            log_ptr_->error("SetWorkMode: SetModel 失败, mode={}", mode);
+            log_ptr_->error("SetWorkMode model binding failed: mode={}.", mode);
             return rc;
         }
 
@@ -926,37 +866,37 @@ namespace rocos {
             std::lock_guard<std::mutex> lock(mtx_);
 
             if (!executor->SwitchController(nullptr)) {
-                log_ptr_->error("SetWorkMode: 清空 Executor Controller 失败, mode={}", mode);
+                log_ptr_->error("SetWorkMode could not clear the executor controller: mode={}.", mode);
                 return Result::Fatal;
             }
             controller.reset();
 
             rc = new_controller->SetReady();
             if (rc != Result::NoError) {
-                log_ptr_->error("SetWorkMode: SetReady 失败, mode={}", mode);
+                log_ptr_->error("SetWorkMode controller preparation failed: mode={}.", mode);
 
                 auto fallback_controller = std::make_unique<PositionController>();
                 Result fallback_rc = fallback_controller->SetHardware(hardware.get());
                 if (fallback_rc != Result::NoError) {
-                    log_ptr_->error("SetWorkMode: fallback SetHardware 失败");
+                    log_ptr_->error("SetWorkMode fallback hardware binding failed.");
                     return rc;
                 }
 
                 fallback_rc = fallback_controller->SetModel(model.get());
                 if (fallback_rc != Result::NoError) {
-                    log_ptr_->error("SetWorkMode: fallback SetModel 失败");
+                    log_ptr_->error("SetWorkMode fallback model binding failed.");
                     return rc;
                 }
 
                 fallback_rc = fallback_controller->SetReady();
                 if (fallback_rc != Result::NoError) {
-                    log_ptr_->error("SetWorkMode: fallback SetReady 失败");
+                    log_ptr_->error("SetWorkMode fallback controller preparation failed.");
                     return rc;
                 }
 
                 controller = std::move(fallback_controller);
                 if (!executor->SwitchController(controller.get())) {
-                    log_ptr_->error("SetWorkMode: fallback SwitchController 失败");
+                    log_ptr_->error("SetWorkMode fallback controller switch failed.");
                     return Result::Fatal;
                 }
                 work_mode_ = "position";
@@ -964,13 +904,13 @@ namespace rocos {
             }
             controller = std::move(new_controller);
             if (!executor->SwitchController(controller.get())) {
-                log_ptr_->error("SetWorkMode: SwitchController 失败, mode={}", mode);
+                log_ptr_->error("SetWorkMode executor controller switch failed: mode={}.", mode);
                 return Result::Fatal;
             }
             work_mode_ = mode;
         }
 
-        log_ptr_->info("SetWorkMode: 成功切换到模式 '{}'", mode);
+        log_ptr_->info("Work mode changed to '{}'.", mode);
         return Result::NoError;
     }
 
@@ -1023,7 +963,7 @@ namespace rocos {
         if (mass < 0.0 || !std::isfinite(mass) ||
             !std::isfinite(com.x()) || !std::isfinite(com.y()) ||
             !std::isfinite(com.z())) {
-            log_ptr_->error("SetLoadParameters: 非法负载参数 mass={}", mass);
+            log_ptr_->error("SetLoadParameters rejected invalid payload parameters: mass={} kg.", mass);
             return Result::ParameterNanOrInf;
         }
 
@@ -1042,7 +982,7 @@ namespace rocos {
         // 文件不存在时静默返回，视为"尚未辨识过负载"，走辨识流程
         std::ifstream in(file);
         if (!in.is_open()) {
-            log_ptr_->info("LoadLoadParameters: 未找到负载参数文件 '{}'，将走辨识流程", file);
+            log_ptr_->info("Payload parameter file '{}' was not found; payload identification is required.", file);
             return Result::ResourceUnavailable;
         }
         in.close();
@@ -1050,7 +990,7 @@ namespace rocos {
         try {
             YAML::Node root = YAML::LoadFile(file);
             if (!root["mass"]) {
-                log_ptr_->error("LoadLoadParameters: 文件 '{}' 缺少 'mass' 字段", file);
+                log_ptr_->error("Payload parameter file '{}' is missing the mass field.", file);
                 return Result::IllegalParameter;
             }
             const double mass = root["mass"].as<double>();
@@ -1063,7 +1003,7 @@ namespace rocos {
                                  com_node[1].as<double>(),
                                  com_node[2].as<double>());
                 } else {
-                    log_ptr_->error("LoadLoadParameters: 文件 '{}' 的 'com' 字段非法", file);
+                    log_ptr_->error("Payload parameter file '{}' contains an invalid center-of-mass field.", file);
                     return Result::IllegalParameter;
                 }
             }
@@ -1072,10 +1012,10 @@ namespace rocos {
             if (rc != Result::NoError) {
                 return rc;
             }
-            log_ptr_->info("LoadLoadParameters: 已从 '{}' 加载负载参数 mass={:.3f} kg", file, mass);
+            log_ptr_->info("Payload parameters loaded from '{}': mass={:.3f} kg.", file, mass);
             return Result::NoError;
         } catch (const YAML::Exception& e) {
-            log_ptr_->error("LoadLoadParameters: YAML 解析失败 '{}': {}", file, e.what());
+            log_ptr_->error("Payload YAML parse failed for '{}': {}", file, e.what());
             return Result::ResourceUnavailable;
         }
     }
@@ -1084,7 +1024,7 @@ namespace rocos {
         const std::string file = path.empty() ? load_params_path_ : path;
 
         if (!load_params_valid_) {
-            log_ptr_->error("SaveLoadParameters: 当前无有效负载参数可保存");
+            log_ptr_->error("Cannot save payload parameters: no valid payload parameters are available.");
             return Result::ResourceUnavailable;
         }
 
@@ -1098,16 +1038,16 @@ namespace rocos {
 
         std::ofstream out(file);
         if (!out.is_open()) {
-            log_ptr_->error("SaveLoadParameters: 无法打开文件 '{}'", file);
+            log_ptr_->error("Cannot open payload parameter file '{}' for writing.", file);
             return Result::ResourceUnavailable;
         }
         out << root;
         if (!out.good()) {
-            log_ptr_->error("SaveLoadParameters: 写入文件 '{}' 失败", file);
+            log_ptr_->error("Writing payload parameter file '{}' failed.", file);
             return Result::ResourceUnavailable;
         }
 
-        log_ptr_->info("SaveLoadParameters: 负载参数已保存到 '{}' mass={:.3f} kg",
+        log_ptr_->info("Payload parameters saved to '{}': mass={:.3f} kg.",
                        file, load_mass_);
         return Result::NoError;
     }
@@ -1221,13 +1161,11 @@ namespace rocos {
       }
 
       if (static_cast<int>(res) < 0) {
-        log_ptr_->error(
-            "机器人控制循环出现错误: result={}, state={}, enabled={}, control_active={}",
-            static_cast<int>(res), GetStateString(), IsEnabled(), IsControlActive());
+        emitLogEvent(LogEventType::CycleFailed, LogModule::Robot, static_cast<int>(res));
         impl_->process_event(EventErrorOccurred{});
       }
       else if (static_cast<int>(res) > 0) {
-        log_ptr_->info("机器人控制循环成功完成: {}", static_cast<int>(res));
+        emitLogEvent(LogEventType::CycleFinished, LogModule::Robot, static_cast<int>(res), -1, 0, 0, 0, LogLevel::Info);
         impl_->process_event(EventSuccessed{});
       }
 
@@ -1239,6 +1177,7 @@ namespace rocos {
 
     Result Robot::MoveJ(const JntArray &q_goal,
                         double v_limit, double a_limit, double j_limit) {
+        auto command_lock = LockToolState();
 
         data_ready_callback_ = [this, q_goal, v_limit, a_limit, j_limit]() -> Result {
             const int n = getJointNum();
@@ -1251,8 +1190,8 @@ namespace rocos {
 
             Result rc = new_motion->Reset();
             if (rc != Result::NoError) {
-                log_ptr_->error(
-                    "MoveJ 规划失败: result={}, joints={}, velocity={}, acceleration={}, jerk={}, dt={}",
+                Logger::logCode(LogLevel::Error, "Robot", static_cast<int>(rc),
+                    "MoveJ planning failed: result={}, joint_count={}, velocity={} rad/s, acceleration={} rad/s^2, jerk={} rad/s^3, dt={} s.",
                     static_cast<int>(rc), q_goal.rows(), v_limit, a_limit, j_limit, dt_);
                 return rc;
             }
@@ -1268,16 +1207,16 @@ namespace rocos {
             // STOPPED → RUNNING
         } else {
             data_ready_callback_ = nullptr;  // 切换失败，清除无效回调
-            log_ptr_->error("MoveJ 请求被状态机拒绝: state={}, enabled={}, running={}",
+            log_ptr_->error("MoveJ request rejected by the state machine: state={}, enabled={}, running={}.",
                             GetStateString(), IsEnabled(), IsRunning());
             if (impl_->is(sml::state<class IDLE>)) {
-                log_ptr_->error("机器人处于IDLE状态，无法执行MoveJ指令，请先上使能");
+                log_ptr_->error("MoveJ requires an enabled robot; current state is IDLE.");
                 return Result::NotEnabled;
             } else if (impl_->is(sml::state<class ERROR_STATE>)) {
-                log_ptr_->error("机器人处于ERROR_STATE状态，无法执行MoveJ指令，请先复位");
+                log_ptr_->error("MoveJ rejected in ERROR_STATE; reset the fault before requesting motion.");
                 return Result::Fatal;
             } else {
-                log_ptr_->error("机器人当前状态无法执行MoveJ指令, 当前状态: {}", GetStateString());
+                log_ptr_->error("MoveJ rejected in the current state: {}.", GetStateString());
                 return Result::ConflictTaskRunning;
             }
         }
@@ -1293,8 +1232,9 @@ namespace rocos {
     Result Robot::MoveL(const Frame &pose_goal,
                         const std::string &tool_name,
                         double v_limit, double a_limit, double j_limit) {
+        auto command_lock = LockToolState();
         if (!tool_name.empty() && !HasToolFrame(tool_name)) {
-            log_ptr_->error("工具坐标系不存在: {}", tool_name);
+            log_ptr_->error("Requested tool frame does not exist: {}", tool_name);
             return Result::ResourceUnavailable;
         }
 
@@ -1307,18 +1247,18 @@ namespace rocos {
             if (model) {
                 const Result fk_result = model->ForwardKinematics(q_current, pose_flange);
                 if (fk_result != Result::NoError) {
-                    log_ptr_->error("MoveL 起点正解失败: result={}, joints={}, state={}",
+                    Logger::logCode(LogLevel::Error, "Robot", static_cast<int>(fk_result), "MoveL start forward kinematics failed: result={}, joint_count={}, state={}.",
                                     static_cast<int>(fk_result), n, GetStateString());
                 }
             } else {
-                log_ptr_->error("MoveL 起点正解失败: robot model pointer is null");
+                log_ptr_->error("MoveL start forward kinematics failed: robot model pointer is null.");
             }
 
             Frame T_tool;
             if (!tool_name.empty()) {
                 Result rc = GetToolFrame(tool_name, T_tool);
                 if (rc != Result::NoError) {
-                    log_ptr_->error("MoveL 工具坐标系读取失败: tool='{}', result={}",
+                    Logger::logCode(LogLevel::Error, "Robot", static_cast<int>(rc), "MoveL tool frame lookup failed: tool='{}', result={}.",
                                     tool_name, static_cast<int>(rc));
                     return rc;
                 }
@@ -1341,8 +1281,8 @@ namespace rocos {
             //     v_limit, a_limit, j_limit, dt_, model.get());
             // Result rc = new_motion->Reset();
             if (rc != Result::NoError) {
-                log_ptr_->error(
-                    "MoveL 规划失败: result={}, tool='{}', velocity={}, acceleration={}, jerk={}, dt={}",
+                Logger::logCode(LogLevel::Error, "Robot", static_cast<int>(rc),
+                    "MoveL planning failed: result={}, tool='{}', velocity={} m/s, acceleration={} m/s^2, jerk={} m/s^3, dt={} s.",
                     static_cast<int>(rc), tool_name, v_limit, a_limit, j_limit, dt_);
                 return rc;
             }
@@ -1360,7 +1300,7 @@ namespace rocos {
 
         if (!impl_->process_event(EventStartReq{})) {
             data_ready_callback_ = nullptr;  // 切换失败，清除无效回调
-            log_ptr_->error("MoveL 请求被状态机拒绝: state={}, enabled={}, running={}, tool='{}'",
+            log_ptr_->error("MoveL request rejected by the state machine: state={}, enabled={}, running={}, tool='{}'.",
                             GetStateString(), IsEnabled(), IsRunning(), tool_name);
             if (impl_->is(sml::state<class IDLE>)) return Result::NotEnabled;
             if (impl_->is(sml::state<class ERROR_STATE>)) return Result::Fatal;
@@ -1371,8 +1311,9 @@ namespace rocos {
 
     Result Robot::MoveJ_IK(const Frame &pose_goal,
                            double v_limit, double a_limit, double j_limit) {
+        auto command_lock = LockToolState();
         if (!model) {
-            log_ptr_->error("机器人模型未初始化，无法执行MoveJ_IK指令");
+            log_ptr_->error("MoveJ_IK requires an initialized robot model.");
             return Result::ResourceUnavailable;
         }
 
@@ -1383,7 +1324,7 @@ namespace rocos {
         JntArray q_goal(static_cast<unsigned int>(n));
         Result rc = model->InverseKinematics(q_current, pose_goal, q_goal);
         if (rc != Result::NoError) {
-            log_ptr_->error("MoveJ_IK 逆解失败: result={}, joints={}, state={}",
+            Logger::logCode(LogLevel::Error, "Robot", static_cast<int>(rc), "MoveJ_IK inverse kinematics failed: result={}, joint_count={}, state={}.",
                             static_cast<int>(rc), n, GetStateString());
             return rc;
         }
@@ -1394,8 +1335,9 @@ namespace rocos {
     Result Robot::MoveL_FK(const JntArray &q_goal,
                            const std::string &tool_name,
                            double v_limit, double a_limit, double j_limit) {
+        auto command_lock = LockToolState();
         if (!model) {
-            log_ptr_->error("机器人模型未初始化，无法执行MoveL_FK指令");
+            log_ptr_->error("MoveL_FK requires an initialized robot model.");
             return Result::ResourceUnavailable;
         }
 
@@ -1406,211 +1348,75 @@ namespace rocos {
         return MoveL(pose_goal, tool_name, v_limit, a_limit, j_limit);
     }
 
-    std::vector<std::string> Robot::GetToolFrameNames() const {
-        return collectFrameNames(tool_frames_);
-    }
-
-    std::vector<std::string> Robot::GetObjectFrameNames() const {
-        return collectFrameNames(object_frames_);
-    }
-
-    bool Robot::HasToolFrame(const std::string &name) const {
-        return tool_frames_.find(name) != tool_frames_.end();
-    }
-
-    bool Robot::HasObjectFrame(const std::string &name) const {
-        return object_frames_.find(name) != object_frames_.end();
-    }
-
-    bool Robot::IsValidFrameName(const std::string &name) const {
-        return isValidFrameNameValue(name);
-    }
-
-    Result Robot::GetToolFrame(const std::string &name, Frame &frame) const {
-        auto it = tool_frames_.find(name);
-        if (it == tool_frames_.end()) return Result::ResourceUnavailable;
-        frame = it->second;
+    std::vector<std::string> Robot::GetToolFrameNames() const { return frames_.names(true); }
+    std::vector<std::string> Robot::GetObjectFrameNames() const { return frames_.names(false); }
+    bool Robot::HasToolFrame(const std::string& name) const { Frame frame; return frames_.get(name, true, frame) == Result::NoError; }
+    bool Robot::HasObjectFrame(const std::string& name) const { Frame frame; return frames_.get(name, false, frame) == Result::NoError; }
+    bool Robot::IsValidFrameName(const std::string& name) const { return FrameRegistry::validName(name); }
+    Result Robot::GetToolFrame(const std::string& name, Frame& frame) const { return frames_.get(name, true, frame); }
+    Result Robot::GetObjectFrame(const std::string& name, Frame& frame) const { return frames_.get(name, false, frame); }
+    Frame Robot::GetToolFrame(const std::string& name) const { Frame frame; frames_.get(name, true, frame); return frame; }
+    Frame Robot::GetObjectFrame(const std::string& name) const { Frame frame; frames_.get(name, false, frame); return frame; }
+    Result Robot::SetToolFrame(const std::string& name, const Frame& frame) { return ModifyFrames([&] { return frames_.set(name, frame, true); }); }
+    Result Robot::SetToolFrame(const std::string& name, const Frame& frame, bool persist) { return ModifyFrames([&] { return frames_.set(name, frame, true, false, persist); }); }
+    Result Robot::SetObjectFrame(const std::string& name, const Frame& frame) { return ModifyFrames([&] { return frames_.set(name, frame, false); }); }
+    Result Robot::AddToolFrame(const std::string& name, const Frame& frame) { return ModifyFrames([&] { return frames_.set(name, frame, true, true); }); }
+    Result Robot::AddObjectFrame(const std::string& name, const Frame& frame) { return ModifyFrames([&] { return frames_.set(name, frame, false, true); }); }
+    Result Robot::RemoveToolFrame(const std::string& name) { return ModifyFrames([&] { return frames_.remove(name, true); }); }
+    Result Robot::RemoveToolFrame(const std::string& name, bool persist) { return ModifyFrames([&] { return frames_.remove(name, true, persist); }); }
+    Result Robot::RemoveObjectFrame(const std::string& name) { return ModifyFrames([&] { return frames_.remove(name, false); }); }
+    Result Robot::SetActiveToolFrame(const std::string& name) { return ModifyFrames([&] { return frames_.activate(name, true); }); }
+    Result Robot::SetActiveToolFrame(const std::string& name, bool persist) { return ModifyFrames([&] { return frames_.activate(name, true, persist); }); }
+    Result Robot::SetActiveObjectFrame(const std::string& name) { return ModifyFrames([&] { return frames_.activate(name, false); }); }
+    std::string Robot::GetActiveToolFrameName() const { return frames_.snapshot()->active_tool; }
+    std::string Robot::GetActiveObjectFrameName() const { return frames_.snapshot()->active_object; }
+    Result Robot::GetActiveToolFrame(Frame& frame) const {
+        auto state = frames_.snapshot();
+        auto found = state->tools.find(state->active_tool);
+        if (found == state->tools.end()) return Result::ResourceUnavailable;
+        frame = found->second;
         return Result::NoError;
     }
-
-    Result Robot::GetObjectFrame(const std::string &name, Frame &frame) const {
-        auto it = object_frames_.find(name);
-        if (it == object_frames_.end()) return Result::ResourceUnavailable;
-        frame = it->second;
+    Result Robot::GetActiveObjectFrame(Frame& frame) const {
+        auto state = frames_.snapshot();
+        auto found = state->objects.find(state->active_object);
+        if (found == state->objects.end()) return Result::ResourceUnavailable;
+        frame = found->second;
         return Result::NoError;
     }
+    Frame Robot::GetActiveToolFrame() const { Frame frame; GetActiveToolFrame(frame); return frame; }
+    Frame Robot::GetActiveObjectFrame() const { Frame frame; GetActiveObjectFrame(frame); return frame; }
+    Result Robot::LoadFrames(const std::string& path) { return ModifyFrames([&] { return frames_.load(path); }); }
+    Result Robot::SaveFrames(const std::string& path) const { return ModifyFrames([&] { return frames_.save(path); }); }
 
-    Frame Robot::GetToolFrame(const std::string &name) const {
-        auto it = tool_frames_.find(name);
-        return (it != tool_frames_.end()) ? it->second : Frame();
+    std::unique_lock<std::recursive_mutex> Robot::LockToolState() const { return impl_->lock(); }
+    bool Robot::CanChangeToolState() const {
+        return impl_->is(sml::state<class IDLE>) || impl_->is(sml::state<class STOPPED>);
     }
-
-    Frame Robot::GetObjectFrame(const std::string &name) const {
-        auto it = object_frames_.find(name);
-        return (it != object_frames_.end()) ? it->second : Frame();
+    Result Robot::ModifyFrames(const std::function<Result()>& change) const {
+        auto state_lock = LockToolState();
+        if (!CanChangeToolState()) return Result::CallingConflictError;
+        return change();
     }
-
-    Result Robot::SetToolFrame(const std::string &name, const Frame &T_tool) {
-        if (!IsValidFrameName(name)) return Result::IllegalParameter;
-        tool_frames_[name] = T_tool;
-        return Result::NoError;
-    }
-
-    Result Robot::SetObjectFrame(const std::string &name, const Frame &T_object) {
-        if (!IsValidFrameName(name)) return Result::IllegalParameter;
-        object_frames_[name] = T_object;
-        return Result::NoError;
-    }
-
-    Result Robot::AddToolFrame(const std::string &name, const Frame &T_tool) {
-        if (!IsValidFrameName(name)) return Result::IllegalParameter;
-        auto inserted = tool_frames_.emplace(name, T_tool);
-        return inserted.second ? Result::NoError : Result::CallingConflictError;
-    }
-
-    Result Robot::AddObjectFrame(const std::string &name, const Frame &T_object) {
-        if (!IsValidFrameName(name)) return Result::IllegalParameter;
-        auto inserted = object_frames_.emplace(name, T_object);
-        return inserted.second ? Result::NoError : Result::CallingConflictError;
-    }
-
-    Result Robot::RemoveToolFrame(const std::string &name) {
-        if (!IsValidFrameName(name)) return Result::IllegalParameter;
-        if (tool_frames_.erase(name) == 0) return Result::ResourceUnavailable;
-        if (active_tool_frame_name_ == name) active_tool_frame_name_.clear();
-        return Result::NoError;
-    }
-
-    Result Robot::RemoveObjectFrame(const std::string &name) {
-        if (!IsValidFrameName(name)) return Result::IllegalParameter;
-        if (object_frames_.erase(name) == 0) return Result::ResourceUnavailable;
-        if (active_object_frame_name_ == name) active_object_frame_name_.clear();
-        return Result::NoError;
-    }
-
-    Result Robot::SetActiveToolFrame(const std::string &name) {
-        if (!IsValidFrameName(name)) return Result::IllegalParameter;
-        if (!HasToolFrame(name)) return Result::ResourceUnavailable;
-        active_tool_frame_name_ = name;
-        return Result::NoError;
-    }
-
-    Result Robot::SetActiveObjectFrame(const std::string &name) {
-        if (!IsValidFrameName(name)) return Result::IllegalParameter;
-        if (!HasObjectFrame(name)) return Result::ResourceUnavailable;
-        active_object_frame_name_ = name;
-        return Result::NoError;
-    }
-
-    std::string Robot::GetActiveToolFrameName() const {
-        return active_tool_frame_name_;
-    }
-
-    std::string Robot::GetActiveObjectFrameName() const {
-        return active_object_frame_name_;
-    }
-
-    Result Robot::GetActiveToolFrame(Frame &frame) const {
-        if (active_tool_frame_name_.empty()) return Result::ResourceUnavailable;
-        return GetToolFrame(active_tool_frame_name_, frame);
-    }
-
-    Result Robot::GetActiveObjectFrame(Frame &frame) const {
-        if (active_object_frame_name_.empty()) return Result::ResourceUnavailable;
-        return GetObjectFrame(active_object_frame_name_, frame);
-    }
-
-    Frame Robot::GetActiveToolFrame() const {
-        return GetToolFrame(active_tool_frame_name_);
-    }
-
-    Frame Robot::GetActiveObjectFrame() const {
-        return GetObjectFrame(active_object_frame_name_);
-    }
-
-    Result Robot::LoadFrames(const std::string &path) {
-        if (path.empty()) {
-            if (log_ptr_) log_ptr_->error("加载坐标系 YAML 失败: path 为空");
-            return Result::IllegalParameter;
+    Result Robot::CaptureCalibrationPose(Frame& flange, std::vector<double>& joints, double& timestamp) const {
+        // 采集耗时短，持命令门闩及 FSM → Robot 锁；状态检查和采集为同一操作。
+        auto command_lock = LockToolState();
+        auto state_lock = impl_->lockState();
+        if (!CanChangeToolState()) return Result::CallingConflictError;
+        std::lock_guard<std::mutex> lock(mtx_);
+        if (!hardware || !model) return Result::CallingConflictError;
+        const auto q = hardware->GetPosition();
+        const auto velocity = hardware->GetVelocity();
+        if (q.rows() == 0 || velocity.rows() != q.rows()) return Result::ResourceUnavailable;
+        for (unsigned int i = 0; i < q.rows(); ++i) {
+            if (!std::isfinite(q(i)) || !std::isfinite(velocity(i)) || std::abs(velocity(i)) > 0.001)
+                return Result::CallingConflictError;
         }
-
-        try {
-            if (log_ptr_) log_ptr_->info("开始加载坐标系 YAML: {}", path);
-            YAML::Node root = YAML::LoadFile(path);
-            std::unordered_map<std::string, Frame> loaded_tools;
-            std::unordered_map<std::string, Frame> loaded_objects;
-            if (!yamlToFrameMap(root["tools"], loaded_tools)) {
-                if (log_ptr_) log_ptr_->error("加载坐标系 YAML 失败: tools 字段非法, path={}", path);
-                return Result::IllegalParameter;
-            }
-            if (!yamlToFrameMap(root["objects"], loaded_objects)) {
-                if (log_ptr_) log_ptr_->error("加载坐标系 YAML 失败: objects 字段非法, path={}", path);
-                return Result::IllegalParameter;
-            }
-
-            std::string active_tool = root["active_tool"].as<std::string>("");
-            std::string active_object = root["active_object"].as<std::string>("");
-            if (!active_tool.empty() && loaded_tools.find(active_tool) == loaded_tools.end()) {
-                if (log_ptr_) {
-                    log_ptr_->error("加载坐标系 YAML 失败: active_tool='{}' 不存在, path={}",
-                                    active_tool, path);
-                }
-                return Result::IllegalParameter;
-            }
-            if (!active_object.empty() && loaded_objects.find(active_object) == loaded_objects.end()) {
-                if (log_ptr_) {
-                    log_ptr_->error("加载坐标系 YAML 失败: active_object='{}' 不存在, path={}",
-                                    active_object, path);
-                }
-                return Result::IllegalParameter;
-            }
-
-            tool_frames_ = std::move(loaded_tools);
-            object_frames_ = std::move(loaded_objects);
-            active_tool_frame_name_ = std::move(active_tool);
-            active_object_frame_name_ = std::move(active_object);
-            if (log_ptr_) {
-                log_ptr_->info("坐标系 YAML 加载完成: path={}, tools={}, objects={}, active_tool='{}', active_object='{}'",
-                               path, tool_frames_.size(), object_frames_.size(),
-                               active_tool_frame_name_, active_object_frame_name_);
-            }
-            return Result::NoError;
-        } catch (const YAML::Exception &e) {
-            if (log_ptr_) log_ptr_->error("加载坐标系 YAML 失败: {} => {}", path, e.what());
-            return Result::ResourceUnavailable;
-        } catch (const std::exception &e) {
-            if (log_ptr_) log_ptr_->error("加载坐标系文件失败: {} => {}", path, e.what());
-            return Result::ResourceUnavailable;
-        }
-    }
-
-    Result Robot::SaveFrames(const std::string &path) const {
-        if (path.empty()) {
-            if (log_ptr_) log_ptr_->error("保存坐标系 YAML 失败: path 为空");
-            return Result::IllegalParameter;
-        }
-
-        YAML::Node root;
-        root["active_tool"] = active_tool_frame_name_;
-        root["active_object"] = active_object_frame_name_;
-        root["tools"] = frameMapToYaml(tool_frames_);
-        root["objects"] = frameMapToYaml(object_frames_);
-
-        std::ofstream out(path);
-        if (!out.is_open()) {
-            if (log_ptr_) log_ptr_->error("保存坐标系 YAML 失败: 无法打开文件 {}", path);
-            return Result::ResourceUnavailable;
-        }
-        out << root;
-        if (!out.good()) {
-            if (log_ptr_) log_ptr_->error("保存坐标系 YAML 失败: 写入失败 {}", path);
-            return Result::ResourceUnavailable;
-        }
-        if (log_ptr_) {
-            log_ptr_->info("坐标系 YAML 保存完成: path={}, tools={}, objects={}, active_tool='{}', active_object='{}'",
-                           path, tool_frames_.size(), object_frames_.size(),
-                           active_tool_frame_name_, active_object_frame_name_);
-        }
+        const auto result = model->ForwardKinematics(q, flange);
+        if (result != Result::NoError || !FrameRegistry::validFrame(flange)) return Result::FkCalcFail;
+        joints.resize(q.rows());
+        for (unsigned int i = 0; i < q.rows(); ++i) joints[i] = q(i);
+        timestamp = std::chrono::duration<double>(std::chrono::system_clock::now().time_since_epoch()).count();
         return Result::NoError;
     }
 
@@ -1620,6 +1426,7 @@ namespace rocos {
 
     Result Robot::MoveC(const Frame &pose_start, const Frame &center_frame,
                         double theta, double v_limit, double a_limit, double j_limit) {
+        auto command_lock = LockToolState();
         data_ready_callback_ = [this, pose_start, center_frame, theta, v_limit, a_limit, j_limit]() -> Result {
             auto new_motion = std::make_unique<MoveCircleOffline>(
                 pose_start, center_frame, theta, model.get(),
@@ -1632,8 +1439,8 @@ namespace rocos {
 
             Result rc = new_motion->Reset();
             if (rc != Result::NoError) {
-                log_ptr_->error(
-                    "MoveC(圆心角度) 规划失败: result={}, theta={}, velocity={}, acceleration={}, jerk={}, dt={}",
+                Logger::logCode(LogLevel::Error, "Robot", static_cast<int>(rc),
+                    "MoveC center-angle planning failed: result={}, angle={} rad, velocity={} m/s, acceleration={} m/s^2, jerk={} m/s^3, dt={} s.",
                     static_cast<int>(rc), theta, v_limit, a_limit, j_limit, dt_);
                 return rc;
             }
@@ -1648,7 +1455,7 @@ namespace rocos {
 
         if (!impl_->process_event(EventStartReq{})) {
             data_ready_callback_ = nullptr;  // 切换失败，清除无效回调
-            log_ptr_->error("MoveC(圆心角度) 请求被状态机拒绝: state={}, enabled={}, running={}",
+            log_ptr_->error("MoveC center-angle request rejected: state={}, enabled={}, running={}.",
                             GetStateString(), IsEnabled(), IsRunning());
             if (impl_->is(sml::state<class IDLE>)) return Result::NotEnabled;
             if (impl_->is(sml::state<class ERROR_STATE>)) return Result::Fatal;
@@ -1664,6 +1471,7 @@ namespace rocos {
     Result Robot::MoveC(const Frame &pose_start, const Frame &pose_via,
                         const Frame &pose_goal,
                         double v_limit, double a_limit, double j_limit) {
+        auto command_lock = LockToolState();
         data_ready_callback_ = [this, pose_start, pose_via, pose_goal, v_limit, a_limit, j_limit]() -> Result {
             auto new_motion = std::make_unique<MoveCircleOffline>(
                 pose_start, pose_via, pose_goal, model.get(),
@@ -1676,8 +1484,8 @@ namespace rocos {
 
             Result rc = new_motion->Reset();
             if (rc != Result::NoError) {
-                log_ptr_->error(
-                    "MoveC(三点) 规划失败: result={}, velocity={}, acceleration={}, jerk={}, dt={}",
+                Logger::logCode(LogLevel::Error, "Robot", static_cast<int>(rc),
+                    "MoveC three-point planning failed: result={}, velocity={} m/s, acceleration={} m/s^2, jerk={} m/s^3, dt={} s.",
                     static_cast<int>(rc), v_limit, a_limit, j_limit, dt_);
                 return rc;
             }
@@ -1692,7 +1500,7 @@ namespace rocos {
 
         if (!impl_->process_event(EventStartReq{})) {
             data_ready_callback_ = nullptr;  // 切换失败，清除无效回调
-            log_ptr_->error("MoveC(三点) 请求被状态机拒绝: state={}, enabled={}, running={}",
+            log_ptr_->error("MoveC three-point request rejected: state={}, enabled={}, running={}.",
                             GetStateString(), IsEnabled(), IsRunning());
             if (impl_->is(sml::state<class IDLE>)) return Result::NotEnabled;
             if (impl_->is(sml::state<class ERROR_STATE>)) return Result::Fatal;
@@ -1706,14 +1514,14 @@ namespace rocos {
         {
             std::lock_guard<std::mutex> lock(mtx_);
             if (!executor->CanPause()) {
-                log_ptr_->error("暂停请求被拒绝: 当前 motion 不支持暂停, state={}, motion_ptr={}",
+                log_ptr_->error("Pause rejected: current motion does not support pausing; state={}, motion_ptr={}.",
                                 GetStateString(), static_cast<const void*>(motion.get()));
                 return Result::FunctionNotSupported;
             }
         }
 
         if (!impl_->process_event(EventPauseReq{})) {
-            log_ptr_->error("当前状态无法执行暂停指令: state={}", GetStateString());
+            log_ptr_->error("Pause rejected in the current state: {}.", GetStateString());
             return Result::Fatal;
         }
 
@@ -1725,14 +1533,14 @@ namespace rocos {
         {
             std::lock_guard<std::mutex> lock(mtx_);
             if (!executor->CanStop()) {
-                log_ptr_->error("停止请求被拒绝: 当前 motion 不支持停止, state={}, motion_ptr={}",
+                log_ptr_->error("Stop rejected: current motion does not support stopping; state={}, motion_ptr={}.",
                                 GetStateString(), static_cast<const void*>(motion.get()));
                 return Result::FunctionNotSupported;
             }
         }
 
         if (!impl_->process_event(EventStopReq{})) {
-            log_ptr_->error("当前状态无法执行停止指令: state={}", GetStateString());
+            log_ptr_->error("Stop rejected in the current state: {}.", GetStateString());
             return Result::Fatal;
         }
         return Result::NoError;
@@ -1743,14 +1551,14 @@ namespace rocos {
         {
             std::lock_guard<std::mutex> lock(mtx_);
             if (!executor->CanResume()) {
-                log_ptr_->error("继续请求被拒绝: 当前 motion 不支持继续, state={}, motion_ptr={}",
+                log_ptr_->error("Resume rejected: current motion does not support resuming; state={}, motion_ptr={}.",
                                 GetStateString(), static_cast<const void*>(motion.get()));
                 return Result::FunctionNotSupported;
             }
         }
 
         if (!impl_->process_event(EventResumeReq{})) {
-            log_ptr_->error("当前状态无法执行恢复指令: state={}", GetStateString());
+            log_ptr_->error("Resume rejected in the current state: {}.", GetStateString());
             return Result::Fatal;
         }
         return Result::NoError;
@@ -1769,6 +1577,7 @@ namespace rocos {
                               double speed,
                               double timeout,
                               double dir_threshold) {
+        auto command_lock = LockToolState();
         KDL::Rotation R_base_frame = KDL::Rotation::Identity();
 
         switch (frame) {
@@ -1801,6 +1610,7 @@ namespace rocos {
 
     Result Robot::MoveJogging(const JogVec &direction, double speed,
                               double timeout, double dir_threshold) {
+        auto command_lock = LockToolState();
         // ── 分支 1：已有活跃 MoveJog → 旁路喂饭 ──
         {
             std::lock_guard<std::mutex> lock(mtx_);
@@ -1859,6 +1669,7 @@ namespace rocos {
 
     Result Robot::MoveNullJogging(const JntArray &intent_direction, double speed,
                                   double timeout, double dir_threshold) {
+        auto command_lock = LockToolState();
         // ── 分支 1：已有活跃 MoveNullJog → 旁路喂饭 ──
         {
             std::lock_guard<std::mutex> lock(mtx_);
@@ -1918,6 +1729,7 @@ namespace rocos {
 
     Result Robot::MoveSvdJogging(const std::vector<double> &dim_speeds,
                                  double timeout, double dir_threshold) {
+        auto command_lock = LockToolState();
         // ── 分支 1：已有活跃 MoveSvdJog → 旁路喂饭 ──
         {
             std::lock_guard<std::mutex> lock(mtx_);
@@ -1974,13 +1786,14 @@ namespace rocos {
     // ============================================================================
 
     Result Robot::SetServoMode(const std::string& mode_str) {
+        auto command_lock = LockToolState();
         MotionMode new_mode;
         if (mode_str == "joint") {
             new_mode = MotionMode::kJointPosition;
         } else if (mode_str == "cartesian") {
             new_mode = MotionMode::kCartesianPosition;
         } else {
-            log_ptr_->error("SetServoMode: 未知模式 '{}', 仅支持 joint / cartesian", mode_str);
+            log_ptr_->error("SetServoMode received unknown mode='{}'; supported modes are joint and cartesian.", mode_str);
             return Result::IllegalParameter;
         }
 
@@ -1993,11 +1806,11 @@ namespace rocos {
             if (servo) {
                 servo->SetMode(new_mode);
             } else {
-                log_ptr_->warn("SetServoMode: 当前 motion 不是 MoveServo 实例，无法动态更新模式");
+                log_ptr_->warn("SetServoMode cannot update the active motion: it is not a MoveServo instance.");
             }
         }
 
-        log_ptr_->info("伺服模式已设置为: {}", mode_str);
+        log_ptr_->info("Servo mode set to {}.", mode_str);
         return Result::NoError;
     }
 
@@ -2006,6 +1819,7 @@ namespace rocos {
     // ============================================================================
 
     Result Robot::MoveServoing(uint16_t port) {
+        auto command_lock = LockToolState();
         data_ready_callback_ = [this, port]() -> Result {
             auto servo = std::make_unique<MoveServo>(
                 hardware.get(), model.get(), port);
@@ -2023,7 +1837,7 @@ namespace rocos {
         };
 
         if (!impl_->process_event(EventServoReq{})) {
-            log_ptr_->error("启动伺服失败，端口号：{}", port);
+            log_ptr_->error("Servo receiver start failed: port={}.", port);
             data_ready_callback_ = nullptr;  // 切换失败，清除无效回调
             if (impl_->is(sml::state<class IDLE>)) return Result::NotEnabled;
             if (impl_->is(sml::state<class ERROR_STATE>)) return Result::Fatal;

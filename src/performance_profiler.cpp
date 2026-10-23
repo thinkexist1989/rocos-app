@@ -1,4 +1,5 @@
 #include "performance_profiler.hpp"
+#include "log_event.hpp"
 
 #include <iomanip>
 #include <iostream>
@@ -53,6 +54,8 @@ void PerformanceProfiler::MeasureStart(int32_t channel) {
   }
 
   measurement->start_time = Clock::now();
+  setRtLogMonotonicTime(std::chrono::duration_cast<std::chrono::microseconds>(
+      measurement->start_time.time_since_epoch()).count());
   measurement->is_running = true;
 }
 
@@ -67,6 +70,8 @@ void PerformanceProfiler::MeasureEnd(int32_t channel) {
   }
 
   const auto end_time = Clock::now();
+  setRtLogMonotonicTime(std::chrono::duration_cast<std::chrono::microseconds>(
+      end_time.time_since_epoch()).count());
   const auto elapsed_us = std::chrono::duration<double, std::micro>(
                               end_time - measurement->start_time)
                               .count();

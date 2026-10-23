@@ -48,6 +48,7 @@ robot:
   tip_link: tool
   joint_binding: bindings.yaml
   payload: load.yaml
+  frames: tools/calibration.yaml
 scripts: lua
 web_root: ../web
 )");
@@ -61,6 +62,7 @@ web_root: ../web
     CHECK(config.robot.urdf == (directory / "models/robot.urdf").string());
     CHECK(config.robot.joint_binding == (directory / "bindings.yaml").string());
     CHECK(config.robot.payload == (directory / "load.yaml").string());
+    CHECK(config.robot.frames == (directory / "tools/calibration.yaml").string());
     CHECK(config.scripts == (directory / "lua").string());
     CHECK(config.web_root == (directory.parent_path() / "web").string());
     CHECK(fs::current_path() == directory / "unrelated-cwd");
@@ -97,4 +99,36 @@ TEST_CASE("Repository startup config points to existing source resources") {
     CHECK(std::filesystem::is_regular_file(config.robot.payload));
     CHECK(std::filesystem::is_directory(config.scripts));
     CHECK(std::filesystem::is_directory(config.web_root));
+}
+
+TEST_CASE_FIXTURE(ConfigFixture, "Logging and diagnostics resolve paths and validate independent limits") {
+    auto config = load(R"(
+logging:
+  directory: diagnostic-logs
+  file_level: trace
+  console_level: critical
+  max_file_size_mib: 2
+  max_files: 3
+  flush_interval_ms: 20
+diagnostics:
+  host: 127.0.0.1
+  port: 8099
+  max_sse_clients: 2
+  max_downloads: 1
+)");
+    CHECK(config.logging.directory == (directory / "diagnostic-logs").string());
+    CHECK(config.logging.file_level == rocos::LogLevel::Trace);
+    CHECK(config.logging.console_level == rocos::LogLevel::Critical);
+    CHECK(config.logging.max_file_size == 2 * 1024 * 1024);
+    CHECK(config.logging.max_files == 3);
+    CHECK(config.diagnostics.port == 8099);
+    CHECK(config.diagnostics.max_sse_clients == 2);
+    for (auto yaml : {"logging: []", "logging: {directory: ''}", "logging: {file_level: error}",
+                      "logging: {console_level: unknown}", "logging: {max_file_size_mib: -1}",
+                      "logging: {max_files: 0}", "logging: {flush_interval_ms: 0}", "diagnostics: []",
+                      "diagnostics: {port: 8080}", "diagnostics: {port: 0}", "diagnostics: {max_sse_clients: 0}",
+                      "diagnostics: {max_downloads: 17}"}) {
+        CAPTURE(yaml);
+        CHECK_THROWS(load(yaml));
+    }
 }
