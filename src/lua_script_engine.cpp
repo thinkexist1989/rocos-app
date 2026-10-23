@@ -615,6 +615,12 @@ private:
             });
         robot_table_.set_function(
             "GetFlange", [this]() { return frameToTable(robot_.getFlange()); });
+        robot_table_.set_function(
+            "GetTcpPose", [this](sol::optional<std::string> tool_name) {
+                Frame tcp;
+                requireSuccess(robot_.GetTcpPose(tcp, tool_name.value_or("")), "GetTcpPose");
+                return frameToTable(tcp);
+            });
 
         // ===== 运动（阻塞，与 MoveJ/MoveL 一致） =====
         robot_table_.set_function(

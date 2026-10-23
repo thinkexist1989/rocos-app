@@ -90,6 +90,8 @@ class Robot {
 
     // --- 笛卡尔位姿 ---
     Frame flange;
+    Frame tcp;  // 基座到当前 TCP，与 flange 使用同一关节采样和注册表快照
+    bool tcp_valid{false};
     std::string active_tool_frame_name;
     std::string active_object_frame_name;
     Frame active_tool_frame;
@@ -241,6 +243,9 @@ class Robot {
   bool HasObjectFrame(const std::string& name) const;
   bool IsValidFrameName(const std::string& name) const;
   Result GetToolFrame(const std::string& name, Frame& frame) const;
+  /// 基座到 TCP 的实时位姿；空名称使用当前工具，无活动工具时为法兰。
+  /// 指定工具不存在或 FK 失败时返回错误，不改变输出或活动工具。
+  Result GetTcpPose(Frame& tcp, const std::string& tool_name = "") const;
   Result GetObjectFrame(const std::string& name, Frame& frame) const;
   Frame GetToolFrame(const std::string& name) const;
   Frame GetObjectFrame(const std::string& name) const;
@@ -382,12 +387,7 @@ class Robot {
 
   inline Frame getFlange() const {
     Frame flange;
-    if (!model || !hardware) return flange;
-
-    auto q = hardware->GetPosition();
-    if (model->ForwardKinematics(q, flange) != Result::NoError) {
-      return Frame();
-    }
+    ReadFlangePose(flange);
     return flange;
   }
 
@@ -411,6 +411,8 @@ class Robot {
 
  private:
 
+  Result ComputeFlangePose(const JntArray& joints, Frame& flange) const;
+  Result ReadFlangePose(Frame& flange) const;
   // void controlLoop();                        // 控制线程函数
   void startControlThread();
   void stopControlThread();

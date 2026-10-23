@@ -1,6 +1,6 @@
 # 六点法标定与工具管理
 
-Viz 的“IO 与设备 → 末端工具”提供真实工具列表、新增、编辑、重命名、删除和当前工具切换；“手动示教”也可进入工具管理。所有位姿均表示 **法兰到 TCP** 的变换。页面按全局长度/角度单位显示，HTTP 使用米和四元数（x、y、z、w），关节角为弧度。
+Viz 的“IO 与设备 → 末端工具”提供真实工具列表、新增、编辑、重命名、删除和当前工具切换；“手动示教”也可进入工具管理。工具列表中的位姿表示固定的 **法兰到 TCP** 变换。页面按全局长度/角度单位显示，HTTP 使用米和四元数（x、y、z、w），关节角为弧度。
 
 ## 六点采集顺序
 
@@ -12,6 +12,16 @@ Viz 的“IO 与设备 → 末端工具”提供真实工具列表、新增、�
 6. 检查结果后明确点击“保存为工具”。计算本身不写入工具表，也不自动启用工具；需要使用时再“设为当前工具”。重采集任一点会撤销旧结果，重新计算后才能保存。
 
 控制权改变、断开或切换控制器会清理本地草稿。控制器会话仅驻留内存，重启失效；最多保留最近 16 个会话。重新进入工具页会回读服务端会话，避免使用过期结果。标定结果必须结合真实工具和机器人精度验证；离线数学测试不能代替现场验收。
+
+## 法兰与实时 TCP 位姿
+
+`getFlange()` 保持返回基座到法兰的位姿。新增 C++ `Result GetTcpPose(Frame& tcp, const std::string& tool_name = "") const`，按 `T_base_tcp = T_base_flange * T_flange_tool` 合成，长度为米。省略或传空名称时使用当前活动工具；无活动工具时 TCP 就是法兰；指定名称不存在返回 ResourceUnavailable，不改变输出和活动工具。FK/反馈失败时明确返回错误，不将单位变换当作有效 TCP。
+
+`GET /api/robot/state` 新增 `tcp` 字段（基座到当前 TCP 的 Pose，失败为 null）；原 `flange` 及 `active_tool_frame` 的含义保持不变。快照中的关节位置、法兰和 TCP 使用同一关节采样，工具名称、偏置和 TCP 使用同一注册表快照。`GET /api/robot/tcp?name=tool1` 查询指定工具的实时 TCP，省略 name 使用当前工具，返回 `{pose, reference_frame: "base"}`；只读、不要求控制权、不续期，也不切换活动工具，运动时仍可查询。
+
+Lua 使用 `robot.GetTcpPose()` 或 `robot.GetTcpPose("tool1")` 取得同一计算结果，失败按现有 binding 规则抛出错误。`robot.GetFlange()` 保持原含义。
+
+Viz 顶部“显示坐标系”选择“工具”后显示 `tcp`；默认法兰显示保持不变。新版 App 的 `tcp: null` 会显示不可用，只有旧 App 完全缺少该字段时才在 Viz 兼容合成。工具轨迹和工具参考同样使用统一 TCP；显示切换不会激活工具或发送运动命令。运动 API 的既有目标位姿及 tool_name 语义保持不变。
 
 ## 保存与启动
 
@@ -32,6 +42,7 @@ Viz 的新增、编辑、重命名、删除和激活均发送 `persist: true`，
 | 操作 | 方法与路径 | 主要参数 |
 | --- | --- | --- |
 | 工具列表 | GET `/api/robot/tool_frames` | 返回 names、active、file_path |
+| 实时 TCP | GET `/api/robot/tcp?name=TCP` | name 可省略；返回基座到 TCP 的实时位姿，不改变活动工具 |
 | 查询工具 | GET `/api/robot/tool_frame?name=TCP` | 返回 name、frame |
 | 创建/编辑/重命名 | POST `/api/robot/tool_frame` | name、frame、persist；重命名传 previous_name，目标不能重名 |
 | 删除 | DELETE `/api/robot/tool_frame?name=TCP&persist=true` | 删除活动工具时清除活动选择 |

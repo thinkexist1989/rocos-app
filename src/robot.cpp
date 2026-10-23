@@ -717,11 +717,12 @@ namespace rocos {
         // 关节状态
         const int n = getJointNum();
         snap.joints.reserve(static_cast<size_t>(n));
+        const auto positions = hardware ? hardware->GetPosition() : JntArray();
         for (int i = 0; i < n; ++i) {
             RobotStateSnapshot::JointState js;
             js.id = i;
             js.name = getJointName(i);
-            js.position = getJointPosition(i);
+            js.position = static_cast<unsigned int>(i) < positions.rows() ? positions(i) : 0.0;
             js.velocity = getJointVelocity(i);
             js.torque = getJointTorque(i);
             js.load_torque = getJointLoadTorque(i);
@@ -730,7 +731,7 @@ namespace rocos {
         }
 
         // 法兰末端位姿
-        snap.flange = getFlange();
+        const auto flange_result = ComputeFlangePose(positions, snap.flange);
 
         // 激活的坐标系
         const auto frames = frames_.snapshot();
@@ -738,6 +739,8 @@ namespace rocos {
         snap.active_object_frame_name = frames->active_object;
         if (frames->tools.count(frames->active_tool)) snap.active_tool_frame = frames->tools.at(frames->active_tool);
         if (frames->objects.count(frames->active_object)) snap.active_object_frame = frames->objects.at(frames->active_object);
+        snap.tcp_valid = flange_result == Result::NoError &&
+                         FrameRegistry::resolveTcp(*frames, snap.flange, snap.tcp) == Result::NoError;
 
         // 硬件摘要
         snap.joint_num = n;
@@ -1353,6 +1356,30 @@ namespace rocos {
     bool Robot::HasToolFrame(const std::string& name) const { Frame frame; return frames_.get(name, true, frame) == Result::NoError; }
     bool Robot::HasObjectFrame(const std::string& name) const { Frame frame; return frames_.get(name, false, frame) == Result::NoError; }
     bool Robot::IsValidFrameName(const std::string& name) const { return FrameRegistry::validName(name); }
+    Result Robot::ComputeFlangePose(const JntArray& joints, Frame& flange) const {
+        if (!model) return Result::ResourceUnavailable;
+        if (joints.rows() == 0 || joints.rows() != static_cast<unsigned int>(model->GetJointNum()))
+            return Result::FkCalcFail;
+        for (unsigned int i = 0; i < joints.rows(); ++i)
+            if (!std::isfinite(joints(i))) return Result::FkCalcFail;
+        Frame value;
+        const auto result = model->ForwardKinematics(joints, value);
+        if (result != Result::NoError) return result;
+        if (!FrameRegistry::validFrame(value)) return Result::FkCalcFail;
+        flange = value;
+        return Result::NoError;
+    }
+    Result Robot::ReadFlangePose(Frame& flange) const {
+        if (!hardware) return Result::ResourceUnavailable;
+        return ComputeFlangePose(hardware->GetPosition(), flange);
+    }
+    Result Robot::GetTcpPose(Frame& tcp, const std::string& tool_name) const {
+        const auto frames = frames_.snapshot();
+        Frame flange;
+        const auto result = ReadFlangePose(flange);
+        if (result != Result::NoError) return result;
+        return FrameRegistry::resolveTcp(*frames, flange, tcp, tool_name);
+    }
     Result Robot::GetToolFrame(const std::string& name, Frame& frame) const { return frames_.get(name, true, frame); }
     Result Robot::GetObjectFrame(const std::string& name, Frame& frame) const { return frames_.get(name, false, frame); }
     Frame Robot::GetToolFrame(const std::string& name) const { Frame frame; frames_.get(name, true, frame); return frame; }

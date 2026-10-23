@@ -5,6 +5,7 @@
 #include <filesystem>
 #include <fstream>
 #include <thread>
+#include <limits>
 
 namespace {
 struct Fixture {
@@ -18,6 +19,36 @@ struct Fixture {
     ~Fixture() { std::filesystem::remove_all(directory); }
 };
 using rocos::Result;
+}
+
+TEST_CASE("TCP uses the selected immutable tool snapshot and rotates the complete tool transform") {
+    rocos::FrameRegistry registry;
+    const KDL::Frame flange(KDL::Rotation::RotZ(1.5707963267948966), KDL::Vector(1, 2, 3));
+    const KDL::Frame tool(KDL::Rotation::RotX(0.4), KDL::Vector(0.01, 0, 0));
+    const KDL::Frame other(KDL::Vector(0, 0.03, 0));
+    REQUIRE(registry.set("tool1", tool, true) == Result::NoError);
+    REQUIRE(registry.set("other", other, true) == Result::NoError);
+    KDL::Frame tcp;
+    REQUIRE(rocos::FrameRegistry::resolveTcp(*registry.snapshot(), flange, tcp) == Result::NoError);
+    CHECK(KDL::Equal(tcp, flange, 1e-12));
+    REQUIRE(registry.activate("tool1", true) == Result::NoError);
+    const auto selected = registry.snapshot();
+    REQUIRE(rocos::FrameRegistry::resolveTcp(*selected, flange, tcp) == Result::NoError);
+    CHECK(tcp.p.x() == doctest::Approx(1));
+    CHECK(tcp.p.y() == doctest::Approx(2.01));
+    CHECK(KDL::Equal(tcp.M, flange.M * tool.M, 1e-12));
+    REQUIRE(rocos::FrameRegistry::resolveTcp(*selected, flange, tcp, "other") == Result::NoError);
+    CHECK(KDL::Equal(tcp, flange * other, 1e-12));
+    CHECK(registry.snapshot()->active_tool == "tool1");
+    REQUIRE(registry.remove("tool1", true) == Result::NoError);
+    REQUIRE(rocos::FrameRegistry::resolveTcp(*selected, flange, tcp) == Result::NoError);
+    CHECK(KDL::Equal(tcp, flange * tool, 1e-12));
+    const auto before = tcp;
+    CHECK(rocos::FrameRegistry::resolveTcp(*registry.snapshot(), flange, tcp, "missing") == Result::ResourceUnavailable);
+    CHECK(rocos::FrameRegistry::resolveTcp(*selected, flange, tcp, "bad/name") == Result::IllegalParameter);
+    auto invalid = flange; invalid.p[0] = std::numeric_limits<double>::quiet_NaN();
+    CHECK(rocos::FrameRegistry::resolveTcp(*selected, invalid, tcp) == Result::FkCalcFail);
+    CHECK(KDL::Equal(tcp, before, 1e-12));
 }
 
 TEST_CASE_FIXTURE(Fixture, "Tools persist create edit activate remove and preserve object frames") {

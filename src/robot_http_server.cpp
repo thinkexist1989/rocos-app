@@ -179,6 +179,10 @@ RobotHttpServer::RobotHttpServer(Robot* robot, LuaScriptEngine* script_engine, i
     }
 
     frame_registry_ = robot ? &robot->frames_ : nullptr;
+    if (robot) state_snapshot_ = [robot] { return robot->GetRobotStateSnapshot(); };
+    tcp_pose_ = [robot](Frame& tcp, const std::string& name) {
+        return robot ? robot->GetTcpPose(tcp, name) : Result::ResourceUnavailable;
+    };
     tool_motion_busy_ = [robot] { return !robot || robot->IsMotionBusy(); };
     calibration_capture_ = [robot](ToolCalibrationSample& sample) {
         if (!robot) return Result::ResourceUnavailable;
@@ -275,6 +279,7 @@ void RobotHttpServer::registerRoutes() {
 
     // Robot state
     server_->Get("/api/robot/state", [this](auto& req, auto& res) { handleGetRobotState(req, res); });
+    server_->Get("/api/robot/tcp", [this](auto& req, auto& res) { handleGetTcpPose(req, res); });
     server_->Get("/api/robot/info", [this](auto& req, auto& res) { handleGetRobotInfo(req, res); });
     server_->Get("/api/robot/impedance", [this](auto& req, auto& res) { handleGetImpedance(req, res); });
     server_->Get("/api/robot/urdf", [this](auto& req, auto& res) { handleGetRobotModel(req, res); });
@@ -861,7 +866,8 @@ void RobotHttpServer::cleanExpiredTasks() {
 // ============================================================================
 
 void RobotHttpServer::handleGetRobotState(const httplib::Request& req, httplib::Response& res) {
-    auto snap = robot_->GetRobotStateSnapshot();
+    if (!state_snapshot_) { sendJson(res, false, -3001, "Robot state is unavailable"); return; }
+    const auto snap = state_snapshot_();
 
     nlohmann::json data;
     data["robot_state"] = snap.state_string;
@@ -889,6 +895,7 @@ void RobotHttpServer::handleGetRobotState(const httplib::Request& req, httplib::
 
     // 法兰末端位姿
     data["flange"] = frameToJson(snap.flange);
+    data["tcp"] = snap.tcp_valid ? frameToJson(snap.tcp) : nlohmann::json(nullptr);
 
     // 激活的坐标系
     data["active_tool_frame_name"] = snap.active_tool_frame_name;
@@ -903,6 +910,19 @@ void RobotHttpServer::handleGetRobotState(const httplib::Request& req, httplib::
     data["hw_state"] = hw;
 
     sendJson(res, true, 0, "ok", data);
+}
+
+void RobotHttpServer::handleGetTcpPose(const httplib::Request& req, httplib::Response& res) {
+    const auto name = req.get_param_value("name");
+    if (!name.empty() && !FrameRegistry::validName(name)) {
+        sendJson(res, false, 1001, "Invalid tool name"); return;
+    }
+    Frame tcp;
+    const auto result = tcp_pose_(tcp, name);
+    if (result != Result::NoError) {
+        sendJson(res, false, resultCode(result), "TCP query failed: check tool name and flange feedback"); return;
+    }
+    sendJson(res, true, 0, "ok", {{"pose", frameToJson(tcp)}, {"reference_frame", "base"}});
 }
 
 void RobotHttpServer::handleGetRobotInfo(const httplib::Request& req, httplib::Response& res) {

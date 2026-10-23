@@ -9,6 +9,22 @@ struct RobotHttpServerTestAccess {
                      std::function<Result(ToolCalibrationSample&)> capture,
                      std::function<bool()> busy) {
         server.frame_registry_ = &registry;
+        server.tcp_pose_ = [&registry, capture](Frame& tcp, const std::string& name) {
+            ToolCalibrationSample sample;
+            const auto result = capture(sample);
+            return result == Result::NoError ? FrameRegistry::resolveTcp(*registry.snapshot(), sample.flange, tcp, name) : result;
+        };
+        server.state_snapshot_ = [&registry, capture] {
+            Robot::RobotStateSnapshot state;
+            ToolCalibrationSample sample;
+            const auto read = capture(sample);
+            const auto frames = registry.snapshot();
+            state.flange = sample.flange;
+            state.active_tool_frame_name = frames->active_tool;
+            if (frames->tools.count(frames->active_tool)) state.active_tool_frame = frames->tools.at(frames->active_tool);
+            state.tcp_valid = read == Result::NoError && FrameRegistry::resolveTcp(*frames, state.flange, state.tcp) == Result::NoError;
+            return state;
+        };
         server.calibration_capture_ = std::move(capture);
         server.tool_motion_busy_ = std::move(busy);
         int port = server.server_->bind_to_any_port("127.0.0.1");
@@ -69,6 +85,37 @@ Json pose(double z = 0.15) {
     return {{"position", {{"x", 0}, {"y", 0}, {"z", z}}},
             {"orientation", {{"x", 0}, {"y", 0}, {"z", 0}, {"w", 1}}}};
 }
+}
+
+TEST_CASE_FIXTURE(Fixture, "TCP queries are read only and state preserves the flange and fixed tool offset") {
+    {
+        std::lock_guard<std::mutex> lock(capture_mutex);
+        next.flange = KDL::Frame(KDL::Rotation::RotZ(1.5707963267948966), KDL::Vector(1, 2, 3));
+    }
+    auto tcp = get("/api/robot/tcp");
+    REQUIRE(tcp["success"] == true);
+    CHECK(tcp["data"]["reference_frame"] == "base");
+    CHECK(tcp["data"]["pose"]["position"]["y"] == 2);
+    REQUIRE(post("/api/robot/tool_frame", {{"name", "tool1"}, {"frame", pose(0.1)}})["success"] == true);
+    REQUIRE(post("/api/robot/active_tool_frame", {{"name", "tool1"}})["success"] == true);
+    REQUIRE(post("/api/robot/tool_frame", {{"name", "other"}, {"frame", pose(0.2)}})["success"] == true);
+    busy = true;
+    CHECK(get("/api/robot/tcp")["data"]["pose"]["position"]["z"].get<double>() == doctest::Approx(3.1));
+    CHECK(get("/api/robot/tcp?name=other")["data"]["pose"]["position"]["z"].get<double>() == doctest::Approx(3.2));
+    const auto state = get("/api/robot/state")["data"];
+    CHECK(state["active_tool_frame_name"] == "tool1");
+    CHECK(state["flange"]["position"]["z"] == 3);
+    CHECK(state["active_tool_frame"]["position"]["z"].get<double>() == doctest::Approx(0.1));
+    CHECK(state["tcp"]["position"]["z"].get<double>() == doctest::Approx(3.1));
+    CHECK(get("/api/robot/tcp?name=missing")["code"] == -3001);
+    CHECK(get("/api/robot/tcp?name=bad%2Fname")["code"] == 1001);
+    {
+        std::lock_guard<std::mutex> lock(capture_mutex);
+        next.flange.M.data[0] = 2;
+    }
+    CHECK(get("/api/robot/tcp")["code"] == static_cast<int>(rocos::Result::FkCalcFail));
+    CHECK(get("/api/robot/state")["data"]["tcp"].is_null());
+    CHECK(get("/api/robot/tool_frames")["data"]["active"] == "tool1");
 }
 
 TEST_CASE_FIXTURE(Fixture, "Tool APIs enforce credentials and persist current tool management") {

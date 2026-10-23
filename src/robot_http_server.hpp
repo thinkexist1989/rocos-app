@@ -62,6 +62,7 @@ private:
 
     // ---- Robot State ----
     void handleGetRobotState(const httplib::Request& req, httplib::Response& res);
+    void handleGetTcpPose(const httplib::Request& req, httplib::Response& res);
     void handleGetRobotInfo(const httplib::Request& req, httplib::Response& res);
     void handleGetRobotModel(const httplib::Request& req, httplib::Response& res);
     void handleGetLinkMesh(const httplib::Request& req, httplib::Response& res);
@@ -231,6 +232,8 @@ private:
     const int control_ttl_seconds_;
     const std::string web_root_;
     FrameRegistry* frame_registry_{nullptr};
+    std::function<Robot::RobotStateSnapshot()> state_snapshot_;
+    std::function<Result(Frame&, const std::string&)> tcp_pose_;
     std::function<bool()> tool_motion_busy_;
     std::function<Result(ToolCalibrationSample&)> calibration_capture_;
     std::mutex calibration_mutex_;

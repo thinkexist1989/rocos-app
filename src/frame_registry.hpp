@@ -20,6 +20,9 @@ public:
     explicit FrameRegistry(std::string path = "frames.yaml");
     static bool validName(const std::string& name);
     static bool validFrame(const KDL::Frame& frame);
+    // 同一注册表快照下解析工具并计算基座到 TCP；空名称使用活动工具，无工具时为法兰。
+    static Result resolveTcp(const FrameRegistryState& state, const KDL::Frame& flange,
+                             KDL::Frame& tcp, const std::string& tool_name = "");
     std::shared_ptr<const FrameRegistryState> snapshot() const;
     std::vector<std::string> names(bool tool) const;
     Result get(const std::string& name, bool tool, KDL::Frame& frame) const;

@@ -32,6 +32,20 @@ bool FrameRegistry::validFrame(const KDL::Frame& frame) {
 std::shared_ptr<const FrameRegistryState> FrameRegistry::snapshot() const {
     return std::atomic_load(&state_);
 }
+Result FrameRegistry::resolveTcp(const FrameRegistryState& state, const KDL::Frame& flange,
+                                 KDL::Frame& tcp, const std::string& tool_name) {
+    if (!validFrame(flange)) return Result::FkCalcFail;
+    const auto& name = tool_name.empty() ? state.active_tool : tool_name;
+    if (name.empty()) { tcp = flange; return Result::NoError; }
+    if (!validName(name)) return Result::IllegalParameter;
+    const auto found = state.tools.find(name);
+    if (found == state.tools.end()) return Result::ResourceUnavailable;
+    if (!validFrame(found->second)) return Result::IllegalParameter;
+    const auto result = flange * found->second;
+    if (!validFrame(result)) return Result::FkCalcFail;
+    tcp = result;
+    return Result::NoError;
+}
 std::vector<std::string> FrameRegistry::names(bool tool) const {
     auto state = snapshot();
     const auto& frames = tool ? state->tools : state->objects;

@@ -237,3 +237,7 @@ if (load_result == rocos::Result::NoError) {
 `RUNNING/PAUSING/PAUSED/COMPLETED/FAILED/STOPPED`，退出前可调用 `Stop()`；析构函数也会停止并
 join worker。`LoadFile()` 只接受 scripts root 内的相对路径，并拒绝 `..` 或
 symlink 指向根目录之外的文件。
+
+## TCP 位姿只读查询
+
+`robot.GetFlange()` 返回基座到法兰的位姿；`robot.GetTcpPose()` 返回当前激活工具的 TCP 相对基座的实时位姿，`robot.GetTcpPose("tool1")` 可只读查询指定工具，不切换活动工具。未激活工具时默认查询返回法兰；指定工具不存在或 FK 失败会抛出带结果码的 Lua 错误。返回 Frame table 的格式与 `GetFlange()` 相同，长度为米。
