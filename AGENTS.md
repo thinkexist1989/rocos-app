@@ -28,6 +28,10 @@ Use C++17, RAII, and explicit ownership; prefer `std::unique_ptr`. Follow nearby
 
 Use the bundled `test/doctest.h`. Name suites `test/<feature>_test.cc` and register executables with `add_test` in `CMakeLists.txt`. Add regression cases for changed motion, controller, or API behavior; no numeric coverage threshold is configured. Some standalone tests are excluded from CTest. Hardware-enabling and robot-motion integration tests require an explicitly prepared hardware/simulator environment.
 
+## ROCOS API Source of Truth
+
+The online OpenAPI document in the Apifox MCP project "ROCOS API" is the sole authoritative source for ROCOS API definitions. For API implementation, integration, testing, documentation, or explanations, refresh and read that online specification and fetch the referenced resources needed for the task. No local API file, including `docs/rocos-API.yaml`, API design documents, return-code tables, or historical notes, overrides the online specification; local files are reference snapshots only. If Apifox cannot be accessed, state that the current contract could not be verified instead of treating local files as authoritative. Use source code to establish actual implementation behavior and explicitly identify any discrepancy with Apifox. Do not silently redefine the contract from the implementation or a local document.
+
 ## Commit & Pull Request Guidelines
 
 History commonly uses `feat:`, `fix:`, `docs:`, `chore:`, and `example:` prefixes. Prefer these with specific, imperative summaries. PRs should describe behavior changes, related issues, validation commands/results, and hardware or simulation assumptions. Include screenshots for UI changes. Update HTTP API documentation when routes or return codes change. Edit source configurations under `config/`, not generated copies in `build/bin/`.

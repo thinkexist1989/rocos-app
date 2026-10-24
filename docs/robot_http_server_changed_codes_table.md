@@ -33,7 +33,7 @@
 | 标定接口 (`handleCalibrationRun`) | 400 | 4004 | 无效 frame -> 标定类错误码 4004
 | 标定接口 (`handleCalibrationRun`) | 500 | 4002 | 标定计算失败 -> 4002
 
-本次变更已把 `src/robot_http_server.cc` 中的大部分短码替换为设计文档的四位业务码，并把未实现的 `/api/move/pathway` 在 OpenAPI 中标注为 Not Implemented（见 `config/rocos-API.yaml`）。
+上述历史变更曾把 `src/robot_http_server.cc` 中的大部分短码替换为设计文档的四位业务码，并把未实现的 `/api/move/pathway` 在旧 OpenAPI 中标注为 Not Implemented。2026-10-24 起，[OpenAPI](rocos-API.yaml) 已同步 Apifox 在线版本，该旧路径不在当前文档中；当前接口定义以 Apifox 为准。
 
 如果你希望，我可以：
 - 继续把剩余尚未替换的位置全部统一并运行构建验证（需要你允许我执行构建命令）；

@@ -104,7 +104,7 @@ Lua 脚本类（-6xxx）：
 
 ---
 
-本仓库状态：已将 `src/robot_http_server.cc` 中大量短码替换为设计的四位业务码（详见 `docs/robot_http_server_changed_codes_table.md`），并在 OpenAPI (`config/rocos-API.yaml`) 将 `/api/move/pathway` 标注为 Not Implemented（服务器返回业务码 `2004` 并在描述中注明）。
+历史记录：曾将 `src/robot_http_server.cc` 中大量短码替换为设计的四位业务码（详见 `docs/robot_http_server_changed_codes_table.md`），并在旧 OpenAPI 中将 `/api/move/pathway` 标注为 Not Implemented。2026-10-24 起，[OpenAPI](rocos-API.yaml) 已同步 Apifox 在线版本，该旧路径不在当前文档中；当前接口定义以 Apifox 为准。
 
 实现引用：`src/robot_http_server.cc`
 设计规范引用：`docs/http_api_design.md`

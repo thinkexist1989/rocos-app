@@ -24,12 +24,12 @@ cd build && ctest
 # 过滤到某一个 doctest 用例
 ./build/bin/unit_test --test-case="Hardware"
 
-# 运行控制器（默认仿真模式）
-./build/bin/rocosAppMain --sim=true --http_port=8080
-./build/bin/rocosAppMain --sim=false --id=0 --urdf=robot.urdf   # 真实硬件
+# 运行控制器（先准备配置所对应的硬件或仿真环境）
+./build/bin/rocosAppMain --config=config/config.yaml
+./build/bin/rocosAppMain --config=config/config.yaml --http_port=8080
 ```
 
-安装前缀为 `/opt/rocos/app`（库、头文件、配置）。配置文件（`*.urdf`、`*.yaml`）在构建时复制到 `build/bin/`，使可执行文件在运行时能找到它们。
+运行配置直接从指定路径加载，不在构建时复制到 `build/bin/`。`--config` 指定启动 YAML，文件内相对资源路径以该 YAML 所在目录为基准；当前入口没有 `--sim` 参数。
 
 测试使用 [doctest](test/doctest.h)（单头文件，已内置）。新增测试用例放入 [test/unit_test.cc](test/unit_test.cc)，或在 [CMakeLists.txt](CMakeLists.txt) 的 `## Testing ##` 段落下接入新的可执行目标。
 
@@ -49,17 +49,15 @@ cd build && ctest
 
 ### HTTP API
 
-对外接口是 HTTP/JSON，**而非** gRPC —— gRPC 已被移除（见 [docs/dev_log.md](docs/dev_log.md)）。`RobotHttpServer`（[include/rocos_app/robot_http_server.h](src/robot_http_server.hpp)）是一个自包含类，仅依赖 `Robot*`，基于内置的 [cpp-httplib](3rdparty/httplib/) 和 [nlohmann/json](3rdparty/json/)（均为单头文件）构建。它注册了约 30 个路由（机器人状态、控制、运动、单轴/多轴、拖拽示教、标定），在线程池上执行异步运动，并返回可通过 `GET /api/move/status` 查询的 `task_id`。
+ROCOS API 的唯一权威来源是 Apifox MCP 项目「ROCOS API」的在线 OpenAPI 文档。后续涉及 API 实现、联调、测试、文档或解释时，先刷新并读取在线版本，按需获取引用资源。所有本地 API 文件（包括 `docs/rocos-API.yaml`、设计文档、返回码表及历史记录）仅作参考副本，不作为接口定义依据。
 
-新增或修改路由时，请同步更新设计文档与返回码表：
-- [docs/http_api_design.md](docs/http_api_design.md) —— API 规范
-- [docs/http_api_return_codes.md](docs/http_api_return_codes.md) —— 业务码参考
+Apifox 不可访问时，应明确说明无法核实最新接口定义，不得把本地文件当作权威替代。源代码可用于核实实际实现行为；实现与在线定义不一致时，应明确指出差异，不得据此擅自改写接口约定。完整规则见 [AGENTS.md](AGENTS.md#rocos-api-source-of-truth)。
 
-业务错误码为 4 位数字且分段：`0` 成功，`1xxx` 参数错误，`2xxx` 运动/规划，`3xxx` 机器人状态，`4xxx` 标定，`5xxx` 异步任务。所有响应均带有 `Access-Control-Allow-Origin: *`。
+HTTP/JSON 服务实现位于 [src/robot_http_server.cpp](src/robot_http_server.cpp)，使用 cpp-httplib 和 nlohmann/json。具体路由、字段、鉴权及返回码以 Apifox 在线版本为准；本地文档更新应与在线定义保持一致。
 
 ### 配置
 
-[config/](config/) 存放控制器加载的运行时数据：`robot.urdf`（运动学模型）、`robotDH.yaml`（DH 参数，由 `DHParamsLoader` 解析）、`joint_impedance_control.yaml`、`calibration.yaml`，以及由 API 提供的 `models/` 网格文件。
+[config/](config/) 保留启动入口 `config.yaml`、默认硬件配置 `hardware_talon_config.yaml`、关节绑定 `joint_binding.yaml`、负载 `payload.yaml`、坐标系 `frames.yaml`，以及五份由 `hardware_test` 读取的硬件配置样例和 `scripts/` 下的 Lua 脚本。机器人 URDF 与网格位于 [models/](models/)，由启动配置选择。未接入代码的旧 YAML 已清理，OpenAPI 文档移至 [docs/rocos-API.yaml](docs/rocos-API.yaml)。加载入口、字段用途及清理记录见 [配置使用分析](docs/config_yaml_usage_analysis.md)。
 
 ### 第三方依赖
 
